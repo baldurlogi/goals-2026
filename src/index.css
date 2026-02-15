@@ -1,0 +1,129 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Tailwind v4: enable dark variant via .dark class */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-lg: var(--radius);
+}
+
+/* -----------------------------
+   Design tokens (Light)
+   (keep a decent light theme too)
+------------------------------ */
+:root {
+  --radius: 0.625rem;
+
+  --background: #ffffff;
+  --foreground: #111217;
+
+  --card: #ffffff;
+  --card-foreground: #111217;
+
+  --popover: #ffffff;
+  --popover-foreground: #111217;
+
+  --primary: #111217;
+  --primary-foreground: #f6f7fb;
+
+  --secondary: #f2f3f7;
+  --secondary-foreground: #111217;
+
+  --muted: #f2f3f7;
+  --muted-foreground: #5b6070;
+
+  --accent: #f2f3f7;
+  --accent-foreground: #111217;
+
+  --destructive: #ef4444;
+
+  --border: #e6e7ee;
+  --input: #e6e7ee;
+  --ring: #8b5cf6;
+}
+
+/* -----------------------------
+   Dark tokens (Life Strategy look)
+   Background ~ #0a0a0f
+   Cards ~ #13131a
+   Borders ~ #1e1e2e
+------------------------------ */
+.dark {
+  /* page */
+  --background: #0a0a0f;
+  --foreground: #e7e7ef;
+
+  /* surfaces */
+  --card: #13131a;
+  --card-foreground: #e7e7ef;
+
+  --popover: #13131a;
+  --popover-foreground: #e7e7ef;
+
+  /* brand / primary (keep neutral-ish; you can change to a “gold” if you want) */
+  --primary: #e7e7ef;
+  --primary-foreground: #0a0a0f;
+
+  /* subtle surface steps (used for tabs/sections) */
+  --secondary: #0f0f14;
+  --secondary-foreground: #e7e7ef;
+
+  --muted: #0f0f14;
+  --muted-foreground: #a6a7b3;
+
+  --accent: #1a1a2e;
+  --accent-foreground: #e7e7ef;
+
+  --destructive: #f87171;
+
+  --border: #1e1e2e;
+  --input: #1e1e2e;
+  --ring: #6366f1;
+}
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+  }
+
+  /* If you previously had @apply border-border and got the error,
+     this avoids relying on that utility in CSS while still giving
+     a consistent default border color. */
+  *, ::before, ::after {
+    border-color: var(--border);
+  }
+}
