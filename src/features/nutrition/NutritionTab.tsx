@@ -50,10 +50,39 @@ export function NutritionTab() {
                         <CardDescription className="text-xs">{nutritionTarget.note}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <MacroRow label="Calories" value={totals.cal} target={nutritionTarget.calories} unit="kcal" />
-                        <MacroRow label="Protein" value={totals.protein} target={nutritionTarget.protein} unit="g" />
-                        <MacroRow label="Carbs" value={totals.carbs} target={nutritionTarget.protein} unit="g" />
-                        <MacroRow label="Fat" value={totals.fat} target={nutritionTarget.protein} unit="g" />
+                        <MacroRow
+                            label="Calories"
+                            value={totals.cal}
+                            target={nutritionTarget.calories}
+                            unit="kcal"
+                            mode="max"
+                        />
+
+                        <MacroRow
+                            label="Protein"
+                            value={totals.protein}
+                            target={nutritionTarget.protein}
+                            unit="g"
+                            mode="min"
+                        />
+
+                        <MacroRow
+                            label="Carbs"
+                            value={totals.carbs}
+                            target={nutritionTarget.carbs}
+                            unit="g"
+                            mode="range"
+                            rangePct={0.10} // +/- 10% window
+                        />
+
+                        <MacroRow
+                            label="Fat"
+                            value={totals.fat}
+                            target={nutritionTarget.fat}
+                            unit="g"
+                            mode="range"
+                            rangePct={0.10}
+                        />
 
                         <Separator />
 

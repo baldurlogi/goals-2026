@@ -1,52 +1,51 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { GoalDefinition } from "../goalTypes"
+import { Link } from "react-router-dom";
+import type { GoalDefinition } from "../goalTypes";
 import { getGoalProgress } from "../goalUtils";
 import { Progress } from "@/components/ui/progress";
-import { StepChecklist } from "./StepChecklist";
 import { Button } from "@/components/ui/button";
 
 type Props = {
-    goal: GoalDefinition;
-    doneMap?: Record<string, boolean>;
-    onToggleStep: (stepId: string) => void;
-    onReset: () => void;
+  goal: GoalDefinition;
+  doneMap?: Record<string, boolean>;
 };
 
-export function GoalCard({ goal, doneMap, onToggleStep, onReset }: Props) {
-    const { pct, doneCount, total } = getGoalProgress(goal, doneMap);
+export function GoalCard({ goal, doneMap }: Props) {
+  const { pct, doneCount, total } = getGoalProgress(goal, doneMap);
 
-    return (
-        <Card>
-            <CardHeader className="space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <CardTitle className="text-base">
-                            <span className="mr-2">{goal.emoji ?? "🎯"}</span>
-                            {goal.title}
-                        </CardTitle>
-                        {goal.subtitle ? <p className="text-sm text-muted-foreground">{goal.subtitle}</p> : null}
-                    </div>
+  return (
+    <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{goal.emoji}</span>
+            <h3 className="text-base font-semibold">{goal.title}</h3>
+          </div>
 
-                    <div className="text-right">
-                        <div className="text-sm font-semibold">{pct}%</div>
-                        <div className="text-xs text-muted-foreground">
-                            {doneCount}/{total}
-                        </div>
-                    </div>
-                </div>
+          <p className="text-sm text-muted-foreground">{goal.subtitle}</p>
+          <p className="text-xs text-muted-foreground mt-1 capitalize">
+            Priority: {goal.priority}
+          </p>
+        </div>
 
-                <Progress value={pct} />
-            </CardHeader>
+        <div className="text-right">
+          <div className="text-sm font-semibold">{doneCount}/{total}</div>
+          <div className="text-xs text-muted-foreground">steps</div>
+        </div>
+      </div>
 
-            <CardContent className="space-y-3">
-                <StepChecklist steps={goal.steps} doneMap={doneMap} onToggle={onToggleStep} />
-        
-                    <div className="flex justify-end">
-                        <Button variant="outline" size="sm" onClick={onReset}>
-                            Reset goal
-                        </Button>
-                    </div>
-            </CardContent>
-        </Card>
-    );
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Progress</span>
+          <span>{pct}%</span>
+        </div>
+        <Progress value={pct} className="h-2" />
+      </div>
+
+      <div className="flex justify-end pt-1">
+        <Button asChild variant="secondary">
+          <Link to={`/goals/${goal.id}`}>View details</Link>
+        </Button>
+      </div>
+    </div>
+  );
 }
