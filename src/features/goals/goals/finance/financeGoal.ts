@@ -1,8 +1,9 @@
 import type { GoalDefinition } from "../../goalTypes";
 
 
+
 export const financeGoal: GoalDefinition = {
-    id: "financial-savings",
+    id: "finance",
     title: "Save 75,000 DKK",
     subtitle: "Build fund for US grad school applications + moving",
     emoji: "💰",

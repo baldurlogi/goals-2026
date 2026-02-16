@@ -20,20 +20,15 @@ function TabLink({ to, children }: { to: string; children: React.ReactNode }) {
 
 export default function DailyPlanLayout() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* keep your DailyPlanHeader here OR in AppLayout (just not twice) */}
-      {/* <DailyPlanHeader /> */}
+    <div className="space-y-6">
+      <div className="flex w-full gap-2 rounded-lg border bg-card p-2">
+        <TabLink to="/daily-plan/nutrition">🥗 Nutrition</TabLink>
+        <TabLink to="/daily-plan/schedule">📅 Schedule</TabLink>
+        <TabLink to="/daily-plan/reading">📖 Reading</TabLink>
+        <TabLink to="/daily-plan/goals">🎯 Goals</TabLink>
+      </div>
 
-      <main className="container mx-auto max-w-5xl px-4 py-6 space-y-6">
-        <div className="flex w-full gap-2 rounded-lg border bg-card p-2">
-          <TabLink to="/daily-plan/nutrition">🥗 Nutrition</TabLink>
-          <TabLink to="/daily-plan/schedule">📅 Schedule</TabLink>
-          <TabLink to="/daily-plan/reading">📖 Reading</TabLink>
-          <TabLink to="/daily-plan/goals">🎯 Goals</TabLink>
-        </div>
-
-        <Outlet />
-      </main>
+      <Outlet />
     </div>
   );
 }
