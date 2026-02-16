@@ -10,6 +10,7 @@ import { GoalsTab } from "@/features/goals/GoalsTab";
 
 import { GoalDetailPage } from "@/features/goals/GoalsDetailPage";
 
+
 export default function App() {
   return (
     <BrowserRouter>

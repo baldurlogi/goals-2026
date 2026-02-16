@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import type { GoalStep } from "../../../goalTypes";
+import type { GoalStep } from "@/features/goals/goalTypes";
 
 type Bucket = "overdue" | "upcoming" | "later" | "ongoing" | "undated";
 
