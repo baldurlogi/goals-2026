@@ -14,7 +14,7 @@ import { ReadingGoalPage } from "./goals/reading/ReadingGoalPage";
 import { SkincareGoalPage } from "./goals/skincare/SkincareGoalPage";
 import { TravelPlanningGoalPage } from "./goals/travel-planning/TravelPlanningGoalPage";
 import { UniversityGoalPage } from "./goals/university/UniversityGoalPage";
-// import { YoutubeChannelGoalPage } from "./goals/youtube-channel/YoutubeChannelGoalPage";
+import { YouTubeChannelGoalPage } from "./goals/youtube-channel/YoutubeChannelGoalPage";
 
 
 
@@ -29,7 +29,7 @@ import { readingGoal } from "./goals/reading/readingGoal";
 import { skincareGoal } from "./goals/skincare/skincareGoal";
 import { travelPlanningGoal } from "./goals/travel-planning/travelPlanningGoal";
 import { universityGoal } from "./goals/university/universityGoal";
-// import { youtubeChannelGoal } from "./goals/youtube-channel/youtubeChannelGoal";
+import { youtubeChannelGoal } from "./goals/youtube-channel/youtubeChannelGoal";
 
 
 
@@ -49,7 +49,7 @@ export function GoalDetailPage() {
   if (goalId === skincareGoal.id) return <SkincareGoalPage />;
   if (goalId === travelPlanningGoal.id) return <TravelPlanningGoalPage />;
   if (goalId === universityGoal.id) return <UniversityGoalPage />;
-  // if (goalId === youtubeChannelGoal.id) return <YoutubeChannelGoalPage />;
+  if (goalId === youtubeChannelGoal.id) return <YouTubeChannelGoalPage />;
 
   // ✅ Fallback: generic page for everything else
   const goal = useMemo(
