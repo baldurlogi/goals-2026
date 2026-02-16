@@ -13,7 +13,7 @@ import { MarathonGoalPage } from "./goals/marathon/MarathonGoalPage";
 import { ReadingGoalPage } from "./goals/reading/ReadingGoalPage";
 import { SkincareGoalPage } from "./goals/skincare/SkincareGoalPage";
 import { TravelPlanningGoalPage } from "./goals/travel-planning/TravelPlanningGoalPage";
-// import { UniversityGoalPage } from "./goals/university/UniversityGoalPage";
+import { UniversityGoalPage } from "./goals/university/UniversityGoalPage";
 // import { YoutubeChannelGoalPage } from "./goals/youtube-channel/YoutubeChannelGoalPage";
 
 
@@ -28,7 +28,7 @@ import { marathonGoal } from "./goals/marathon/marathonGoal";
 import { readingGoal } from "./goals/reading/readingGoal";
 import { skincareGoal } from "./goals/skincare/skincareGoal";
 import { travelPlanningGoal } from "./goals/travel-planning/travelPlanningGoal";
-// import { universityGoal } from "./goals/university/universityGoal";
+import { universityGoal } from "./goals/university/universityGoal";
 // import { youtubeChannelGoal } from "./goals/youtube-channel/youtubeChannelGoal";
 
 
@@ -48,7 +48,7 @@ export function GoalDetailPage() {
   if (goalId === readingGoal.id) return <ReadingGoalPage />;
   if (goalId === skincareGoal.id) return <SkincareGoalPage />;
   if (goalId === travelPlanningGoal.id) return <TravelPlanningGoalPage />;
-  // if (goalId === universityGoal.id) return <UniversityGoalPage />;
+  if (goalId === universityGoal.id) return <UniversityGoalPage />;
   // if (goalId === youtubeChannelGoal.id) return <YoutubeChannelGoalPage />;
 
   // ✅ Fallback: generic page for everything else
