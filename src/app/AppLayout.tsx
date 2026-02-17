@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import { DailyPlanHeader } from "@/app/DailyPlan/DailyPlanHeader";
+import { DailyPlanHeader } from "@/app/daily-plan/DailyPlanHeader";
 
 export function AppLayout() {
   return (

@@ -1,3 +1,5 @@
+import type { ComponentType } from "react";
+
 export interface GoalStep {
   id: string;
   label: string;
@@ -14,4 +16,11 @@ export interface GoalDefinition {
   emoji: string;
   priority: "high" | "medium" | "low";
   steps: GoalStep[];
+}
+
+export type GoalPageProps = { goalId?: string };
+
+export type GoalModule = {
+  goal: GoalDefinition;
+  Page: ComponentType<GoalPageProps>;
 }

@@ -40,15 +40,24 @@ export function ReadingNowCard({ stats }: { stats: ReadingStats }) {
 
                 <Separator />
 
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-sm text-muted-foreground">
-                        At <span className="font-medium text-foreground">{stats.dailyGoalPages}</span> pages
-                        <span className="font-medium text-foreground">{stats.pagesLeft}</span> pages
+                <div className="mt-4 flex items-end justify-between gap-4">
+                    <div className="min-w-0">
+                        <div className="text-sm text-muted-foreground">Pages left</div>
+                        <div className="text-lg font-semibold tabular-nums">
+                        {stats.pagesLeft}
+                        </div>
                     </div>
 
-                    <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                    <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Daily goal</div>
+                        <div className="text-lg font-semibold tabular-nums">
+                        {stats.dailyGoalPages}/day
+                        </div>
+                    </div>
+
+                    <div className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white tabular-nums">
                         ~{stats.daysToFinishCurrent} days
-                    </Badge>
+                    </div>
                 </div>
             </CardContent>
         </Card>

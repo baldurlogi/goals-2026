@@ -5,32 +5,43 @@ export type BookProgress = {
     totalPages: number;
 };
 
+export type UpNextBook = {
+  title: string;
+  author: string;
+  totalPages: number;
+};
+
+export type CompletedBook = UpNextBook & {
+  finishedAt: string; // ISO
+};
+
 export type ReadingPlan = {
-    current: BookProgress;
-    next?: Omit<BookProgress, "currentPage">;
-    dailyGoalPages: number;
+  current: BookProgress;
+  next?: Omit<BookProgress, "currentPage">;
+  dailyGoalPages: number;
 };
 
 export type ReadingStats = ReadingPlan & {
-    pct: number;
-    pagesLeft: number;
-    daysToFinishCurrent: number;
-    daysToFinishNext?: number;
+  pct: number;
+  pagesLeft: number;
+  daysToFinishCurrent: number;
+  daysToFinishNext?: number;
 };
 
 export type ReadingInputs = {
-    current: {
-        title: string;
-        author: string;
-        currentPage: string;
-        totalPages: string;
-    };
-    next?: {
-        title: string;
-        author: string;
-        totalPages: string;
-    };
-    dailyGoalPages: string;
+  current: {
+    title: string;
+    author: string;
+    currentPage: string;
+    totalPages: string;
+  };
+  upNext: Array<{
+    title: string;
+    author: string;
+    totalPages: string;
+  }>;
+  completed: CompletedBook[];
+  dailyGoalPages: string;
 };
 
 export type ReadingFieldPath =
@@ -38,7 +49,4 @@ export type ReadingFieldPath =
   | "current.author"
   | "current.currentPage"
   | "current.totalPages"
-  | "dailyGoalPages"
-  | "next.title"
-  | "next.author"
-  | "next.totalPages";
+  | "dailyGoalPages";

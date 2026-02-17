@@ -1,4 +1,5 @@
 import React from "react";
+import { readJson, writeJson } from "@/lib/storage";
 
 type DoneState = Record<string, Record<string, boolean>>;
 
@@ -13,14 +14,8 @@ type Action =
 const STORAGE_KEY = "daily-life:goals:v1";
 
 function loadInitialState(): GoalsState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { done: {} };
-    const parsed = JSON.parse(raw) as GoalsState;
-    return parsed?.done ? parsed : { done: {} };
-  } catch {
-    return { done: {} };
-  }
+  const parsed = readJson<GoalsState | null>(STORAGE_KEY, null);
+  return parsed?.done ? parsed : { done: {} };
 }
 
 function reducer(state: GoalsState, action: Action): GoalsState {
@@ -52,11 +47,7 @@ export function GoalsStoreProvider({ children }: { children: React.ReactNode }) 
   const [state, dispatch] = React.useReducer(reducer, undefined, loadInitialState);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // ignore storage errors
-    }
+    writeJson(STORAGE_KEY, state);
   }, [state]);
 
   return (
@@ -68,8 +59,6 @@ export function GoalsStoreProvider({ children }: { children: React.ReactNode }) 
 
 export function useGoalsStore() {
   const ctx = React.useContext(GoalsStoreContext);
-  if (!ctx) {
-    throw new Error("useGoalsStore must be used inside GoalsStoreProvider");
-  }
+  if (!ctx) throw new Error("useGoalsStore must be used inside GoalsStoreProvider");
   return ctx;
 }

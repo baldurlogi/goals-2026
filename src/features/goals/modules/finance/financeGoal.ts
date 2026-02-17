@@ -1,6 +1,4 @@
-import type { GoalDefinition } from "../../goalTypes";
-
-
+import type { GoalDefinition } from "@/features/goals/goalTypes";
 
 export const financeGoal: GoalDefinition = {
     id: "finance",

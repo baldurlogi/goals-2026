@@ -1,51 +1,48 @@
 import { useGoalsStore } from "../../goalStore";
-import { financeGoal } from "./financeGoal";
+import { freelanceGoal } from "./freelanceGoal";
 
 import { GoalPageHeader } from "@/features/goals/components/GoalPageHeader";
 import { StepsCard } from "@/features/goals/components/StepsCard";
 import { TimelineCard } from "@/features/goals/components/TimelineCard";
 
-import { SavingsCard } from "./components/SavingsCard";
-import { ExpenseTrackerCard } from "./components/ExpenseTrackerCard";
-import { SpendingDonutCard } from "./components/SpendingDonutCard";
+import { RevenueCard } from "./components/RevenueCard";
+import { PipelineCard } from "./components/PipelineCard";
+import { SaaSStageCard } from "./components/SaaSStageCard";
 
-export function FinanceGoalPage() {
+export function FreelanceGoalPage() {
   const { state, dispatch } = useGoalsStore();
 
-  const goalId = financeGoal.id;
+  const goalId = freelanceGoal.id;
   const doneMap = state.done[goalId] ?? {};
 
   return (
     <div className="space-y-6">
       <GoalPageHeader
-        goal={financeGoal}
+        goal={freelanceGoal}
         doneMap={doneMap}
         onReset={() => dispatch({ type: "resetGoal", goalId })}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left: steps + timeline */}
         <div className="lg:col-span-2 space-y-6">
           <StepsCard
             goalId={goalId}
-            goalTitle={financeGoal.title}
-            steps={financeGoal.steps}
+            goalTitle={freelanceGoal.title}
+            steps={freelanceGoal.steps}
             doneMap={doneMap}
-            onToggle={(stepId) =>
-              dispatch({ type: "toggleStep", goalId, stepId })
-            }
+            onToggle={(stepId) => dispatch({ type: "toggleStep", goalId, stepId })}
             heightClassName="h-[640px]"
           />
 
-          <TimelineCard steps={financeGoal.steps} doneMap={doneMap} />
+          <TimelineCard steps={freelanceGoal.steps} doneMap={doneMap} />
         </div>
 
+        {/* Right: goal-specific widgets */}
         <div className="lg:col-span-1 space-y-6">
-          <SavingsCard goalId={goalId} target={75000} currency="DKK" />
-          <ExpenseTrackerCard goalId={goalId} />
-        </div>
-
-        <div className="lg:col-span-3">
-          <SpendingDonutCard goalId={goalId} />
+          <RevenueCard goalId={goalId} />
+          <PipelineCard goalId={goalId} />
+          <SaaSStageCard goalId={goalId} />
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GoalsStoreProvider } from "@/features/goals/goalStore";
 import { AppLayout } from "@/app/AppLayout";
 
-import DailyPlanLayout from "@/app/DailyPlan/DailyPlanLayout";
+import DailyPlanLayout from "@/app/daily-plan/DailyPlanLayout";
 import { NutritionTab } from "@/features/nutrition/NutritionTab";
 import { ScheduleTab } from "@/features/schedule/ScheduleTab";
 import { ReadingTab } from "@/features/reading/ReadingTab";

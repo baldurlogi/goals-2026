@@ -1,3 +1,5 @@
+import { readJson, writeJson } from "@/lib/storage";
+
 export type FinanceCategoryId =
   | "rent"
   | "subscriptions"
@@ -11,13 +13,13 @@ export type FinanceCategoryId =
 export type FinanceCategory = {
   id: FinanceCategoryId;
   name: string;
-  budget: number; // DKK
-  spent: number;  // DKK
+  budget: number;
+  spent: number;
 };
 
 export type FinanceMonthState = {
-  month: string;     // YYYY-MM
-  income: number;    // DKK
+  month: string; // YYYY-MM
+  income: number;
   categories: FinanceCategory[];
 };
 
@@ -58,37 +60,28 @@ function storageKey(goalId: string, month: string) {
 
 export function loadFinanceMonth(goalId: string, month: string): FinanceMonthState {
   const key = storageKey(goalId, month);
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return defaultFinanceState(month);
+  const parsed = readJson<Partial<FinanceMonthState> | null>(key, null);
+  if (!parsed) return defaultFinanceState(month);
 
-    const parsed = JSON.parse(raw) as Partial<FinanceMonthState>;
-    const base = defaultFinanceState(month);
+  const base = defaultFinanceState(month);
+  const categoriesById = new Map(base.categories.map((c) => [c.id, c]));
 
-    const categoriesById = new Map(base.categories.map((c) => [c.id, c]));
-    (parsed.categories ?? []).forEach((c) => {
-      if (!c?.id) return;
-      const existing = categoriesById.get(c.id as FinanceCategoryId);
-      if (!existing) return;
-      existing.budget = Number(c.budget ?? existing.budget) || 0;
-      existing.spent = Number(c.spent ?? existing.spent) || 0;
-    });
+  (parsed.categories ?? []).forEach((c) => {
+    if (!c?.id) return;
+    const existing = categoriesById.get(c.id as FinanceCategoryId);
+    if (!existing) return;
+    existing.budget = Number(c.budget ?? existing.budget) || 0;
+    existing.spent = Number(c.spent ?? existing.spent) || 0;
+  });
 
-    return {
-      month,
-      income: Number(parsed.income ?? base.income) || 0,
-      categories: base.categories,
-    };
-  } catch {
-    return defaultFinanceState(month);
-  }
+  return {
+    month,
+    income: Number(parsed.income ?? base.income) || 0,
+    categories: base.categories,
+  };
 }
 
 export function saveFinanceMonth(goalId: string, state: FinanceMonthState) {
   const key = storageKey(goalId, state.month);
-  try {
-    localStorage.setItem(key, JSON.stringify(state));
-  } catch {
-    // ignore storage errors
-  }
+  writeJson(key, state);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -7,8 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   getMonthKey,
   shiftMonth,
-  loadFinanceMonth,
-  saveFinanceMonth,
+  defaultFinanceState,
   type FinanceMonthState,
   type FinanceCategoryId,
 } from "../financeStorage";
@@ -35,22 +34,13 @@ function monthLabel(ym: string) {
 
 export function ExpenseTrackerCard(props: {
   goalId: string;
+  month: string;
+  setMonth: (m: string) => void;
+  data: FinanceMonthState;
+  setData: Dispatch<SetStateAction<FinanceMonthState>>;
   className?: string;
 }) {
-  const { goalId, className } = props;
-
-  const [month, setMonth] = useState(() => getMonthKey());
-  const [data, setData] = useState<FinanceMonthState>(() => loadFinanceMonth(goalId, month));
-
-  // reload when month changes
-  useEffect(() => {
-    setData(loadFinanceMonth(goalId, month));
-  }, [goalId, month]);
-
-  // persist on change
-  useEffect(() => {
-    saveFinanceMonth(goalId, data);
-  }, [goalId, data]);
+  const { goalId, month, setMonth, data, setData, className } = props;
 
   const totals = useMemo(() => {
     const totalSpent = data.categories.reduce((acc, c) => acc + (c.spent || 0), 0);
@@ -63,7 +53,10 @@ export function ExpenseTrackerCard(props: {
     setData((prev) => ({ ...prev, income: toNumber(v) }));
   }
 
-  function updateCategory(id: FinanceCategoryId, patch: Partial<{ budget: number; spent: number }>) {
+  function updateCategory(
+    id: FinanceCategoryId,
+    patch: Partial<{ budget: number; spent: number }>
+  ) {
     setData((prev) => ({
       ...prev,
       categories: prev.categories.map((c) =>
@@ -88,9 +81,8 @@ export function ExpenseTrackerCard(props: {
   }
 
   function resetMonth() {
-    setData(loadFinanceMonth(goalId, month)); // reload (in case you want a "true reset", you can set defaultFinanceState)
-    // If you want HARD reset uncomment:
-    // setData(defaultFinanceState(month));
+    // Hard reset this month back to defaults
+    setData(defaultFinanceState(month));
   }
 
   return (
@@ -121,14 +113,13 @@ export function ExpenseTrackerCard(props: {
         <div className="grid gap-2">
           <div className="text-sm font-medium">Income (net)</div>
           <Input
+            key={`income-${month}`}
             inputMode="numeric"
-            placeholder="e.g. 35,000"
+            placeholder="e.g. 35.000"
             defaultValue={data.income ? String(data.income) : ""}
             onBlur={(e) => updateIncome(e.target.value)}
           />
-          <div className="text-xs text-muted-foreground">
-            Tip: type amount and click outside to save.
-          </div>
+          <div className="text-xs text-muted-foreground">Tip: type amount and click outside to save.</div>
         </div>
 
         <div className="rounded-xl border p-4">
@@ -149,15 +140,17 @@ export function ExpenseTrackerCard(props: {
             </div>
           </div>
 
-          {/* overall budget bar (spent vs budget) */}
           {totals.totalBudget > 0 ? (
             <div className="mt-3 space-y-1.5">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
                   Budget usage: {formatDkk(totals.totalSpent)}/{formatDkk(totals.totalBudget)} DKK
                 </span>
-                <span>{Math.round(clamp((totals.totalSpent / totals.totalBudget) * 100, 0, 999))}%</span>
+                <span>
+                  {Math.round(clamp((totals.totalSpent / totals.totalBudget) * 100, 0, 999))}%
+                </span>
               </div>
+
               <Progress
                 value={clamp((totals.totalSpent / totals.totalBudget) * 100, 0, 100)}
                 className="h-2"
@@ -208,6 +201,7 @@ export function ExpenseTrackerCard(props: {
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Budget</div>
                     <Input
+                      key={`budget-${month}-${c.id}`}
                       inputMode="numeric"
                       placeholder="0"
                       defaultValue={c.budget ? String(c.budget) : ""}
@@ -218,6 +212,7 @@ export function ExpenseTrackerCard(props: {
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Spent</div>
                     <Input
+                      key={`spent-${month}-${c.id}`}
                       inputMode="numeric"
                       placeholder="0"
                       defaultValue={c.spent ? String(c.spent) : ""}
@@ -234,6 +229,7 @@ export function ExpenseTrackerCard(props: {
                       </span>
                       <span>{Math.round((c.spent / c.budget) * 100)}%</span>
                     </div>
+
                     <Progress
                       value={pct}
                       className="h-2"
@@ -241,27 +237,15 @@ export function ExpenseTrackerCard(props: {
                     />
                   </div>
                 ) : (
-                  <div className="text-xs text-muted-foreground">
-                    Set a budget to track progress.
-                  </div>
+                  <div className="text-xs text-muted-foreground">Set a budget to track progress.</div>
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 50)}>
-                    +50
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 100)}>
-                    +100
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 250)}>
-                    +250
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 500)}>
-                    +500
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => quickAdd(c.id, -100)}>
-                    −100
-                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 50)}>+50</Button>
+                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 100)}>+100</Button>
+                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 250)}>+250</Button>
+                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 500)}>+500</Button>
+                  <Button variant="ghost" size="sm" onClick={() => quickAdd(c.id, -100)}>−100</Button>
                 </div>
               </div>
             );
@@ -269,7 +253,6 @@ export function ExpenseTrackerCard(props: {
         </div>
       </div>
 
-      {/* Footer hint */}
       <div className="text-xs text-muted-foreground">
         Leftover = income − total spent. Use it to decide how much to transfer into savings.
       </div>
