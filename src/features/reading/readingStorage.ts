@@ -1,6 +1,15 @@
+// src/features/reading/readingStorage.ts
 import type { ReadingInputs } from "./readingTypes";
 
 const STORAGE_KEY = "daily-life:reading:v2";
+
+// ✅ add this
+export const READING_CHANGED_EVENT = "daily-life:reading:changed";
+function emitReadingChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(READING_CHANGED_EVENT));
+  }
+}
 
 export const DEFAULT_READING_INPUTS: ReadingInputs = {
   current: { title: "", author: "", currentPage: "", totalPages: "" },
@@ -23,7 +32,6 @@ export function loadReadingInputs(): ReadingInputs {
       };
     }
 
-    // ---- Migration from old v1 key (current + next?) ----
     const oldRaw = localStorage.getItem("daily-life:reading:v1");
     if (!oldRaw) return DEFAULT_READING_INPUTS;
 
@@ -52,7 +60,6 @@ export function loadReadingInputs(): ReadingInputs {
       completed: [],
     };
 
-    // Save migrated to v2
     localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
     return migrated;
   } catch {
@@ -62,6 +69,8 @@ export function loadReadingInputs(): ReadingInputs {
 
 export function saveReadingInputs(value: ReadingInputs) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  // ✅ add this
+  emitReadingChanged();
 }
 
 export function resetReadingInputs() {

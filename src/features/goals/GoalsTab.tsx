@@ -1,6 +1,6 @@
-import { GoalCard } from "./components/GoalCard";
-import { useGoalsStore } from "./goalStore";
 import { goalsRegistry } from "./registry";
+import { useGoalsStore } from "./goalStore";
+import { GoalCard } from "./components/GoalCard";
 
 export function GoalsTab() {
   const { state } = useGoalsStore();
@@ -16,11 +16,7 @@ export function GoalsTab() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {goalsRegistry.map((goal) => (
-          <GoalCard
-            key={goal.id}
-            goal={goal}
-            doneMap={state.done[goal.id]}
-          />
+          <GoalCard key={goal.id} goal={goal} doneMap={state.done[goal.id]} />
         ))}
       </div>
     </div>

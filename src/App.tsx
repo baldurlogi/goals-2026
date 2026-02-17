@@ -6,34 +6,37 @@ import DailyPlanLayout from "@/app/daily-plan/DailyPlanLayout";
 import { NutritionTab } from "@/features/nutrition/NutritionTab";
 import { ScheduleTab } from "@/features/schedule/ScheduleTab";
 import { ReadingTab } from "@/features/reading/ReadingTab";
-import { GoalsTab } from "@/features/goals/GoalsTab";
 
+import { GoalsTab } from "@/features/goals/GoalsTab";
+import { UpcomingTasksPage } from "@/features/goals/UpcomingTasksPage";
 import { GoalDetailPage } from "@/features/goals/GoalsDetailPage";
 
+import DashboardPage from "@/app/DashboardPage";
 
 export default function App() {
   return (
     <BrowserRouter>
       <GoalsStoreProvider>
         <Routes>
-          <Route path="/" element={<Navigate to="/daily-plan/nutrition" replace />} />
-
-          {/* ✅ Global shell with header + container */}
           <Route element={<AppLayout />}>
-            {/* ✅ Tabs layout */}
+            {/* ✅ "/" is the overview */}
+            <Route index element={<DashboardPage />} />
+
+            {/* ✅ Daily plan keeps only “daily” stuff */}
             <Route path="/daily-plan" element={<DailyPlanLayout />}>
               <Route index element={<Navigate to="nutrition" replace />} />
               <Route path="nutrition" element={<NutritionTab />} />
               <Route path="schedule" element={<ScheduleTab />} />
               <Route path="reading" element={<ReadingTab />} />
-              <Route path="goals" element={<GoalsTab />} />
             </Route>
 
-            {/* ✅ Goal details ALSO get the same header */}
+            {/* ✅ Move these OUT of the daily-plan tabs */}
+            <Route path="/upcoming" element={<UpcomingTasksPage />} />
+            <Route path="/goals" element={<GoalsTab />} />
             <Route path="/goals/:goalId" element={<GoalDetailPage />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/daily-plan/nutrition" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </GoalsStoreProvider>
     </BrowserRouter>

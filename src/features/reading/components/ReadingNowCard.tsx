@@ -2,15 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ReadingStats } from "../readingTypes";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 
 export function ReadingNowCard({ stats }: { stats: ReadingStats }) {
     return (
-        <Card className="border-rose-200/60 dark:border:rose-900/60">
+        <Card className="border-rose-200/60 dark:border-rose-900/60">
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                        <div className="text-ws font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-400">
+                        <div className="text-xl font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-400">
                             Now reading
                         </div>
                         <CardTitle className="mt-1 text-base leading-tight">
