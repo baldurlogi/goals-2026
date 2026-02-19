@@ -1,22 +1,9 @@
-/**
- * ScheduleTab.tsx — wired to scheduleStorage
- *
- * Changes from original:
- *  - View selection is persisted: choosing WFH/Office/Weekend saves to localStorage
- *    and auto-infers from the current weekday on first visit
- *  - Each timeline block can be checked off as "done"
- *  - A progress summary is shown at the top (X / Y blocks done)
- *  - Dashboard picks up changes via the SCHEDULE_CHANGED_EVENT
- */
-
 import { useEffect, useMemo, useState } from "react";
 import type { ScheduleView } from "./scheduleTypes";
 import { dailySchedule } from "./scheduleData";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { SchedulePicker } from "./components/SchedulePicker";
-import { Separator } from "@/components/ui/separator";
 import { TimelineList } from "./components/TimelineList";
 import {
   loadScheduleLog,
@@ -29,7 +16,6 @@ import {
 export function ScheduleTab() {
   const [log, setLog] = useState(() => loadScheduleLog());
 
-  // Keep in sync with other tabs / windows
   useEffect(() => {
     const sync = () => setLog(loadScheduleLog());
     window.addEventListener(SCHEDULE_CHANGED_EVENT, sync);
@@ -41,13 +27,8 @@ export function ScheduleTab() {
   }, []);
 
   const view: ScheduleView = log.view;
-  const schedule = useMemo(() => dailySchedule[view], [view]);
-
-  const summary = useMemo(
-    () => getScheduleSummary(log, schedule.blocks.length),
-    [log, schedule.blocks.length],
-  );
-
+  const schedule    = useMemo(() => dailySchedule[view], [view]);
+  const summary     = useMemo(() => getScheduleSummary(log, schedule.blocks.length), [log, schedule.blocks.length]);
   const completedSet = useMemo(() => new Set(log.completed), [log.completed]);
 
   const handleViewChange = (v: ScheduleView) => {
@@ -61,38 +42,36 @@ export function ScheduleTab() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 pt-4 px-4">
+          {/* Row 1: title + counter */}
           <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-sm">Daily Schedule</CardTitle>
-            {summary.total > 0 && (
-              <Badge
-                variant="secondary"
-                className="tabular-nums text-xs"
-              >
-                {summary.done} / {summary.total} done
-              </Badge>
-            )}
+            <div>
+              <p className="text-sm font-semibold">{schedule.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Tap a row to expand · check off to track progress
+              </p>
+            </div>
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {summary.done}/{summary.total} done
+            </span>
           </div>
-        </CardHeader>
 
-        <CardContent className="space-y-4">
-          <SchedulePicker value={view} onChange={handleViewChange} />
+          {/* Row 2: day picker */}
+          <div className="mt-3">
+            <SchedulePicker value={view} onChange={handleViewChange} />
+          </div>
 
-          {/* Day progress bar */}
+          {/* Row 3: progress bar */}
           {summary.total > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Day progress</span>
-                <span className="tabular-nums font-medium">{summary.pct}%</span>
-              </div>
-              <Progress value={summary.pct} className="h-2" />
+            <div className="mt-3 space-y-1">
+              <Progress value={summary.pct} className="h-1.5" />
             </div>
           )}
+        </CardHeader>
 
-          <Separator />
-
+        <CardContent className="px-2 pb-3">
           <TimelineList
             schedule={schedule}
             completedSet={completedSet}

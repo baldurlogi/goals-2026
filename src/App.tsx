@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GoalsStoreProvider } from "@/features/goals/goalStore";
 import { AppLayout } from "@/app/AppLayout";
 
-import DailyPlanLayout from "@/app/daily-plan/DailyPlanLayout";
 import { NutritionTab } from "@/features/nutrition/NutritionTab";
 import { ScheduleTab } from "@/features/schedule/ScheduleTab";
 import { ReadingTab } from "@/features/reading/ReadingTab";
@@ -22,18 +21,15 @@ export default function App() {
             {/* ✅ "/" is the overview */}
             <Route index element={<DashboardPage />} />
 
-            {/* ✅ Daily plan keeps only “daily” stuff */}
-            <Route path="/daily-plan" element={<DailyPlanLayout />}>
-              <Route index element={<Navigate to="nutrition" replace />} />
-              <Route path="nutrition" element={<NutritionTab />} />
-              <Route path="schedule" element={<ScheduleTab />} />
-              <Route path="reading" element={<ReadingTab />} />
-            </Route>
+            <Route path="/daily-plan/nutrition" element={<NutritionTab />} />
+            <Route path="/daily-plan/schedule" element={<ScheduleTab />} />
+            <Route path="/daily-plan/reading" element={<ReadingTab />} />
 
-            {/* ✅ Move these OUT of the daily-plan tabs */}
             <Route path="/upcoming" element={<UpcomingTasksPage />} />
             <Route path="/goals" element={<GoalsTab />} />
             <Route path="/goals/:goalId" element={<GoalDetailPage />} />
+
+            <Route path="/daily-plan" element={<Navigate to="/" replace />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
