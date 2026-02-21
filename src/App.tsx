@@ -11,6 +11,7 @@ import { UpcomingTasksPage } from "@/features/goals/UpcomingTasksPage";
 import { GoalDetailPage } from "@/features/goals/GoalsDetailPage";
 
 import DashboardPage from "@/app/DashboardPage";
+import { TodosPage } from "./features/todos/TodosPage";
 
 export default function App() {
   return (
@@ -28,6 +29,9 @@ export default function App() {
             <Route path="/upcoming" element={<UpcomingTasksPage />} />
             <Route path="/goals" element={<GoalsTab />} />
             <Route path="/goals/:goalId" element={<GoalDetailPage />} />
+
+            {/* legacy redirect - anyone hitting /daily-plan lands on dashboard */}
+            <Route path="/todos" element={<TodosPage />} />
 
             <Route path="/daily-plan" element={<Navigate to="/" replace />} />
           </Route>

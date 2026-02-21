@@ -7,6 +7,7 @@ import { MacrosCard } from "./cards/MacrosCard";
 import { ScheduleCard } from "./cards/ScheduleCard";
 import { UpcomingGoalsCard } from "./cards/UpcomingGoalsCard";
 import { SpendingCard } from "./cards/SpendingCard";
+import { TodoCard } from "./cards/TodoCard";
 
 // ─── Quick action strip ───────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ export default function DashboardPage() {
         <ScheduleCard />
         <UpcomingGoalsCard />
         <SpendingCard />
+        <TodoCard />
 
         {/* ── Quick actions strip ── */}
         <div className="md:col-span-2 lg:col-span-12">

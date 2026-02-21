@@ -9,96 +9,96 @@ export const readingGoal: GoalDefinition = {
     priority: "medium",
     steps: [
         {
-            id: "book-1-completed",
-            label: "✓ Book 1 completed (Jan-Feb)",
-            notes: "Already done! 1/12 complete.",
-            idealFinish: "2026-02-14",
-            estimatedTime: "completed"
+            id: "reading-list-established",
+            label: "Make a 12 book reading list",
+            notes: "Establish a 12 book reading list for the year. Mix of habits, business, entrepenourship and social influence",
+            idealFinish: "2026-02-28",
+            estimatedTime: "30 min",
+            links: ["https://goodreads.com"]
         },
         {
-            id: "book-2-zero-to-one",
-            label: "Read 'Zero to One' by Peter Thiel",
-            notes: "224 pages. Startup thinking, innovation, contrarian ideas. Read 30-45 min before bed daily.",
-            idealFinish: "2026-03-31",
-            estimatedTime: "8 hours"
-        },
-        {
-            id: "book-3-deep-work",
-            label: "Read 'Deep Work' by Cal Newport",
-            notes: "296 pages. Focus, productivity, attention management. Perfect for balancing all your goals.",
-            idealFinish: "2026-04-30",
-            estimatedTime: "10 hours"
-        },
-        {
-            id: "book-4-lean-startup",
-            label: "Read 'The Lean Startup' by Eric Ries",
-            notes: "336 pages. SaaS methodology, MVP, validated learning. Apply directly to your side project.",
-            idealFinish: "2026-05-31",
-            estimatedTime: "11 hours"
-        },
-        {
-            id: "book-5-why-we-sleep",
-            label: "Read 'Why We Sleep' by Matthew Walker",
-            notes: "368 pages. Sleep science, recovery, performance. Will improve training and productivity.",
-            idealFinish: "2026-06-30",
-            estimatedTime: "12 hours"
-        },
-        {
-            id: "book-6-show-your-work",
-            label: "Read 'Show Your Work' by Austin Kleon",
-            notes: "224 pages. Building in public, sharing process. Perfect for YouTube channel launch.",
-            idealFinish: "2026-07-31",
-            estimatedTime: "7 hours"
-        },
-        {
-            id: "book-7-7-habits",
-            label: "Read '7 Habits of Highly Effective People' by Stephen Covey",
-            notes: "384 pages. Classic productivity, leadership, character. Timeless principles.",
-            idealFinish: "2026-08-31",
+            id: "book-1-the-hunger-games",
+            label: "Read 'The Hunger Games: Sunrise on the Reaping' by Suzanne Collins",
+            notes: "382 pages. The prequel of the second Quatert Quell when Haymitch won the games.",
+            idealFinish: "2026-02-15",
             estimatedTime: "13 hours"
         },
         {
-            id: "book-8-traction",
-            label: "Read 'Traction' by Gabriel Weinberg",
-            notes: "240 pages. Customer acquisition for startups. 19 traction channels explained.",
-            idealFinish: "2026-09-30",
-            estimatedTime: "8 hours"
+            id: "book-2-the-7-habits-of-highly-effective-people",
+            label: "Read 'The 7 Habits of Highly Effective People' by Stephen Covey",
+            notes: "397 pages. A practical framework for building character-based habits that improve how you lead yourself and work with others.",
+            idealFinish: "2026-02-28",
+            estimatedTime: "13 hours"
         },
         {
-            id: "book-9-48-laws",
+            id: "book-3-thinking-fast-and-slow",
+            label: "Read 'Thinking, fast and slow' by Daniel Kahneman",
+            notes: "498 pages. How two mental systems drive your decisions, and the biases that quietly distort your judgment.",
+            idealFinish: "2026-03-31",
+            estimatedTime: "16 hours"
+        },
+        {
+            id: "book-4-why-we-sleep",
+            label: "Read 'Why We Sleep?' by Matthew Walker",
+            notes: "368 pages. Why sleep is a biological superpower that shapes your health, learning, mood, and performance.",
+            idealFinish: "2026-04-30",
+            estimatedTime: "14 hours"
+        },
+        {
+            id: "book-5-the-48-laws-of-power",
             label: "Read 'The 48 Laws of Power' by Robert Greene",
-            notes: "452 pages. Strategy, influence, power dynamics. Dense but valuable. Take notes.",
-            idealFinish: "2026-10-31",
-            estimatedTime: "15 hours"
+            notes: "430 pages. A blunt guide to how power dynamics work, and the strategies people use to gain, keep, or lose influence.",
+            idealFinish: "2026-05-31",
+            estimatedTime: "18 hours"
         },
         {
-            id: "book-10-100-startup",
-            label: "Read 'The $100 Startup' by Chris Guillebeau",
-            notes: "272 pages. Low-capital business ideas, case studies. Inspiring and actionable.",
-            idealFinish: "2026-11-15",
-            estimatedTime: "9 hours"
+            id: "book-6-zero-to-one",
+            label: "Read 'Zero to One' by Peter Thiel",
+            notes: "129 pages. How to create truly new value by building unique businesses, rather than competing in crowded markets.",
+            idealFinish: "2026-06-30",
+            estimatedTime: "4 hours"
         },
         {
-            id: "book-11-art-of-learning",
-            label: "Read 'The Art of Learning' by Josh Waitzkin",
-            notes: "288 pages. Mastery, peak performance, learning process. Chess/martial arts wisdom.",
-            idealFinish: "2026-11-30",
+            id: "book-7-finding-me",
+            label: "Read 'Finding Me: A Memoir' by Viola Davis",
+            notes: "304 pages. A personal story of survival, identity, and self-worth through hardship, healing, and growth.",
+            idealFinish: "2026-07-31",
+            estimatedTime: "11 hours"
+        },
+        {
+            id: "book-8-deep-work",
+            label: "Read 'Deep Work' by Cal Newport",
+            notes: "305 pages. Why focused, distraction-free effort is a career superpower—and how to train it in a noisy world.",
+            idealFinish: "2026-08-31",
+            estimatedTime: "11 hours"
+        },
+        {
+            id: "book-9-never-split-the-difference",
+            label: "Read 'Never Split the Difference' by Chris Voss",
+            notes: "288 pages. Negotiation tactics from hostage bargaining that help you get better outcomes through psychology and empathy.",
+            idealFinish: "2026-09-30",
             estimatedTime: "10 hours"
         },
         {
-            id: "book-12-rework",
-            label: "Read 'Rework' by Jason Fried & DHH",
-            notes: "279 pages. Unconventional business wisdom, remote work, simplicity. Quick, punchy read.",
-            idealFinish: "2026-12-31",
-            estimatedTime: "9 hours"
+            id: "book-10-essentialism",
+            label: "Read 'Essentialism' by Greg McKeown",
+            notes: "304 pages. A mindset and method for cutting the nonessential so you can do fewer things better.",
+            idealFinish: "2026-10-31",
+            estimatedTime: "11 hours"
         },
         {
-            id: "reading-habit-established",
-            label: "Establish 30-45 min daily reading habit",
-            notes: "Before bed. No phone. Use Kindle app or physical books. Track in Goodreads.",
-            idealFinish: "2026-03-31",
-            estimatedTime: "ongoing",
-            links: ["https://goodreads.com"]
+            id: "book-11-cant-hurt-me",
+            label: "Read 'Can't Hurt Me' by David Goggins",
+            notes: "366 pages. A raw blueprint for mental toughness: turning pain and discipline into relentless self-mastery.",
+            idealFinish: "2026-11-30",
+            estimatedTime: "12 hours"
+        },
+        {
+            id: "book-12-million-dollar-weekend",
+            label: "Read 'Million Dollar Weekend' by Noah Kagan",
+            notes: "240 pages. A step-by-step playbook to validate and sell a simple business idea fast—often in a weekend.",
+            idealFinish: "2026-12-31",
+            estimatedTime: "8 hours"
         }
     ]
 }

@@ -10,7 +10,10 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, LayoutDashboard } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
-const NAV_SECTIONS = [
+type NavItem = { label: string; href: string };
+type NavSection = { label: string; items: NavItem[] }
+
+const NAV_SECTIONS: NavSection[] = [
   {
     label: "Daily Plan",
     items: [
@@ -26,6 +29,12 @@ const NAV_SECTIONS = [
       { label: "📌 Upcoming",   href: "/upcoming" },
     ],
   },
+  {
+    label: "Other",
+    items: [
+      { label: "✅ To-do", href: "/todos"}
+    ]
+  }
 ];
 
 export function DailyPlanHeader() {

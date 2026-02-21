@@ -14,6 +14,37 @@ function formatDkk(n: number) {
 
 
 
+
+// Custom tooltip — uses CSS vars so it works in both light and dark mode
+function DonutTooltip({ active, payload }: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; payload: { color: string } }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const { name, value, payload: { color } } = payload[0];
+  return (
+    <div
+      style={{
+        background: "hsl(var(--popover))",
+        border: "1px solid hsl(var(--border))",
+        borderRadius: 8,
+        padding: "6px 10px",
+        color: "hsl(var(--popover-foreground))",
+        fontSize: 12,
+        lineHeight: 1.5,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+        <span style={{ fontWeight: 600 }}>{name}</span>
+      </div>
+      <div style={{ marginTop: 2, paddingLeft: 14 }}>
+        {new Intl.NumberFormat("da-DK").format(Math.round(value))} DKK
+      </div>
+    </div>
+  );
+}
+
 export function SpendingCard() {
   const { donutData, totalSpent, isEmpty } = useSpendingDashboard(FINANCE_GOAL_ID);
 
@@ -67,19 +98,7 @@ export function SpendingCard() {
                     paddingAngle={2}
                     shape={makeShapeFn(donutData)}
                   />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      const n = Number(value);
-                      return [`${formatDkk(Number.isFinite(n) ? n : 0)} DKK`, String(name)];
-                    }}
-                    contentStyle={{
-                      borderRadius: 8,
-                      border: "1px solid hsl(var(--border))",
-                      background: "hsl(var(--popover))",
-                      color: "hsl(var(--popover-foreground))",
-                      fontSize: 11,
-                    }}
-                  />
+                  <Tooltip content={<DonutTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

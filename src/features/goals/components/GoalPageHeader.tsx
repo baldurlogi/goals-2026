@@ -10,7 +10,7 @@ export function GoalPageHeader(props: {
   backHref?: string;
   onReset?: () => void;
 }) {
-  const { goal, doneMap, backHref = "/daily-plan/goals", onReset } = props;
+  const { goal, doneMap, backHref = "/goals", onReset } = props;
   const { pct, doneCount, total } = getGoalProgress(goal, doneMap);
 
   return (
