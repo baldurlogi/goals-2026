@@ -8,6 +8,27 @@ function prettyHref(href: string) {
     return href.replace(/^https?:\/\//, "");
 }
 
+// -- sort helpers -------------------------------------
+function parseDate(s?: string): number {
+    if (!s || s.toLocaleLowerCase() === "ongoing") return Number.MAX_SAFE_INTEGER;
+    const t = new Date(s).getTime();
+    return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
+}
+
+function sortedSteps(steps: GoalStep[], doneMap?: Record<string, boolean>): GoalStep[] {
+    return [...steps].sort((a,b) => {
+        // 1. idealFinish ascending (undated last)
+        const dateDiff = parseDate(a.idealFinish) - parseDate(b.idealFinish);
+        if (dateDiff !== 0) return dateDiff;
+        // 2. incomplete before complete
+        const aDone = doneMap?.[a.id] ? 1 : 0;
+        const bDone = doneMap?.[b.id] ? 1 : 0;
+        if (aDone !== bDone) return aDone - bDone;
+        // 3. stable tiebraker: label then id
+        return a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
+    })
+}
+
 export function StepsCard(props: {
     goalId: string;
     goalTitle?: string;
@@ -17,7 +38,8 @@ export function StepsCard(props: {
     heightClassName?: string; // e.g. "h-[640px]"
     className?: string;
 }) {
-    const { steps, doneMap, onToggle, heightClassName = "h-[640px]", className } = props;
+    const { steps: rawSteps, doneMap, onToggle, heightClassName = "h-[640px]", className } = props;
+    const steps = sortedSteps(rawSteps, doneMap);
 
     const nextIndex = useMemo(
         () => steps.findIndex((s) => !doneMap?.[s.id]),
