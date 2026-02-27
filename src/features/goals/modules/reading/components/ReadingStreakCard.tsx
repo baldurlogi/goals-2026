@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +12,20 @@ import {
 } from "../readingStorage";
 
 export function ReadingStreakCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState({ lastReadISO: null as string | null, streak: 0 });
 
-  const state = useMemo(() => {
-    void tick;
-    return getReadingStreak(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const next = await getReadingStreak(goalId);
+      if (!cancelled) setState(next);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [goalId]);
 
   const today = todayISO();
   const last = state.lastReadISO;
@@ -30,28 +38,23 @@ export function ReadingStreakCard({ goalId }: { goalId: string }) {
     return { label: "Missed days → reset on next log", tone: "destructive" as const };
   }, [last, today]);
 
+  function persist(next: { lastReadISO: string | null; streak: number }) {
+    setState(next);
+    void setReadingStreak(goalId, next);
+  }
+
   function logToday() {
-    const cur = getReadingStreak(goalId);
-    const lastISO = cur.lastReadISO;
+    if (!last) return persist({ lastReadISO: today, streak: 1 });
 
-    if (!lastISO) {
-      setReadingStreak(goalId, { lastReadISO: today, streak: 1 });
-      setTick((x) => x + 1);
-      return;
-    }
-
-    const d = diffDays(lastISO, today);
+    const d = diffDays(last, today);
     if (d === 0) return;
 
-    if (d === 1) setReadingStreak(goalId, { lastReadISO: today, streak: cur.streak + 1 });
-    else setReadingStreak(goalId, { lastReadISO: today, streak: 1 });
-
-    setTick((x) => x + 1);
+    if (d === 1) return persist({ lastReadISO: today, streak: state.streak + 1 });
+    return persist({ lastReadISO: today, streak: 1 });
   }
 
   function reset() {
-    setReadingStreak(goalId, { lastReadISO: null, streak: 0 });
-    setTick((x) => x + 1);
+    persist({ lastReadISO: null, streak: 0 });
   }
 
   return (
