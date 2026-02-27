@@ -62,7 +62,6 @@ export function FinanceGoalPage() {
           <SavingsCard goalId={goalId} target={75000} currency="DKK" />
 
           <ExpenseTrackerCard
-            goalId={goalId}
             month={month}
             setMonth={setMonth}
             data={monthState}

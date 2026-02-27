@@ -1,10 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReadingFieldPath } from "./readingTypes";
-import {
-  canAcceptDigitsOrBlank,
-  getReadingStats,
-  inputsToPlan,
-} from "./readingUtils";
+import { useEffect, useMemo, useState } from "react";
+import type { ReadingFieldPath, ReadingInputs } from "./readingTypes";
+import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan } from "./readingUtils";
 import { ReadingInputsCard } from "./components/ReadingInputsCard";
 import { Button } from "@/components/ui/button";
 import { ReadingNowCard } from "./components/ReadingNowCard";
@@ -13,6 +9,7 @@ import {
   loadReadingInputs,
   saveReadingInputs,
   DEFAULT_READING_INPUTS,
+  READING_CHANGED_EVENT,
 } from "./readingStorage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,51 +17,47 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
 export function ReadingTab() {
-  const [inputs, setInputs] = useState(DEFAULT_READING_INPUTS);
+  // ✅ always start with safe defaults
+  const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
 
   // Draft inputs for adding to queue
   const [draft, setDraft] = useState({ title: "", author: "", totalPages: "" });
 
-  // load once on mount
+  // ✅ hydrate from storage (works for sync or async storage)
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const loaded = await loadReadingInputs();
-      if (!cancelled) setInputs(loaded);
-    })();
+
+    const sync = async () => {
+      const next = await Promise.resolve(loadReadingInputs());
+      if (!cancelled) setInputs(next);
+    };
+
+    sync();
+
+    window.addEventListener(READING_CHANGED_EVENT, sync as any);
+    window.addEventListener("storage", sync as any);
+
     return () => {
       cancelled = true;
+      window.removeEventListener(READING_CHANGED_EVENT, sync as any);
+      window.removeEventListener("storage", sync as any);
     };
   }, []);
-
-  // debounce saves (prevents spamming Supabase on every keypress)
-  const saveTimer = useRef<number | null>(null);
-  const didHydrate = useRef(false);
-
-  useEffect(() => {
-    // skip the very first render before hydration finishes
-    if (!didHydrate.current) {
-      didHydrate.current = true;
-      return;
-    }
-
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-
-    saveTimer.current = window.setTimeout(() => {
-      saveReadingInputs(inputs).catch((e) => {
-        console.warn("saveReadingInputs failed:", e);
-      });
-    }, 300);
-
-    return () => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    };
-  }, [inputs]);
 
   const stats = useMemo(() => {
     const plan = inputsToPlan(inputs);
     return getReadingStats(plan);
   }, [inputs]);
+
+  // ✅ helper: compute next state AND persist it immediately
+  function setAndPersist(updater: (prev: ReadingInputs) => ReadingInputs) {
+    setInputs((prev) => {
+      const next = updater(prev);
+      // save can be sync or async — we don’t block UI
+      void Promise.resolve(saveReadingInputs(next));
+      return next;
+    });
+  }
 
   function updateField(path: ReadingFieldPath, value: string) {
     const digitOnlyPaths: ReadingFieldPath[] = [
@@ -74,15 +67,11 @@ export function ReadingTab() {
     ];
     if (digitOnlyPaths.includes(path) && !canAcceptDigitsOrBlank(value)) return;
 
-    setInputs((prev) => {
-      if (path === "current.title")
-        return { ...prev, current: { ...prev.current, title: value } };
-      if (path === "current.author")
-        return { ...prev, current: { ...prev.current, author: value } };
-      if (path === "current.currentPage")
-        return { ...prev, current: { ...prev.current, currentPage: value } };
-      if (path === "current.totalPages")
-        return { ...prev, current: { ...prev.current, totalPages: value } };
+    setAndPersist((prev) => {
+      if (path === "current.title") return { ...prev, current: { ...prev.current, title: value } };
+      if (path === "current.author") return { ...prev, current: { ...prev.current, author: value } };
+      if (path === "current.currentPage") return { ...prev, current: { ...prev.current, currentPage: value } };
+      if (path === "current.totalPages") return { ...prev, current: { ...prev.current, totalPages: value } };
       if (path === "dailyGoalPages") return { ...prev, dailyGoalPages: value };
       return prev;
     });
@@ -91,27 +80,26 @@ export function ReadingTab() {
   function addToQueue() {
     if (!draft.title.trim() && !draft.author.trim()) return;
 
-    setInputs((prev) => ({
+    setAndPersist((prev) => ({
       ...prev,
       upNext: [...prev.upNext, { ...draft }],
     }));
+
     setDraft({ title: "", author: "", totalPages: "" });
   }
 
   function removeFromQueue(index: number) {
-    setInputs((prev) => ({
+    setAndPersist((prev) => ({
       ...prev,
       upNext: prev.upNext.filter((_, i) => i !== index),
     }));
   }
 
   function markCurrentCompleted() {
-    setInputs((prev) => {
+    setAndPersist((prev) => {
       const finishedAt = new Date().toISOString();
-      const totalPagesNum = Math.max(
-        1,
-        parseInt(prev.current.totalPages || "0", 10) || 0
-      );
+
+      const totalPagesNum = Math.max(1, parseInt(prev.current.totalPages || "0", 10) || 0);
 
       const completedBook = {
         title: prev.current.title,
@@ -140,13 +128,18 @@ export function ReadingTab() {
     });
   }
 
+  function resetAll() {
+    setInputs(DEFAULT_READING_INPUTS);
+    void Promise.resolve(saveReadingInputs(DEFAULT_READING_INPUTS));
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-4">
         <ReadingInputsCard value={inputs} onChange={updateField} />
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setInputs(DEFAULT_READING_INPUTS)}>
+          <Button variant="outline" onClick={resetAll}>
             Reset
           </Button>
 
@@ -167,21 +160,11 @@ export function ReadingTab() {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Title</Label>
-                <Input
-                  value={draft.title}
-                  onChange={(e) =>
-                    setDraft((p) => ({ ...p, title: e.target.value }))
-                  }
-                />
+                <Input value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <Label>Author</Label>
-                <Input
-                  value={draft.author}
-                  onChange={(e) =>
-                    setDraft((p) => ({ ...p, author: e.target.value }))
-                  }
-                />
+                <Input value={draft.author} onChange={(e) => setDraft((p) => ({ ...p, author: e.target.value }))} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Total pages</Label>
