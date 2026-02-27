@@ -1,12 +1,34 @@
-import type { Meal } from "./nutritionTypes";
+import type { Meal, Macros } from "./nutritionTypes";
 
-export const nutritionTarget = {
-    calories: 2400,
-    protein: 156,
-    carbs: 260,
-    fat: 68,
-    note: "Slight deficit for cutting while building muscle. Male, 78kg, 180cm, age 25. Active training 6-7x/week.",
+export type NutritionPhase = "maintain" | "cut";
+
+/*
+ - Two target profiles - swap with the phase toggle
+ - Cut season: ~4-6 weeks before summer, tighter calories, same protein
+*/
+
+export const PHASE_TARGETS: Record<NutritionPhase, Macros & { note: string }> = {
+    maintain: {
+        cal: 2400,
+        protein: 156,
+        carbs: 260,
+        fat: 68,
+        note: "Maintenance / lean bulk, Male · 25yo · 78kg · 180cm · Training 6-7x/week."
+    },
+    cut: {
+        cal: 2000,
+        protein: 170, // higher protein protects muscle during cut
+        carbs: 185,
+        fat: 58,
+        note: "Cut phase (4-6 weeks pre-summer) 400 kcal deficit, high protein."
+    },
 };
+
+/* Convenience - used everywhere a single target object is needed */
+export function getTargets(phase: NutritionPhase) {
+    return PHASE_TARGETS[phase];
+}
+
 
 export const meals: {
     breakfast: { option1: Meal; option2: Meal };

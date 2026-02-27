@@ -6,15 +6,29 @@ import { CheckSquare, ChevronRight, Plus, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { type Todo } from "@/features/todos/todoStorage"; // adjust path to where Todo type lives
+
+
 
 export function TodoCard() {
-    const { preview, hasMore, extraCount, doneCount, total } = useTodoDashboard();
+    const { todos = [] } = useTodoDashboard();
+
+    const total = todos.length;
+    const doneCount = todos.filter((t) => t.done).length;
+
+    const incomplete = todos.filter((t) => !t.done);
+    const preview = incomplete.slice(0, 4);
+
+    const hasMore = incomplete.length > preview.length;
+    const extraCount = Math.max(0, incomplete.length - preview.length);
+
     const [input, setInput] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
 
-    function handleAdd() {
-        if (!input.trim()) return;
-        addTodo(input);
+    async function handleAdd() {
+        const text = input.trim();
+        if (!text) return;
+        await addTodo(text);
         setInput("");
         inputRef.current?.focus();
     }
@@ -47,20 +61,20 @@ export function TodoCard() {
                     </p>
                 ) : (
                     <>
-                        {preview.map((item) => (
+                        {preview.map((item: Todo) => (
                             <div
                                 key={item.id}
                                 className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40"
                             >
                                 <Checkbox
                                     checked={item.done}
-                                    onCheckedChange={() => toggleTodo(item.id)}
+                                    onCheckedChange={async () => { await toggleTodo(item.id); }}
                                     className="shrink-0"
                                 />
                                 <span className="flex-1 text-sm leading-snug">{item.text}</span>
                                 <button
                                     type="button"
-                                    onClick={() => deleteTodo(item.id)}
+                                    onClick={async () => { await deleteTodo(item.id); }}
                                     className="invisible shrink-0 text-muted-foreground/40 hvoer:text-muted-foreground group-hover:visible"
                                 >
                                     <X className="h-3 w-3" />

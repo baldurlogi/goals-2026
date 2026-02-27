@@ -8,6 +8,10 @@ import { ScheduleCard } from "./cards/ScheduleCard";
 import { UpcomingGoalsCard } from "./cards/UpcomingGoalsCard";
 import { SpendingCard } from "./cards/SpendingCard";
 import { TodoCard } from "./cards/TodoCard";
+import { FitnessCard } from "./cards/FitnessCard";
+
+import { migrateLocalStorageToSupabase } from "@/auth/migrationToSupabase";
+
 
 // ─── Quick action strip ───────────────────────────────────────────────────────
 
@@ -57,6 +61,12 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* ── Header ── */}
+      <button
+        onClick={migrateLocalStorageToSupabase}
+        className="fixed bottom-4 right-4 z-50 rounded bg-red-500 px-3 py-2 text-xs text-white"
+      >
+        Migrate → Supabase
+      </button>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -88,6 +98,7 @@ export default function DashboardPage() {
         <UpcomingGoalsCard />
         <SpendingCard />
         <TodoCard />
+        <FitnessCard />
 
         {/* ── Quick actions strip ── */}
         <div className="md:col-span-2 lg:col-span-12">

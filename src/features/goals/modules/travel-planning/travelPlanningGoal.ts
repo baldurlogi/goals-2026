@@ -5,7 +5,7 @@ export const travelPlanningGoal: GoalDefinition = {
   title: "Travel Planning",
   subtitle: "Trips, budgets, booking rules, PTO, and execution",
   emoji: "✈️",
-  priority: "medium",
+  priority: "high",
 
   /**
    * FX NOTE (planning only):

@@ -1,44 +1,46 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GoalsStoreProvider } from "@/features/goals/goalStore";
+import { AuthProvider } from "@/auth/AuthProvider";
+import { RequireAuth } from "@/auth/RequireAuth";
 import { AppLayout } from "@/app/AppLayout";
 
-import { NutritionTab } from "@/features/nutrition/NutritionTab";
-import { ScheduleTab } from "@/features/schedule/ScheduleTab";
-import { ReadingTab } from "@/features/reading/ReadingTab";
-
-import { GoalsTab } from "@/features/goals/GoalsTab";
-import { UpcomingTasksPage } from "@/features/goals/UpcomingTasksPage";
-import { GoalDetailPage } from "@/features/goals/GoalsDetailPage";
-
-import DashboardPage from "@/app/DashboardPage";
-import { TodosPage } from "./features/todos/TodosPage";
+import { NutritionTab }     from "@/features/nutrition/NutritionTab";
+import { ScheduleTab }      from "@/features/schedule/ScheduleTab";
+import { ReadingTab }       from "@/features/reading/ReadingTab";
+import { GoalsTab }         from "@/features/goals/GoalsTab";
+import { UpcomingTasksPage }from "@/features/goals/UpcomingTasksPage";
+import { GoalDetailPage }   from "@/features/goals/GoalsDetailPage";
+import { TodosPage }        from "@/features/todos/TodosPage";
+import { FitnessPage }      from "@/features/fitness/FitnessPage";
+import DashboardPage        from "@/app/DashboardPage";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <GoalsStoreProvider>
-        <Routes>
-          <Route element={<AppLayout />}>
-            {/* ✅ "/" is the overview */}
-            <Route index element={<DashboardPage />} />
+      <AuthProvider>
+        <GoalsStoreProvider>
+          <RequireAuth>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route index element={<DashboardPage />} />
 
-            <Route path="/daily-plan/nutrition" element={<NutritionTab />} />
-            <Route path="/daily-plan/schedule" element={<ScheduleTab />} />
-            <Route path="/daily-plan/reading" element={<ReadingTab />} />
+                <Route path="/daily-plan/nutrition" element={<NutritionTab />} />
+                <Route path="/daily-plan/schedule"  element={<ScheduleTab />} />
+                <Route path="/daily-plan/reading"   element={<ReadingTab />} />
 
-            <Route path="/upcoming" element={<UpcomingTasksPage />} />
-            <Route path="/goals" element={<GoalsTab />} />
-            <Route path="/goals/:goalId" element={<GoalDetailPage />} />
+                <Route path="/goals"         element={<GoalsTab />} />
+                <Route path="/goals/:goalId" element={<GoalDetailPage />} />
+                <Route path="/upcoming"      element={<UpcomingTasksPage />} />
+                <Route path="/todos"         element={<TodosPage />} />
+                <Route path="/fitness"       element={<FitnessPage />} />
 
-            {/* legacy redirect - anyone hitting /daily-plan lands on dashboard */}
-            <Route path="/todos" element={<TodosPage />} />
-
-            <Route path="/daily-plan" element={<Navigate to="/" replace />} />
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </GoalsStoreProvider>
+                <Route path="/daily-plan" element={<Navigate to="/" replace />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </RequireAuth>
+        </GoalsStoreProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

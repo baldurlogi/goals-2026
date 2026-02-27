@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 const PRIORITY_COLOR: Record<string, string> = {
   high:   "bg-rose-500/10 text-rose-600 dark:text-rose-400",
   medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  low:    "bg-muted text-muted-foreground",
+  low:    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
 };
 
 type Props = {

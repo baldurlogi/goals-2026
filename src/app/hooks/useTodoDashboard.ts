@@ -1,26 +1,28 @@
-import { loadTodos, TODO_CHANGED_EVENT, type TodoItem } from "@/features/todos/todoStorage";
 import { useEffect, useState } from "react";
-
-const PREVIEW_LIMIT = 5;
+import { listTodos, TODO_CHANGED_EVENT, type Todo } from "@/features/todos/todoStorage";
 
 export function useTodoDashboard() {
-    const [todos, setTodos] = useState<TodoItem[]>(() => loadTodos());
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const sync = () => setTodos(loadTodos());
-        window.addEventListener(TODO_CHANGED_EVENT, sync);
-        window.addEventListener("storage", sync);
-        return () => {
-            window.removeEventListener(TODO_CHANGED_EVENT, sync);
-            window.removeEventListener("storage", sync)
-        };
-    }, []);
+  useEffect(() => {
+    let alive = true;
 
-    const incomplete = todos.filter((t) => !t.done);
-    const preview = incomplete.slice(0, PREVIEW_LIMIT);
-    const hasMore = incomplete.length > PREVIEW_LIMIT;
-    const extraCount = incomplete.length - PREVIEW_LIMIT;
-    const doneCount = todos.filter((t) => t.done).length;
+    const sync = async () => {
+      setLoading(true);
+      const next = await listTodos();
+      if (!alive) return;
+      setTodos(next);
+      setLoading(false);
+    };
 
-    return { preview, incomplete, hasMore, extraCount, doneCount, total: todos.length};
+    sync();
+    window.addEventListener(TODO_CHANGED_EVENT, sync);
+    return () => {
+      alive = false;
+      window.removeEventListener(TODO_CHANGED_EVENT, sync);
+    };
+  }, []);
+
+  return { todos, loading };
 }

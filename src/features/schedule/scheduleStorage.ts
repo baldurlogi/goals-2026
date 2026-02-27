@@ -1,82 +1,78 @@
-/**
- * scheduleStorage.ts
- *
- * Persists:
- *  1. Which schedule view (wfh / office / weekend) the user has selected for today
- *  2. Which timeline blocks they've completed today
- *
- * Storage key: schedule_log_<YYYY-MM-DD>
- * Mirrors the pattern used in readingStorage / nutritionStorage.
- */
-
-import type { ScheduleView } from "./scheduleTypes";
+import { supabase } from "@/lib/supabaseClient";
+import type { ScheduleView } from "@/features/schedule/scheduleTypes";
 
 export const SCHEDULE_CHANGED_EVENT = "schedule:changed";
+function emit() { window.dispatchEvent(new Event(SCHEDULE_CHANGED_EVENT)); }
+function todayKey() { return new Date().toISOString().slice(0, 10); }
 
 export type ScheduleLog = {
-  date: string;           // "YYYY-MM-DD"
-  view: ScheduleView;     // which day-type is active
-  completed: number[];    // indices of completed blocks in that view's blocks array
+  date:      string;
+  view:      ScheduleView;
+  completed: number[];
 };
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+export async function loadScheduleLog(): Promise<ScheduleLog> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const date = todayKey();
+  const empty: ScheduleLog = { date, view: "wfh", completed: [] };
+  if (!user) return empty;
 
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+  const { data, error } = await supabase
+    .from("schedule_logs")
+    .select("log_date, view, completed")
+    .eq("user_id", user.id)
+    .eq("log_date", date)
+    .maybeSingle();
 
-function storageKey(date: string): string {
-  return `schedule_log_${date}`;
-}
-
-/** Guess today's view from the day of the week */
-export function inferTodayView(): ScheduleView {
-  const day = new Date().getDay(); // 0=Sun,1=Mon,...,6=Sat
-  if (day === 0 || day === 6) return "weekend";
-  if (day === 1 || day === 2) return "wfh";
-  return "office";
-}
-
-// ─── public API ──────────────────────────────────────────────────────────────
-
-export function loadScheduleLog(date = todayKey()): ScheduleLog {
-  try {
-    const raw = localStorage.getItem(storageKey(date));
-    if (raw) return JSON.parse(raw) as ScheduleLog;
-  } catch {
-    // ignore
+  if (error) {
+    console.warn("loadScheduleLog error:", error);
+    return empty;
   }
-  return { date, view: inferTodayView(), completed: [] };
-}
 
-export function saveScheduleLog(log: ScheduleLog): void {
-  try {
-    localStorage.setItem(storageKey(log.date), JSON.stringify(log));
-    window.dispatchEvent(new Event(SCHEDULE_CHANGED_EVENT));
-  } catch {
-    // storage full / private mode — fail silently
+  // First time today: create default row
+  if (!data) {
+    await supabase.from("schedule_logs").insert({
+      user_id: user.id,
+      log_date: date,
+      view: "wfh",
+      completed: [],
+    });
+    return empty;
   }
+
+  return {
+    date: data.log_date,
+    view: (data.view as ScheduleView) ?? "wfh",
+    completed: data.completed ?? [],
+  };
 }
 
-/** Persist which schedule view (wfh/office/weekend) the user chose for today */
-export function setTodayView(view: ScheduleView, date = todayKey()): void {
-  const log = loadScheduleLog(date);
-  // reset completed blocks when the view changes — old indices are irrelevant
-  saveScheduleLog({ ...log, view, completed: [] });
+async function saveLog(log: ScheduleLog): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("schedule_logs").upsert({
+    user_id: user.id, log_date: log.date, view: log.view, completed: log.completed,
+  }, { onConflict: "user_id,log_date" });
+  emit();
 }
 
-/** Toggle a block's completed state by its index in the blocks array */
-export function toggleBlock(index: number, done: boolean, date = todayKey()): void {
-  const log = loadScheduleLog(date);
-  const set = new Set(log.completed);
-  done ? set.add(index) : set.delete(index);
-  saveScheduleLog({ ...log, completed: Array.from(set) });
+export async function setTodayView(view: ScheduleView): Promise<void> {
+  const log = await loadScheduleLog();
+  log.view = view;
+  await saveLog(log);
 }
 
-// ─── derived helpers for the dashboard ───────────────────────────────────────
+export async function toggleBlock(index: number, done: boolean): Promise<void> {
+  const log = await loadScheduleLog();
+  if (done) {
+    if (!log.completed.includes(index)) log.completed.push(index);
+  } else {
+    log.completed = log.completed.filter((i) => i !== index);
+  }
+  await saveLog(log);
+}
 
-export function getScheduleSummary(log: ScheduleLog, totalBlocks: number) {
+export function getScheduleSummary(log: ScheduleLog, total: number) {
   const done = log.completed.length;
-  const pct = totalBlocks > 0 ? Math.round((done / totalBlocks) * 100) : 0;
-  return { done, total: totalBlocks, pct };
+  return { done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }

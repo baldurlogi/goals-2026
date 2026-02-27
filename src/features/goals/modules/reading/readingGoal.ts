@@ -6,7 +6,7 @@ export const readingGoal: GoalDefinition = {
     title: "Read 12 Books in 2026",
     subtitle: "1 book per month for personal & business growth",
     emoji: "📚",
-    priority: "medium",
+    priority: "low",
     steps: [
         {
             id: "reading-list-established",

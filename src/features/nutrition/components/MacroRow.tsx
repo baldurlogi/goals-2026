@@ -1,35 +1,25 @@
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-
 type MacroMode = "min" | "max" | "range";
 
-function getStatus(
-    value: number,
-    target: number,
-    mode: MacroMode,
-    rangePct: number,
-) {
-    const delta = value - target;
-    const absPctOff = target <= 0 ? 0 : Math.abs(delta) / target;
+function clamp(v: number, lo = 0, hi = 100) {
+    return Math.min(Math.max(v, lo), hi);
+}
 
-    if (mode === "min") {
-        if (value >= target) return { status: "good" as const, deltaLabel: `+${delta}` };
-        // close but under
-        if (absPctOff <= rangePct) return { status: "warn" as const, deltaLabel: `${delta}` };
-        return { status: "bad" as const, deltaLabel: `${delta}` };
-    }
+function statusColor(value: number, target: number, mode: MacroMode): string {
+    if (target <= 0) return "text-muted-foreground";
+    const pct = value / target;
 
-    if (mode === "max") {
-        if (value <= target) return { status: "good" as const, deltaLabel: `${delta}` };
-        // over is bad
-        return { status: "bad" as const, deltaLabel: `${delta}` };
-    }
+    if (mode === "min") return pct >= 1 ? "text-emerald-500" : pct >= 0.85 ? "text-amber-500" : "text-destructive";
+    if (mode === "max") return pct <= 1 ? "text-emerald-500" : "text-destructive";
+    // range : within ±15% is fine
+    return Math.abs(pct - 1) <= 0.15 ? "text-emerald-500" : pct > 1.15 ? "text-destructive" : "text-amber-500";
+}
 
-    if (absPctOff <= rangePct) {
-        return { status: "warn" as const, deltaLabel: delta > 0 ? `+${delta}` : `${delta}` };
-    }
-    // outside range -> warn (or "bad" if you want harsher)
-    return { status: "warn" as const, deltaLabel: delta > 0 ? `+${delta}` : `${delta}` };
+function barColor(value: number, target: number, mode: MacroMode): string {
+    if (target <= 0) return "bg-muted";
+    const pct = value / target;
+    if (mode === "min") return pct >= 1 ? "bg-emerald-500" : pct >= 0.85 ? "bg-amber-500" : "bg-destructive";
+    if (mode === "max") return pct <= 1 ? "bg-primary" : "bg-destructive";
+    return Math.abs(pct - 1) <= 0.15 ? "bg-emerald-500" : pct > 1.15 ? "bg-destructive" : "bg-amber-500";
 }
 
 export function MacroRow(props: {
@@ -40,52 +30,44 @@ export function MacroRow(props: {
     mode?: MacroMode;
     rangePct?: number;
 }) {
-    const { label, value, target, unit, mode = "range", rangePct = 0.1 } = props;
+    const { label, value, target, unit, mode = "range" } = props;
 
-    const pct = target <= 0 ? 0 : Math.min(Math.max((value / target) * 100, 0), 100);
-    const diff = value - target;
-
-    const { status } = getStatus(value, target, mode, rangePct);
-
-    const deltaClass =
-        status === "good"
-        ? "text-emerald-500"
-        : status === "warn"
-            ? "text-amber-500"
-            : "text-destructive";
-
-    // show delta only if meaningful (keeps UI clean)
-    const showDelta = Math.abs(diff) > (unit === "kcal" ? 25 : 5);
+    const fillPct = clamp(target > 0 ? (value / target) * 100 : 0);
+    const remaining = target - value;
+    const color = statusColor(value, target, mode);
+    const bar = barColor(value, target, mode);
 
     return (
         <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {/* Label row */}
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {label}
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="h-5 px-2 text-[11px]">
-                        {value}
-                        {unit}
-                    </Badge>
-
-                    <span className="text-[11px] text-muted-foreground">
-                        / {target}
-                        {unit}
-                    </span>
-
-                    {showDelta && (
-                        <span className={`text-[11px] font-medium ${deltaClass}`}>
-                            {diff > 0 ? "+" : ""}
-                            {diff}
-                            {unit}
-                        </span>
-                    )}
+                </span>
+                <div className="flex items-baseline gap-1 tabular-nums">
+                    <span className={`text-sm font-semibold ${color}`}>{value}</span>
+                    <span className="text-xs text-muted-foreground">/ {target} {unit} </span>
                 </div>
             </div>
 
-            <Progress value={pct} className="h-2" />
+            {/* Progress bar */}
+            <div className="relative h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                    className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${bar}`}
+                    style={{ width: `${fillPct}%` }}
+                />
+            </div>
+
+            {/* Remaining hint */}
+            <div className="text-right text-[10px] text-muted-foreground tabular-nums">
+                {value === 0
+                    ? `${target} ${unit} to go`
+                    : remaining > 0
+                    ? `${remaining} ${unit} remaining`
+                    : remaining === 0
+                    ? `✓ Target hit`
+                    : `${Math.abs(remaining)} ${unit} over`}
+            </div>
         </div>
-    )
+    );
 }

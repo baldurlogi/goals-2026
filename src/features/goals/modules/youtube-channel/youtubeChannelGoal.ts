@@ -5,7 +5,7 @@ export const youtubeChannelGoal: GoalDefinition = {
   title: "Launch YouTube Channel",
   subtitle: "Build a consistent upload system (1 video every 3–4 weeks)",
   emoji: "🎥",
-  priority: "medium",
+  priority: "low",
 
   /**
    * Strategy:

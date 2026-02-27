@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-import { diffDays, getStreak, setStreak, todayISO } from "../fitnessStorage";
+import { diffDays, getStreak, setStreak, todayISO } from "../../../../fitness/fitnessStorage";
 
 export function WorkoutStreakCard({ goalId }: { goalId: string }) {
   const [tick, setTick] = useState(0);

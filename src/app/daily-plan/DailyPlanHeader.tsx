@@ -1,17 +1,18 @@
-import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { ChevronDown, LayoutDashboard } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
-type NavItem = { label: string; href: string };
-type NavSection = { label: string; items: NavItem[] }
+type NavItem    = { label: string; href: string };
+type NavSection = { label: string; items: NavItem[] };
 
 const NAV_SECTIONS: NavSection[] = [
   {
@@ -25,16 +26,17 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Goals",
     items: [
-      { label: "🎯 All Goals",  href: "/goals" },
-      { label: "📌 Upcoming",   href: "/upcoming" },
+      { label: "🎯 All Goals", href: "/daily-plan/goals" },
+      { label: "📌 Upcoming",  href: "/daily-plan/upcoming" },
     ],
   },
   {
     label: "Other",
     items: [
-      { label: "✅ To-do", href: "/todos"}
-    ]
-  }
+      { label: "✅ To-do",     href: "/todos" },
+      { label: "🏋️ Fitness",  href: "/fitness" },
+    ],
+  },
 ];
 
 export function DailyPlanHeader() {
@@ -43,13 +45,13 @@ export function DailyPlanHeader() {
   // Derive a readable current-section label for the dropdown trigger
   const currentItem = NAV_SECTIONS
     .flatMap((s) => s.items)
-    .find((i) => pathname.startsWith(i.href)); 
+    .find((i) => pathname.startsWith(i.href));
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center gap-4 px-4 lg:px-10">
 
-        {/* --- Brand / Dashboard home --- */}
+        {/* ── Brand / Dashboard home ── */}
         <Link
           to="/"
           className={cn(
@@ -61,10 +63,10 @@ export function DailyPlanHeader() {
           <span className="hidden sm:inline">Dashboard</span>
         </Link>
 
-        {/* --- Divider --- */}
+        {/* ── Divider ── */}
         <span className="text-border select-none">|</span>
 
-        {/* --- Section dropdown */}
+        {/* ── Section dropdown ── */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -90,7 +92,7 @@ export function DailyPlanHeader() {
                       to={item.href}
                       className={cn(
                         "cursor-pointer",
-                        pathname.startsWith(item.href) && "font-semibold"
+                        pathname.startsWith(item.href) && "font-semibold",
                       )}
                     >
                       {item.label}
@@ -102,10 +104,10 @@ export function DailyPlanHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* --- Spaced --- */}
+        {/* ── Spacer ── */}
         <div className="flex-1" />
 
-        {/* --- Identity --- */}
+        {/* ── Identity ── */}
         <p className="hidden text-xs text-muted-foreground md:block">
           Male · 25yo · 78kg · 180cm
         </p>

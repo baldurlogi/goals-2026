@@ -3,27 +3,39 @@ import {
   loadScheduleLog,
   getScheduleSummary,
   SCHEDULE_CHANGED_EVENT,
+  type ScheduleLog,
 } from "@/features/schedule/scheduleStorage";
 import { dailySchedule } from "@/features/schedule/scheduleData";
-import type { ScheduleLog } from "@/features/schedule/scheduleStorage";
+
+const EMPTY: ScheduleLog = { date: "", view: "wfh", completed: [] };
 
 export function useScheduleDashboard() {
-  const [scheduleLog, setScheduleLog] = useState<ScheduleLog>(() => loadScheduleLog());
+  const [scheduleLog, setScheduleLog] = useState<ScheduleLog>(EMPTY);
 
   useEffect(() => {
-    const sync = () => setScheduleLog(loadScheduleLog());
+    let alive = true;
+
+    const sync = async () => {
+      const next = await loadScheduleLog();
+      if (!alive) return;
+      setScheduleLog(next);
+    };
+
+    sync();
+
     window.addEventListener(SCHEDULE_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {
+      alive = false;
       window.removeEventListener(SCHEDULE_CHANGED_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
   }, []);
 
-  const config = dailySchedule[scheduleLog.view];
+  const config = dailySchedule[scheduleLog.view ?? "wfh"];
 
   const completedSet = useMemo(
-    () => new Set(scheduleLog.completed),
+    () => new Set(scheduleLog.completed ?? []),
     [scheduleLog.completed],
   );
 
@@ -32,15 +44,12 @@ export function useScheduleDashboard() {
     [scheduleLog, config.blocks.length],
   );
 
-  // First incomplete block is "next up"
   const nextBlockIndex = useMemo(
     () => config.blocks.findIndex((_, i) => !completedSet.has(i)),
     [config.blocks, completedSet],
   );
 
   const nextBlock = nextBlockIndex >= 0 ? config.blocks[nextBlockIndex] : null;
-
-  // First 5 blocks shown as a preview in the dashboard card
   const previewBlocks = config.blocks.slice(0, 5);
 
   const viewLabel =
