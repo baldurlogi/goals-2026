@@ -28,12 +28,10 @@ export function FinanceGoalPage() {
     loadFinanceMonth(goalId, month)
   );
 
-  // reload when month changes
   useEffect(() => {
     setMonthState(loadFinanceMonth(goalId, month));
   }, [goalId, month]);
 
-  // persist on change
   useEffect(() => {
     saveFinanceMonth(goalId, monthState);
   }, [goalId, monthState]);
@@ -73,7 +71,7 @@ export function FinanceGoalPage() {
         </div>
 
         <div className="lg:col-span-3">
-          <SpendingDonutCard goalId={goalId} month={month} data={monthState} />
+          <SpendingDonutCard goalId={goalId} month={month} />
         </div>
       </div>
     </div>

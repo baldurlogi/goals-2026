@@ -24,9 +24,9 @@ export default function App() {
               <Route element={<AppLayout />}>
                 <Route index element={<DashboardPage />} />
 
-                <Route path="/daily-plan/nutrition" element={<NutritionTab />} />
-                <Route path="/daily-plan/schedule"  element={<ScheduleTab />} />
-                <Route path="/daily-plan/reading"   element={<ReadingTab />} />
+                <Route path="/nutrition" element={<NutritionTab />} />
+                <Route path="/schedule"  element={<ScheduleTab />} />
+                <Route path="/reading"   element={<ReadingTab />} />
 
                 <Route path="/goals"         element={<GoalsTab />} />
                 <Route path="/goals/:goalId" element={<GoalDetailPage />} />

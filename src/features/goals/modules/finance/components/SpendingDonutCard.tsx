@@ -4,6 +4,7 @@ import { PieChart, Pie, Tooltip, ResponsiveContainer } from "recharts";
 import { getMonthKey, loadFinanceMonth } from "../financeStorage";
 import { CATEGORY_COLOR, type DonutDatum } from "@/app/hooks/useSpendingDashboard";
 import { makeShapeFn } from "@/app/pieShape";
+import type { FinanceMonthState } from "../financeStorage";
 
 function formatDkk(n: number) {
   return new Intl.NumberFormat("da-DK").format(Math.round(n));
@@ -53,6 +54,7 @@ function DonutTooltip({ active, payload }: {
 export function SpendingDonutCard(props: {
   goalId: string;
   month?: string;
+  data?: FinanceMonthState;
   className?: string;
 }) {
   const { goalId, month: controlledMonth, className } = props;
@@ -62,7 +64,9 @@ export function SpendingDonutCard(props: {
     if (controlledMonth) setMonth(controlledMonth);
   }, [controlledMonth]);
 
-  const data = useMemo(() => loadFinanceMonth(goalId, month), [goalId, month]);
+  const data = useMemo(() => {
+    return props.data ?? loadFinanceMonth(goalId, month);
+  }, [props.data, goalId, month]);
 
   const donutData: DonutDatum[] = useMemo(() =>
     data.categories

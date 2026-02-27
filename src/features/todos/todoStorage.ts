@@ -73,6 +73,7 @@ export async function clearCompleted(): Promise<void> {
   emit();
 }
 
+
 export type TodoItem = Todo;
 
 export async function toggleTodo(id: string): Promise<void> {

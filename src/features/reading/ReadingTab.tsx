@@ -1,24 +1,64 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReadingFieldPath } from "./readingTypes";
-import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan } from "./readingUtils";
+import {
+  canAcceptDigitsOrBlank,
+  getReadingStats,
+  inputsToPlan,
+} from "./readingUtils";
 import { ReadingInputsCard } from "./components/ReadingInputsCard";
 import { Button } from "@/components/ui/button";
 import { ReadingNowCard } from "./components/ReadingNowCard";
 import { ReadingNextCard } from "./components/ReadingNextCard";
-import { loadReadingInputs, saveReadingInputs, DEFAULT_READING_INPUTS } from "./readingStorage";
+import {
+  loadReadingInputs,
+  saveReadingInputs,
+  DEFAULT_READING_INPUTS,
+} from "./readingStorage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
 export function ReadingTab() {
-  const [inputs, setInputs] = useState(() => loadReadingInputs());
+  const [inputs, setInputs] = useState(DEFAULT_READING_INPUTS);
 
   // Draft inputs for adding to queue
   const [draft, setDraft] = useState({ title: "", author: "", totalPages: "" });
 
+  // load once on mount
   useEffect(() => {
-    saveReadingInputs(inputs);
+    let cancelled = false;
+    (async () => {
+      const loaded = await loadReadingInputs();
+      if (!cancelled) setInputs(loaded);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // debounce saves (prevents spamming Supabase on every keypress)
+  const saveTimer = useRef<number | null>(null);
+  const didHydrate = useRef(false);
+
+  useEffect(() => {
+    // skip the very first render before hydration finishes
+    if (!didHydrate.current) {
+      didHydrate.current = true;
+      return;
+    }
+
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+
+    saveTimer.current = window.setTimeout(() => {
+      saveReadingInputs(inputs).catch((e) => {
+        console.warn("saveReadingInputs failed:", e);
+      });
+    }, 300);
+
+    return () => {
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    };
   }, [inputs]);
 
   const stats = useMemo(() => {
@@ -35,10 +75,14 @@ export function ReadingTab() {
     if (digitOnlyPaths.includes(path) && !canAcceptDigitsOrBlank(value)) return;
 
     setInputs((prev) => {
-      if (path === "current.title") return { ...prev, current: { ...prev.current, title: value } };
-      if (path === "current.author") return { ...prev, current: { ...prev.current, author: value } };
-      if (path === "current.currentPage") return { ...prev, current: { ...prev.current, currentPage: value } };
-      if (path === "current.totalPages") return { ...prev, current: { ...prev.current, totalPages: value } };
+      if (path === "current.title")
+        return { ...prev, current: { ...prev.current, title: value } };
+      if (path === "current.author")
+        return { ...prev, current: { ...prev.current, author: value } };
+      if (path === "current.currentPage")
+        return { ...prev, current: { ...prev.current, currentPage: value } };
+      if (path === "current.totalPages")
+        return { ...prev, current: { ...prev.current, totalPages: value } };
       if (path === "dailyGoalPages") return { ...prev, dailyGoalPages: value };
       return prev;
     });
@@ -64,9 +108,10 @@ export function ReadingTab() {
   function markCurrentCompleted() {
     setInputs((prev) => {
       const finishedAt = new Date().toISOString();
-
-      // Save completed book (best-effort numeric pages)
-      const totalPagesNum = Math.max(1, parseInt(prev.current.totalPages || "0", 10) || 0);
+      const totalPagesNum = Math.max(
+        1,
+        parseInt(prev.current.totalPages || "0", 10) || 0
+      );
 
       const completedBook = {
         title: prev.current.title,
@@ -122,11 +167,21 @@ export function ReadingTab() {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Title</Label>
-                <Input value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} />
+                <Input
+                  value={draft.title}
+                  onChange={(e) =>
+                    setDraft((p) => ({ ...p, title: e.target.value }))
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <Label>Author</Label>
-                <Input value={draft.author} onChange={(e) => setDraft((p) => ({ ...p, author: e.target.value }))} />
+                <Input
+                  value={draft.author}
+                  onChange={(e) =>
+                    setDraft((p) => ({ ...p, author: e.target.value }))
+                  }
+                />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Total pages</Label>

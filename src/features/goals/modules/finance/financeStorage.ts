@@ -70,8 +70,8 @@ export function loadFinanceMonth(goalId: string, month: string): FinanceMonthSta
     if (!c?.id) return;
     const existing = categoriesById.get(c.id as FinanceCategoryId);
     if (!existing) return;
-    existing.budget = Number(c.budget ?? existing.budget) || 0;
-    existing.spent = Number(c.spent ?? existing.spent) || 0;
+    existing.budget = Number((c as any).budget ?? existing.budget) || 0;
+    existing.spent = Number((c as any).spent ?? existing.spent) || 0;
   });
 
   return {

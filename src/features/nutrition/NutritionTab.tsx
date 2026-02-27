@@ -24,6 +24,7 @@ import {
   type MealKey,
   type SavedMeal,
   type CustomEntry,
+  NUTRITION_CHANGED_EVENT, // if you export it; otherwise keep "nutrition:changed"
 } from "./nutritionStorage";
 import type { Macros } from "./nutritionTypes";
 
@@ -92,7 +93,6 @@ function ManualEntryForm({
 
   return (
     <div className="space-y-3 rounded-xl border bg-muted/20 p-3">
-      {/* Meal name + emoji */}
       <div className="flex gap-2">
         <input
           type="text"
@@ -111,7 +111,6 @@ function ManualEntryForm({
         />
       </div>
 
-      {/* Macro inputs */}
       <div className="grid grid-cols-4 gap-2">
         <MacroInputRow label="Calories" value={cal}     unit="kcal" onChange={setCal}     />
         <MacroInputRow label="Protein"  value={protein} unit="g"    onChange={setProtein} />
@@ -119,7 +118,6 @@ function ManualEntryForm({
         <MacroInputRow label="Fat"      value={fat}     unit="g"    onChange={setFat}     />
       </div>
 
-      {/* Actions */}
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
@@ -177,7 +175,7 @@ function SavedMealPill({
   );
 }
 
-// ── Custom entry row (today's logged items) ────────────────────────────────────
+// ── Custom entry row ───────────────────────────────────────────────────────────
 
 function CustomEntryRow({
   entry, onRemove,
@@ -221,69 +219,85 @@ function MealToggle({ id, label, eaten, onToggle }: {
 
 export function NutritionTab() {
   const [breakfastChoice, setBreakfastChoice] = useState<1 | 2>(1);
-  const [phase,       setPhase]       = useState<NutritionPhase>(() => loadPhase());
-  const [log,         setLog]         = useState(() => loadNutritionLog());
-  const [savedMeals,  setSavedMeals]  = useState<SavedMeal[]>(() => loadSavedMeals());
-  const [showManual,  setShowManual]  = useState(false);
+
+  // Start with safe defaults, then hydrate async
+  const [phase, setPhase] = useState<NutritionPhase>("maintain");
+  const [log, setLog] = useState<{ eaten: Record<string, boolean>; customEntries: CustomEntry[]; date: string }>({
+    date: new Date().toISOString().slice(0, 10),
+    eaten: {},
+    customEntries: [],
+  });
+  const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
+  const [showManual, setShowManual] = useState(false);
   const [showLibrary, setShowLibrary] = useState(true);
 
   useEffect(() => {
-    const sync = () => {
-      setLog(loadNutritionLog());
-      setPhase(loadPhase());
-      setSavedMeals(loadSavedMeals());
+    let cancelled = false;
+
+    const sync = async () => {
+      const [nextLog, nextPhase, nextSaved] = await Promise.all([
+        loadNutritionLog(),
+        loadPhase(),
+        loadSavedMeals(),
+      ]);
+      if (cancelled) return;
+      setLog(nextLog as any);
+      setPhase(nextPhase);
+      setSavedMeals(nextSaved);
     };
-    window.addEventListener("nutrition:changed", sync);
-    window.addEventListener("storage", sync);
+
+    sync();
+
+    window.addEventListener("nutrition:changed", sync as any);
     return () => {
-      window.removeEventListener("nutrition:changed", sync);
-      window.removeEventListener("storage", sync);
+      cancelled = true;
+      window.removeEventListener(NUTRITION_CHANGED_EVENT ?? "nutrition:changed", sync as any);
     };
   }, []);
 
-  const handlePhaseToggle = () => {
+  const handlePhaseToggle = async () => {
     const next: NutritionPhase = phase === "maintain" ? "cut" : "maintain";
-    savePhase(next);
+    await savePhase(next);
     setPhase(next);
   };
 
-  const handleToggle = (key: MealKey, eaten: boolean) => {
-    toggleMeal(key, eaten);
-    setLog(loadNutritionLog());
+  const handleToggle = async (key: MealKey, eaten: boolean) => {
+    await toggleMeal(key, eaten);
+    setLog(await loadNutritionLog());
   };
 
-  const handleManualAdd = (name: string, macros: Macros) => {
-    addCustomEntry(name, macros);
-    setLog(loadNutritionLog());
+  const handleManualAdd = async (name: string, macros: Macros) => {
+    await addCustomEntry(name, macros);
+    setLog(await loadNutritionLog());
   };
 
-  const handleSaveAndAdd = (name: string, macros: Macros, emoji: string) => {
-    saveNewMeal(name, macros, emoji);
-    addCustomEntry(name, macros);
-    setLog(loadNutritionLog());
-    setSavedMeals(loadSavedMeals());
+  const handleSaveAndAdd = async (name: string, macros: Macros, emoji: string) => {
+    await saveNewMeal(name, macros, emoji);
+    await addCustomEntry(name, macros);
+    setLog(await loadNutritionLog());
+    setSavedMeals(await loadSavedMeals());
   };
 
-  const handleQuickAdd = (meal: SavedMeal) => {
-    logSavedMeal(meal);
-    setLog(loadNutritionLog());
+  const handleQuickAdd = async (meal: SavedMeal) => {
+    await logSavedMeal(meal);
+    setLog(await loadNutritionLog());
   };
 
-  const handleRemoveCustom = (id: string) => {
-    removeCustomEntry(id);
-    setLog(loadNutritionLog());
+  const handleRemoveCustom = async (id: string) => {
+    await removeCustomEntry(id);
+    setLog(await loadNutritionLog());
   };
 
-  const handleDeleteSaved = (id: string) => {
-    deleteSavedMeal(id);
-    setSavedMeals(loadSavedMeals());
+  const handleDeleteSaved = async (id: string) => {
+    await deleteSavedMeal(id);
+    setSavedMeals(await loadSavedMeals());
   };
 
-  const targets    = useMemo(() => getTargets(phase), [phase]);
-  const logged     = useMemo(() => getLoggedMacros(log), [log]);
-  const breakfast  = breakfastChoice === 1 ? meals.breakfast.option1 : meals.breakfast.option2;
+  const targets = useMemo(() => getTargets(phase), [phase]);
+  const logged = useMemo(() => getLoggedMacros(log as any), [log]);
+  const breakfast = breakfastChoice === 1 ? meals.breakfast.option1 : meals.breakfast.option2;
   const breakfastKey: MealKey = breakfastChoice === 1 ? "breakfast1" : "breakfast2";
-  const totalEntries = Object.values(log.eaten).filter(Boolean).length + log.customEntries.length;
+  const totalEntries = Object.values((log as any).eaten ?? {}).filter(Boolean).length + ((log as any).customEntries?.length ?? 0);
 
   return (
     <div className="space-y-6">
@@ -306,10 +320,12 @@ export function NutritionTab() {
             phase === "cut" ? "bg-rose-500" : "bg-muted",
           ].join(" ")}
         >
-          <span className={[
-            "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transform transition-transform duration-200",
-            phase === "cut" ? "translate-x-5" : "translate-x-0",
-          ].join(" ")} />
+          <span
+            className={[
+              "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transform transition-transform duration-200",
+              phase === "cut" ? "translate-x-5" : "translate-x-0",
+            ].join(" ")}
+          />
         </button>
       </div>
 

@@ -38,17 +38,14 @@ export function WorkoutStreakCard({ goalId }: { goalId: string }) {
 
     const delta = diffDays(lastISO, today);
 
-    // already logged today
     if (delta === 0) return;
 
-    // yesterday -> extend streak
     if (delta === 1) {
       setStreak(goalId, { lastWorkoutISO: today, streak: current.streak + 1 });
       setTick((x) => x + 1);
       return;
     }
 
-    // missed days -> reset to 1
     setStreak(goalId, { lastWorkoutISO: today, streak: 1 });
     setTick((x) => x + 1);
   }

@@ -33,14 +33,13 @@ function monthLabel(ym: string) {
 }
 
 export function ExpenseTrackerCard(props: {
-  goalId: string;
   month: string;
   setMonth: (m: string) => void;
   data: FinanceMonthState;
   setData: Dispatch<SetStateAction<FinanceMonthState>>;
   className?: string;
 }) {
-  const { goalId, month, setMonth, data, setData, className } = props;
+  const { month, setMonth, data, setData, className } = props;
 
   const totals = useMemo(() => {
     const totalSpent = data.categories.reduce((acc, c) => acc + (c.spent || 0), 0);

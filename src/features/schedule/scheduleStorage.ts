@@ -5,6 +5,12 @@ export const SCHEDULE_CHANGED_EVENT = "schedule:changed";
 function emit() { window.dispatchEvent(new Event(SCHEDULE_CHANGED_EVENT)); }
 function todayKey() { return new Date().toISOString().slice(0, 10); }
 
+export const DEFAULT_SCHEDULE_LOG: ScheduleLog = {
+  date: new Date().toISOString().slice(0, 10),
+  view: "wfh",
+  completed: [],
+};
+
 export type ScheduleLog = {
   date:      string;
   view:      ScheduleView;
@@ -14,7 +20,7 @@ export type ScheduleLog = {
 export async function loadScheduleLog(): Promise<ScheduleLog> {
   const { data: { user } } = await supabase.auth.getUser();
   const date = todayKey();
-  const empty: ScheduleLog = { date, view: "wfh", completed: [] };
+  const empty: ScheduleLog = { ...DEFAULT_SCHEDULE_LOG, date };
   if (!user) return empty;
 
   const { data, error } = await supabase

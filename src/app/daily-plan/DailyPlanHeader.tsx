@@ -18,9 +18,9 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Daily Plan",
     items: [
-      { label: "📖 Reading",   href: "/daily-plan/reading" },
-      { label: "🥗 Nutrition", href: "/daily-plan/nutrition" },
-      { label: "📅 Schedule",  href: "/daily-plan/schedule" },
+      { label: "📖 Reading",   href: "/reading" },
+      { label: "🥗 Nutrition", href: "/nutrition" },
+      { label: "📅 Schedule",  href: "/schedule" },
     ],
   },
   {
