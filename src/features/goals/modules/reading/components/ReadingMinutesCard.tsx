@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,19 +14,29 @@ function toNum(v: string, fallback = 0) {
 }
 
 export function ReadingMinutesCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState({ dayISO: "", minutes: 0, target: 30 });
 
-  const state = useMemo(() => {
-    void tick;
-    return getReadingMinutes(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const next = await getReadingMinutes(goalId);
+      if (!cancelled) setState(next);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [goalId]);
 
   const pct = state.target <= 0 ? 0 : Math.min(100, Math.round((state.minutes / state.target) * 100));
 
   function patch(p: Partial<typeof state>) {
-    const cur = getReadingMinutes(goalId);
-    setReadingMinutes(goalId, { ...cur, ...p });
-    setTick((x) => x + 1);
+    setState((prev) => {
+      const next = { ...prev, ...p };
+      void setReadingMinutes(goalId, next);
+      return next;
+    });
   }
 
   return (

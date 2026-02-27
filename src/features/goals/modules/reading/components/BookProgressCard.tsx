@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -14,23 +14,36 @@ function toNum(v: string, fallback = 0) {
 }
 
 export function BookProgressCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState({
+    title: "Current book",
+    author: "",
+    totalPages: 300,
+    currentPage: 0,
+  });
 
-  const state = useMemo(() => {
-    void tick;
-    return getBookProgress(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const next = await getBookProgress(goalId);
+      if (!cancelled) setState(next);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [goalId]);
 
   const pct =
     state.totalPages <= 0 ? 0 : Math.min(100, Math.round((state.currentPage / state.totalPages) * 100));
 
   function patch(p: Partial<typeof state>) {
-    const cur = getBookProgress(goalId);
-    const next = { ...cur, ...p };
-    // keep currentPage bounded
-    next.currentPage = Math.max(0, Math.min(next.totalPages, next.currentPage));
-    setBookProgress(goalId, next);
-    setTick((x) => x + 1);
+    setState((prev) => {
+      const next = { ...prev, ...p };
+      next.currentPage = Math.max(0, Math.min(next.totalPages, next.currentPage));
+      void setBookProgress(goalId, next);
+      return next;
+    });
   }
 
   return (
