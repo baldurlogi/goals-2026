@@ -3,9 +3,12 @@ import { useGoalsStore } from "@/features/goals/goalStore";
 import { goalsRegistry } from "@/features/goals/registry";
 import { getUpcomingSteps, type UpcomingItem } from "@/features/goals/goalUtils";
 
-const HORIZON = 14;
+const HORIZON       = 14;
 const PREVIEW_LIMIT = 6;
 
+// Goals definitions stay as static TypeScript — only the "done" state
+// comes from Supabase via GoalsStoreProvider (already wired in goalStore).
+// No async needed here — GoalsStoreProvider handles the fetch.
 export function useGoalsDashboard() {
   const { state: goalsState } = useGoalsStore();
 
@@ -20,16 +23,12 @@ export function useGoalsDashboard() {
   );
 
   const previewItems = upcomingItems.slice(0, PREVIEW_LIMIT);
-  const hasMore = upcomingItems.length > PREVIEW_LIMIT;
-  const extraCount = upcomingItems.length - PREVIEW_LIMIT;
+  const hasMore      = upcomingItems.length > PREVIEW_LIMIT;
+  const extraCount   = upcomingItems.length - PREVIEW_LIMIT;
 
   return {
-    upcomingItems,
-    previewItems,
-    overdueCount,
-    hasMore,
-    extraCount,
-    horizon: HORIZON,
-    totalCount: upcomingItems.length,
+    upcomingItems, previewItems, overdueCount,
+    hasMore, extraCount,
+    horizon: HORIZON, totalCount: upcomingItems.length,
   };
 }

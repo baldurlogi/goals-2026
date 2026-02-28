@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useScheduleDashboard } from "../hooks/useScheduleDashboard";
 
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-muted ${className}`} />;
+}
+
 function ScheduleRow({
   time,
   label,
@@ -27,9 +31,9 @@ function ScheduleRow({
         {time}
       </span>
       <span
-        className={`flex-1 text-sm ${isNext && !done ? "font-semibold" : "font-medium"} ${
-          done ? "line-through text-muted-foreground" : ""
-        }`}
+        className={`flex-1 text-sm ${
+          isNext && !done ? "font-semibold" : "font-medium"
+        } ${done ? "line-through text-muted-foreground" : ""}`}
       >
         {label}
       </span>
@@ -43,6 +47,52 @@ function ScheduleRow({
   );
 }
 
+function ScheduleCardSkeleton() {
+  return (
+    <Card className="relative overflow-hidden lg:col-span-7">
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-purple-400 to-fuchsia-400" />
+
+      <CardHeader className="pb-2 pt-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-3.5 w-3.5 text-violet-500" />
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Today&apos;s schedule
+            </span>
+          </div>
+
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+
+        <div className="mt-2 flex items-center gap-2">
+          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+
+        <div className="mt-3 space-y-1">
+          <Skeleton className="h-1.5 w-full" />
+          <div className="flex justify-end">
+            <Skeleton className="h-3 w-8" />
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-2 pb-5">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-full" />
+
+        <div className="flex items-center justify-between pt-2">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-7 w-28 rounded-md" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ScheduleCard() {
   const {
     summary,
@@ -52,7 +102,12 @@ export function ScheduleCard() {
     completedSet,
     viewLabel,
     totalBlocks,
-  } = useScheduleDashboard();
+    isLoading, // <-- add this to your hook return
+  } = useScheduleDashboard() as ReturnType<typeof useScheduleDashboard> & {
+    isLoading?: boolean;
+  };
+
+  if (isLoading) return <ScheduleCardSkeleton />;
 
   return (
     <Card className="relative overflow-hidden lg:col-span-7">
@@ -63,7 +118,7 @@ export function ScheduleCard() {
           <div className="flex items-center gap-2">
             <CalendarDays className="h-3.5 w-3.5 text-violet-500" />
             <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Today's schedule
+              Today&apos;s schedule
             </span>
           </div>
           <Badge variant="secondary" className="tabular-nums text-[10px]">
@@ -78,8 +133,8 @@ export function ScheduleCard() {
               Next:{" "}
               <span className="font-bold text-foreground">
                 {nextBlock.icon} {nextBlock.label}
-              </span>
-              {" "}· {nextBlock.time}
+              </span>{" "}
+              · {nextBlock.time}
             </span>
           </div>
         ) : (

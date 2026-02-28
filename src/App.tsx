@@ -11,7 +11,7 @@ import { GoalsTab }         from "@/features/goals/GoalsTab";
 import { UpcomingTasksPage }from "@/features/goals/UpcomingTasksPage";
 import { GoalDetailPage }   from "@/features/goals/GoalsDetailPage";
 import { TodosPage }        from "@/features/todos/TodosPage";
-import { FitnessPage }      from "@/features/fitness/FitnessPage";
+import { FitnessGoalPage } from "./features/goals/modules/fitness/FitnessGoalPage";
 import DashboardPage        from "@/app/DashboardPage";
 
 export default function App() {
@@ -32,7 +32,7 @@ export default function App() {
                 <Route path="/goals/:goalId" element={<GoalDetailPage />} />
                 <Route path="/upcoming"      element={<UpcomingTasksPage />} />
                 <Route path="/todos"         element={<TodosPage />} />
-                <Route path="/fitness"       element={<FitnessPage />} />
+                <Route path="/fitness"       element={<FitnessGoalPage />} />
 
                 <Route path="/daily-plan" element={<Navigate to="/" replace />} />
               </Route>

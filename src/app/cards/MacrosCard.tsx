@@ -6,21 +6,17 @@ import { Button } from "@/components/ui/button";
 import { useNutritionDashboard } from "../hooks/useNutritionDashboard";
 
 function pct(value: number, target: number) {
-  return Math.min(Math.max( target > 0 ? Math.round((value / target) * 100) : 0, 0), 100);
+  return Math.min(Math.max(target > 0 ? Math.round((value / target) * 100) : 0, 0), 100);
+}
+
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-muted ${className}`} />;
 }
 
 function MacroPill({
-  label,
-  value,
-  target,
-  unit,
-  color
+  label, value, target, unit, color,
 }: {
-  label: string;
-  value: number;
-  target: number;
-  unit: string;
-  color: string;
+  label: string; value: number; target: number; unit: string; color: string;
 }) {
   const fillPct = pct(value, target);
   const remaining = target - value;
@@ -28,7 +24,7 @@ function MacroPill({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-medium text-muted-foreground uppercase tracking-wider text-[10px]">
+        <span className="font-medium uppercase tracking-wider text-muted-foreground text-[10px]">
           {label}
         </span>
         <span className="tabular-nums">
@@ -37,10 +33,10 @@ function MacroPill({
         </span>
       </div>
       <div className="relative h-2 rounded-full bg-muted overflow-hidden">
-          <div
-            className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
-            style={{ width: `${fillPct}%`, background: color }}
-          />
+        <div
+          className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+          style={{ width: `${fillPct}%`, background: color }}
+        />
       </div>
       <div className="text-right text-[10px] text-muted-foreground tabular-nums">
         {remaining > 0 ? `${remaining}${unit} left` : remaining === 0 ? "✓" : `${Math.abs(remaining)}${unit} over`}
@@ -51,15 +47,20 @@ function MacroPill({
 
 export function MacrosCard() {
   const {
-    logged,
-    target,
-    phase,
-    calPct,
-    mealsEaten,
-    totalMeals,
-    caloriesRemaining,
-    proteinRemaining,
+    logged, target, phase, calPct,
+    mealsEaten, totalMeals,
+    caloriesRemaining, proteinRemaining,
+    loading,
   } = useNutritionDashboard();
+
+  const cacheEmpty = logged.cal === 0 && mealsEaten === 0;
+  if (loading && cacheEmpty) return (
+    <Card className="relative overflow-hidden lg:col-span-7">
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-400" />
+      <CardHeader className="pb-2 pt-5"><Skeleton className="h-4 w-32" /><Skeleton className="mt-3 h-8 w-24" /></CardHeader>
+      <CardContent className="space-y-3 pb-5"><Skeleton className="h-3 w-full rounded-full" /><div className="grid grid-cols-3 gap-2"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div></CardContent>
+    </Card>
+  );
 
   return (
     <Card className="relative overflow-hidden lg:col-span-7">
@@ -146,7 +147,7 @@ export function MacrosCard() {
             )}
           </div>
           <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-            <Link to="/nutrition">
+            <Link to="/daily-plan/nutrition">
               Log food <ChevronRight className="h-3 w-3" />
             </Link>
           </Button>

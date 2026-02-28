@@ -137,6 +137,23 @@ export async function migrateLocalStorageToSupabase() {
     console.warn("No local fitness PRs found (fitness_prs_v1)");
   }
 
+  const FINANCE_GOAL_ID = "finance";
+  const financeKeys = Object.keys(localStorage).filter(
+    (k) => k.startsWith(`daily-life:finance:${FINANCE_GOAL_ID}:`)
+  );
+  for (const key of financeKeys) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    const state = JSON.parse(raw) as { month: string };
+    const month = state.month ?? key.split(":").pop();
+    if (!month) continue;
+    await upsert(
+      "finance_months",
+      { user_id: uid, goal_id: FINANCE_GOAL_ID, month, state },
+      "user_id,goal_id,month"
+    );
+  }
+
   // ✅ Goal progress (daily-life:goals:v1)
   const goals = localStorage.getItem("daily-life:goals:v1");
   if (goals) {

@@ -14,6 +14,7 @@ import {
   getMonthKey,
   loadFinanceMonth,
   saveFinanceMonth,
+  defaultFinanceState,
   type FinanceMonthState,
 } from "./financeStorage";
 
@@ -24,17 +25,26 @@ export function FinanceGoalPage() {
   const doneMap = state.done[goalId] ?? {};
 
   const [month, setMonth] = useState(() => getMonthKey());
-  const [monthState, setMonthState] = useState<FinanceMonthState>(() =>
-    loadFinanceMonth(goalId, month)
-  );
+  const [monthState, setMonthState] = useState<FinanceMonthState>(() => {
+    try {
+      const raw = localStorage.getItem(`cache:finance:${goalId}:${getMonthKey()}`);
+      return raw ? JSON.parse(raw) : defaultFinanceState(getMonthKey());
+    } catch { return defaultFinanceState(getMonthKey()); }
+  });
+
 
   useEffect(() => {
-    setMonthState(loadFinanceMonth(goalId, month));
+    let cancelled = false;
+    loadFinanceMonth(goalId, month).then((fresh) => {
+      if (!cancelled) setMonthState(fresh);
+    });
+    return () => { cancelled = true; };
   }, [goalId, month]);
 
-  useEffect(() => {
-    saveFinanceMonth(goalId, monthState);
-  }, [goalId, monthState]);
+  async function handleSetMonthState(next: FinanceMonthState) {
+    setMonthState(next);
+    await saveFinanceMonth(goalId, next);
+  }
 
   return (
     <div className="space-y-6">
@@ -65,7 +75,7 @@ export function FinanceGoalPage() {
             month={month}
             setMonth={setMonth}
             data={monthState}
-            setData={setMonthState}
+            setData={handleSetMonthState}
           />
         </div>
 

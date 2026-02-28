@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useFitnessDashboard } from "../hooks/useFitnessDashboard";
 
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-muted ${className}`} />;
+}
+
 function MiniBar({ pct, color = "bg-violet-500" }: { pct: number; color?: string }) {
   return (
     <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -16,7 +20,15 @@ function MiniBar({ pct, color = "bg-violet-500" }: { pct: number; color?: string
 }
 
 export function FitnessCard() {
-  const { topLifts } = useFitnessDashboard();
+  const { topLifts, loading } = useFitnessDashboard();
+
+  if (loading && topLifts.every((l) => l.best === null)) return (
+    <Card className="relative overflow-hidden lg:col-span-4">
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-purple-400 to-fuchsia-400" />
+      <CardHeader className="pb-2 pt-5"><Skeleton className="h-4 w-28" /></CardHeader>
+      <CardContent className="space-y-3 pb-4">{[...Array(3)].map((_,i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}</CardContent>
+    </Card>
+  );
 
   const anyData = topLifts.some((l) => l.best !== null);
 

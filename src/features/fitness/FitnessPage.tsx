@@ -1,393 +1,498 @@
-import { useEffect, useState } from "react";
-import { Dumbbell, Plus, Trash2, ChevronDown, ChevronUp, Pencil } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, X, Trash2, BookMarked, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+
+import { meals, getTargets, type NutritionPhase } from "../nutrition/nutritionData";
+import { MacroRow } from "../nutrition/components/MacroRow";
+import { MealCard } from "../nutrition/components/MealCard";
 import {
-  loadFitness,
-  logPR,
-  updateGoal,
-  deleteEntry,
-  currentBest,
-  progressPct,
-  FITNESS_CHANGED_EVENT,
-  type FitnessStore,
-  type LiftId,
-  type SkillId,
-  type LiftRecord,
-  type SkillRecord,
-  type PREntry,
-} from "@/features/fitness/fitnessStorage";
+  loadNutritionLog,
+  loadPhase,
+  loadSavedMeals,
+  savePhase,
+  saveNewMeal,
+  deleteSavedMeal,
+  logSavedMeal,
+  toggleMeal,
+  addCustomEntry,
+  removeCustomEntry,
+  getLoggedMacros,
+  type MealKey,
+  type SavedMeal,
+  type CustomEntry,
+  type NutritionLog,
+} from "../nutrition/nutritionStorage";
+import type { Macros } from "../nutrition/nutritionTypes";
 
-// ── Tabs ─────────────────────────────────────────────────────────────────────
-type Tab = "lifts" | "crossfit" | "swimming";
+// ── tiny helpers ──────────────────────────────────────────────────────────────
 
-// ── Log PR modal (inline form) ───────────────────────────────────────────────
-function LogForm({
-  unit,
-  metricType,
-  onSubmit,
-  onCancel,
+function MacroInputRow({
+  label, value, unit, onChange,
 }: {
-  unit: string;
-  metricType: string;
-  onSubmit: (value: number, notes: string) => void;
-  onCancel: () => void;
+  label: string; value: string; unit: string;
+  onChange: (v: string) => void;
 }) {
-  const [val, setVal]     = useState("");
-  const [notes, setNotes] = useState("");
-
-  const placeholder =
-    metricType === "seconds" ? "Time in seconds (e.g. 78)" :
-    `Value in ${unit}`;
-
   return (
-    <div className="mt-3 space-y-2 rounded-xl border bg-muted/30 p-3">
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-1">
+      <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
+      <div className="flex items-center gap-1">
         <input
           type="number"
           min={0}
-          placeholder={placeholder}
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          className="w-28 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+          placeholder="0"
         />
-        <input
-          type="text"
-          placeholder="Notes (optional)"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="flex-1 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        />
-      </div>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          disabled={!val || Number(val) <= 0}
-          onClick={() => onSubmit(Number(val), notes)}
-        >
-          Log PR
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+        <span className="shrink-0 text-xs text-muted-foreground">{unit}</span>
       </div>
     </div>
   );
 }
 
-// ── Goal editor ───────────────────────────────────────────────────────────────
-function GoalEditor({
-  current,
-  unit,
-  onSave,
-  onCancel,
+function macroBadge(m: Macros) {
+  return `${m.cal} kcal · ${m.protein}g P · ${m.carbs}g C · ${m.fat}g F`;
+}
+
+// ── Manual entry form ─────────────────────────────────────────────────────────
+
+function ManualEntryForm({
+  onAdd,
+  onSaveAndAdd,
 }: {
-  current: number;
-  unit: string;
-  onSave: (val: number) => void;
-  onCancel: () => void;
+  onAdd:       (name: string, macros: Macros) => void;
+  onSaveAndAdd:(name: string, macros: Macros, emoji: string) => void;
 }) {
-  const [val, setVal] = useState(String(current));
+  const [name,    setName]    = useState("");
+  const [cal,     setCal]     = useState("");
+  const [protein, setProtein] = useState("");
+  const [carbs,   setCarbs]   = useState("");
+  const [fat,     setFat]     = useState("");
+  const [emoji,   setEmoji]   = useState("🍽️");
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  const macros: Macros = {
+    cal:     Number(cal)     || 0,
+    protein: Number(protein) || 0,
+    carbs:   Number(carbs)   || 0,
+    fat:     Number(fat)     || 0,
+  };
+
+  const valid = macros.cal > 0 || macros.protein > 0;
+
+  function reset() {
+    setName(""); setCal(""); setProtein(""); setCarbs(""); setFat("");
+    nameRef.current?.focus();
+  }
+
   return (
-    <span className="inline-flex items-center gap-1">
-      <input
-        type="number"
-        value={val}
-        min={0}
-        onChange={(e) => setVal(e.target.value)}
-        className="w-20 rounded border bg-background px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-      />
-      <span className="text-xs text-muted-foreground">{unit}</span>
-      <button
-        type="button"
-        onClick={() => Number(val) > 0 && onSave(Number(val))}
-        className="text-[10px] font-semibold text-emerald-500 hover:text-emerald-400"
-      >Save</button>
-      <button type="button" onClick={onCancel} className="text-[10px] text-muted-foreground hover:text-foreground">✕</button>
-    </span>
+    <div className="space-y-3 rounded-xl border bg-muted/20 p-3">
+      {/* Meal name + emoji */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={emoji}
+          onChange={(e) => setEmoji(e.target.value)}
+          className="w-10 rounded-md border bg-background px-1.5 py-1.5 text-center text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          maxLength={2}
+        />
+        <input
+          ref={nameRef}
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Meal name (e.g. Hello Fresh Chicken)"
+          className="flex-1 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+      </div>
+
+      {/* Macro inputs */}
+      <div className="grid grid-cols-4 gap-2">
+        <MacroInputRow label="Calories" value={cal}     unit="kcal" onChange={setCal}     />
+        <MacroInputRow label="Protein"  value={protein} unit="g"    onChange={setProtein} />
+        <MacroInputRow label="Carbs"    value={carbs}   unit="g"    onChange={setCarbs}   />
+        <MacroInputRow label="Fat"      value={fat}     unit="g"    onChange={setFat}     />
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          disabled={!valid}
+          onClick={() => { onAdd(name || "Custom meal", macros); reset(); }}
+        >
+          Log now
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!valid || !name.trim()}
+          onClick={() => { onSaveAndAdd(name, macros, emoji); reset(); }}
+          title="Save to your meal library and log today"
+        >
+          <BookMarked className="mr-1.5 h-3.5 w-3.5" />
+          Save & log
+        </Button>
+      </div>
+    </div>
   );
 }
 
-// ── History row ───────────────────────────────────────────────────────────────
-function HistoryRow({
-  entry, index, unit, metricType, onDelete,
-}: {
-  entry: PREntry; index: number; unit: string; metricType: string;
-  onDelete: (i: number) => void;
-}) {
-  const displayVal =
-    metricType === "seconds"
-      ? `${Math.floor(entry.value / 60)}:${String(entry.value % 60).padStart(2, "0")}`
-      : `${entry.value} ${unit}`;
+// ── Saved meal pill ───────────────────────────────────────────────────────────
 
+function SavedMealPill({
+  meal, onAdd, onDelete,
+}: {
+  meal: SavedMeal;
+  onAdd:    (m: SavedMeal) => void;
+  onDelete: (id: string) => void;
+}) {
   return (
-    <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/30">
-      <span className="w-24 shrink-0 text-xs text-muted-foreground">{entry.date}</span>
-      <span className="flex-1 text-sm font-semibold tabular-nums">{displayVal}</span>
-      {entry.notes && <span className="text-xs text-muted-foreground italic truncate max-w-[120px]">{entry.notes}</span>}
+    <div className="group flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-muted/30 transition-colors">
       <button
         type="button"
-        onClick={() => onDelete(index)}
-        className="invisible ml-auto shrink-0 text-muted-foreground/40 hover:text-destructive group-hover:visible"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        onClick={() => onAdd(meal)}
       >
-        <Trash2 className="h-3 w-3" />
+        <span className="text-base leading-none">{meal.emoji}</span>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium">{meal.name}</div>
+          <div className="text-[10px] text-muted-foreground">{macroBadge(meal.macros)}</div>
+        </div>
+        <Plus className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      </button>
+      <button
+        type="button"
+        onClick={() => onDelete(meal.id)}
+        className="invisible shrink-0 text-muted-foreground/40 hover:text-destructive group-hover:visible"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
       </button>
     </div>
   );
 }
 
-// ── Single PR card ────────────────────────────────────────────────────────────
-function PRCard({
-  kind,
-  record,
-  onLog,
-  onGoalSave,
-  onDelete,
+// ── Custom entry row (today's logged items) ────────────────────────────────────
+
+function CustomEntryRow({
+  entry, onRemove,
 }: {
-  kind: "lift" | "skill";
-  record: LiftRecord | SkillRecord;
-  onLog: (kind: "lift" | "skill", id: string, value: number, notes?: string) => void;
-  onGoalSave: (kind: "lift" | "skill", id: string, goal: number) => void;
-  onDelete: (kind: "lift" | "skill", id: string, index: number) => void;
+  entry: CustomEntry; onRemove: (id: string) => void;
 }) {
-  const [showLog,     setShowLog]     = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [editGoal,    setEditGoal]    = useState(false);
-
-  const unit       = record.unit;
-  const metricType = kind === "skill" ? (record as SkillRecord).metricType : "number";
-  const best       = currentBest(record.history);
-  const pct        = progressPct(best, record.goal);
-  const goalLabel  = kind === "skill" ? ((record as SkillRecord).goalLabel ?? `${record.goal} ${unit}`) : `${record.goal} ${unit}`;
-
-  const displayBest =
-    metricType === "seconds" && best !== null
-      ? `${Math.floor(best / 60)}:${String(best % 60).padStart(2, "0")}`
-      : best !== null
-      ? `${best} ${unit}`
-      : null;
-
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-2 pt-4 px-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-sm">{record.label}</CardTitle>
-            <CardDescription className="text-xs mt-0.5">
-              Goal:{" "}
-              {editGoal ? (
-                <GoalEditor
-                  current={record.goal}
-                  unit={unit}
-                  onSave={(v) => { onGoalSave(kind, record.id, v); setEditGoal(false); }}
-                  onCancel={() => setEditGoal(false)}
-                />
-              ) : (
-                <span>
-                  {goalLabel}{" "}
-                  <button type="button" onClick={() => setEditGoal(true)} className="inline-flex text-muted-foreground/60 hover:text-muted-foreground">
-                    <Pencil className="h-2.5 w-2.5" />
-                  </button>
-                </span>
-              )}
-            </CardDescription>
-          </div>
+    <div className="group flex items-center gap-3 rounded-md px-1 py-1.5 hover:bg-muted/30">
+      <div className="flex-1 min-w-0">
+        <div className="truncate text-sm font-medium">{entry.name}</div>
+        <div className="text-[10px] text-muted-foreground">{macroBadge(entry.macros)}</div>
+      </div>
+      <button
+        type="button"
+        onClick={() => onRemove(entry.id)}
+        className="invisible shrink-0 text-muted-foreground/40 hover:text-destructive group-hover:visible"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
-          <div className="text-right shrink-0">
-            {displayBest ? (
-              <>
-                <div className="text-lg font-bold tabular-nums leading-none">{displayBest}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">current PR</div>
-              </>
-            ) : (
-              <div className="text-xs italic text-muted-foreground">No PR yet</div>
-            )}
-          </div>
-        </div>
+// ── MealToggle ────────────────────────────────────────────────────────────────
 
-        {/* Progress toward goal */}
-        <div className="mt-3 space-y-1">
-          <Progress value={pct} className="h-1.5" />
-          <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
-            <span>{pct}% to goal</span>
-            {best !== null && best >= record.goal && (
-              <span className="text-emerald-500 font-semibold">🎯 Goal hit!</span>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="px-4 pb-4 space-y-1">
-        {/* Log + History toggles */}
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant={showLog ? "default" : "outline"}
-            className="h-7 gap-1 text-xs"
-            onClick={() => { setShowLog((s) => !s); setShowHistory(false); }}
-          >
-            <Plus className="h-3 w-3" /> Log PR
-          </Button>
-
-          {record.history.length > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 gap-1 text-xs text-muted-foreground"
-              onClick={() => { setShowHistory((s) => !s); setShowLog(false); }}
-            >
-              {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              History ({record.history.length})
-            </Button>
-          )}
-        </div>
-
-        {showLog && (
-          <LogForm
-            unit={unit}
-            metricType={metricType}
-            onSubmit={(v, n) => { onLog(kind, record.id, v, n); setShowLog(false); }}
-            onCancel={() => setShowLog(false)}
-          />
-        )}
-
-        {showHistory && (
-          <div className="mt-2 space-y-0.5 max-h-48 overflow-auto">
-            {record.history.map((entry, i) => (
-              <HistoryRow
-                key={`${entry.date}-${i}`}
-                entry={entry}
-                index={i}
-                unit={unit}
-                metricType={metricType}
-                onDelete={(idx) => onDelete(kind, record.id, idx)}
-              />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+function MealToggle({ id, label, eaten, onToggle }: {
+  id: MealKey; label: string; eaten: boolean;
+  onToggle: (key: MealKey, value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <Checkbox id={id} checked={eaten} onCheckedChange={(c) => onToggle(id, !!c)} />
+      <Label htmlFor={id} className={`cursor-pointer text-sm ${eaten ? "line-through text-muted-foreground" : ""}`}>
+        {label}
+      </Label>
+    </div>
   );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export function FitnessPage() {
-  const [store, setStore] = useState<FitnessStore>(() => loadFitness());
-  const [tab,   setTab]   = useState<Tab>("lifts");
+
+export function NutritionTab() {
+  const [breakfastChoice, setBreakfastChoice] = useState<1 | 2>(1);
+
+    // ✅ safe defaults, then hydrate in the effect
+    const [phase, setPhase] = useState<NutritionPhase>("maintain");
+    const [log, setLog] = useState<NutritionLog>(() => ({
+    date: new Date().toISOString().slice(0, 10),
+    eaten: {},
+    customEntries: [],
+  }));
+
+  const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
+  const [showManual,  setShowManual]  = useState(false);
+  const [showLibrary, setShowLibrary] = useState(true);
 
   useEffect(() => {
-    const sync = () => setStore(loadFitness());
-    window.addEventListener(FITNESS_CHANGED_EVENT, sync);
+    async function init() {
+      const [freshLog, freshPhase, freshMeals] = await Promise.all([
+        loadNutritionLog(), loadPhase(), loadSavedMeals(),
+      ]);
+      setLog(freshLog);
+      setPhase(freshPhase);
+      setSavedMeals(freshMeals);
+    }
+    init();
+
+    const sync = async () => {
+      const [freshLog, freshPhase, freshMeals] = await Promise.all([
+        loadNutritionLog(), loadPhase(), loadSavedMeals(),
+      ]);
+      setLog(freshLog);
+      setPhase(freshPhase);
+      setSavedMeals(freshMeals);
+    };
+    window.addEventListener("nutrition:changed", sync);
     window.addEventListener("storage", sync);
     return () => {
-      window.removeEventListener(FITNESS_CHANGED_EVENT, sync);
+      window.removeEventListener("nutrition:changed", sync);
       window.removeEventListener("storage", sync);
     };
   }, []);
 
-  const handleLog = (kind: "lift" | "skill", id: string, value: number, notes?: string) => {
-    logPR(kind, id as LiftId & SkillId, value, notes);
-    setStore(loadFitness());
+  const handlePhaseToggle = async () => {
+    const next: NutritionPhase = phase === "maintain" ? "cut" : "maintain";
+    await savePhase(next);
+    setPhase(next);
   };
 
-  const handleGoalSave = (kind: "lift" | "skill", id: string, goal: number) => {
-    updateGoal(kind, id as LiftId & SkillId, goal);
-    setStore(loadFitness());
+  const handleToggle = async (key: MealKey, eaten: boolean) => {
+    await toggleMeal(key, eaten);
+    setLog(await loadNutritionLog());
   };
 
-  const handleDelete = (kind: "lift" | "skill", id: string, index: number) => {
-    deleteEntry(kind, id as LiftId & SkillId, index);
-    setStore(loadFitness());
+  const handleManualAdd = async (name: string, macros: Macros) => {
+    await addCustomEntry(name, macros);
+    setLog(await loadNutritionLog());
   };
 
-  const liftOrder: LiftId[]       = ["bench", "squat", "ohp", "clean", "snatch"];
-  const crossfitOrder: SkillId[]  = ["butterfly_pullups", "muscle_ups", "strict_hspu", "freestanding_hspu", "hsw"];
-  const swimmingOrder: SkillId[]  = ["swim_100m", "swim_200m"];
+  const handleSaveAndAdd = async (name: string, macros: Macros, emoji: string) => {
+    saveNewMeal(name, macros, emoji);
+    await addCustomEntry(name, macros);
+    setLog(await loadNutritionLog());
+    setSavedMeals(await loadSavedMeals());
+  };
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: "lifts",    label: "🏋️ Lifts" },
-    { id: "crossfit", label: "🤸 CrossFit" },
-    { id: "swimming", label: "🏊 Swimming" },
-  ];
+  const handleQuickAdd = async (meal: SavedMeal) => {
+    await logSavedMeal(meal);
+    setLog(await loadNutritionLog());
+  };
+
+  const handleRemoveCustom = async (id: string) => {
+    await removeCustomEntry(id);
+    setLog(await loadNutritionLog());
+  };
+
+  const handleDeleteSaved = async (id: string) => {
+    await deleteSavedMeal(id);
+    setSavedMeals(await loadSavedMeals());
+  };
+
+  const targets    = useMemo(() => getTargets(phase), [phase]);
+  const logged     = useMemo(() => getLoggedMacros(log), [log]);
+  const breakfast  = breakfastChoice === 1 ? meals.breakfast.option1 : meals.breakfast.option2;
+  const breakfastKey: MealKey = breakfastChoice === 1 ? "breakfast1" : "breakfast2";
+  const totalEntries = Object.values(log.eaten).filter(Boolean).length + log.customEntries.length;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Dumbbell className="h-5 w-5 text-violet-500" />
+      {/* ── Phase toggle banner ── */}
+      <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3">
         <div>
-          <h1 className="text-xl font-semibold">PRs & Fitness</h1>
-          <p className="text-sm text-muted-foreground">
-            Track personal records, goals and history across lifts and skills.
+          <p className="text-sm font-semibold">
+            {phase === "cut" ? "✂️ Cut phase" : "💪 Maintain / Lean bulk"}
           </p>
+          <p className="text-xs text-muted-foreground">{targets.note}</p>
         </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={phase === "cut"}
+          onClick={handlePhaseToggle}
+          className={[
+            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent",
+            "transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            phase === "cut" ? "bg-rose-500" : "bg-muted",
+          ].join(" ")}
+        >
+          <span className={[
+            "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transform transition-transform duration-200",
+            phase === "cut" ? "translate-x-5" : "translate-x-0",
+          ].join(" ")} />
+        </button>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 rounded-xl border bg-card p-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={[
-              "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              tab === t.id
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:text-foreground",
-            ].join(" ")}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* ── Left column ── */}
+        <div className="space-y-5">
+
+          {/* Today's macros summary — top of left col for quick reference */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Today's macros</CardTitle>
+              <CardDescription className="text-xs">
+                {totalEntries === 0
+                  ? "Nothing logged yet."
+                  : `${totalEntries} item${totalEntries > 1 ? "s" : ""} logged today.`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MacroRow label="Calories" value={logged.cal}     target={targets.cal} unit="kcal" mode="max" />
+              <MacroRow label="Protein"  value={logged.protein} target={targets.protein}  unit="g"    mode="min" />
+              <Separator />
+              <MacroRow label="Carbs"    value={logged.carbs}   target={targets.carbs}    unit="g"    mode="range" />
+              <MacroRow label="Fat"      value={logged.fat}     target={targets.fat}      unit="g"    mode="range" />
+            </CardContent>
+          </Card>
+
+          {/* Meal plan checkboxes */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={breakfastChoice === 1 ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setBreakfastChoice(1)}
+                >
+                  Overnight oats
+                </Button>
+                <Button
+                  variant={breakfastChoice === 2 ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setBreakfastChoice(2)}
+                >
+                  Skyr Bowl
+                </Button>
+              </div>
+              <CardDescription className="text-xs mt-2">
+                Tick off plan meals as you eat them.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <MealToggle id={breakfastKey}   label="🌅 Breakfast"          eaten={!!log.eaten[breakfastKey]}     onToggle={handleToggle} />
+              <MealToggle id="lunchWfh"       label="🥗 Lunch"              eaten={!!log.eaten["lunchWfh"]}       onToggle={handleToggle} />
+              <MealToggle id="afternoonSnack" label="🍎 Afternoon snack"    eaten={!!log.eaten["afternoonSnack"]} onToggle={handleToggle} />
+              <MealToggle id="postWorkout"    label="🥤 Post-workout shake" eaten={!!log.eaten["postWorkout"]}    onToggle={handleToggle} />
+              <MealToggle id="dinner"         label="🍽️ Dinner"             eaten={!!log.eaten["dinner"]}         onToggle={handleToggle} />
+            </CardContent>
+          </Card>
+
+          {/* ── Saved meals quick-add ── */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Saved meals</CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setShowLibrary((s) => !s)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {showLibrary
+                    ? <ChevronUp className="h-4 w-4" />
+                    : <ChevronDown className="h-4 w-4" />}
+                </button>
+              </div>
+              <CardDescription className="text-xs">
+                Tap any meal to log it instantly. Save new ones below.
+              </CardDescription>
+            </CardHeader>
+            {showLibrary && (
+              <CardContent className="space-y-2 pb-4">
+                {savedMeals.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No saved meals yet — use "Save & log" below to build your library.
+                  </p>
+                ) : (
+                  savedMeals.map((m) => (
+                    <SavedMealPill
+                      key={m.id}
+                      meal={m}
+                      onAdd={handleQuickAdd}
+                      onDelete={handleDeleteSaved}
+                    />
+                  ))
+                )}
+              </CardContent>
+            )}
+          </Card>
+
+          {/* ── Manual / custom log ── */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Log a custom meal</CardTitle>
+                <Button
+                  size="sm"
+                  variant={showManual ? "secondary" : "outline"}
+                  className="h-7 text-xs"
+                  onClick={() => setShowManual((s) => !s)}
+                >
+                  {showManual ? "Close" : <><Plus className="mr-1 h-3 w-3" />Add</>}
+                </Button>
+              </div>
+              <CardDescription className="text-xs">
+                Enter macros manually — for Hello Fresh meals, custom cooking, or anything else.
+              </CardDescription>
+            </CardHeader>
+            {showManual && (
+              <CardContent className="pb-4">
+                <ManualEntryForm
+                  onAdd={handleManualAdd}
+                  onSaveAndAdd={handleSaveAndAdd}
+                />
+              </CardContent>
+            )}
+
+            {/* Custom entries logged today */}
+            {log.customEntries.length > 0 && (
+              <CardContent className="space-y-0.5 pt-0 pb-4">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Logged today
+                </p>
+                {log.customEntries.map((entry) => (
+                  <CustomEntryRow
+                    key={entry.id}
+                    entry={entry}
+                    onRemove={handleRemoveCustom}
+                  />
+                ))}
+              </CardContent>
+            )}
+          </Card>
+        </div>
+
+        {/* ── Right column — meal reference cards ── */}
+        <div className="space-y-4">
+          <MealCard title="🌅 Breakfast" meal={breakfast} />
+          <MealCard title="🥗 Lunch (WFH)" meal={meals.lunch.wfh} />
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Office lunch note</CardTitle>
+              <CardDescription className="text-xs">Wed–Fri lunch is provided</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {meals.lunch.office.note}
+            </CardContent>
+          </Card>
+          <MealCard title="🍎 Afternoon snack" meal={meals.afternoonSnack} />
+          <MealCard title="🥤 Post-workout"    meal={meals.postWorkout} />
+          <MealCard title="🍽️ Dinner"          meal={meals.dinner} />
+        </div>
       </div>
-
-      {/* Lifts tab */}
-      {tab === "lifts" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {liftOrder.map((id) => (
-            <PRCard
-              key={id}
-              kind="lift"
-              record={store.lifts[id]}
-              onLog={handleLog}
-              onGoalSave={handleGoalSave}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* CrossFit tab */}
-      {tab === "crossfit" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {crossfitOrder.map((id) => (
-            <PRCard
-              key={id}
-              kind="skill"
-              record={store.skills[id]}
-              onLog={handleLog}
-              onGoalSave={handleGoalSave}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Swimming tab */}
-      {tab === "swimming" && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {swimmingOrder.map((id) => (
-            <PRCard
-              key={id}
-              kind="skill"
-              record={store.skills[id]}
-              onLog={handleLog}
-              onGoalSave={handleGoalSave}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,75 +1,55 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   loadFitness,
   FITNESS_CHANGED_EVENT,
   currentBest,
   progressPct,
+  DEFAULT_STORE,
   type FitnessStore,
 } from "@/features/fitness/fitnessStorage";
 
-type LiftId = "bench" | "squat" | "ohp";
+const CACHE_KEY = "cache:fitness:v1";
 
-const FALLBACK_LIFT = (id: LiftId) => ({
-  label: id.toUpperCase(),
-  goal: 0,
-  history: [] as any[],
-});
-
-const EMPTY_STORE: FitnessStore = {
-  lifts: {
-    bench: FALLBACK_LIFT("bench"),
-    squat: FALLBACK_LIFT("squat"),
-    ohp: FALLBACK_LIFT("ohp"),
-  },
-  skills: {}, // adjust if your FitnessStore.skills is not an object
-} as FitnessStore;
+function readCache(): FitnessStore {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : DEFAULT_STORE;
+  } catch { return DEFAULT_STORE; }
+}
 
 export function useFitnessDashboard() {
-  const [store, setStore] = useState<FitnessStore>(EMPTY_STORE);
+  const [store,   setStore]   = useState<FitnessStore>(readCache);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let alive = true;
+    let cancelled = false;
 
-    const sync = async () => {
-      setLoading(true);
-      try {
-        const next = await loadFitness();          // ✅ await
-        if (alive) setStore(next ?? EMPTY_STORE);  // guard
-      } finally {
-        if (alive) setLoading(false);
+    async function fetch() {
+      const fresh = await loadFitness();
+      if (!cancelled) {
+        setStore(fresh);
+        setLoading(false);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(fresh)); } catch {}
       }
-    };
+    }
 
-    sync();
+    fetch();
 
-    const onChange = () => { void sync(); };
-    window.addEventListener(FITNESS_CHANGED_EVENT, onChange);
-    window.addEventListener("storage", onChange);
-
+    const sync = () => fetch();
+    window.addEventListener(FITNESS_CHANGED_EVENT, sync);
+    window.addEventListener("storage", sync);
     return () => {
-      alive = false;
-      window.removeEventListener(FITNESS_CHANGED_EVENT, onChange);
-      window.removeEventListener("storage", onChange);
+      cancelled = true;
+      window.removeEventListener(FITNESS_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", sync);
     };
   }, []);
 
-  const topLifts = useMemo(() => {
-    const lifts = (store as any)?.lifts ?? {};
-    return (["bench", "squat", "ohp"] as const).map((id) => {
-      const r = lifts[id] ?? FALLBACK_LIFT(id);
-      const best = currentBest(r.history ?? []);
-      const goal = r.goal ?? 0;
-
-      return {
-        id,
-        label: r.label ?? id.toUpperCase(),
-        best,
-        goal,
-        pct: progressPct(best, goal),
-      };
-    });
-  }, [store]);
+  const topLifts = (["bench", "squat", "ohp"] as const).map((id) => {
+    const r    = store.lifts[id];
+    const best = currentBest(r.history);
+    return { id, label: r.label, best, goal: r.goal, pct: progressPct(best, r.goal) };
+  });
 
   return { store, topLifts, loading };
 }

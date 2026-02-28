@@ -13,8 +13,6 @@ function formatDkk(n: number) {
 }
 
 
-
-
 // Custom tooltip — uses CSS vars so it works in both light and dark mode
 function DonutTooltip({ active, payload }: {
   active?: boolean;

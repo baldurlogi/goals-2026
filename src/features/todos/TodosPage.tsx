@@ -1,41 +1,52 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  addTodo,
-  clearCompleted,
-  deleteTodo,
-  loadTodos,
-  TODO_CHANGED_EVENT,
-  toggleTodo,
-  type TodoItem,
-} from "./todoStorage";
-import { CheckSquare, Trash2, X } from "lucide-react";
+import { CheckSquare, ChevronDown, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  listTodos,
+  addTodo,
+  toggleTodo,
+  deleteTodo,
+  clearCompleted,
+  TODO_CHANGED_EVENT,
+  type TodoItem,
+} from "@/features/todos/todoStorage";
 
 export function TodosPage() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
+
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [showDone, setShowDone] = useState(false);
 
   useEffect(() => {
-    const sync = async () => {
-      const rows = await loadTodos();
-      setTodos(rows);
+    let alive = true;
+
+    const load = async () => {
+      const data = await listTodos();
+      if (alive) setTodos(data as TodoItem[]);
     };
 
-    sync(); // initial load
-    window.addEventListener(TODO_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(TODO_CHANGED_EVENT, sync);
+    load();
+
+    const onChanged = () => load();
+    window.addEventListener(TODO_CHANGED_EVENT, onChanged);
+
+    return () => {
+      alive = false;
+      window.removeEventListener(TODO_CHANGED_EVENT, onChanged);
+    };
   }, []);
 
   async function handleAdd() {
     const text = input.trim();
     if (!text) return;
-    await addTodo(text);
+
+    await addTodo(text); // addTodo is async in your storage
     setInput("");
     inputRef.current?.focus();
-    // no need to manually reload if emit() triggers and your listener runs,
-    // but it’s fine either way
+    // no need to call listTodos() here because TODO_CHANGED_EVENT should fire,
+    // but it's fine either way.
   }
 
   const incomplete = todos.filter((t) => !t.done);
@@ -54,9 +65,7 @@ export function TodosPage() {
             variant="ghost"
             size="sm"
             className="h-7 gap-1 text-xs text-muted-foreground"
-            onClick={async () => {
-              await clearCompleted();
-            }}
+            onClick={() => clearCompleted()}
           >
             <Trash2 className="h-3 w-3" />
             Clear completed
@@ -70,7 +79,7 @@ export function TodosPage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          placeholder="Add a task and press Enter..."
+          placeholder="Add a task and press Enter…"
           className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
         />
         <Button onClick={handleAdd} disabled={!input.trim()} size="sm">
@@ -83,10 +92,35 @@ export function TodosPage() {
           All clear 🎉 — nothing left to do.
         </div>
       ) : (
-        <div>
+        <div className="divide-y divide-border/50 rounded-xl border bg-card">
           {incomplete.map((item) => (
             <TodoRow key={item.id} item={item} />
           ))}
+        </div>
+      )}
+
+      {done.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowDone((s: boolean) => !s)}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${
+                showDone ? "rotate-180" : ""
+              }`}
+            />
+            {done.length} completed
+          </button>
+
+          {showDone && (
+            <div className="mt-2 divide-y divide-border/50 rounded-xl border bg-card opacity-70">
+              {done.map((item) => (
+                <TodoRow key={item.id} item={item} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -98,9 +132,7 @@ function TodoRow({ item }: { item: TodoItem }) {
     <div className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
       <Checkbox
         checked={item.done}
-        onCheckedChange={async () => {
-          await toggleTodo(item.id);
-        }}
+        onCheckedChange={() => toggleTodo(item.id)}
         className="shrink-0"
       />
       <span
@@ -112,7 +144,7 @@ function TodoRow({ item }: { item: TodoItem }) {
       </span>
       <button
         type="button"
-        onClick={async () => deleteTodo(item.id)}
+        onClick={() => deleteTodo(item.id)}
         className="invisible shrink-0 text-muted-foreground/40 hover:text-muted-foreground group-hover:visible"
       >
         <X className="h-3.5 w-3.5" />

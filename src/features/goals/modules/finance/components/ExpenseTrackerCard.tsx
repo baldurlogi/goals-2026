@@ -1,4 +1,4 @@
-import { useMemo, type Dispatch, type SetStateAction } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +10,7 @@ import {
   defaultFinanceState,
   type FinanceMonthState,
   type FinanceCategoryId,
+  type FinanceCategory,
 } from "../financeStorage";
 
 function formatDkk(n: number) {
@@ -36,7 +37,7 @@ export function ExpenseTrackerCard(props: {
   month: string;
   setMonth: (m: string) => void;
   data: FinanceMonthState;
-  setData: Dispatch<SetStateAction<FinanceMonthState>>;
+  setData: (next: FinanceMonthState) => void;
   className?: string;
 }) {
   const { month, setMonth, data, setData, className } = props;
@@ -49,34 +50,27 @@ export function ExpenseTrackerCard(props: {
   }, [data]);
 
   function updateIncome(v: string) {
-    setData((prev) => ({ ...prev, income: toNumber(v) }));
+    setData({ ...data, income: toNumber(v) });
   }
 
-  function updateCategory(
-    id: FinanceCategoryId,
-    patch: Partial<{ budget: number; spent: number }>
-  ) {
-    setData((prev) => ({
-      ...prev,
-      categories: prev.categories.map((c) =>
+  function updateCategory(id: FinanceCategoryId, patch: Partial<{ budget: number; spent: number }>) {
+    setData({
+      ...data,
+      categories: data.categories.map((c: FinanceCategory) =>
         c.id === id
-          ? {
-              ...c,
-              budget: patch.budget ?? c.budget,
-              spent: patch.spent ?? c.spent,
-            }
+          ? { ...c, budget: patch.budget ?? c.budget, spent: patch.spent ?? c.spent }
           : c
       ),
-    }));
+    });
   }
 
   function quickAdd(id: FinanceCategoryId, delta: number) {
-    setData((prev) => ({
-      ...prev,
-      categories: prev.categories.map((c) =>
+    setData({
+      ...data,
+      categories: data.categories.map((c: FinanceCategory) =>
         c.id === id ? { ...c, spent: Math.max(0, (c.spent || 0) + delta) } : c
       ),
-    }));
+    });
   }
 
   function resetMonth() {

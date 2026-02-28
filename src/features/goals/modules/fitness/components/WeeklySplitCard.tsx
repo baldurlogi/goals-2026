@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
-import { getMondayISO, getWeeklySplit, setWeeklySplit, todayISO } from "../../finance/financeStorage";
+import { getMondayISO, getWeeklySplit, setWeeklySplit, todayISO } from "@/features/fitness/fitnessStorage";
 
 const PLAN: Array<{ day: "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun"; label: string }> =
   [

@@ -1,46 +1,67 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   loadReadingInputs,
+  DEFAULT_READING_INPUTS,
   READING_CHANGED_EVENT,
 } from "@/features/reading/readingStorage";
 import { inputsToPlan, getReadingStats } from "@/features/reading/readingUtils";
 import type { ReadingInputs } from "@/features/reading/readingTypes";
-import { DEFAULT_READING_INPUTS } from "@/features/reading/readingStorage";
+
+const CACHE_KEY = "daily-life:reading:v2";
+
+/** Read cached value from localStorage synchronously — instant on first paint */
+function readCache(): ReadingInputs {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : DEFAULT_READING_INPUTS;
+  } catch {
+    return DEFAULT_READING_INPUTS;
+  }
+}
 
 export function useReadingDashboard() {
-  const [readingInputs, setReadingInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
+  // Seed state from localStorage cache — renders immediately with real data
+  const [inputs,  setInputs]  = useState<ReadingInputs>(readCache);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    const sync = async () => {
-      const next = await loadReadingInputs();
-      if (!cancelled) setReadingInputs(next);
-    };
+    async function fetchFromSupabase() {
+      const fresh = await loadReadingInputs();
+      if (!cancelled) {
+        setInputs(fresh);
+        setLoading(false);
+        // Keep cache in sync for next load
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(fresh)); } catch {}
+      }
+    }
 
-    // initial load
-    sync();
+    fetchFromSupabase();
 
-    // on app-level event (emitted after save)
+    // Re-fetch when another tab/component saves
+    const sync = () => { fetchFromSupabase(); };
     window.addEventListener(READING_CHANGED_EVENT, sync);
+    window.addEventListener("storage", sync);
 
     return () => {
       cancelled = true;
       window.removeEventListener(READING_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", sync);
     };
   }, []);
 
   const stats = useMemo(
-    () => getReadingStats(inputsToPlan(readingInputs)),
-    [readingInputs]
+    () => getReadingStats(inputsToPlan(inputs)),
+    [inputs],
   );
 
   const hasReading = Boolean(
-    stats.current.title.trim() ||
-      stats.current.author.trim() ||
-      readingInputs.current.totalPages.trim() ||
-      readingInputs.current.currentPage.trim()
+    stats.current.title.trim()      ||
+    stats.current.author.trim()     ||
+    inputs.current.totalPages.trim() ||
+    inputs.current.currentPage.trim(),
   );
 
-  return { stats, hasReading };
+  return { stats, hasReading, loading };
 }
