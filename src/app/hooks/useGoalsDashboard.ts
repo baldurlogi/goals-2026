@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useGoalsStore } from "@/features/goals/goalStore";
+import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { goalsRegistry } from "@/features/goals/registry";
 import { getUpcomingSteps, type UpcomingItem } from "@/features/goals/goalUtils";
 

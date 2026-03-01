@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth } from "@/auth/authContext";
 import { loadProfile, readProfileCache, type UserProfile } from "./profileStorage";
 import { OnboardingFlow } from "./OnboardingFlow";
 
@@ -11,7 +11,10 @@ export function RequireOnboarding({ children }: Props) {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!user) { setChecking(false); return; }
+    if (!user) {
+      Promise.resolve().then(() => setChecking(false));
+      return;
+    }
 
     loadProfile().then((p) => {
       setProfile(p);

@@ -1,4 +1,4 @@
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth } from "@/auth/authContext";
 import { LoginPage } from "@/auth/LoginPage";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {

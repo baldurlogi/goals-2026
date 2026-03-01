@@ -51,7 +51,10 @@ export function useNutritionDashboard() {
         try {
           localStorage.setItem(LOG_CACHE,   JSON.stringify(freshLog));
           localStorage.setItem(PHASE_CACHE, freshPhase);
-        } catch {}
+        } catch(e) {
+          console.warn("read cache failed", e);
+          return {};
+        }
       }
     }
 

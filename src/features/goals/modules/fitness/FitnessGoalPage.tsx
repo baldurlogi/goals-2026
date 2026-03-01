@@ -1,4 +1,4 @@
-import { useGoalsStore } from "../../goalStore";
+import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { fitnessGoal } from "./fitnessGoal";
 
 import { GoalPageHeader } from "@/features/goals/components/GoalPageHeader";

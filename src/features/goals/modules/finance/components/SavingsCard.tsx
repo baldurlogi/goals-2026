@@ -21,19 +21,19 @@ export function SavingsCard(props: {
     const { goalId, target, currency = "DKK", className } = props;
     const storageKey = `daily-life:goals:metric:${goalId}:saved`;
 
-    const [saved, setSaved] = useState<number>(0);
     const [add, setAdd] = useState<string>("");
 
-    useEffect(() => {
+    const [saved, setSaved] = useState<number>(() => {
         try {
             const raw = localStorage.getItem(storageKey);
-            if (!raw) return;
+            if (!raw) return 0;
             const n = Number(raw);
-            if (Number.isFinite(n)) setSaved(n);
+            return Number.isFinite(n) ? n : 0;
         } catch {
             // ignore
+            return 0;
         }
-    }, [storageKey]);
+    });
 
     useEffect(() => {
         try {

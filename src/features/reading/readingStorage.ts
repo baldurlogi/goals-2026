@@ -22,16 +22,16 @@ export const DEFAULT_READING_INPUTS: ReadingInputs = {
 // helper: merge partial into defaults safely
 function normalizeReadingInputs(parsed: Partial<ReadingInputs> | null | undefined): ReadingInputs {
   const p = parsed ?? {};
+  const dailyGoalPages = typeof p.dailyGoalPages === "string"
+    ? p.dailyGoalPages
+    : DEFAULT_READING_INPUTS.dailyGoalPages;
   return {
     ...DEFAULT_READING_INPUTS,
     ...p,
     current: { ...DEFAULT_READING_INPUTS.current, ...(p.current ?? {}) },
     upNext: Array.isArray(p.upNext) ? p.upNext : [],
     completed: Array.isArray(p.completed) ? p.completed : [],
-    dailyGoalPages:
-      typeof (p as any).dailyGoalPages === "string"
-        ? (p as any).dailyGoalPages
-        : DEFAULT_READING_INPUTS.dailyGoalPages,
+    dailyGoalPages,
   };
 }
 

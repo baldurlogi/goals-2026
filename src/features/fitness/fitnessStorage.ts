@@ -155,11 +155,14 @@ export async function loadFitness(): Promise<FitnessStore> {
     const id = row.skill_id as SkillId;
     if (store.skills[id]) {
       store.skills[id].goal = row.goal;
-      store.skills[id].goalLabel = (row.goal_label ?? store.skills[id].goalLabel) as any;
+
+      const rawLabel = row.goal_label;
+      store.skills[id].goalLabel =
+        typeof rawLabel === "string" ? rawLabel : store.skills[id].goalLabel;
+
       store.skills[id].history = (row.history ?? []) as PREntry[];
     }
   }
-
   return store;
 }
 

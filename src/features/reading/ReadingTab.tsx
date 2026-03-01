@@ -31,24 +31,47 @@ export function ReadingTab() {
 
     const sync = async () => {
       const next = await Promise.resolve(loadReadingInputs());
-      if (!cancelled) setInputs(next);
+      if (!cancelled) {
+        setInputs(next);
+        setCurrentDraft(next.current); // <- move it here (event callback)
+      }
     };
 
     sync();
 
-    window.addEventListener(READING_CHANGED_EVENT, sync as any);
-    window.addEventListener("storage", sync as any);
+    window.addEventListener(READING_CHANGED_EVENT, sync);
+    window.addEventListener("storage", sync);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(READING_CHANGED_EVENT, sync as any);
-      window.removeEventListener("storage", sync as any);
+      window.removeEventListener(READING_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", sync);
     };
   }, []);
 
   useEffect(() => {
-    setCurrentDraft(inputs.current);
-  }, [inputs.current]);
+    let cancelled = false;
+
+    const sync = async () => {
+      const next = await Promise.resolve(loadReadingInputs());
+      if (!cancelled) setInputs(next);
+    };
+
+    const onEvent: EventListener = () => {
+      void sync();
+    };
+
+    void sync();
+
+    window.addEventListener(READING_CHANGED_EVENT, onEvent);
+    window.addEventListener("storage", onEvent);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(READING_CHANGED_EVENT, onEvent);
+      window.removeEventListener("storage", onEvent);
+    };
+  }, []);
 
   const stats = useMemo(() => {
     const plan = inputsToPlan(inputs);

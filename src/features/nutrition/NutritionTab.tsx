@@ -30,6 +30,12 @@ import type { Macros } from "./nutritionTypes";
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
 
+type NutritionLog = {
+  date: string;
+  eaten: Record<string, boolean>;
+  customEntries: CustomEntry[];
+};
+
 function MacroInputRow({
   label, value, unit, onChange,
 }: {
@@ -220,13 +226,14 @@ function MealToggle({ id, label, eaten, onToggle }: {
 export function NutritionTab() {
   const [breakfastChoice, setBreakfastChoice] = useState<1 | 2>(1);
 
-  // Start with safe defaults, then hydrate async
-  const [phase, setPhase] = useState<NutritionPhase>("maintain");
-  const [log, setLog] = useState<{ eaten: Record<string, boolean>; customEntries: CustomEntry[]; date: string }>({
+  const [log, setLog] = useState<NutritionLog>({
     date: new Date().toISOString().slice(0, 10),
     eaten: {},
     customEntries: [],
   });
+
+  // Start with safe defaults, then hydrate async
+  const [phase, setPhase] = useState<NutritionPhase>("maintain");
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
   const [showManual, setShowManual] = useState(false);
   const [showLibrary, setShowLibrary] = useState(true);
@@ -240,18 +247,48 @@ export function NutritionTab() {
         loadPhase(),
         loadSavedMeals(),
       ]);
+
       if (cancelled) return;
-      setLog(nextLog as any);
+
+      setLog(nextLog);          // no cast
+      setPhase(nextPhase);
+      setSavedMeals(nextSaved);
+    };
+
+    const onEvent: EventListener = () => {
+      void sync();
+    };
+
+    void sync();
+
+    window.addEventListener(NUTRITION_CHANGED_EVENT ?? "nutrition:changed", onEvent);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NUTRITION_CHANGED_EVENT ?? "nutrition:changed", onEvent);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const sync = async () => {
+      const [nextLog, nextPhase, nextSaved] = await Promise.all([
+        loadNutritionLog(),
+        loadPhase(),
+        loadSavedMeals(),
+      ]);
+      if (cancelled) return;
+      setLog(nextLog);
       setPhase(nextPhase);
       setSavedMeals(nextSaved);
     };
 
     sync();
 
-    window.addEventListener("nutrition:changed", sync as any);
+    window.addEventListener("nutrition:changed", sync);
     return () => {
       cancelled = true;
-      window.removeEventListener(NUTRITION_CHANGED_EVENT ?? "nutrition:changed", sync as any);
+      window.removeEventListener(NUTRITION_CHANGED_EVENT ?? "nutrition:changed", sync);
     };
   }, []);
 
@@ -294,10 +331,10 @@ export function NutritionTab() {
   };
 
   const targets = useMemo(() => getTargets(phase), [phase]);
-  const logged = useMemo(() => getLoggedMacros(log as any), [log]);
+  const logged = useMemo(() => getLoggedMacros(log), [log]);
   const breakfast = breakfastChoice === 1 ? meals.breakfast.option1 : meals.breakfast.option2;
   const breakfastKey: MealKey = breakfastChoice === 1 ? "breakfast1" : "breakfast2";
-  const totalEntries = Object.values((log as any).eaten ?? {}).filter(Boolean).length + ((log as any).customEntries?.length ?? 0);
+  const totalEntries = Object.values(log.eaten).filter(Boolean).length + log.customEntries.length;
 
   return (
     <div className="space-y-6">

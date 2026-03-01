@@ -33,6 +33,16 @@ const CATEGORY_COLOR: Record<FinanceCategoryId, string> = {
   other:         "#94A3B8",
 };
 
+type PieShapeProps = {
+  cx: number;
+  cy: number;
+  innerRadius: number;
+  outerRadius: number;
+  startAngle: number;
+  endAngle: number;
+  index: number;
+};
+
 function readCache(goalId: string, month: string): FinanceMonthState {
   try {
     const raw = localStorage.getItem(`cache:finance:${goalId}:${month}`);
@@ -46,11 +56,8 @@ export function SpendingDonutCard(props: {
   className?: string;
 }) {
   const { goalId, month: controlledMonth, className } = props;
-  const [month, setMonth] = useState(() => controlledMonth ?? getMonthKey());
-
-  useEffect(() => {
-    if (controlledMonth) setMonth(controlledMonth);
-  }, [controlledMonth]);
+  const [uncontrolledMonth] = useState(() => getMonthKey());
+  const month = controlledMonth ?? uncontrolledMonth;
 
   // Seed from cache for instant paint, then fetch from Supabase
   const [data, setData] = useState<FinanceMonthState>(() => readCache(goalId, month));
@@ -134,7 +141,7 @@ export function SpendingDonutCard(props: {
                     <Pie
                       data={donutData} dataKey="value" nameKey="name"
                       innerRadius="68%" outerRadius="95%" paddingAngle={2} stroke="transparent"
-                      shape={(props: any) => {
+                      shape={(props: PieShapeProps) => {
                         const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, index } = props;
                         const entry = donutData[index];
                         if (!entry) return <g />;

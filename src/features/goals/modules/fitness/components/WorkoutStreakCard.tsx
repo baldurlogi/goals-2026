@@ -17,13 +17,15 @@ export function WorkoutStreakCard({ goalId }: { goalId: string }) {
   const today = todayISO();
   const last = state.lastWorkoutISO;
 
-  const status = useMemo(() => {
-    if (!last) return { label: "No workouts logged yet", tone: "secondary" as const };
+  type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
+
+  const status = useMemo((): { label: string; variant: BadgeVariant } => {
+    if (!last) return { label: "No workouts logged yet", variant: "secondary" };
 
     const delta = diffDays(last, today);
-    if (delta === 0) return { label: "Logged today", tone: "default" as const };
-    if (delta === 1) return { label: "Keep it going today", tone: "secondary" as const };
-    return { label: "Streak will reset (missed days)", tone: "destructive" as const };
+    if (delta === 0) return { label: "Logged today", variant: "default" };
+    if (delta === 1) return { label: "Keep it going today", variant: "secondary" };
+    return { label: "Streak will reset (missed days)", variant: "destructive" };
   }, [last, today]);
 
   function logToday() {
@@ -67,7 +69,7 @@ export function WorkoutStreakCard({ goalId }: { goalId: string }) {
             <div className="text-2xl font-semibold">{state.streak}</div>
             <div className="text-sm text-muted-foreground">days</div>
           </div>
-          <Badge variant={status.tone as any}>{status.label}</Badge>
+          <Badge variant={status.variant}>{status.label}</Badge>
         </div>
 
         <Separator />

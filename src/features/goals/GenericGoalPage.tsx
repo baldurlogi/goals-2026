@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
 
 import type { GoalDefinition } from "./goalTypes";
-import { useGoalsStore } from "./goalStore";
+import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { getGoalProgress } from "./goalUtils";
 import { StepChecklist } from "./components/StepChecklist";
 

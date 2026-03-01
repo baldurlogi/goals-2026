@@ -56,7 +56,12 @@ function readCache(goalId: string, month: string): FinanceMonthState | null {
 }
 
 function writeCache(goalId: string, state: FinanceMonthState) {
-  try { localStorage.setItem(cacheKey(goalId, state.month), JSON.stringify(state)); } catch {}
+  try {
+    localStorage.setItem(cacheKey(goalId, state.month), JSON.stringify(state));
+  } catch(e) {
+    console.warn("read cache failed", e);
+    return {};
+  }
 }
 
 /** Merge partial saved data onto default category scaffold */

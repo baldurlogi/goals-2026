@@ -1,5 +1,5 @@
 import { goalsRegistry } from "./registry";
-import { useGoalsStore } from "./goalStore";
+import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { GoalCard } from "./components/GoalCard";
 import { getUpcomingSteps } from "./goalUtils";
 import { useMemo, useState } from "react";

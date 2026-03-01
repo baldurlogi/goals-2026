@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import type { ComponentType } from "react";
 import type { GoalModule } from "./goalTypes";
 
 import { financeGoal } from "./modules/finance/financeGoal";
@@ -12,43 +13,26 @@ import { travelPlanningGoal } from "./modules/travel-planning/travelPlanningGoal
 import { universityGoal } from "./modules/university/universityGoal";
 import { youtubeChannelGoal } from "./modules/youtube-channel/youtubeChannelGoal";
 
-// Lazy-load pages (your pages are named exports, so we map to default)
-const FinanceGoalPage = lazy(() =>
-  import("./modules/finance/FinanceGoalPage").then((m) => ({ default: m.FinanceGoalPage }))
-);
-const FitnessGoalPage = lazy(() =>
-  import("./modules/fitness/FitnessGoalPage").then((m) => ({ default: m.FitnessGoalPage }))
-);
-const FreelanceGoalPage = lazy(() =>
-  import("./modules/freelance/FreelanceGoalPage").then((m) => ({ default: m.FreelanceGoalPage }))
-);
-const FrontendRoadmapGoalPage = lazy(() =>
-  import("./modules/frontend-roadmap/FrontendRoadmapGoalPage").then((m) => ({
-    default: m.FrontendRoadmapGoalPage,
-  }))
-);
-const MarathonGoalPage = lazy(() =>
-  import("./modules/marathon/MarathonGoalPage").then((m) => ({ default: m.MarathonGoalPage }))
-);
-const ReadingGoalPage = lazy(() =>
-  import("./modules/reading/ReadingGoalPage").then((m) => ({ default: m.ReadingGoalPage }))
-);
-const SkincareGoalPage = lazy(() =>
-  import("./modules/skincare/SkincareGoalPage").then((m) => ({ default: m.SkincareGoalPage }))
-);
-const TravelPlanningGoalPage = lazy(() =>
-  import("./modules/travel-planning/TravelPlanningGoalPage").then((m) => ({
-    default: m.TravelPlanningGoalPage,
-  }))
-);
-const UniversityGoalPage = lazy(() =>
-  import("./modules/university/UniversityGoalPage").then((m) => ({ default: m.UniversityGoalPage }))
-);
-const YouTubeChannelGoalPage = lazy(() =>
-  import("./modules/youtube-channel/YoutubeChannelGoalPage").then((m) => ({
-    default: m.YouTubeChannelGoalPage,
-  }))
-);
+type ModuleExports = Record<string, unknown>;
+
+const lazyNamed = <T extends ModuleExports, K extends keyof T>(
+  loader: () => Promise<T>,
+  key: K,
+) => lazy(() => loader().then((mod) => ({ default: mod[key] as ComponentType })));
+
+const FinanceGoalPage = lazyNamed(() => import("./modules/finance/FinanceGoalPage"), "FinanceGoalPage");
+const FitnessGoalPage = lazyNamed(() => import("./modules/fitness/FitnessGoalPage"), "FitnessGoalPage");
+const FreelanceGoalPage = lazyNamed(() => import("./modules/freelance/FreelanceGoalPage"), "FreelanceGoalPage");
+const FrontendRoadmapGoalPage = lazyNamed(() => import("./modules/frontend-roadmap/FrontendRoadmapGoalPage"), "FrontendRoadmapGoalPage");
+const MarathonGoalPage = lazyNamed(() => import("./modules/marathon/MarathonGoalPage"), "MarathonGoalPage");
+const ReadingGoalPage = lazyNamed(() => import("./modules/reading/ReadingGoalPage"), "ReadingGoalPage");
+const SkincareGoalPage = lazyNamed(() => import("./modules/skincare/SkincareGoalPage"), "SkincareGoalPage");
+const TravelPlanningGoalPage = lazyNamed(() => import("./modules/travel-planning/TravelPlanningGoalPage"), "TravelPlanningGoalPage");
+const UniversityGoalPage = lazyNamed(() => import("./modules/university/UniversityGoalPage"), "UniversityGoalPage");
+const YouTubeChannelGoalPage = lazyNamed(() => import("./modules/youtube-channel/YoutubeChannelGoalPage"), "YouTubeChannelGoalPage");
+
+
+
 
 export const goalModules = [
   { goal: financeGoal, Page: FinanceGoalPage },

@@ -109,7 +109,12 @@ export async function loadProfile(): Promise<UserProfile | null> {
   if (error || !data) return null;
 
   const profile = data as UserProfile;
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(profile)); } catch {}
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+  } catch(e) {
+    console.warn("read cache failed", e);
+    return null;
+  }
   return profile;
 }
 
@@ -124,7 +129,12 @@ export async function saveProfile(patch: Partial<Omit<UserProfile, "id">>): Prom
   // Update cache
   const cached = readProfileCache();
   if (cached) {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...cached, ...patch })); } catch {}
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ ...cached, ...patch }));
+    } catch(e) {
+      console.warn("read cache failed", e);
+      return;
+    }
   }
 }
 

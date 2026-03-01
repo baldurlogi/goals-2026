@@ -66,7 +66,7 @@ export function StudyStreakCard({ goalId }: { goalId: string }) {
             <div className="text-2xl font-semibold">{state.streak}</div>
             <div className="text-sm text-muted-foreground">days</div>
           </div>
-          <Badge variant={badge.variant as any}>{badge.label}</Badge>
+          <Badge variant={badge.variant}>{badge.label}</Badge>
         </div>
 
         <Separator />

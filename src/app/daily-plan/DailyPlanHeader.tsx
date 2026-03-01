@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronDown, LayoutDashboard, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth } from "@/auth/authContext";
 
 type NavItem    = { label: string; href: string };
 type NavSection = { label: string; items: NavItem[] };

@@ -54,7 +54,7 @@ export function ContentPipelineCard({ goalId }: { goalId: string }) {
   const counts = STAGES.reduce<Record<PipelineStage, number>>((acc, s) => {
     acc[s] = state.items.filter((i) => i.stage === s).length;
     return acc;
-  }, {} as any);
+  }, Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<PipelineStage, number>);
 
   return (
     <Card className="rounded-2xl">

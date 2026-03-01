@@ -33,7 +33,12 @@ export function useReadingDashboard() {
         setInputs(fresh);
         setLoading(false);
         // Keep cache in sync for next load
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(fresh)); } catch {}
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+        } catch(e) {
+          console.warn("read cache failed", e);
+          return {};
+        }
       }
     }
 

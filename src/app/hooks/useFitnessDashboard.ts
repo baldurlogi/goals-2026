@@ -29,7 +29,12 @@ export function useFitnessDashboard() {
       if (!cancelled) {
         setStore(fresh);
         setLoading(false);
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(fresh)); } catch {}
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+        } catch(e) {
+          console.warn("read cache failed", e);
+          return {};
+        }
       }
     }
 

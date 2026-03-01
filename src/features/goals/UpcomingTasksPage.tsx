@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { useGoalsStore } from "./goalStore";
+import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { goalsRegistry } from "./registry";
 import { getUpcomingSteps } from "./goalUtils";
 

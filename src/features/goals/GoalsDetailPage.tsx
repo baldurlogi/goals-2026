@@ -6,9 +6,15 @@ import { GenericGoalPage } from "./GenericGoalPage";
 
 export function GoalDetailPage() {
   const { goalId } = useParams<{ goalId: string }>();
+
+  const mod = useMemo(() => (goalId ? goalModuleById[goalId] : undefined), [goalId]);
+  const goal = useMemo(
+    () => (goalId ? goalsRegistry.find((g) => g.id === goalId) : undefined),
+    [goalId]
+  );
+
   if (!goalId) return null;
 
-  const mod = goalModuleById[goalId];
   if (mod) {
     const Page = mod.Page;
     return (
@@ -18,6 +24,5 @@ export function GoalDetailPage() {
     );
   }
 
-  const goal = useMemo(() => goalsRegistry.find((g) => g.id === goalId), [goalId]);
   return <GenericGoalPage goalId={goalId} goal={goal} />;
 }

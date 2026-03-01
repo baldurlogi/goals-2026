@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useGoalsStore } from "@/features/goals/goalStore";
+import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { financeGoal } from "./financeGoal";
 
 import { GoalPageHeader } from "@/features/goals/components/GoalPageHeader";

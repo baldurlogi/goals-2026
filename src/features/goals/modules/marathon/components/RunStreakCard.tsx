@@ -60,7 +60,7 @@ export function RunStreakCard({ goalId }: { goalId: string }) {
             <div className="text-2xl font-semibold">{state.streak}</div>
             <div className="text-sm text-muted-foreground">days</div>
           </div>
-          <Badge variant={status.tone as any}>{status.label}</Badge>
+          <Badge variant={status.tone}>{status.label}</Badge>
         </div>
 
         <Separator />
