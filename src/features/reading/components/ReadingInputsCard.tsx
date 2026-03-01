@@ -1,14 +1,89 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ReadingFieldPath, ReadingInputs } from "../readingTypes";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
-export function ReadingInputsCard(props: {
+type Props = {
   value: ReadingInputs;
   onChange: (path: ReadingFieldPath, value: string) => void;
-}) {
-  const { value, onChange } = props;
+};
+
+function getByPath(v: ReadingInputs, path: ReadingFieldPath): string {
+  switch (path) {
+    case "current.title":
+      return v.current.title ?? "";
+    case "current.author":
+      return v.current.author ?? "";
+    case "current.currentPage":
+      return String(v.current.currentPage ?? "");
+    case "current.totalPages":
+      return String(v.current.totalPages ?? "");
+    case "dailyGoalPages":
+      return String(v.dailyGoalPages ?? "");
+    default:
+      return "";
+  }
+}
+
+export function ReadingInputsCard({ value, onChange }: Props) {
+  // Local draft values so typing is always instant.
+  const [draft, setDraft] = useState(() => ({
+    "current.title": getByPath(value, "current.title"),
+    "current.author": getByPath(value, "current.author"),
+    "current.currentPage": getByPath(value, "current.currentPage"),
+    "current.totalPages": getByPath(value, "current.totalPages"),
+    dailyGoalPages: getByPath(value, "dailyGoalPages"),
+  }));
+
+  // Keep draft in sync if parent value changes elsewhere (e.g. load, reset).
+  const valueKey = useMemo(() => JSON.stringify(value), [value]);
+  useEffect(() => {
+    setDraft({
+      "current.title": getByPath(value, "current.title"),
+      "current.author": getByPath(value, "current.author"),
+      "current.currentPage": getByPath(value, "current.currentPage"),
+      "current.totalPages": getByPath(value, "current.totalPages"),
+      dailyGoalPages: getByPath(value, "dailyGoalPages"),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valueKey]);
+
+  // Debounce commits to parent so we don't re-render the whole app per keystroke.
+  const timersRef = useRef<Record<string, number | undefined>>({});
+
+  function commitDebounced(path: ReadingFieldPath, next: string) {
+    const timers = timersRef.current;
+    const key = path as string;
+
+    if (timers[key]) window.clearTimeout(timers[key]);
+    timers[key] = window.setTimeout(() => {
+      onChange(path, next);
+      timers[key] = undefined;
+    }, 250);
+  }
+
+  function commitNow(path: ReadingFieldPath) {
+    const timers = timersRef.current;
+    const key = path as string;
+
+    if (timers[key]) window.clearTimeout(timers[key]);
+    timers[key] = undefined;
+    onChange(path, draft[path]);
+  }
+
+  function bind(path: ReadingFieldPath) {
+    return {
+      value: draft[path],
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        const next = e.target.value;
+        setDraft((d) => ({ ...d, [path]: next }));
+        commitDebounced(path, next);
+      },
+      onBlur: () => commitNow(path),
+    };
+  }
 
   return (
     <Card>
@@ -20,27 +95,19 @@ export function ReadingInputsCard(props: {
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Current book title</Label>
-            <Input
-              value={value.current.title}
-              onChange={(e) => onChange("current.title", e.target.value)}
-              placeholder="e.g. Atomic Habits"
-            />
+            <Input {...bind("current.title")} placeholder="e.g. Atomic Habits" />
           </div>
 
           <div className="space-y-2">
             <Label>Current book author</Label>
-            <Input
-              value={value.current.author}
-              onChange={(e) => onChange("current.author", e.target.value)}
-              placeholder="e.g. James Clear"
-            />
+            <Input {...bind("current.author")} placeholder="e.g. James Clear" />
           </div>
 
           <div className="space-y-2">
             <Label>Current page</Label>
             <Input
-              value={value.current.currentPage}
-              onChange={(e) => onChange("current.currentPage", e.target.value)}
+              {...bind("current.currentPage")}
+              inputMode="numeric"
               placeholder="e.g. 120"
             />
           </div>
@@ -48,8 +115,8 @@ export function ReadingInputsCard(props: {
           <div className="space-y-2">
             <Label>Total pages</Label>
             <Input
-              value={value.current.totalPages}
-              onChange={(e) => onChange("current.totalPages", e.target.value)}
+              {...bind("current.totalPages")}
+              inputMode="numeric"
               placeholder="e.g. 320"
             />
           </div>
@@ -60,8 +127,8 @@ export function ReadingInputsCard(props: {
         <div className="space-y-2">
           <Label>Daily goal (pages)</Label>
           <Input
-            value={value.dailyGoalPages}
-            onChange={(e) => onChange("dailyGoalPages", e.target.value)}
+            {...bind("dailyGoalPages")}
+            inputMode="numeric"
             placeholder="e.g. 20"
           />
         </div>

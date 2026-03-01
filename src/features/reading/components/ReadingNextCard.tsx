@@ -10,7 +10,7 @@ export function ReadingNextCard(props: {
   const { queue, onRemove } = props;
 
   return (
-    <Card>
+    <Card className="border-emerald-500">
       <CardHeader className="pb-3">
         <div className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
           Up next

@@ -19,6 +19,8 @@ import { Separator } from "@/components/ui/separator";
 export function ReadingTab() {
   // ✅ always start with safe defaults
   const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
+  const [currentDraft, setCurrentDraft] = useState(() => DEFAULT_READING_INPUTS.current);
+
 
   // Draft inputs for adding to queue
   const [draft, setDraft] = useState({ title: "", author: "", totalPages: "" });
@@ -43,6 +45,10 @@ export function ReadingTab() {
       window.removeEventListener("storage", sync as any);
     };
   }, []);
+
+  useEffect(() => {
+    setCurrentDraft(inputs.current);
+  }, [inputs.current]);
 
   const stats = useMemo(() => {
     const plan = inputsToPlan(inputs);
@@ -136,9 +142,35 @@ export function ReadingTab() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-4">
-        <ReadingInputsCard value={inputs} onChange={updateField} />
+        <ReadingInputsCard
+          value={{ ...inputs, current: currentDraft }}
+          onChange={(path, v) => {
+            if (path === "current.currentPage") {
+              setCurrentDraft((p) => ({ ...p, currentPage: v }));
+              updateField("current.currentPage", v); // ✅ updates inputs + NowReading live
+              return;
+            }
+
+            if (path === "current.totalPages") {
+              setCurrentDraft((p) => ({ ...p, totalPages: v }));
+              updateField("current.totalPages", v); // optional: keep stats live too
+              return;
+            }
+
+            // keep these local-only (no lag)
+            if (path === "current.title") setCurrentDraft((p) => ({ ...p, title: v }));
+            if (path === "current.author") setCurrentDraft((p) => ({ ...p, author: v }));
+          }}
+        />
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => {
+              setAndPersist((prev) => ({ ...prev, current: currentDraft }));
+            }}
+          >
+            Save current book
+          </Button>
           <Button variant="outline" onClick={resetAll}>
             Reset
           </Button>
@@ -194,9 +226,9 @@ export function ReadingTab() {
 
         <ReadingNextCard queue={inputs.upNext} onRemove={removeFromQueue} />
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Completed this year</CardTitle>
+        <Card className="border-amber-500">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-md text-amber-400">Completed this year</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {inputs.completed.length === 0 ? (

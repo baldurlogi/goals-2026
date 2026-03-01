@@ -21,7 +21,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "📖 Reading",   href: "/daily-plan/reading" },
       { label: "🥗 Nutrition", href: "/daily-plan/nutrition" },
-      { label: "📅 Schedule",  href: "/daily-plan/schedule" },
+      { label: "📅 Schedule",  href: "/schedule" },
     ],
   },
   {

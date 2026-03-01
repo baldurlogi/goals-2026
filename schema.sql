@@ -119,27 +119,28 @@ alter table public.todos           enable row level security;
 alter table public.fitness_lifts   enable row level security;
 alter table public.fitness_skills  enable row level security;
 
--- Helper: one policy pattern repeated per table
--- "Users can only see and modify their own rows"
-
+-- Policies for tables that have user_id
 do $$ declare t text; begin
   foreach t in array array[
-    'profiles', 'nutrition_phase', 'nutrition_logs', 'saved_meals',
+    'nutrition_phase', 'nutrition_logs', 'saved_meals',
     'schedule_logs', 'reading_logs', 'goal_progress', 'todos',
     'fitness_lifts', 'fitness_skills'
   ] loop
+    execute format('drop policy if exists owner_all on public.%I', t);
     execute format(
-      'create policy "owner_all" on public.%I
-       for all using (auth.uid() = user_id)
+      'create policy owner_all on public.%I
+       for all
+       using (auth.uid() = user_id)
        with check (auth.uid() = user_id)', t
     );
   end loop;
 end $$;
 
 -- Profiles uses "id" not "user_id"
-drop policy if exists "owner_all" on public.profiles;
-create policy "owner_all" on public.profiles
-  for all using (auth.uid() = id)
+drop policy if exists owner_all on public.profiles;
+create policy owner_all on public.profiles
+  for all
+  using (auth.uid() = id)
   with check (auth.uid() = id);
 
 -- ============================================================
@@ -160,3 +161,45 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+  create table if not exists public.reading_state (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  state jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.reading_state enable row level security;
+
+drop policy if exists owner_all on public.reading_state;
+create policy owner_all on public.reading_state
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Add to your Supabase SQL Editor
+
+create table if not exists public.finance_months (
+  id       uuid primary key default gen_random_uuid(),
+  user_id  uuid not null references auth.users(id) on delete cascade,
+  goal_id  text not null,
+  month    text not null,  -- YYYY-MM
+  state    jsonb not null default '{}',
+  updated_at timestamptz default now(),
+  unique(user_id, goal_id, month)
+);
+
+alter table public.finance_months enable row level security;
+
+create policy "owner_all" on public.finance_months
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table public.goal_module_state (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  goal_id    text not null,
+  module_key text not null,  -- e.g. "revenue", "streak", "pipeline"
+  state      jsonb not null default '{}',
+  updated_at timestamptz default now(),
+  unique(user_id, goal_id, module_key)
+);
