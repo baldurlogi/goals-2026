@@ -1,61 +1,63 @@
 -- ============================================================
---  Daily Life Progress — Supabase Schema
---  Run this in: Supabase Dashboard → SQL Editor → New query
+--  Daily Life Progress — Supabase Schema (consolidated)
+--  Safe to re-run: all statements are idempotent
 -- ============================================================
 
--- Enable UUID generation
 create extension if not exists "pgcrypto";
 
--- ── Users profile (extends Supabase auth.users) ──────────────────────────────
+-- ── Tables ────────────────────────────────────────────────────────────────────
+
 create table if not exists public.profiles (
-  id          uuid primary key references auth.users(id) on delete cascade,
-  display_name text,
-  weight_kg   numeric,
-  height_cm   numeric,
-  age         int,
-  created_at  timestamptz default now()
+  id                   uuid primary key references auth.users(id) on delete cascade,
+  display_name         text,
+  weight_kg            numeric,
+  height_cm            numeric,
+  age                  int,
+  sex                  text check (sex in ('male','female')),
+  activity_level       text check (activity_level in ('sedentary','light','moderate','active','very_active')) default 'active',
+  onboarding_done      boolean not null default false,
+  macro_maintain       jsonb,
+  macro_cut            jsonb,
+  default_schedule_view text check (default_schedule_view in ('wfh','office','weekend')) default 'wfh',
+  daily_reading_goal   int default 20,
+  created_at           timestamptz default now()
 );
 
--- ── Nutrition phase (maintain / cut) ─────────────────────────────────────────
 create table if not exists public.nutrition_phase (
-  id      uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  phase   text not null default 'maintain' check (phase in ('maintain', 'cut')),
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  phase      text not null default 'maintain' check (phase in ('maintain','cut')),
   updated_at timestamptz default now(),
   unique(user_id)
 );
 
--- ── Nutrition daily log ───────────────────────────────────────────────────────
 create table if not exists public.nutrition_logs (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references auth.users(id) on delete cascade,
-  log_date    date not null default current_date,
-  eaten       jsonb not null default '{}',       -- Record<MealKey, boolean>
-  custom_entries jsonb not null default '[]',    -- CustomEntry[]
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  log_date       date not null default current_date,
+  eaten          jsonb not null default '{}',
+  custom_entries jsonb not null default '[]',
   unique(user_id, log_date)
 );
 
--- ── Saved meals library ───────────────────────────────────────────────────────
 create table if not exists public.saved_meals (
-  id       uuid primary key default gen_random_uuid(),
-  user_id  uuid not null references auth.users(id) on delete cascade,
-  name     text not null,
-  emoji    text not null default '🍽️',
-  macros   jsonb not null,   -- { cal, protein, carbs, fat }
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  name       text not null,
+  emoji      text not null default '🍽️',
+  macros     jsonb not null,
   created_at timestamptz default now()
 );
 
--- ── Schedule log ──────────────────────────────────────────────────────────────
 create table if not exists public.schedule_logs (
   id        uuid primary key default gen_random_uuid(),
   user_id   uuid not null references auth.users(id) on delete cascade,
   log_date  date not null default current_date,
-  view      text not null default 'wfh' check (view in ('wfh', 'office', 'weekend')),
+  view      text not null default 'wfh' check (view in ('wfh','office','weekend')),
   completed int[] not null default '{}',
   unique(user_id, log_date)
 );
 
--- ── Reading log ───────────────────────────────────────────────────────────────
 create table if not exists public.reading_logs (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references auth.users(id) on delete cascade,
@@ -65,17 +67,21 @@ create table if not exists public.reading_logs (
   unique(user_id, log_date)
 );
 
--- ── Goals progress (step completions) ────────────────────────────────────────
+create table if not exists public.reading_state (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  state      jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.goal_progress (
-  id       uuid primary key default gen_random_uuid(),
-  user_id  uuid not null references auth.users(id) on delete cascade,
-  goal_id  text not null,
-  done     jsonb not null default '{}',  -- Record<stepId, boolean>
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  goal_id    text not null,
+  done       jsonb not null default '{}',
   updated_at timestamptz default now(),
   unique(user_id, goal_id)
 );
 
--- ── Todos ────────────────────────────────────────────────────────────────────
 create table if not exists public.todos (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid not null references auth.users(id) on delete cascade,
@@ -84,68 +90,95 @@ create table if not exists public.todos (
   created_at timestamptz default now()
 );
 
--- ── Fitness PRs ───────────────────────────────────────────────────────────────
 create table if not exists public.fitness_lifts (
   id       uuid primary key default gen_random_uuid(),
   user_id  uuid not null references auth.users(id) on delete cascade,
-  lift_id  text not null,   -- e.g. "bench", "squat"
+  lift_id  text not null,
   goal     numeric not null default 0,
-  history  jsonb not null default '[]',  -- PREntry[]
+  history  jsonb not null default '[]',
   unique(user_id, lift_id)
 );
 
 create table if not exists public.fitness_skills (
-  id       uuid primary key default gen_random_uuid(),
-  user_id  uuid not null references auth.users(id) on delete cascade,
-  skill_id text not null,
-  goal     numeric not null default 0,
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  skill_id   text not null,
+  goal       numeric not null default 0,
   goal_label text,
-  history  jsonb not null default '[]',  -- PREntry[]
+  history    jsonb not null default '[]',
   unique(user_id, skill_id)
 );
 
--- ============================================================
---  Row Level Security — every table locked to owner only
--- ============================================================
+create table if not exists public.finance_months (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  goal_id    text not null,
+  month      text not null,
+  state      jsonb not null default '{}',
+  updated_at timestamptz default now(),
+  unique(user_id, goal_id, month)
+);
 
-alter table public.profiles        enable row level security;
-alter table public.nutrition_phase enable row level security;
-alter table public.nutrition_logs  enable row level security;
-alter table public.saved_meals     enable row level security;
-alter table public.schedule_logs   enable row level security;
-alter table public.reading_logs    enable row level security;
-alter table public.goal_progress   enable row level security;
-alter table public.todos           enable row level security;
-alter table public.fitness_lifts   enable row level security;
-alter table public.fitness_skills  enable row level security;
+create table if not exists public.goal_module_state (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  goal_id    text not null,
+  module_key text not null,
+  state      jsonb not null default '{}',
+  updated_at timestamptz default now(),
+  unique(user_id, goal_id, module_key)
+);
 
--- Policies for tables that have user_id
+-- ── Add new profile columns if upgrading from old schema ─────────────────────
+
+alter table public.profiles
+  add column if not exists sex                   text check (sex in ('male','female')),
+  add column if not exists activity_level        text check (activity_level in ('sedentary','light','moderate','active','very_active')) default 'active',
+  add column if not exists onboarding_done       boolean not null default false,
+  add column if not exists macro_maintain        jsonb,
+  add column if not exists macro_cut             jsonb,
+  add column if not exists default_schedule_view text check (default_schedule_view in ('wfh','office','weekend')) default 'wfh',
+  add column if not exists daily_reading_goal    int default 20;
+
+-- ── Row Level Security ────────────────────────────────────────────────────────
+
+alter table public.profiles           enable row level security;
+alter table public.nutrition_phase    enable row level security;
+alter table public.nutrition_logs     enable row level security;
+alter table public.saved_meals        enable row level security;
+alter table public.schedule_logs      enable row level security;
+alter table public.reading_logs       enable row level security;
+alter table public.reading_state      enable row level security;
+alter table public.goal_progress      enable row level security;
+alter table public.todos              enable row level security;
+alter table public.fitness_lifts      enable row level security;
+alter table public.fitness_skills     enable row level security;
+alter table public.finance_months     enable row level security;
+alter table public.goal_module_state  enable row level security;
+
+-- Drop all policies first, then recreate — fully idempotent
 do $$ declare t text; begin
   foreach t in array array[
-    'nutrition_phase', 'nutrition_logs', 'saved_meals',
-    'schedule_logs', 'reading_logs', 'goal_progress', 'todos',
-    'fitness_lifts', 'fitness_skills'
+    'nutrition_phase','nutrition_logs','saved_meals','schedule_logs',
+    'reading_logs','reading_state','goal_progress','todos',
+    'fitness_lifts','fitness_skills','finance_months','goal_module_state'
   ] loop
     execute format('drop policy if exists owner_all on public.%I', t);
     execute format(
       'create policy owner_all on public.%I
-       for all
-       using (auth.uid() = user_id)
+       for all using (auth.uid() = user_id)
        with check (auth.uid() = user_id)', t
     );
   end loop;
 end $$;
 
--- Profiles uses "id" not "user_id"
+-- profiles uses "id" not "user_id"
 drop policy if exists owner_all on public.profiles;
 create policy owner_all on public.profiles
-  for all
-  using (auth.uid() = id)
+  for all using (auth.uid() = id)
   with check (auth.uid() = id);
 
--- ============================================================
---  Auto-create profile on signup
--- ============================================================
+-- ── Auto-create profile on signup ─────────────────────────────────────────────
 
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer as $$
@@ -161,45 +194,3 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
-
-  create table if not exists public.reading_state (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  state jsonb not null default '{}'::jsonb,
-  updated_at timestamptz not null default now()
-);
-
-alter table public.reading_state enable row level security;
-
-drop policy if exists owner_all on public.reading_state;
-create policy owner_all on public.reading_state
-  for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
--- Add to your Supabase SQL Editor
-
-create table if not exists public.finance_months (
-  id       uuid primary key default gen_random_uuid(),
-  user_id  uuid not null references auth.users(id) on delete cascade,
-  goal_id  text not null,
-  month    text not null,  -- YYYY-MM
-  state    jsonb not null default '{}',
-  updated_at timestamptz default now(),
-  unique(user_id, goal_id, month)
-);
-
-alter table public.finance_months enable row level security;
-
-create policy "owner_all" on public.finance_months
-  for all using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create table public.goal_module_state (
-  id         uuid primary key default gen_random_uuid(),
-  user_id    uuid not null references auth.users(id) on delete cascade,
-  goal_id    text not null,
-  module_key text not null,  -- e.g. "revenue", "streak", "pipeline"
-  state      jsonb not null default '{}',
-  updated_at timestamptz default now(),
-  unique(user_id, goal_id, module_key)
-);
