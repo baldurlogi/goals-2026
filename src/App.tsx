@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { GoalsStoreProvider } from "@/features/goals/goalStore";
+import { GoalStoreProvider } from "@/features/goals/goalStore";
 import { AuthProvider }       from "@/auth/AuthProvider";
 import { RequireAuth }        from "@/auth/RequireAuth";
 import { RequireOnboarding }  from "@/features/onboarding/RequireOnboarding";
@@ -21,7 +21,7 @@ export default function App() {
       <AuthProvider>
         <RequireAuth>
           <RequireOnboarding>
-            <GoalsStoreProvider>
+            <GoalStoreProvider>
               <Routes>
                 <Route element={<AppLayout />}>
                   <Route index element={<DashboardPage />} />
@@ -40,7 +40,7 @@ export default function App() {
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
-            </GoalsStoreProvider>
+            </GoalStoreProvider>
           </RequireOnboarding>
         </RequireAuth>
       </AuthProvider>
