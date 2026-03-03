@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-import { getRevenue, setRevenue } from "../freelanceStorage";
+import {
+  getRevenue, setRevenue, seedRevenue,
+  type RevenueState,
+} from "../freelanceStorage";
 
 function toNum(v: string, fallback = 0) {
   const n = Number(v);
@@ -14,19 +17,25 @@ function toNum(v: string, fallback = 0) {
 }
 
 export function RevenueCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<RevenueState>(() => seedRevenue(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getRevenue(goalId);
-  }, [goalId, tick]);
+  // Fetch from Supabase on mount
+  useEffect(() => {
+    let cancelled = false;
+    getRevenue(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
-  const pct = state.monthlyTargetDKK <= 0 ? 0 : Math.min(100, Math.round((state.earnedDKK / state.monthlyTargetDKK) * 100));
+  const pct = state.monthlyTargetDKK <= 0
+    ? 0
+    : Math.min(100, Math.round((state.earnedDKK / state.monthlyTargetDKK) * 100));
 
-  function update(patch: Partial<typeof state>) {
-    const next = { ...getRevenue(goalId), ...patch };
-    setRevenue(goalId, next);
-    setTick((x) => x + 1);
+  async function update(patch: Partial<RevenueState>) {
+    const next = { ...state, ...patch };
+    setState(next);              // optimistic
+    await setRevenue(goalId, next);
   }
 
   return (

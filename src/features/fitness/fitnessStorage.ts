@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
-import { readJson, writeJson } from "@/lib/storage";
+import { loadModuleState, saveModuleState, seedCache } from "@/features/goals/modules/goalModuleStorage";
 
 export const FITNESS_CHANGED_EVENT = "fitness:changed";
 function emit() {
@@ -288,18 +288,16 @@ function streakKey(goalId: string) {
   return `daily-life:fitness:streak:${goalId}:v1`;
 }
 
-export function getStreak(goalId: string): StreakState {
-  const base: StreakState = { lastWorkoutISO: null, streak: 0 };
-  const parsed = readJson<Partial<StreakState> | null>(streakKey(goalId), null);
-  if (!parsed) return base;
-  return {
-    lastWorkoutISO: typeof parsed.lastWorkoutISO === "string" ? parsed.lastWorkoutISO : null,
-    streak: Number(parsed.streak ?? 0) || 0,
-  };
+export function seedStreak(goalId: string): StreakState {
+  return seedCache(goalId, "fitness_streak", { lastWorkoutISO: null, streak: 0 });
 }
 
-export function setStreak(goalId: string, state: StreakState) {
-  writeJson(streakKey(goalId), state);
+export async function getStreak(goalId: string): Promise<StreakState> {
+  return loadModuleState(goalId, "fitness_streak", { lastWorkoutISO: null, streak: 0 });
+}
+
+export async function setStreak(goalId: string, state: StreakState): Promise<void> {
+  await saveModuleState(goalId, "fitness_streak", state);
   emit();
 }
 
@@ -316,27 +314,17 @@ export type WeeklySplitState = {
   doneByDay: Record<"Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun", boolean>;
 };
 
-function weeklySplitKey(goalId: string) {
-  return `daily-life:fitness:weeklySplit:${goalId}:v1`;
+const weeklySplitDefault = (): WeeklySplitState => ({
+  weekStartISO: getMondayISO(),
+  doneByDay: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false },
+});
+export function seedWeeklySplit(goalId: string): WeeklySplitState {
+  return seedCache(goalId, "fitness_weekly", weeklySplitDefault());
 }
-
-export function getWeeklySplit(goalId: string): WeeklySplitState {
-  const monday = getMondayISO(new Date());
-  const base: WeeklySplitState = {
-    weekStartISO: monday,
-    doneByDay: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false },
-  };
-
-  const parsed = readJson<Partial<WeeklySplitState> | null>(weeklySplitKey(goalId), null);
-  if (!parsed) return base;
-
-  return {
-    weekStartISO: typeof parsed.weekStartISO === "string" ? parsed.weekStartISO : base.weekStartISO,
-    doneByDay: { ...base.doneByDay, ...(parsed.doneByDay ?? {}) },
-  };
+export async function getWeeklySplit(goalId: string): Promise<WeeklySplitState> {
+  return loadModuleState(goalId, "fitness_weekly", weeklySplitDefault());
 }
-
-export function setWeeklySplit(goalId: string, state: WeeklySplitState) {
-  writeJson(weeklySplitKey(goalId), state);
+export async function setWeeklySplit(goalId: string, state: WeeklySplitState): Promise<void> {
+  await saveModuleState(goalId, "fitness_weekly", state);
   emit();
 }

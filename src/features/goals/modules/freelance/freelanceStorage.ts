@@ -1,50 +1,16 @@
-type RevenueState = {
-  monthlyTargetDKK: number;
-  monthLabel: string; // e.g. "2026-02"
-  earnedDKK: number;
-};
+import { loadModuleState, saveModuleState, seedCache } from "../goalModuleStorage";
 
-type PipelineState = {
-  weekLabel: string; // e.g. "2026-W08"
-  proposalsSent: number;
-  replies: number;
-  callsBooked: number;
-  clientsWon: number;
-};
-
+export type RevenueState  = { monthlyTargetDKK: number; monthLabel: string; earnedDKK: number };
+export type PipelineState = { weekLabel: string; proposalsSent: number; replies: number; callsBooked: number; clientsWon: number };
 export type SaaSStage =
-  | "Idea validation"
-  | "MVP design"
-  | "MVP build"
-  | "Beta users"
-  | "Payments (Stripe)"
-  | "Launch (Product Hunt)"
-  | "First paying customer";
-
-type SaaSState = {
-  stage: SaaSStage;
-  notes: string;
-};
-
-const ns = (goalId: string, key: string) => `goals:${goalId}:freelance:${key}`;
-
-function safeParse<T>(raw: string | null, fallback: T): T {
-  try {
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+  | "Idea validation" | "MVP design" | "MVP build" | "Beta users"
+  | "Payments (Stripe)" | "Launch (Product Hunt)" | "First paying customer";
+export type SaaSState = { stage: SaaSStage; notes: string };
 
 function monthLabel(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
-
 function weekLabel(d = new Date()) {
-  // simple ISO-ish week label (good enough for tracking)
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() + 4 - dayNum);
@@ -53,51 +19,26 @@ function weekLabel(d = new Date()) {
   return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
-export function getRevenue(goalId: string): RevenueState {
-  const currentMonth = monthLabel();
-  const fallback: RevenueState = { monthLabel: currentMonth, monthlyTargetDKK: 15000, earnedDKK: 0 };
+const revenueDefault  = (): RevenueState  => ({ monthLabel: monthLabel(), monthlyTargetDKK: 15000, earnedDKK: 0 });
+const pipelineDefault = (): PipelineState => ({ weekLabel: weekLabel(), proposalsSent: 0, replies: 0, callsBooked: 0, clientsWon: 0 });
+const saasDefault     = (): SaaSState     => ({ stage: "Idea validation", notes: "" });
 
-  const state = safeParse<RevenueState>(localStorage.getItem(ns(goalId, "revenue")), fallback);
-
-  // auto-roll month
-  if (state.monthLabel !== currentMonth) {
-    const next = { ...fallback };
-    localStorage.setItem(ns(goalId, "revenue"), JSON.stringify(next));
-    return next;
-  }
-  return state;
+function normalizeRevenue(s: RevenueState): RevenueState {
+  return s.monthLabel === monthLabel() ? s : revenueDefault();
+}
+function normalizePipeline(s: PipelineState): PipelineState {
+  return s.weekLabel === weekLabel() ? s : pipelineDefault();
 }
 
-export function setRevenue(goalId: string, next: RevenueState) {
-  localStorage.setItem(ns(goalId, "revenue"), JSON.stringify(next));
-}
+export function seedRevenue(goalId: string)  { return normalizeRevenue(seedCache(goalId, "revenue", revenueDefault())); }
+export function seedPipeline(goalId: string) { return normalizePipeline(seedCache(goalId, "pipeline", pipelineDefault())); }
+export function seedSaaS(goalId: string)     { return seedCache(goalId, "saas", saasDefault()); }
 
-export function getPipeline(goalId: string): PipelineState {
-  const currentWeek = weekLabel();
-  const fallback: PipelineState = { weekLabel: currentWeek, proposalsSent: 0, replies: 0, callsBooked: 0, clientsWon: 0 };
+export async function getRevenue(goalId: string)  { return normalizeRevenue(await loadModuleState(goalId, "revenue", revenueDefault())); }
+export async function setRevenue(goalId: string, next: RevenueState)   { await saveModuleState(goalId, "revenue", next); }
 
-  const state = safeParse<PipelineState>(localStorage.getItem(ns(goalId, "pipeline")), fallback);
+export async function getPipeline(goalId: string) { return normalizePipeline(await loadModuleState(goalId, "pipeline", pipelineDefault())); }
+export async function setPipeline(goalId: string, next: PipelineState) { await saveModuleState(goalId, "pipeline", next); }
 
-  // auto-roll week
-  if (state.weekLabel !== currentWeek) {
-    const next = { ...fallback };
-    localStorage.setItem(ns(goalId, "pipeline"), JSON.stringify(next));
-    return next;
-  }
-  return state;
-}
-
-export function setPipeline(goalId: string, next: PipelineState) {
-  localStorage.setItem(ns(goalId, "pipeline"), JSON.stringify(next));
-}
-
-export function getSaaS(goalId: string): SaaSState {
-  return safeParse<SaaSState>(localStorage.getItem(ns(goalId, "saas")), {
-    stage: "Idea validation",
-    notes: "",
-  });
-}
-
-export function setSaaS(goalId: string, next: SaaSState) {
-  localStorage.setItem(ns(goalId, "saas"), JSON.stringify(next));
-}
+export async function getSaaS(goalId: string)     { return loadModuleState(goalId, "saas", saasDefault()); }
+export async function setSaaS(goalId: string, next: SaaSState)         { await saveModuleState(goalId, "saas", next); }

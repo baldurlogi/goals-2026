@@ -1,104 +1,46 @@
-type RoutineStreakState = { lastISO: string | null; streak: number };
+import { loadModuleState, saveModuleState, seedCache } from "../goalModuleStorage";
 
-type DailyRoutineState = {
-  dayISO: string; // YYYY-MM-DD
-  amDone: boolean;
-  pmDone: boolean;
-};
-
-type RoutineItemsState = {
+export type RoutineStreakState = { lastISO: string | null; streak: number };
+export type DailyRoutineState = { dayISO: string; amDone: boolean; pmDone: boolean };
+export type RoutineItemsState = {
   am: { cleanser: boolean; moisturizer: boolean; spf: boolean };
   pm: { cleanser: boolean; moisturizer: boolean; retinoid: boolean };
 };
-
-type SkinLogEntry = {
-  dayISO: string;
-  irritation: number; // 1-5
-  acne: number; // 1-5
-  hydration: number; // 1-5
-  notes: string;
-};
-
-type SkinLogState = {
-  entries: SkinLogEntry[]; // most recent first
-};
-
-const ns = (goalId: string, key: string) => `goals:${goalId}:skincare:${key}`;
-
-function safeParse<T>(raw: string | null, fallback: T): T {
-  try {
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+export type SkinLogEntry = { dayISO: string; irritation: number; acne: number; hydration: number; notes: string };
+export type SkinLogState  = { entries: SkinLogEntry[] };
 
 export function todayISO(d = new Date()) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
 export function diffDays(aISO: string, bISO: string) {
-  const a = new Date(aISO + "T00:00:00");
-  const b = new Date(bISO + "T00:00:00");
-  return Math.round((b.getTime() - a.getTime()) / 86400000);
+  return Math.round((new Date(bISO + "T00:00:00").getTime() - new Date(aISO + "T00:00:00").getTime()) / 86400000);
 }
 
-// --- streak ---
-export function getRoutineStreak(goalId: string): RoutineStreakState {
-  return safeParse(localStorage.getItem(ns(goalId, "streak")), { lastISO: null, streak: 0 });
+const streakDefault  = (): RoutineStreakState => ({ lastISO: null, streak: 0 });
+const dailyDefault   = (): DailyRoutineState  => ({ dayISO: todayISO(), amDone: false, pmDone: false });
+const itemsDefault   = () => ({ dayISO: todayISO(), items: { am: { cleanser: false, moisturizer: false, spf: false }, pm: { cleanser: false, moisturizer: false, retinoid: false } } });
+const skinLogDefault = (): SkinLogState => ({ entries: [] });
+
+function normalizeDaily(s: DailyRoutineState): DailyRoutineState {
+  return s.dayISO === todayISO() ? s : dailyDefault();
 }
-export function setRoutineStreak(goalId: string, next: RoutineStreakState) {
-  localStorage.setItem(ns(goalId, "streak"), JSON.stringify(next));
+function normalizeItems(s: ReturnType<typeof itemsDefault>) {
+  return s.dayISO === todayISO() ? s : itemsDefault();
 }
 
-// --- daily AM/PM ---
-export function getDailyRoutine(goalId: string): DailyRoutineState {
-  const today = todayISO();
-  const fallback: DailyRoutineState = { dayISO: today, amDone: false, pmDone: false };
-  const state = safeParse(localStorage.getItem(ns(goalId, "daily")), fallback);
+export function seedRoutineStreak(goalId: string) { return seedCache(goalId, "streak", streakDefault()); }
+export function seedDailyRoutine(goalId: string)  { return normalizeDaily(seedCache(goalId, "daily", dailyDefault())); }
+export function seedRoutineItems(goalId: string)  { return normalizeItems(seedCache(goalId, "items", itemsDefault())); }
+export function seedSkinLog(goalId: string)       { return seedCache(goalId, "log", skinLogDefault()); }
 
-  if (state.dayISO !== today) {
-    localStorage.setItem(ns(goalId, "daily"), JSON.stringify(fallback));
-    return fallback;
-  }
-  return state;
-}
-export function setDailyRoutine(goalId: string, next: DailyRoutineState) {
-  localStorage.setItem(ns(goalId, "daily"), JSON.stringify(next));
-}
+export async function getRoutineStreak(goalId: string) { return loadModuleState(goalId, "streak", streakDefault()); }
+export async function setRoutineStreak(goalId: string, next: RoutineStreakState) { await saveModuleState(goalId, "streak", next); }
 
-// --- routine items (resets daily, but keeps structure) ---
-export function getRoutineItems(goalId: string): { dayISO: string; items: RoutineItemsState } {
-  const today = todayISO();
-  const fallback = {
-    dayISO: today,
-    items: {
-      am: { cleanser: false, moisturizer: false, spf: false },
-      pm: { cleanser: false, moisturizer: false, retinoid: false },
-    },
-  };
+export async function getDailyRoutine(goalId: string) { return normalizeDaily(await loadModuleState(goalId, "daily", dailyDefault())); }
+export async function setDailyRoutine(goalId: string, next: DailyRoutineState) { await saveModuleState(goalId, "daily", next); }
 
-  const state = safeParse(localStorage.getItem(ns(goalId, "items")), fallback);
+export async function getRoutineItems(goalId: string) { return normalizeItems(await loadModuleState(goalId, "items", itemsDefault())); }
+export async function setRoutineItems(goalId: string, next: ReturnType<typeof itemsDefault>) { await saveModuleState(goalId, "items", next); }
 
-  if (state.dayISO !== today) {
-    localStorage.setItem(ns(goalId, "items"), JSON.stringify(fallback));
-    return fallback;
-  }
-  return state;
-}
-
-export function setRoutineItems(goalId: string, next: { dayISO: string; items: RoutineItemsState }) {
-  localStorage.setItem(ns(goalId, "items"), JSON.stringify(next));
-}
-
-// --- skin log ---
-export function getSkinLog(goalId: string): SkinLogState {
-  return safeParse(localStorage.getItem(ns(goalId, "log")), { entries: [] });
-}
-export function setSkinLog(goalId: string, next: SkinLogState) {
-  localStorage.setItem(ns(goalId, "log"), JSON.stringify(next));
-}
+export async function getSkinLog(goalId: string) { return loadModuleState(goalId, "log", skinLogDefault()); }
+export async function setSkinLog(goalId: string, next: SkinLogState) { await saveModuleState(goalId, "log", next); }

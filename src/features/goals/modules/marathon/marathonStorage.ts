@@ -1,90 +1,39 @@
-type RunStreakState = { lastRunISO: string | null; streak: number };
+import { loadModuleState, saveModuleState, seedCache } from "../goalModuleStorage";
 
-type WeeklyMileageState = {
-  weekStartISO: string; // Monday YYYY-MM-DD
-  targetKm: number;
-  doneKm: number;
-};
-
-type LongRunState = {
-  nextLongRunKm: number;
-  scheduledISO: string | null; // YYYY-MM-DD
-  notes: string;
-};
-
-const ns = (goalId: string, key: string) => `goals:${goalId}:marathon:${key}`;
-
-function safeParse<T>(raw: string | null, fallback: T): T {
-  try {
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+export type RunStreakState     = { lastRunISO: string | null; streak: number };
+export type WeeklyMileageState = { weekStartISO: string; targetKm: number; doneKm: number };
+export type LongRunState       = { nextLongRunKm: number; scheduledISO: string | null; notes: string };
 
 export function todayISO(d = new Date()) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
 export function diffDays(aISO: string, bISO: string) {
-  const a = new Date(aISO + "T00:00:00");
-  const b = new Date(bISO + "T00:00:00");
-  return Math.round((b.getTime() - a.getTime()) / 86400000);
+  return Math.round((new Date(bISO + "T00:00:00").getTime() - new Date(aISO + "T00:00:00").getTime()) / 86400000);
 }
-
-export function getMondayISO(d: Date) {
+export function getMondayISO(d = new Date()) {
   const date = new Date(d);
-  const day = date.getDay(); // Sun=0
-  const diffToMonday = (day === 0 ? -6 : 1) - day;
-  date.setDate(date.getDate() + diffToMonday);
+  const day = date.getDay();
+  date.setDate(date.getDate() + (day === 0 ? -6 : 1) - day);
   return todayISO(date);
 }
 
-// -------- streak --------
+const streakDefault  = (): RunStreakState     => ({ lastRunISO: null, streak: 0 });
+const mileageDefault = (): WeeklyMileageState => ({ weekStartISO: getMondayISO(), targetKm: 20, doneKm: 0 });
+const longRunDefault = (): LongRunState       => ({ nextLongRunKm: 10, scheduledISO: null, notes: "" });
 
-export function getRunStreak(goalId: string): RunStreakState {
-  return safeParse(localStorage.getItem(ns(goalId, "streak")), {
-    lastRunISO: null,
-    streak: 0,
-  });
+function normalizeMileage(s: WeeklyMileageState): WeeklyMileageState {
+  return s.weekStartISO === getMondayISO() ? s : mileageDefault();
 }
 
-export function setRunStreak(goalId: string, next: RunStreakState) {
-  localStorage.setItem(ns(goalId, "streak"), JSON.stringify(next));
-}
+export function seedRunStreak(goalId: string)     { return seedCache(goalId, "streak", streakDefault()); }
+export function seedWeeklyMileage(goalId: string) { return normalizeMileage(seedCache(goalId, "weeklyKm", mileageDefault())); }
+export function seedLongRun(goalId: string)       { return seedCache(goalId, "longRun", longRunDefault()); }
 
-// -------- weekly mileage --------
+export async function getRunStreak(goalId: string) { return loadModuleState(goalId, "streak", streakDefault()); }
+export async function setRunStreak(goalId: string, next: RunStreakState) { await saveModuleState(goalId, "streak", next); }
 
-export function getWeeklyMileage(goalId: string): WeeklyMileageState {
-  const monday = getMondayISO(new Date());
-  const fallback: WeeklyMileageState = { weekStartISO: monday, targetKm: 20, doneKm: 0 };
-  const state = safeParse(localStorage.getItem(ns(goalId, "weeklyKm")), fallback);
+export async function getWeeklyMileage(goalId: string) { return normalizeMileage(await loadModuleState(goalId, "weeklyKm", mileageDefault())); }
+export async function setWeeklyMileage(goalId: string, next: WeeklyMileageState) { await saveModuleState(goalId, "weeklyKm", next); }
 
-  if (state.weekStartISO !== monday) {
-    localStorage.setItem(ns(goalId, "weeklyKm"), JSON.stringify(fallback));
-    return fallback;
-  }
-  return state;
-}
-
-export function setWeeklyMileage(goalId: string, next: WeeklyMileageState) {
-  localStorage.setItem(ns(goalId, "weeklyKm"), JSON.stringify(next));
-}
-
-// -------- long run planner --------
-
-export function getLongRun(goalId: string): LongRunState {
-  return safeParse(localStorage.getItem(ns(goalId, "longRun")), {
-    nextLongRunKm: 10,
-    scheduledISO: null,
-    notes: "",
-  });
-}
-
-export function setLongRun(goalId: string, next: LongRunState) {
-  localStorage.setItem(ns(goalId, "longRun"), JSON.stringify(next));
-}
+export async function getLongRun(goalId: string) { return loadModuleState(goalId, "longRun", longRunDefault()); }
+export async function setLongRun(goalId: string, next: LongRunState) { await saveModuleState(goalId, "longRun", next); }

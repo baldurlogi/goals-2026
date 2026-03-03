@@ -1,80 +1,36 @@
-type StudyStreakState = { lastISO: string | null; streak: number };
+import { loadModuleState, saveModuleState, seedCache } from "../goalModuleStorage";
 
-type DrillState = {
-  monthLabel: string; // YYYY-MM
-  leetcodeDone: number; // progress toward 30
-  target: number; // default 30
-};
-
-type FocusState = {
-  currentFocus: "JavaScript" | "TypeScript" | "React" | "Frontend";
-  notes: string;
-};
-
-const ns = (goalId: string, key: string) => `goals:${goalId}:frontend:${key}`;
-
-function safeParse<T>(raw: string | null, fallback: T): T {
-  try {
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+export type StudyStreakState = { lastISO: string | null; streak: number };
+export type DrillState = { monthLabel: string; leetcodeDone: number; target: number };
+export type FocusState = { currentFocus: "JavaScript" | "TypeScript" | "React" | "Frontend"; notes: string };
 
 export function todayISO(d = new Date()) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
 export function diffDays(aISO: string, bISO: string) {
-  const a = new Date(aISO + "T00:00:00");
-  const b = new Date(bISO + "T00:00:00");
-  return Math.round((b.getTime() - a.getTime()) / 86400000);
+  return Math.round((new Date(bISO + "T00:00:00").getTime() - new Date(aISO + "T00:00:00").getTime()) / 86400000);
 }
-
 function monthLabel(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export function getStudyStreak(goalId: string): StudyStreakState {
-  return safeParse(localStorage.getItem(ns(goalId, "streak")), {
-    lastISO: null,
-    streak: 0,
-  });
+const streakDefault = (): StudyStreakState => ({ lastISO: null, streak: 0 });
+const drillDefault  = (): DrillState      => ({ monthLabel: monthLabel(), leetcodeDone: 0, target: 30 });
+const focusDefault  = (): FocusState      => ({ currentFocus: "JavaScript", notes: "" });
+
+function normalizeDrill(s: DrillState): DrillState {
+  return s.monthLabel === monthLabel() ? s : drillDefault();
 }
 
-export function setStudyStreak(goalId: string, next: StudyStreakState) {
-  localStorage.setItem(ns(goalId, "streak"), JSON.stringify(next));
-}
+export function seedStudyStreak(goalId: string) { return seedCache(goalId, "streak", streakDefault()); }
+export function seedDrills(goalId: string)      { return normalizeDrill(seedCache(goalId, "drills", drillDefault())); }
+export function seedFocus(goalId: string)       { return seedCache(goalId, "focus", focusDefault()); }
 
-export function getDrills(goalId: string): DrillState {
-  const current = monthLabel();
-  const fallback: DrillState = { monthLabel: current, leetcodeDone: 0, target: 30 };
-  const state = safeParse(localStorage.getItem(ns(goalId, "drills")), fallback);
+export async function getStudyStreak(goalId: string) { return loadModuleState(goalId, "streak", streakDefault()); }
+export async function setStudyStreak(goalId: string, next: StudyStreakState) { await saveModuleState(goalId, "streak", next); }
 
-  if (state.monthLabel !== current) {
-    localStorage.setItem(ns(goalId, "drills"), JSON.stringify(fallback));
-    return fallback;
-  }
-  return state;
-}
+export async function getDrills(goalId: string) { return normalizeDrill(await loadModuleState(goalId, "drills", drillDefault())); }
+export async function setDrills(goalId: string, next: DrillState) { await saveModuleState(goalId, "drills", next); }
 
-export function setDrills(goalId: string, next: DrillState) {
-  localStorage.setItem(ns(goalId, "drills"), JSON.stringify(next));
-}
-
-export function getFocus(goalId: string): FocusState {
-  return safeParse(localStorage.getItem(ns(goalId, "focus")), {
-    currentFocus: "JavaScript",
-    notes: "",
-  });
-}
-
-export function setFocus(goalId: string, next: FocusState) {
-  localStorage.setItem(ns(goalId, "focus"), JSON.stringify(next));
-}
+export async function getFocus(goalId: string) { return loadModuleState(goalId, "focus", focusDefault()); }
+export async function setFocus(goalId: string, next: FocusState) { await saveModuleState(goalId, "focus", next); }

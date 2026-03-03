@@ -1,58 +1,15 @@
-export type PipelineStage =
-  | "Idea"
-  | "Script"
-  | "Record"
-  | "Edit"
-  | "Thumbnail"
-  | "Upload"
-  | "Published";
+import { loadModuleState, saveModuleState, seedCache } from "../goalModuleStorage";
 
-export type PipelineItem = {
-  id: string;
-  title: string;
-  stage: PipelineStage;
-  dueISO: string | null; // optional target date
-};
-
-type ScheduleState = {
-  weekLabel: string;     // e.g. 2026-W08
-  targetPerWeek: number; // e.g. 1–3 videos
-  publishedThisWeek: number;
-  nextUploadISO: string | null;
-};
-
-type MetricsState = {
-  monthLabel: string; // YYYY-MM (optional to change later)
-  subs: number;
-  watchHours: number;
-  videosThisYear: number;
-
-  subsTarget: number;       // e.g. 1000
-  watchHoursTarget: number; // e.g. 4000
-  videosTarget: number;     // e.g. 52
-};
-
-type PipelineState = { items: PipelineItem[] };
-
-const ns = (goalId: string, key: string) => `goals:${goalId}:youtube:${key}`;
-
-function safeParse<T>(raw: string | null, fallback: T): T {
-  try {
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+export type PipelineStage = "Idea" | "Script" | "Record" | "Edit" | "Thumbnail" | "Upload" | "Published";
+export type PipelineItem  = { id: string; title: string; stage: PipelineStage; dueISO: string | null };
+export type ScheduleState = { weekLabel: string; targetPerWeek: number; publishedThisWeek: number; nextUploadISO: string | null };
+export type MetricsState  = { monthLabel: string; subs: number; watchHours: number; videosThisYear: number; subsTarget: number; watchHoursTarget: number; videosTarget: number };
+export type PipelineState = { items: PipelineItem[] };
 
 function monthLabel(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
-
 function weekLabel(d = new Date()) {
-  // ISO-ish week label
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() + 4 - dayNum);
@@ -61,62 +18,26 @@ function weekLabel(d = new Date()) {
   return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
-export function getSchedule(goalId: string): ScheduleState {
-  const currentWeek = weekLabel();
-  const fallback: ScheduleState = {
-    weekLabel: currentWeek,
-    targetPerWeek: 1,
-    publishedThisWeek: 0,
-    nextUploadISO: null,
-  };
+const scheduleDefault = (): ScheduleState => ({ weekLabel: weekLabel(), targetPerWeek: 1, publishedThisWeek: 0, nextUploadISO: null });
+const metricsDefault  = (): MetricsState  => ({ monthLabel: monthLabel(), subs: 0, watchHours: 0, videosThisYear: 0, subsTarget: 1000, watchHoursTarget: 4000, videosTarget: 52 });
+const pipelineDefault = (): PipelineState => ({ items: [] });
 
-  const state = safeParse<ScheduleState>(localStorage.getItem(ns(goalId, "schedule")), fallback);
-
-  // auto-roll week
-  if (state.weekLabel !== currentWeek) {
-    localStorage.setItem(ns(goalId, "schedule"), JSON.stringify(fallback));
-    return fallback;
-  }
-  return state;
+function normalizeSchedule(s: ScheduleState): ScheduleState {
+  return s.weekLabel === weekLabel() ? s : scheduleDefault();
+}
+function normalizeMetrics(s: MetricsState): MetricsState {
+  return s.monthLabel === monthLabel() ? s : { ...s, monthLabel: monthLabel() };
 }
 
-export function setSchedule(goalId: string, next: ScheduleState) {
-  localStorage.setItem(ns(goalId, "schedule"), JSON.stringify(next));
-}
+export function seedSchedule(goalId: string) { return normalizeSchedule(seedCache(goalId, "schedule", scheduleDefault())); }
+export function seedMetrics(goalId: string)  { return normalizeMetrics(seedCache(goalId, "metrics", metricsDefault())); }
+export function seedPipeline(goalId: string) { return seedCache(goalId, "pipeline", pipelineDefault()); }
 
-export function getMetrics(goalId: string): MetricsState {
-  const currentMonth = monthLabel();
-  const fallback: MetricsState = {
-    monthLabel: currentMonth,
-    subs: 0,
-    watchHours: 0,
-    videosThisYear: 0,
-    subsTarget: 1000,
-    watchHoursTarget: 4000,
-    videosTarget: 52,
-  };
+export async function getSchedule(goalId: string) { return normalizeSchedule(await loadModuleState(goalId, "schedule", scheduleDefault())); }
+export async function setSchedule(goalId: string, next: ScheduleState) { await saveModuleState(goalId, "schedule", next); }
 
-  const state = safeParse<MetricsState>(localStorage.getItem(ns(goalId, "metrics")), fallback);
+export async function getMetrics(goalId: string) { return normalizeMetrics(await loadModuleState(goalId, "metrics", metricsDefault())); }
+export async function setMetrics(goalId: string, next: MetricsState) { await saveModuleState(goalId, "metrics", next); }
 
-  // keep month label current (doesn't reset values; just updates label)
-  if (state.monthLabel !== currentMonth) {
-    const next = { ...state, monthLabel: currentMonth };
-    localStorage.setItem(ns(goalId, "metrics"), JSON.stringify(next));
-    return next;
-  }
-  return state;
-}
-
-export function setMetrics(goalId: string, next: MetricsState) {
-  localStorage.setItem(ns(goalId, "metrics"), JSON.stringify(next));
-}
-
-export function getPipeline(goalId: string): PipelineState {
-  return safeParse<PipelineState>(localStorage.getItem(ns(goalId, "pipeline")), {
-    items: [],
-  });
-}
-
-export function setPipeline(goalId: string, next: PipelineState) {
-  localStorage.setItem(ns(goalId, "pipeline"), JSON.stringify(next));
-}
+export async function getPipeline(goalId: string) { return loadModuleState(goalId, "pipeline", pipelineDefault()); }
+export async function setPipeline(goalId: string, next: PipelineState) { await saveModuleState(goalId, "pipeline", next); }
