@@ -1,27 +1,32 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-import { getNotes, setNotes } from "../travelPlanningStorage";
+import { getNotes, setNotes, seedNotes, type NotesState } from "../travelPlanningStorage";
 
 export function ItineraryNotesCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<NotesState>(() => seedNotes(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getNotes(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getNotes(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
-  function update(notes: string) {
-    setNotes(goalId, { notes });
-    setTick((x) => x + 1);
+  async function update(notes: string) {
+    const next = { notes };
+    setState(next);
+    await setNotes(goalId, next);
   }
 
-  function clear() {
-    setNotes(goalId, { notes: "" });
-    setTick((x) => x + 1);
+  async function clear() {
+    const next = { notes: "" };
+    setState(next);
+    await setNotes(goalId, next);
   }
 
   return (

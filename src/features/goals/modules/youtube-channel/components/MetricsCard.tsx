@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,11 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 
-import { getMetrics, setMetrics } from "../youtubeChannelStorage";
+import {
+  getMetrics,
+  setMetrics,
+  type MetricsState, // <-- export this
+} from "../youtubeChannelStorage";
 
 function toNum(v: string, fallback = 0) {
   const n = Number(v);
@@ -18,17 +22,34 @@ function pct(done: number, target: number) {
   return Math.min(100, Math.round((done / target) * 100));
 }
 
+const EMPTY: MetricsState = {
+  monthLabel: "",
+  subs: 0,
+  subsTarget: 1000,
+  watchHours: 0,
+  watchHoursTarget: 4000,
+  videosThisYear: 0,
+  videosTarget: 52,
+};
+
 export function MetricsCard({ goalId }: { goalId: string }) {
+  const [state, setState] = useState<MetricsState>(EMPTY);
   const [tick, setTick] = useState(0);
 
-  const state = useMemo(() => {
-    void tick;
-    return getMetrics(goalId);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const s = await getMetrics(goalId);
+      if (alive) setState(s);
+    })();
+    return () => {
+      alive = false;
+    };
   }, [goalId, tick]);
 
-  function patch(p: Partial<typeof state>) {
-    const cur = getMetrics(goalId);
-    setMetrics(goalId, { ...cur, ...p });
+  async function patch(p: Partial<MetricsState>) {
+    const cur = await getMetrics(goalId);
+    await setMetrics(goalId, { ...cur, ...p });
     setTick((x) => x + 1);
   }
 
@@ -46,7 +67,6 @@ export function MetricsCard({ goalId }: { goalId: string }) {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Subscribers */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Subscribers</span>
@@ -56,12 +76,18 @@ export function MetricsCard({ goalId }: { goalId: string }) {
             <Input
               inputMode="numeric"
               value={String(state.subs)}
-              onChange={(e) => patch({ subs: Math.max(0, toNum(e.target.value, 0)) })}
+              onChange={(e) =>
+                void patch({ subs: Math.max(0, toNum(e.target.value, 0)) })
+              }
             />
             <Input
               inputMode="numeric"
               value={String(state.subsTarget)}
-              onChange={(e) => patch({ subsTarget: Math.max(1, toNum(e.target.value, 1000)) })}
+              onChange={(e) =>
+                void patch({
+                  subsTarget: Math.max(1, toNum(e.target.value, 1000)),
+                })
+              }
             />
           </div>
           <Progress value={subsPct} className="h-2" />
@@ -72,7 +98,6 @@ export function MetricsCard({ goalId }: { goalId: string }) {
 
         <Separator />
 
-        {/* Watch hours */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Watch hours</span>
@@ -82,23 +107,34 @@ export function MetricsCard({ goalId }: { goalId: string }) {
             <Input
               inputMode="numeric"
               value={String(state.watchHours)}
-              onChange={(e) => patch({ watchHours: Math.max(0, toNum(e.target.value, 0)) })}
+              onChange={(e) =>
+                void patch({
+                  watchHours: Math.max(0, toNum(e.target.value, 0)),
+                })
+              }
             />
             <Input
               inputMode="numeric"
               value={String(state.watchHoursTarget)}
-              onChange={(e) => patch({ watchHoursTarget: Math.max(1, toNum(e.target.value, 4000)) })}
+              onChange={(e) =>
+                void patch({
+                  watchHoursTarget: Math.max(
+                    1,
+                    toNum(e.target.value, 4000)
+                  ),
+                })
+              }
             />
           </div>
           <Progress value={hoursPct} className="h-2" />
           <div className="text-xs text-muted-foreground">
-            {state.watchHours.toLocaleString()} / {state.watchHoursTarget.toLocaleString()}
+            {state.watchHours.toLocaleString()} /{" "}
+            {state.watchHoursTarget.toLocaleString()}
           </div>
         </div>
 
         <Separator />
 
-        {/* Videos this year */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Videos (2026)</span>
@@ -108,17 +144,26 @@ export function MetricsCard({ goalId }: { goalId: string }) {
             <Input
               inputMode="numeric"
               value={String(state.videosThisYear)}
-              onChange={(e) => patch({ videosThisYear: Math.max(0, toNum(e.target.value, 0)) })}
+              onChange={(e) =>
+                void patch({
+                  videosThisYear: Math.max(0, toNum(e.target.value, 0)),
+                })
+              }
             />
             <Input
               inputMode="numeric"
               value={String(state.videosTarget)}
-              onChange={(e) => patch({ videosTarget: Math.max(1, toNum(e.target.value, 52)) })}
+              onChange={(e) =>
+                void patch({
+                  videosTarget: Math.max(1, toNum(e.target.value, 52)),
+                })
+              }
             />
           </div>
           <Progress value={vidsPct} className="h-2" />
           <div className="text-xs text-muted-foreground">
-            {state.videosThisYear.toLocaleString()} / {state.videosTarget.toLocaleString()}
+            {state.videosThisYear.toLocaleString()} /{" "}
+            {state.videosTarget.toLocaleString()}
           </div>
         </div>
 
@@ -126,7 +171,7 @@ export function MetricsCard({ goalId }: { goalId: string }) {
         <Button
           variant="ghost"
           className="w-full"
-          onClick={() => patch({ subs: 0, watchHours: 0, videosThisYear: 0 })}
+          onClick={() => void patch({ subs: 0, watchHours: 0, videosThisYear: 0 })}
         >
           Reset progress
         </Button>

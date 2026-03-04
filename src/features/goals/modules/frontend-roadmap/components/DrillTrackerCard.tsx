@@ -1,37 +1,40 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 
-import { getDrills, setDrills } from "../frontendRoadmapStorage";
+import { getDrills, setDrills, seedDrills, type DrillState } from "../frontendRoadmapStorage";
 
 export function DrillTrackerCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<DrillState>(() => seedDrills(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getDrills(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getDrills(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
-  const pct =
-    state.target <= 0 ? 0 : Math.min(100, Math.round((state.leetcodeDone / state.target) * 100));
+  const pct = state.target <= 0
+    ? 0
+    : Math.min(100, Math.round((state.leetcodeDone / state.target) * 100));
 
-  function patch(delta: number) {
-    const cur = getDrills(goalId);
+  async function patch(delta: number) {
     const next = {
-      ...cur,
-      leetcodeDone: Math.max(0, Math.min(cur.target, cur.leetcodeDone + delta)),
+      ...state,
+      leetcodeDone: Math.max(0, Math.min(state.target, state.leetcodeDone + delta)),
     };
-    setDrills(goalId, next);
-    setTick((x) => x + 1);
+    setState(next);
+    await setDrills(goalId, next);
   }
 
-  function resetMonth() {
-    const cur = getDrills(goalId);
-    setDrills(goalId, { ...cur, leetcodeDone: 0 });
-    setTick((x) => x + 1);
+  async function resetMonth() {
+    const next = { ...state, leetcodeDone: 0 };
+    setState(next);
+    await setDrills(goalId, next);
   }
 
   return (
@@ -52,12 +55,8 @@ export function DrillTrackerCard({ goalId }: { goalId: string }) {
         <Progress value={pct} className="h-2" />
 
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={() => patch(-1)}>
-            –1
-          </Button>
-          <Button className="flex-1" onClick={() => patch(+1)}>
-            +1
-          </Button>
+          <Button variant="outline" className="flex-1" onClick={() => patch(-1)}>–1</Button>
+          <Button className="flex-1" onClick={() => patch(+1)}>+1</Button>
         </div>
 
         <Separator />

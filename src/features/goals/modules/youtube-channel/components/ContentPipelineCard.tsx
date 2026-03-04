@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import {
   setPipeline,
   type PipelineItem,
   type PipelineStage,
+  type PipelineState, // <-- make sure you export this type from storage
 } from "../youtubeChannelStorage";
 
 const STAGES: PipelineStage[] = [
@@ -22,39 +23,54 @@ const STAGES: PipelineStage[] = [
   "Published",
 ];
 
+const EMPTY: PipelineState = { items: [] };
+
 export function ContentPipelineCard({ goalId }: { goalId: string }) {
+  const [state, setState] = useState<PipelineState>(EMPTY);
   const [tick, setTick] = useState(0);
 
-  const state = useMemo(() => {
-    void tick;
-    return getPipeline(goalId);
+  // Load async state
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const s = await getPipeline(goalId);
+      if (alive) setState(s);
+    })();
+    return () => {
+      alive = false;
+    };
   }, [goalId, tick]);
 
-  function patch(items: PipelineItem[]) {
-    setPipeline(goalId, { items });
-    setTick((x) => x + 1);
+  async function patch(items: PipelineItem[]) {
+    await setPipeline(goalId, { items });
+    setTick((x) => x + 1); // refresh from source of truth
   }
 
-  function add() {
+  async function add() {
     const id = `vid-${Date.now()}`;
-    patch([
+    await patch([
       { id, title: "New video idea", stage: "Idea", dueISO: null },
       ...state.items,
     ]);
   }
 
-  function update(id: string, p: Partial<PipelineItem>) {
-    patch(state.items.map((it) => (it.id === id ? { ...it, ...p } : it)));
+  async function update(id: string, p: Partial<PipelineItem>) {
+    await patch(state.items.map((it) => (it.id === id ? { ...it, ...p } : it)));
   }
 
-  function remove(id: string) {
-    patch(state.items.filter((it) => it.id !== id));
+  async function remove(id: string) {
+    await patch(state.items.filter((it) => it.id !== id));
   }
 
-  const counts = STAGES.reduce<Record<PipelineStage, number>>((acc, s) => {
-    acc[s] = state.items.filter((i) => i.stage === s).length;
-    return acc;
-  }, Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<PipelineStage, number>);
+  const counts = useMemo(() => {
+    const base = Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<
+      PipelineStage,
+      number
+    >;
+
+    for (const it of state.items) base[it.stage] = (base[it.stage] ?? 0) + 1;
+    return base;
+  }, [state.items]);
 
   return (
     <Card className="rounded-2xl">
@@ -67,14 +83,17 @@ export function ContentPipelineCard({ goalId }: { goalId: string }) {
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
           {STAGES.map((s) => (
             <span key={s}>
-              {s}: <span className="text-foreground font-medium">{counts[s] ?? 0}</span>
+              {s}:{" "}
+              <span className="text-foreground font-medium">
+                {counts[s] ?? 0}
+              </span>
             </span>
           ))}
         </div>
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <Button className="w-full" onClick={add}>
+        <Button className="w-full" onClick={() => void add()}>
           Add video
         </Button>
 
@@ -82,14 +101,18 @@ export function ContentPipelineCard({ goalId }: { goalId: string }) {
 
         <div className="space-y-3">
           {state.items.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No videos yet. Add one above.</div>
+            <div className="text-sm text-muted-foreground">
+              No videos yet. Add one above.
+            </div>
           ) : null}
 
           {state.items.slice(0, 6).map((it) => (
             <div key={it.id} className="rounded-xl border p-3 space-y-2">
               <Input
                 value={it.title}
-                onChange={(e) => update(it.id, { title: e.target.value })}
+                onChange={(e) =>
+                  void update(it.id, { title: e.target.value })
+                }
               />
 
               <div className="flex flex-wrap gap-2">
@@ -98,7 +121,7 @@ export function ContentPipelineCard({ goalId }: { goalId: string }) {
                     key={s}
                     size="sm"
                     variant={it.stage === s ? "default" : "outline"}
-                    onClick={() => update(it.id, { stage: s })}
+                    onClick={() => void update(it.id, { stage: s })}
                   >
                     {s}
                   </Button>
@@ -110,11 +133,17 @@ export function ContentPipelineCard({ goalId }: { goalId: string }) {
                 <Input
                   type="date"
                   value={it.dueISO ?? ""}
-                  onChange={(e) => update(it.id, { dueISO: e.target.value || null })}
+                  onChange={(e) =>
+                    void update(it.id, { dueISO: e.target.value || null })
+                  }
                 />
               </div>
 
-              <Button variant="ghost" size="sm" onClick={() => remove(it.id)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void remove(it.id)}
+              >
                 Remove
               </Button>
             </div>
@@ -122,7 +151,8 @@ export function ContentPipelineCard({ goalId }: { goalId: string }) {
 
           {state.items.length > 6 ? (
             <div className="text-xs text-muted-foreground">
-              Showing 6 items (you have {state.items.length}). We can add paging later.
+              Showing 6 items (you have {state.items.length}). We can add paging
+              later.
             </div>
           ) : null}
         </div>

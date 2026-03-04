@@ -1,60 +1,62 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-import { diffDays, getStreak, setStreak, todayISO } from "../../../../fitness/fitnessStorage";
+import {
+  diffDays,
+  getStreak,
+  setStreak,
+  seedStreak,
+  todayISO,
+  type StreakState,
+} from "../../../../fitness/fitnessStorage";
+
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
 export function WorkoutStreakCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<StreakState>(() => seedStreak(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getStreak(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getStreak(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
   const today = todayISO();
-  const last = state.lastWorkoutISO;
-
-  type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
   const status = useMemo((): { label: string; variant: BadgeVariant } => {
+    const last = state.lastWorkoutISO;
     if (!last) return { label: "No workouts logged yet", variant: "secondary" };
-
     const delta = diffDays(last, today);
     if (delta === 0) return { label: "Logged today", variant: "default" };
     if (delta === 1) return { label: "Keep it going today", variant: "secondary" };
     return { label: "Streak will reset (missed days)", variant: "destructive" };
-  }, [last, today]);
+  }, [state.lastWorkoutISO, today]);
 
-  function logToday() {
-    const current = getStreak(goalId);
-    const lastISO = current.lastWorkoutISO;
+  async function logToday() {
+    const last = state.lastWorkoutISO;
+    let next: StreakState;
 
-    if (!lastISO) {
-      setStreak(goalId, { lastWorkoutISO: today, streak: 1 });
-      setTick((x) => x + 1);
-      return;
+    if (!last) {
+      next = { lastWorkoutISO: today, streak: 1 };
+    } else {
+      const delta = diffDays(last, today);
+      if (delta === 0) return; // already logged
+      next = { lastWorkoutISO: today, streak: delta === 1 ? state.streak + 1 : 1 };
     }
 
-    const delta = diffDays(lastISO, today);
-
-    if (delta === 0) return;
-
-    if (delta === 1) {
-      setStreak(goalId, { lastWorkoutISO: today, streak: current.streak + 1 });
-      setTick((x) => x + 1);
-      return;
-    }
-
-    setStreak(goalId, { lastWorkoutISO: today, streak: 1 });
-    setTick((x) => x + 1);
+    setState(next);
+    await setStreak(goalId, next);
   }
 
-  function reset() {
-    setStreak(goalId, { lastWorkoutISO: null, streak: 0 });
-    setTick((x) => x + 1);
+  async function reset() {
+    const next: StreakState = { lastWorkoutISO: null, streak: 0 };
+    setState(next);
+    await setStreak(goalId, next);
   }
 
   return (

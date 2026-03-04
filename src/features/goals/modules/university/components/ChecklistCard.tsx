@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,32 +6,38 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-import { getUniversityState, setUniversityState, type ChecklistItem } from "../universityStorage";
+import {
+  getUniversityState, setUniversityState, seedUniversityState,
+  type UniversityState, type ChecklistItem,
+} from "../universityStorage";
 
 export function ChecklistCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<UniversityState>(() => seedUniversityState(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getUniversityState(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getUniversityState(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
-  function patch(checklist: ChecklistItem[]) {
-    setUniversityState(goalId, { ...getUniversityState(goalId), checklist });
-    setTick((x) => x + 1);
+  async function patchChecklist(checklist: ChecklistItem[]) {
+    const next = { ...state, checklist };
+    setState(next);
+    await setUniversityState(goalId, next);
   }
 
   function add() {
-    const id = `ck-${Date.now()}`;
-    patch([...state.checklist, { id, label: "New task", done: false }]);
+    patchChecklist([...state.checklist, { id: `ck-${Date.now()}`, label: "New task", done: false }]);
   }
 
   function update(id: string, p: Partial<ChecklistItem>) {
-    patch(state.checklist.map((c) => (c.id === id ? { ...c, ...p } : c)));
+    patchChecklist(state.checklist.map((c) => (c.id === id ? { ...c, ...p } : c)));
   }
 
   function remove(id: string) {
-    patch(state.checklist.filter((c) => c.id !== id));
+    patchChecklist(state.checklist.filter((c) => c.id !== id));
   }
 
   const done = state.checklist.filter((c) => c.done).length;
@@ -49,20 +55,13 @@ export function ChecklistCard({ goalId }: { goalId: string }) {
         {state.checklist.map((c) => (
           <div key={c.id} className="flex items-center gap-2 rounded-xl border p-3">
             <Checkbox checked={c.done} onCheckedChange={() => update(c.id, { done: !c.done })} />
-            <Input
-              value={c.label}
-              onChange={(e) => update(c.id, { label: e.target.value })}
-            />
-            <Button variant="ghost" size="sm" onClick={() => remove(c.id)}>
-              Remove
-            </Button>
+            <Input value={c.label} onChange={(e) => update(c.id, { label: e.target.value })} />
+            <Button variant="ghost" size="sm" onClick={() => remove(c.id)}>Remove</Button>
           </div>
         ))}
 
         <Separator />
-        <Button className="w-full" onClick={add}>
-          Add task
-        </Button>
+        <Button className="w-full" onClick={add}>Add task</Button>
       </CardContent>
     </Card>
   );

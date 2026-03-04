@@ -1,39 +1,40 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-import { getUniversityState, setUniversityState, type UniApp } from "../universityStorage";
+import {
+  getUniversityState, setUniversityState, seedUniversityState,
+  type UniversityState, type UniApp,
+} from "../universityStorage";
 
 const STATUSES: UniApp["status"][] = [
-  "Researching",
-  "Shortlisted",
-  "Applying",
-  "Submitted",
-  "Rejected",
-  "Accepted",
+  "Researching", "Shortlisted", "Applying", "Submitted", "Rejected", "Accepted",
 ];
 
 export function ApplicationsCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<UniversityState>(() => seedUniversityState(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getUniversityState(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getUniversityState(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
-  function patchApps(apps: UniApp[]) {
-    setUniversityState(goalId, { ...getUniversityState(goalId), apps });
-    setTick((x) => x + 1);
+  async function patchApps(apps: UniApp[]) {
+    const next = { ...state, apps };
+    setState(next);
+    await setUniversityState(goalId, next);
   }
 
   function add() {
-    const id = `app-${Date.now()}`;
     patchApps([
       ...state.apps,
-      { id, school: "New school", program: "MS (TBD)", status: "Researching" },
+      { id: `app-${Date.now()}`, school: "New school", program: "MS (TBD)", status: "Researching" },
     ]);
   }
 
@@ -63,12 +64,10 @@ export function ApplicationsCard({ goalId }: { goalId: string }) {
               <Input value={a.school} onChange={(e) => update(a.id, { school: e.target.value })} />
               <Input value={a.program} onChange={(e) => update(a.id, { program: e.target.value })} />
             </div>
-
             <div className="flex flex-wrap gap-2">
               {STATUSES.map((s) => (
                 <Button
-                  key={s}
-                  size="sm"
+                  key={s} size="sm"
                   variant={a.status === s ? "default" : "outline"}
                   onClick={() => update(a.id, { status: s })}
                 >
@@ -76,17 +75,12 @@ export function ApplicationsCard({ goalId }: { goalId: string }) {
                 </Button>
               ))}
             </div>
-
-            <Button variant="ghost" size="sm" onClick={() => remove(a.id)}>
-              Remove
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => remove(a.id)}>Remove</Button>
           </div>
         ))}
 
         <Separator />
-        <Button className="w-full" onClick={add}>
-          Add application
-        </Button>
+        <Button className="w-full" onClick={add}>Add application</Button>
       </CardContent>
     </Card>
   );

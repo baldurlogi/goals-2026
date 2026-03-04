@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,39 +6,47 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 
-import { daysUntil, getUniversityState, setUniversityState, type Deadline } from "../universityStorage";
+import {
+  daysUntil, getUniversityState, setUniversityState, seedUniversityState,
+  type UniversityState, type Deadline,
+} from "../universityStorage";
 
 export function DeadlinesCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<UniversityState>(() => seedUniversityState(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getUniversityState(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getUniversityState(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
   const sorted = [...state.deadlines].sort((a, b) => a.dueISO.localeCompare(b.dueISO));
 
-  function patch(deadlines: Deadline[]) {
-    setUniversityState(goalId, { ...getUniversityState(goalId), deadlines });
-    setTick((x) => x + 1);
+  async function patchDeadlines(deadlines: Deadline[]) {
+    const next = { ...state, deadlines };
+    setState(next);
+    await setUniversityState(goalId, next);
   }
 
   function add() {
-    const id = `dl-${Date.now()}`;
-    patch([...state.deadlines, { id, label: "New deadline", dueISO: "2026-04-01", done: false }]);
+    patchDeadlines([
+      ...state.deadlines,
+      { id: `dl-${Date.now()}`, label: "New deadline", dueISO: "2026-04-01", done: false },
+    ]);
   }
 
   function update(id: string, p: Partial<Deadline>) {
-    patch(state.deadlines.map((d) => (d.id === id ? { ...d, ...p } : d)));
+    patchDeadlines(state.deadlines.map((d) => (d.id === id ? { ...d, ...p } : d)));
   }
 
   function remove(id: string) {
-    patch(state.deadlines.filter((d) => d.id !== id));
+    patchDeadlines(state.deadlines.filter((d) => d.id !== id));
   }
 
   const next = sorted.find((d) => !d.done);
-  const nextBadge =
-    next ? `${Math.max(0, daysUntil(next.dueISO))}d` : "All done";
+  const nextBadge = next ? `${Math.max(0, daysUntil(next.dueISO))}d` : "All done";
 
   return (
     <Card className="rounded-2xl">
@@ -65,16 +73,12 @@ export function DeadlinesCard({ goalId }: { goalId: string }) {
               <Input type="date" value={d.dueISO} onChange={(e) => update(d.id, { dueISO: e.target.value })} />
             </div>
 
-            <Button variant="ghost" size="sm" onClick={() => remove(d.id)}>
-              Remove
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => remove(d.id)}>Remove</Button>
           </div>
         ))}
 
         <Separator />
-        <Button className="w-full" onClick={add}>
-          Add deadline
-        </Button>
+        <Button className="w-full" onClick={add}>Add deadline</Button>
       </CardContent>
     </Card>
   );

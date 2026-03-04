@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-import { getLongRun, setLongRun, todayISO } from "../marathonStorage";
+import { getLongRun, setLongRun, seedLongRun, todayISO, type LongRunState } from "../marathonStorage";
 
 function toNum(v: string, fallback = 0) {
   const n = Number(v);
@@ -14,27 +14,28 @@ function toNum(v: string, fallback = 0) {
 }
 
 export function LongRunPlannerCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<LongRunState>(() => seedLongRun(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getLongRun(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getLongRun(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
-  function patch(p: Partial<typeof state>) {
-    const cur = getLongRun(goalId);
-    setLongRun(goalId, { ...cur, ...p });
-    setTick((x) => x + 1);
+  async function patch(p: Partial<LongRunState>) {
+    const next = { ...state, ...p };
+    setState(next);
+    await setLongRun(goalId, next);
   }
-
-  const scheduled = state.scheduledISO ?? "Not set";
 
   return (
     <Card className="rounded-2xl">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base">🗓️ Next long run</CardTitle>
-          <Badge variant="secondary">{scheduled}</Badge>
+          <Badge variant="secondary">{state.scheduledISO ?? "Not set"}</Badge>
         </div>
       </CardHeader>
 
@@ -48,7 +49,6 @@ export function LongRunPlannerCard({ goalId }: { goalId: string }) {
               onChange={(e) => patch({ nextLongRunKm: Math.max(0, toNum(e.target.value, 10)) })}
             />
           </div>
-
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Date</div>
             <Input

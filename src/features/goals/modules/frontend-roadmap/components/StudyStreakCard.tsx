@@ -1,58 +1,56 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
 import {
-  diffDays,
-  getStudyStreak,
-  setStudyStreak,
-  todayISO,
+  diffDays, getStudyStreak, setStudyStreak, seedStudyStreak, todayISO,
+  type StudyStreakState,
 } from "../frontendRoadmapStorage";
 
 export function StudyStreakCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<StudyStreakState>(() => seedStudyStreak(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getStudyStreak(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getStudyStreak(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
   const today = todayISO();
-  const last = state.lastISO;
 
   const badge = useMemo(() => {
+    const last = state.lastISO;
     if (!last) return { label: "No sessions logged yet", variant: "secondary" as const };
     const d = diffDays(last, today);
     if (d === 0) return { label: "Logged today", variant: "default" as const };
     if (d === 1) return { label: "Log today to keep streak", variant: "secondary" as const };
     return { label: "Missed days → reset on next log", variant: "destructive" as const };
-  }, [last, today]);
+  }, [state.lastISO, today]);
 
-  function logToday() {
-    const cur = getStudyStreak(goalId);
-    const lastISO = cur.lastISO;
+  async function logToday() {
+    const last = state.lastISO;
+    let next: StudyStreakState;
 
-    if (!lastISO) {
-      setStudyStreak(goalId, { lastISO: today, streak: 1 });
-      setTick((x) => x + 1);
-      return;
-    }
-
-    const d = diffDays(lastISO, today);
-    if (d === 0) return;
-    if (d === 1) {
-      setStudyStreak(goalId, { lastISO: today, streak: cur.streak + 1 });
+    if (!last) {
+      next = { lastISO: today, streak: 1 };
     } else {
-      setStudyStreak(goalId, { lastISO: today, streak: 1 });
+      const d = diffDays(last, today);
+      if (d === 0) return;
+      next = { lastISO: today, streak: d === 1 ? state.streak + 1 : 1 };
     }
-    setTick((x) => x + 1);
+
+    setState(next);
+    await setStudyStreak(goalId, next);
   }
 
-  function reset() {
-    setStudyStreak(goalId, { lastISO: null, streak: 0 });
-    setTick((x) => x + 1);
+  async function reset() {
+    const next: StudyStreakState = { lastISO: null, streak: 0 };
+    setState(next);
+    await setStudyStreak(goalId, next);
   }
 
   return (
@@ -72,12 +70,8 @@ export function StudyStreakCard({ goalId }: { goalId: string }) {
         <Separator />
 
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={logToday}>
-            Log study today
-          </Button>
-          <Button variant="ghost" onClick={reset}>
-            Reset
-          </Button>
+          <Button className="flex-1" onClick={logToday}>Log study today</Button>
+          <Button variant="ghost" onClick={reset}>Reset</Button>
         </div>
 
         <div className="text-xs text-muted-foreground">

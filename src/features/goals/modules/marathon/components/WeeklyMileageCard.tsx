@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 
-import { getWeeklyMileage, setWeeklyMileage } from "../marathonStorage";
+import { getWeeklyMileage, setWeeklyMileage, seedWeeklyMileage, type WeeklyMileageState } from "../marathonStorage";
 
 function toNum(v: string, fallback = 0) {
   const n = Number(v);
@@ -14,20 +14,24 @@ function toNum(v: string, fallback = 0) {
 }
 
 export function WeeklyMileageCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<WeeklyMileageState>(() => seedWeeklyMileage(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getWeeklyMileage(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getWeeklyMileage(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
-  const pct =
-    state.targetKm <= 0 ? 0 : Math.min(100, Math.round((state.doneKm / state.targetKm) * 100));
+  const pct = state.targetKm <= 0
+    ? 0
+    : Math.min(100, Math.round((state.doneKm / state.targetKm) * 100));
 
-  function patch(p: Partial<typeof state>) {
-    const cur = getWeeklyMileage(goalId);
-    setWeeklyMileage(goalId, { ...cur, ...p });
-    setTick((x) => x + 1);
+  async function patch(p: Partial<WeeklyMileageState>) {
+    const next = { ...state, ...p };
+    setState(next);
+    await setWeeklyMileage(goalId, next);
   }
 
   return (
@@ -61,9 +65,7 @@ export function WeeklyMileageCard({ goalId }: { goalId: string }) {
 
         <div>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {state.doneKm} / {state.targetKm} km
-            </span>
+            <span>{state.doneKm} / {state.targetKm} km</span>
             <span>{pct}%</span>
           </div>
           <Progress value={pct} className="mt-2 h-2" />

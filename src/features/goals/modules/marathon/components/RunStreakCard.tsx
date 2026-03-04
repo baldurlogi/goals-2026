@@ -1,52 +1,53 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-import { diffDays, getRunStreak, setRunStreak, todayISO } from "../marathonStorage";
+import { diffDays, getRunStreak, setRunStreak, seedRunStreak, todayISO, type RunStreakState } from "../marathonStorage";
 
 export function RunStreakCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<RunStreakState>(() => seedRunStreak(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getRunStreak(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getRunStreak(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
   const today = todayISO();
-  const last = state.lastRunISO;
 
   const status = useMemo(() => {
+    const last = state.lastRunISO;
     if (!last) return { label: "No runs logged yet", tone: "secondary" as const };
     const d = diffDays(last, today);
     if (d === 0) return { label: "Logged today", tone: "default" as const };
     if (d === 1) return { label: "Run today to keep streak", tone: "secondary" as const };
     return { label: "Missed days → reset on next log", tone: "destructive" as const };
-  }, [last, today]);
+  }, [state.lastRunISO, today]);
 
-  function logToday() {
-    const cur = getRunStreak(goalId);
-    const lastISO = cur.lastRunISO;
+  async function logToday() {
+    const last = state.lastRunISO;
+    let next: RunStreakState;
 
-    if (!lastISO) {
-      setRunStreak(goalId, { lastRunISO: today, streak: 1 });
-      setTick((x) => x + 1);
-      return;
+    if (!last) {
+      next = { lastRunISO: today, streak: 1 };
+    } else {
+      const d = diffDays(last, today);
+      if (d === 0) return;
+      next = { lastRunISO: today, streak: d === 1 ? state.streak + 1 : 1 };
     }
 
-    const d = diffDays(lastISO, today);
-    if (d === 0) return;
-
-    if (d === 1) setRunStreak(goalId, { lastRunISO: today, streak: cur.streak + 1 });
-    else setRunStreak(goalId, { lastRunISO: today, streak: 1 });
-
-    setTick((x) => x + 1);
+    setState(next);
+    await setRunStreak(goalId, next);
   }
 
-  function reset() {
-    setRunStreak(goalId, { lastRunISO: null, streak: 0 });
-    setTick((x) => x + 1);
+  async function reset() {
+    const next: RunStreakState = { lastRunISO: null, streak: 0 };
+    setState(next);
+    await setRunStreak(goalId, next);
   }
 
   return (
@@ -66,12 +67,8 @@ export function RunStreakCard({ goalId }: { goalId: string }) {
         <Separator />
 
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={logToday}>
-            Log run today
-          </Button>
-          <Button variant="ghost" onClick={reset}>
-            Reset
-          </Button>
+          <Button className="flex-1" onClick={logToday}>Log run today</Button>
+          <Button variant="ghost" onClick={reset}>Reset</Button>
         </div>
 
         <div className="text-xs text-muted-foreground">

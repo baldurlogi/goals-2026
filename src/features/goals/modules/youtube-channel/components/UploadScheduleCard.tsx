@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,34 +6,61 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 
-import { getSchedule, setSchedule } from "../youtubeChannelStorage";
+import {
+  getSchedule,
+  setSchedule,
+  type ScheduleState, // <-- export this
+} from "../youtubeChannelStorage";
 
 function toNum(v: string, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
+const EMPTY: ScheduleState = {
+  weekLabel: "",
+  targetPerWeek: 0,
+  publishedThisWeek: 0,
+  nextUploadISO: null,
+};
+
 export function UploadScheduleCard({ goalId }: { goalId: string }) {
+  const [state, setState] = useState<ScheduleState>(EMPTY);
   const [tick, setTick] = useState(0);
 
-  const state = useMemo(() => {
-    void tick;
-    return getSchedule(goalId);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const s = await getSchedule(goalId);
+      if (alive) setState(s);
+    })();
+    return () => {
+      alive = false;
+    };
   }, [goalId, tick]);
 
-  const pct =
-    state.targetPerWeek <= 0 ? 0 : Math.min(100, Math.round((state.publishedThisWeek / state.targetPerWeek) * 100));
+  const progressPct =
+    state.targetPerWeek <= 0
+      ? 0
+      : Math.min(
+          100,
+          Math.round((state.publishedThisWeek / state.targetPerWeek) * 100)
+        );
 
-  function patch(p: Partial<typeof state>) {
-    const cur = getSchedule(goalId);
+  async function patch(p: Partial<ScheduleState>) {
+    const cur = await getSchedule(goalId);
     const next = { ...cur, ...p };
-    setSchedule(goalId, next);
+    await setSchedule(goalId, next);
     setTick((x) => x + 1);
   }
 
-  function resetWeek() {
-    const cur = getSchedule(goalId);
-    patch({ publishedThisWeek: 0, targetPerWeek: cur.targetPerWeek, nextUploadISO: cur.nextUploadISO });
+  async function resetWeek() {
+    const cur = await getSchedule(goalId);
+    await patch({
+      publishedThisWeek: 0,
+      targetPerWeek: cur.targetPerWeek,
+      nextUploadISO: cur.nextUploadISO,
+    });
   }
 
   return (
@@ -52,7 +79,11 @@ export function UploadScheduleCard({ goalId }: { goalId: string }) {
             <Input
               inputMode="numeric"
               value={String(state.targetPerWeek)}
-              onChange={(e) => patch({ targetPerWeek: Math.max(0, toNum(e.target.value, 1)) })}
+              onChange={(e) =>
+                void patch({
+                  targetPerWeek: Math.max(0, toNum(e.target.value, 1)),
+                })
+              }
             />
           </div>
 
@@ -62,7 +93,9 @@ export function UploadScheduleCard({ goalId }: { goalId: string }) {
               inputMode="numeric"
               value={String(state.publishedThisWeek)}
               onChange={(e) =>
-                patch({ publishedThisWeek: Math.max(0, toNum(e.target.value, 0)) })
+                void patch({
+                  publishedThisWeek: Math.max(0, toNum(e.target.value, 0)),
+                })
               }
             />
           </div>
@@ -73,9 +106,9 @@ export function UploadScheduleCard({ goalId }: { goalId: string }) {
             <span>
               {state.publishedThisWeek} / {state.targetPerWeek} videos
             </span>
-            <span>{pct}%</span>
+            <span>{progressPct}%</span>
           </div>
-          <Progress value={pct} className="mt-2 h-2" />
+          <Progress value={progressPct} className="mt-2 h-2" />
         </div>
 
         <div className="space-y-1">
@@ -83,7 +116,7 @@ export function UploadScheduleCard({ goalId }: { goalId: string }) {
           <Input
             type="date"
             value={state.nextUploadISO ?? ""}
-            onChange={(e) => patch({ nextUploadISO: e.target.value || null })}
+            onChange={(e) => void patch({ nextUploadISO: e.target.value || null })}
           />
         </div>
 
@@ -93,19 +126,25 @@ export function UploadScheduleCard({ goalId }: { goalId: string }) {
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => patch({ publishedThisWeek: Math.max(0, state.publishedThisWeek - 1) })}
+            onClick={() =>
+              void patch({
+                publishedThisWeek: Math.max(0, state.publishedThisWeek - 1),
+              })
+            }
           >
             –1
           </Button>
           <Button
             className="flex-1"
-            onClick={() => patch({ publishedThisWeek: state.publishedThisWeek + 1 })}
+            onClick={() =>
+              void patch({ publishedThisWeek: state.publishedThisWeek + 1 })
+            }
           >
             +1
           </Button>
         </div>
 
-        <Button variant="ghost" className="w-full" onClick={resetWeek}>
+        <Button variant="ghost" className="w-full" onClick={() => void resetWeek()}>
           Reset week
         </Button>
       </CardContent>

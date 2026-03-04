@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-import { getBudget, setBudget, type BudgetLine } from "../travelPlanningStorage";
+import { getBudget, setBudget, seedBudget, type BudgetState, type BudgetLine } from "../travelPlanningStorage";
 
 function toNum(v: string, fallback = 0) {
   const n = Number(v);
@@ -14,33 +14,35 @@ function toNum(v: string, fallback = 0) {
 }
 
 export function BudgetCard({ goalId, currency }: { goalId: string; currency: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<BudgetState>(() => seedBudget(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getBudget(goalId, currency);
-  }, [goalId, currency, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getBudget(goalId, currency).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId, currency]);
 
   const total = state.lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
   const pct = state.target <= 0 ? 0 : Math.min(100, Math.round((total / state.target) * 100));
 
-  function patch(p: Partial<typeof state>) {
-    const cur = getBudget(goalId, currency);
-    setBudget(goalId, { ...cur, ...p });
-    setTick((x) => x + 1);
+  async function patch(p: Partial<BudgetState>) {
+    const next = { ...state, ...p };
+    setState(next);
+    await setBudget(goalId, next);
   }
 
-  function updateLine(id: string, amount: number) {
-    const cur = getBudget(goalId, currency);
-    const lines = cur.lines.map((l) => (l.id === id ? { ...l, amount } : l));
-    setBudget(goalId, { ...cur, lines });
-    setTick((x) => x + 1);
+  async function updateLine(id: string, amount: number) {
+    const next = { ...state, lines: state.lines.map((l: BudgetLine) => l.id === id ? { ...l, amount } : l) };
+    setState(next);
+    await setBudget(goalId, next);
   }
 
-  function reset() {
-    const cur = getBudget(goalId, currency);
-    setBudget(goalId, { ...cur, lines: cur.lines.map((l) => ({ ...l, amount: 0 })) });
-    setTick((x) => x + 1);
+  async function reset() {
+    const next = { ...state, lines: state.lines.map((l: BudgetLine) => ({ ...l, amount: 0 })) };
+    setState(next);
+    await setBudget(goalId, next);
   }
 
   return (
@@ -84,9 +86,7 @@ export function BudgetCard({ goalId, currency }: { goalId: string; currency: str
         </div>
 
         <Separator />
-        <Button variant="ghost" className="w-full" onClick={reset}>
-          Reset budget
-        </Button>
+        <Button variant="ghost" className="w-full" onClick={reset}>Reset budget</Button>
       </CardContent>
     </Card>
   );

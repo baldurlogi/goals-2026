@@ -1,25 +1,28 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
-import { daysUntil, getCountdown, setCountdown, todayISO } from "../travelPlanningStorage";
+import { daysUntil, getCountdown, setCountdown, seedCountdown, todayISO, type CountdownState } from "../travelPlanningStorage";
 
 export function TripCountdownCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<CountdownState>(() => seedCountdown(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getCountdown(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getCountdown(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
   const d = state.departISO ? daysUntil(state.departISO) : null;
 
-  function patch(p: Partial<typeof state>) {
-    const cur = getCountdown(goalId);
-    setCountdown(goalId, { ...cur, ...p });
-    setTick((x) => x + 1);
+  async function patch(p: Partial<CountdownState>) {
+    const next = { ...state, ...p };
+    setState(next);
+    await setCountdown(goalId, next);
   }
 
   return (
@@ -41,7 +44,6 @@ export function TripCountdownCard({ goalId }: { goalId: string }) {
               placeholder="e.g. Los Angeles"
             />
           </div>
-
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Depart</div>
             <Input

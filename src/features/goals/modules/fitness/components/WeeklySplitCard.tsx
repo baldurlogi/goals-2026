@@ -1,60 +1,69 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
-import { getMondayISO, getWeeklySplit, setWeeklySplit, todayISO } from "@/features/fitness/fitnessStorage";
+import {
+  getMondayISO,
+  getWeeklySplit,
+  setWeeklySplit,
+  seedWeeklySplit,
+  todayISO,
+  type WeeklySplitState,
+} from "@/features/fitness/fitnessStorage";
 
-const PLAN: Array<{ day: "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun"; label: string }> =
-  [
-    { day: "Mon", label: "Upper Push" },
-    { day: "Tue", label: "Lower Squat" },
-    { day: "Wed", label: "Swim" },
-    { day: "Thu", label: "Upper Pull" },
-    { day: "Fri", label: "Lower Hinge" },
-    { day: "Sat", label: "CrossFit" },
-    { day: "Sun", label: "Rest" },
-  ];
+const PLAN: Array<{ day: "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun"; label: string }> = [
+  { day: "Mon", label: "Upper Push" },
+  { day: "Tue", label: "Lower Squat" },
+  { day: "Wed", label: "Swim" },
+  { day: "Thu", label: "Upper Pull" },
+  { day: "Fri", label: "Lower Hinge" },
+  { day: "Sat", label: "CrossFit" },
+  { day: "Sun", label: "Rest" },
+];
+
+function freshWeek(): WeeklySplitState {
+  return {
+    weekStartISO: getMondayISO(),
+    doneByDay: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false },
+  };
+}
 
 export function WeeklySplitCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<WeeklySplitState>(() => {
+    const cached = seedWeeklySplit(goalId);
+    // auto-roll on mount if week changed
+    return cached.weekStartISO === getMondayISO() ? cached : freshWeek();
+  });
 
-  const state = useMemo(() => {
-    void tick;
-    const current = getWeeklySplit(goalId);
-
-    // auto-roll week on Monday change
-    const nowMonday = getMondayISO(new Date());
-    if (current.weekStartISO !== nowMonday) {
-      const reset = {
-        weekStartISO: nowMonday,
-        doneByDay: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false },
-      };
-      setWeeklySplit(goalId, reset);
-      return reset;
-    }
-
-    return current;
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getWeeklySplit(goalId).then((fresh) => {
+      if (!cancelled) {
+        // auto-roll if week changed
+        setState(fresh.weekStartISO === getMondayISO() ? fresh : freshWeek());
+      }
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
   const doneCount = Object.values(state.doneByDay).filter(Boolean).length;
 
-  function toggle(day: (typeof PLAN)[number]["day"]) {
-    const next = getWeeklySplit(goalId);
-    next.doneByDay = { ...next.doneByDay, [day]: !next.doneByDay[day] };
-    setWeeklySplit(goalId, next);
-    setTick((x) => x + 1);
+  async function toggle(day: (typeof PLAN)[number]["day"]) {
+    const next: WeeklySplitState = {
+      ...state,
+      doneByDay: { ...state.doneByDay, [day]: !state.doneByDay[day] },
+    };
+    setState(next);
+    await setWeeklySplit(goalId, next);
   }
 
-  function clearWeek() {
-    const monday = getMondayISO(new Date());
-    setWeeklySplit(goalId, {
-      weekStartISO: monday,
-      doneByDay: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false },
-    });
-    setTick((x) => x + 1);
+  async function clearWeek() {
+    const next = freshWeek();
+    setState(next);
+    await setWeeklySplit(goalId, next);
   }
 
   return (

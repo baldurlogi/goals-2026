@@ -1,51 +1,56 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 
-import { diffDays, getRoutineStreak, setRoutineStreak, todayISO } from "../skincareStorage";
+import {
+  diffDays, getRoutineStreak, setRoutineStreak, seedRoutineStreak, todayISO,
+  type RoutineStreakState,
+} from "../skincareStorage";
 
 export function RoutineStreakCard({ goalId }: { goalId: string }) {
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<RoutineStreakState>(() => seedRoutineStreak(goalId));
 
-  const state = useMemo(() => {
-    void tick;
-    return getRoutineStreak(goalId);
-  }, [goalId, tick]);
+  useEffect(() => {
+    let cancelled = false;
+    getRoutineStreak(goalId).then((fresh) => {
+      if (!cancelled) setState(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [goalId]);
 
   const today = todayISO();
-  const last = state.lastISO;
 
   const status = useMemo(() => {
+    const last = state.lastISO;
     if (!last) return { label: "No completed days yet", tone: "secondary" as const };
     const d = diffDays(last, today);
     if (d === 0) return { label: "Completed today", tone: "default" as const };
     if (d === 1) return { label: "Complete today to keep streak", tone: "secondary" as const };
     return { label: "Missed days → resets on next completion", tone: "destructive" as const };
-  }, [last, today]);
+  }, [state.lastISO, today]);
 
-  function markDayComplete() {
-    const cur = getRoutineStreak(goalId);
-    const lastISO = cur.lastISO;
+  async function markDayComplete() {
+    const last = state.lastISO;
+    let next: RoutineStreakState;
 
-    if (!lastISO) {
-      setRoutineStreak(goalId, { lastISO: today, streak: 1 });
-      setTick((x) => x + 1);
-      return;
+    if (!last) {
+      next = { lastISO: today, streak: 1 };
+    } else {
+      const d = diffDays(last, today);
+      if (d === 0) return;
+      next = { lastISO: today, streak: d === 1 ? state.streak + 1 : 1 };
     }
 
-    const d = diffDays(lastISO, today);
-    if (d === 0) return;
-    if (d === 1) setRoutineStreak(goalId, { lastISO: today, streak: cur.streak + 1 });
-    else setRoutineStreak(goalId, { lastISO: today, streak: 1 });
-
-    setTick((x) => x + 1);
+    setState(next);
+    await setRoutineStreak(goalId, next);
   }
 
-  function reset() {
-    setRoutineStreak(goalId, { lastISO: null, streak: 0 });
-    setTick((x) => x + 1);
+  async function reset() {
+    const next: RoutineStreakState = { lastISO: null, streak: 0 };
+    setState(next);
+    await setRoutineStreak(goalId, next);
   }
 
   return (
@@ -65,16 +70,12 @@ export function RoutineStreakCard({ goalId }: { goalId: string }) {
         <Separator />
 
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={markDayComplete}>
-            Mark day complete
-          </Button>
-          <Button variant="ghost" onClick={reset}>
-            Reset
-          </Button>
+          <Button className="flex-1" onClick={markDayComplete}>Mark day complete</Button>
+          <Button variant="ghost" onClick={reset}>Reset</Button>
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Tip: use the checklist below; when AM + PM are done, hit “Mark day complete”.
+          Tip: use the checklist below; when AM + PM are done, hit "Mark day complete".
         </div>
       </CardContent>
     </Card>
