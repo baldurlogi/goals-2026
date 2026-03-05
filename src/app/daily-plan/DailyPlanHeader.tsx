@@ -19,28 +19,27 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Daily Plan",
     items: [
-      { label: "📖 Reading",   href: "/reading" },
-      { label: "🥗 Nutrition", href: "/nutrition" },
-      { label: "📅 Schedule",  href: "/schedule" },
+      { label: "📖 Reading",   href: "/app/reading" },
+      { label: "🥗 Nutrition", href: "/app/nutrition" },
+      { label: "📅 Schedule",  href: "/app/schedule" },
     ],
   },
   {
     label: "Goals",
     items: [
-      { label: "🎯 All Goals", href: "/goals" },
-      { label: "📌 Upcoming",  href: "/upcoming" },
+      { label: "🎯 All Goals", href: "/app/goals" },
+      { label: "📌 Upcoming",  href: "/app/upcoming" },
     ],
   },
   {
     label: "Other",
     items: [
-      { label: "✅ To-do",    href: "/todos" },
-      { label: "🏋️ Fitness", href: "/fitness" },
+      { label: "✅ To-do",    href: "/app/todos" },
+      { label: "🏋️ Fitness", href: "/app/fitness" },
     ],
   },
 ];
 
-// Derive initials from email or display name
 function getInitials(user: { email?: string; user_metadata?: { full_name?: string; name?: string } } | null) {
   if (!user) return "?";
   const name = user.user_metadata?.full_name ?? user.user_metadata?.name;
@@ -66,9 +65,7 @@ export function DailyPlanHeader() {
   const initials    = getInitials(user);
   const displayName = getDisplayName(user);
   const email       = user?.email ?? "";
-
-  // Google avatar if available
-  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const avatarUrl   = user?.user_metadata?.avatar_url as string | undefined;
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -76,10 +73,10 @@ export function DailyPlanHeader() {
 
         {/* ── Brand ── */}
         <Link
-          to="/"
+          to="/app"
           className={cn(
             "flex items-center gap-2 text-sm font-semibold transition-colors hover:text-foreground",
-            pathname === "/" ? "text-foreground" : "text-muted-foreground",
+            pathname === "/app" ? "text-foreground" : "text-muted-foreground",
           )}
         >
           <LayoutDashboard className="h-4 w-4" />
@@ -126,7 +123,6 @@ export function DailyPlanHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* ── Spacer ── */}
         <div className="flex-1" />
 
         {/* ── User menu ── */}
@@ -156,20 +152,17 @@ export function DailyPlanHeader() {
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end" className="w-56">
-            {/* Identity block */}
             <div className="px-3 py-2">
               <p className="text-sm font-semibold leading-tight truncate">
                 {displayName || "Account"}
               </p>
-              <p className="text-xs text-muted-foreground truncate mt-0.5">
-                {email}
-              </p>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{email}</p>
             </div>
 
             <DropdownMenuSeparator />
 
             <DropdownMenuItem asChild>
-              <Link to="/profile" className="flex items-center gap-2">
+              <Link to="/app/profile" className="flex items-center gap-2">
                 <User className="h-3.5 w-3.5" />
                 <span>Profile settings</span>
               </Link>

@@ -53,10 +53,10 @@ export default function DashboardPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link to="/nutrition">Log food</Link>
+            <Link to="/app/nutrition">Log food</Link>
           </Button>
           <Button asChild size="sm">
-            <Link to="/reading">Update reading</Link>
+            <Link to="/app/reading">Update reading</Link>
           </Button>
         </div>
       </div>
@@ -73,10 +73,10 @@ export default function DashboardPage() {
 
         <div className="md:col-span-2 lg:col-span-12">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <QuickAction icon={<Apple className="h-4 w-4" />}     label="Log a meal"    sub="Nutrition tab"    href="/daily-plan/nutrition" color="bg-orange-500/10 text-orange-600 dark:text-orange-400" />
-            <QuickAction icon={<BookOpen className="h-4 w-4" />}  label="Update pages"  sub="Reading tab"      href="/daily-plan/reading"   color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
-            <QuickAction icon={<Dumbbell className="h-4 w-4" />}  label="Log a PR"      sub="Fitness"          href="/fitness"              color="bg-violet-500/10 text-violet-600 dark:text-violet-400" />
-            <QuickAction icon={<TrendingUp className="h-4 w-4" />} label="Review goals" sub="Upcoming tasks"   href="/upcoming"             color="bg-rose-500/10 text-rose-600 dark:text-rose-400" />
+            <QuickAction icon={<Apple className="h-4 w-4" />}      label="Log a meal"    sub="Nutrition tab"   href="/app/nutrition" color="bg-orange-500/10 text-orange-600 dark:text-orange-400" />
+            <QuickAction icon={<BookOpen className="h-4 w-4" />}   label="Update pages"  sub="Reading tab"     href="/app/reading"   color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
+            <QuickAction icon={<Dumbbell className="h-4 w-4" />}   label="Log a PR"      sub="Fitness"         href="/app/fitness"   color="bg-violet-500/10 text-violet-600 dark:text-violet-400" />
+            <QuickAction icon={<TrendingUp className="h-4 w-4" />} label="Review goals"  sub="Upcoming tasks"  href="/app/upcoming"  color="bg-rose-500/10 text-rose-600 dark:text-rose-400" />
           </div>
         </div>
       </div>

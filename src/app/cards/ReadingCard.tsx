@@ -106,7 +106,7 @@ export function ReadingCard() {
                 </span>
               </p>
               <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-                <Link to="/reading">
+                <Link to="/app/reading">
                   Open <ChevronRight className="h-3 w-3" />
                 </Link>
               </Button>
@@ -114,7 +114,7 @@ export function ReadingCard() {
           </>
         ) : (
           <Button asChild size="sm" className="w-full">
-            <Link to="/reading">Set up reading</Link>
+            <Link to="/app/reading">Set up reading</Link>
           </Button>
         )}
       </CardContent>

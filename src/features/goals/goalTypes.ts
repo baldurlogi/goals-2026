@@ -24,3 +24,26 @@ export type GoalModule = {
   goal: GoalDefinition;
   Page: ComponentType<GoalPageProps>;
 }
+
+// -- User-created goal types (dynamic, stored in Supabase) --
+
+export interface UserGoalStep {
+  id: string;
+  label: string;
+  notes: string;
+  idealFinish: string | null;
+  estimatedTime: string;
+  sortOrder: number;
+}
+
+export interface UserGoal {
+  id: string;
+  userId: string;
+  title: string;
+  subtitle: string;
+  emoji: string;
+  priority: "high" | "medium" | "low";
+  steps: UserGoalStep[];
+  createdAt: string;
+  updatedAt: string;
+}

@@ -1,0 +1,233 @@
+.
+├── .DS_Store
+├── .env
+├── .env.local
+├── .gitignore
+├── app-tree.txt
+├── components.json
+├── eslint.config.js
+├── index.html
+├── package.json
+├── public
+│   ├── icons
+│   │   ├── icon-16.png
+│   │   ├── icon-180.png
+│   │   ├── icon-192.png
+│   │   ├── icon-32.png
+│   │   └── icon-512.png
+│   └── vite.svg
+├── README.md
+├── schema.sql
+├── src
+│   ├── .DS_Store
+│   ├── app
+│   │   ├── .DS_Store
+│   │   ├── AppLayout.tsx
+│   │   ├── cards
+│   │   │   ├── FitnessCard.tsx
+│   │   │   ├── MacrosCard.tsx
+│   │   │   ├── ReadingCard.tsx
+│   │   │   ├── ScheduleCard.tsx
+│   │   │   ├── SpendingCard.tsx
+│   │   │   ├── TodoCard.tsx
+│   │   │   └── UpcomingGoalsCard.tsx
+│   │   ├── daily-plan
+│   │   │   ├── DailyPlanHeader.tsx
+│   │   │   └── DailyPlanPage.tsx
+│   │   ├── DashboardPage.tsx
+│   │   ├── hooks
+│   │   │   ├── useFitnessDashboard.ts
+│   │   │   ├── useGoalsDashboard.ts
+│   │   │   ├── useNutritionDashboard.ts
+│   │   │   ├── useReadingDashboard.ts
+│   │   │   ├── useScheduleDashboard.ts
+│   │   │   ├── useSpendingDashboard.ts
+│   │   │   └── useTodoDashboard.ts
+│   │   └── pieShape.tsx
+│   ├── App.tsx
+│   ├── assets
+│   │   └── react.svg
+│   ├── auth
+│   │   ├── authContext.ts
+│   │   ├── AuthProvider.tsx
+│   │   ├── LoginPage.tsx
+│   │   ├── migrationToSupabase.ts
+│   │   └── RequireAuth.tsx
+│   ├── components
+│   │   ├── BackToDashboard.tsx
+│   │   └── ui
+│   │       ├── accordion.tsx
+│   │       ├── badge.tsx
+│   │       ├── button.tsx
+│   │       ├── card.tsx
+│   │       ├── checkbox.tsx
+│   │       ├── dropdown-menu.tsx
+│   │       ├── input.tsx
+│   │       ├── label.tsx
+│   │       ├── progress.tsx
+│   │       ├── separator.tsx
+│   │       ├── sonner.tsx
+│   │       ├── tabs.tsx
+│   │       ├── textarea.tsx
+│   │       ├── toggle-group.tsx
+│   │       ├── toggle.tsx
+│   │       └── variants.ts
+│   ├── features
+│   │   ├── .DS_Store
+│   │   ├── fitness
+│   │   │   ├── FitnessPage.tsx
+│   │   │   └── fitnessStorage.ts
+│   │   ├── goals
+│   │   │   ├── .DS_Store
+│   │   │   ├── components
+│   │   │   │   ├── GoalCard.tsx
+│   │   │   │   ├── GoalPageHeader.tsx
+│   │   │   │   ├── StepChecklist.tsx
+│   │   │   │   ├── StepsCard.tsx
+│   │   │   │   └── TimelineCard.tsx
+│   │   │   ├── GenericGoalPage.tsx
+│   │   │   ├── GoalsDetailPage.tsx
+│   │   │   ├── GoalsTab.tsx
+│   │   │   ├── goalStore.tsx
+│   │   │   ├── goalStoreContext.ts
+│   │   │   ├── goalTypes.ts
+│   │   │   ├── goalUtils.ts
+│   │   │   ├── modules
+│   │   │   │   ├── .DS_Store
+│   │   │   │   ├── finance
+│   │   │   │   │   ├── .DS_Store
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ExpenseTrackerCard.tsx
+│   │   │   │   │   │   ├── SavingsCard.tsx
+│   │   │   │   │   │   └── SpendingDonutCard.tsx
+│   │   │   │   │   ├── financeGoal.ts
+│   │   │   │   │   ├── FinanceGoalPage.tsx
+│   │   │   │   │   └── financeStorage.ts
+│   │   │   │   ├── fitness
+│   │   │   │   │   ├── .DS_Store
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── MacroTargetsCard.tsx
+│   │   │   │   │   │   ├── WeeklySplitCard.tsx
+│   │   │   │   │   │   └── WorkoutStreakCard.tsx
+│   │   │   │   │   ├── fitnessGoal.ts
+│   │   │   │   │   └── FitnessGoalPage.tsx
+│   │   │   │   ├── freelance
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── PipelineCard.tsx
+│   │   │   │   │   │   ├── RevenueCard.tsx
+│   │   │   │   │   │   └── SaaSStageCard.tsx
+│   │   │   │   │   ├── freelanceGoal.ts
+│   │   │   │   │   ├── FreelanceGoalPage.tsx
+│   │   │   │   │   └── freelanceStorage.ts
+│   │   │   │   ├── frontend-roadmap
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── DrillTrackerCard.tsx
+│   │   │   │   │   │   ├── FocusCard.tsx
+│   │   │   │   │   │   └── StudyStreakCard.tsx
+│   │   │   │   │   ├── frontendRoadmapGoal.ts
+│   │   │   │   │   ├── FrontendRoadmapGoalPage.tsx
+│   │   │   │   │   └── frontendRoadmapStorage.ts
+│   │   │   │   ├── goalModuleStorage.ts
+│   │   │   │   ├── marathon
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── LongRunPlannerCard.tsx
+│   │   │   │   │   │   ├── RunStreakCard.tsx
+│   │   │   │   │   │   └── WeeklyMileageCard.tsx
+│   │   │   │   │   ├── marathonGoal.ts
+│   │   │   │   │   ├── MarathonGoalPage.tsx
+│   │   │   │   │   └── marathonStorage.ts
+│   │   │   │   ├── reading
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── BookProgressCard.tsx
+│   │   │   │   │   │   ├── ReadingMinutesCard.tsx
+│   │   │   │   │   │   └── ReadingStreakCard.tsx
+│   │   │   │   │   ├── readingGoal.ts
+│   │   │   │   │   ├── ReadingGoalPage.tsx
+│   │   │   │   │   └── readingStorage.ts
+│   │   │   │   ├── skincare
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── RoutineChecklistCard.tsx
+│   │   │   │   │   │   ├── RoutineStreakCard.tsx
+│   │   │   │   │   │   └── SkinLogCard.tsx
+│   │   │   │   │   ├── skincareGoal.ts
+│   │   │   │   │   ├── SkincareGoalPage.tsx
+│   │   │   │   │   └── skincareStorage.ts
+│   │   │   │   ├── travel-planning
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── BudgetCard.tsx
+│   │   │   │   │   │   ├── ItineraryNotesCard.tsx
+│   │   │   │   │   │   └── TripCountdownCard.tsx
+│   │   │   │   │   ├── travelPlanningGoal.ts
+│   │   │   │   │   ├── TravelPlanningGoalPage.tsx
+│   │   │   │   │   └── travelPlanningStorage.ts
+│   │   │   │   ├── university
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ApplicationsCard.tsx
+│   │   │   │   │   │   ├── ChecklistCard.tsx
+│   │   │   │   │   │   └── DeadlinesCard.tsx
+│   │   │   │   │   ├── universityGoal.ts
+│   │   │   │   │   ├── UniversityGoalPage.tsx
+│   │   │   │   │   └── universityStorage.ts
+│   │   │   │   └── youtube-channel
+│   │   │   │       ├── components
+│   │   │   │       │   ├── ContentPipelineCard.tsx
+│   │   │   │       │   ├── MetricsCard.tsx
+│   │   │   │       │   └── UploadScheduleCard.tsx
+│   │   │   │       ├── youtubeChannelGoal.ts
+│   │   │   │       ├── YoutubeChannelGoalPage.tsx
+│   │   │   │       └── youtubeChannelStorage.ts
+│   │   │   ├── registry.ts
+│   │   │   └── UpcomingTasksPage.tsx
+│   │   ├── landing
+│   │   │   └── LandingPage.tsx
+│   │   ├── nutrition
+│   │   │   ├── components
+│   │   │   │   ├── MacroRow.tsx
+│   │   │   │   └── MealCard.tsx
+│   │   │   ├── nutritionData.ts
+│   │   │   ├── nutritionStorage.ts
+│   │   │   ├── NutritionTab.tsx
+│   │   │   ├── nutritionTypes.ts
+│   │   │   └── nutritionUtils.ts
+│   │   ├── onboarding
+│   │   │   ├── OnboardingFlow.tsx
+│   │   │   ├── profileStorage.ts
+│   │   │   ├── RequireOnboarding.tsx
+│   │   │   └── useProfile.ts
+│   │   ├── profile
+│   │   │   └── ProfilePage.tsx
+│   │   ├── reading
+│   │   │   ├── components
+│   │   │   │   ├── ReadingInputsCard.tsx
+│   │   │   │   ├── ReadingNextCard.tsx
+│   │   │   │   └── ReadingNowCard.tsx
+│   │   │   ├── readingStorage.ts
+│   │   │   ├── ReadingTab.tsx
+│   │   │   ├── readingTypes.ts
+│   │   │   └── readingUtils.ts
+│   │   ├── schedule
+│   │   │   ├── components
+│   │   │   │   ├── SchedulePicker.tsx
+│   │   │   │   ├── TimelineCard.tsx
+│   │   │   │   └── TimelineList.tsx
+│   │   │   ├── scheduleData.ts
+│   │   │   ├── scheduleStorage.ts
+│   │   │   ├── ScheduleTab.tsx
+│   │   │   └── scheduleTypes.ts
+│   │   └── todos
+│   │       ├── TodosPage.tsx
+│   │       └── todoStorage.ts
+│   ├── index.css
+│   ├── lib
+│   │   ├── storage.ts
+│   │   ├── supabaseClient.ts
+│   │   └── utils.ts
+│   ├── main.tsx
+│   └── styles
+│       └── tokens.css
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+└── vite.config.ts
+
+49 directories, 182 files
