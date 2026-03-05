@@ -28,6 +28,7 @@
   --color-accent-foreground: var(--accent-foreground);
 
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
 
   --color-border: var(--border);
   --color-input: var(--input);
@@ -37,93 +38,113 @@
 }
 
 /* -----------------------------
-   Design tokens (Light)
-   (keep a decent light theme too)
+   Light tokens (optional)
 ------------------------------ */
 :root {
-  --radius: 0.625rem;
+  --radius: 1rem;
 
   --background: #ffffff;
-  --foreground: #111217;
+  --foreground: #0b1220;
 
   --card: #ffffff;
-  --card-foreground: #111217;
+  --card-foreground: #0b1220;
 
   --popover: #ffffff;
-  --popover-foreground: #111217;
+  --popover-foreground: #0b1220;
 
-  --primary: #111217;
-  --primary-foreground: #f6f7fb;
+  --primary: #16a34a; /* green-ish */
+  --primary-foreground: #07110b;
 
-  --secondary: #f2f3f7;
-  --secondary-foreground: #111217;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #0b1220;
 
-  --muted: #f2f3f7;
-  --muted-foreground: #5b6070;
+  --muted: #f3f4f6;
+  --muted-foreground: #5b6472;
 
-  --accent: #f2f3f7;
-  --accent-foreground: #111217;
+  --accent: #eef2ff;
+  --accent-foreground: #0b1220;
 
   --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
 
-  --border: #e6e7ee;
-  --input: #e6e7ee;
-  --ring: #8b5cf6;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #22c55e;
 }
 
 /* -----------------------------
-   Dark tokens (Life Strategy look)
-   Background ~ #0a0a0f
-   Cards ~ #13131a
-   Borders ~ #1e1e2e
+   Dark tokens (Landing style)
+   Background: #060b14
+   Accent:     #4ade80
 ------------------------------ */
 .dark {
-  /* page */
-  --background: #0a0a0f;
-  --foreground: #e7e7ef;
+  --background: #060b14;
+  --foreground: #f1f5f9;
 
-  /* surfaces */
-  --card: #13131a;
-  --card-foreground: #e7e7ef;
+  /* glassy surfaces */
+  --card: rgba(255, 255, 255, 0.04);
+  --card-foreground: #f1f5f9;
 
-  --popover: #13131a;
-  --popover-foreground: #e7e7ef;
+  --popover: rgba(255, 255, 255, 0.04);
+  --popover-foreground: #f1f5f9;
 
-  /* brand / primary (keep neutral-ish; you can change to a “gold” if you want) */
-  --primary: #e7e7ef;
-  --primary-foreground: #0a0a0f;
+  /* brand */
+  --primary: #4ade80;
+  --primary-foreground: #060b14;
 
-  /* subtle surface steps (used for tabs/sections) */
-  --secondary: #0f0f14;
-  --secondary-foreground: #e7e7ef;
+  --secondary: rgba(255, 255, 255, 0.04);
+  --secondary-foreground: #f1f5f9;
 
-  --muted: #0f0f14;
-  --muted-foreground: #a6a7b3;
+  --muted: rgba(255, 255, 255, 0.03);
+  --muted-foreground: #94a3b8;
 
-  --accent: #1a1a2e;
-  --accent-foreground: #e7e7ef;
+  --accent: rgba(255, 255, 255, 0.06);
+  --accent-foreground: #f1f5f9;
 
   --destructive: #f87171;
+  --destructive-foreground: #0b1220;
 
-  --border: #1e1e2e;
-  --input: #1e1e2e;
-  --ring: #6366f1;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.10);
+  --ring: rgba(74, 222, 128, 0.6);
 }
 
 @layer base {
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
   }
 
   body {
     background: var(--background);
     color: var(--foreground);
+    font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto,
+      "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    overflow-x: hidden;
   }
 
-  /* If you previously had @apply border-border and got the error,
-     this avoids relying on that utility in CSS while still giving
-     a consistent default border color. */
   *, ::before, ::after {
     border-color: var(--border);
   }
+}
+
+/* ---- Landing-like noise overlay helper ---- */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* Optional utility-ish helpers (nice for headings) */
+.font-mono {
+  font-family: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+.font-serif {
+  font-family: "Instrument Serif", ui-serif, Georgia, Cambria, "Times New Roman",
+    Times, serif;
 }
