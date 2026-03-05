@@ -14,6 +14,8 @@ import { GoalDetailPage }    from "@/features/goals/GoalsDetailPage";
 import { TodosPage }         from "@/features/todos/TodosPage";
 import { FitnessGoalPage }   from "@/features/goals/modules/fitness/FitnessGoalPage";
 import DashboardPage         from "@/app/DashboardPage";
+import { ProfilePage } from "@/features/profile/ProfilePage";
+
 
 export default function App() {
   return (
@@ -35,6 +37,7 @@ export default function App() {
                   <Route path="/upcoming"      element={<UpcomingTasksPage />} />
                   <Route path="/todos"         element={<TodosPage />} />
                   <Route path="/fitness"       element={<FitnessGoalPage />} />
+                  <Route path="/profile"       element={<ProfilePage />} />
 
                   <Route path="/daily-plan"    element={<Navigate to="/" replace />} />
                 </Route>

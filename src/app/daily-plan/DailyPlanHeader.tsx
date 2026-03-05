@@ -168,9 +168,11 @@ export function DailyPlanHeader() {
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem disabled className="gap-2 text-xs text-muted-foreground cursor-default">
-              <User className="h-3.5 w-3.5" />
-              Profile settings coming soon
+            <DropdownMenuItem asChild>
+              <Link to="/profile" className="flex items-center gap-2">
+                <User className="h-3.5 w-3.5" />
+                <span>Profile settings</span>
+              </Link>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
