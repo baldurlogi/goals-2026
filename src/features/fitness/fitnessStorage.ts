@@ -284,10 +284,6 @@ export type StreakState = {
   streak: number;
 };
 
-function streakKey(goalId: string) {
-  return `daily-life:fitness:streak:${goalId}:v1`;
-}
-
 export function seedStreak(goalId: string): StreakState {
   return seedCache(goalId, "fitness_streak", { lastWorkoutISO: null, streak: 0 });
 }
