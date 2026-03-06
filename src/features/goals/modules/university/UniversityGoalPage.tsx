@@ -1,47 +1,20 @@
-import { useGoalsStore } from "@/features/goals/goalStoreContext";
-import { universityGoal } from "./universityGoal";
-
-import { GoalPageHeader } from "@/features/goals/components/GoalPageHeader";
-import { StepsCard } from "@/features/goals/components/StepsCard";
-import { TimelineCard } from "@/features/goals/components/TimelineCard";
-
 import { ApplicationsCard } from "./components/ApplicationsCard";
 import { DeadlinesCard } from "./components/DeadlinesCard";
 import { ChecklistCard } from "./components/ChecklistCard";
 
+const GOAL_ID = "university";
+
 export function UniversityGoalPage() {
-  const { state, dispatch } = useGoalsStore();
-
-  const goalId = universityGoal.id;
-  const doneMap = state.done[goalId] ?? {};
-
   return (
     <div className="space-y-6">
-      <GoalPageHeader
-        goal={universityGoal}
-        doneMap={doneMap}
-        onReset={() => dispatch({ type: "resetGoal", goalId })}
-      />
-
+      <div>
+        <h1 className="text-2xl font-semibold">🎓 University</h1>
+        <p className="text-muted-foreground text-sm mt-1">Track applications, deadlines, and checklist.</p>
+      </div>
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <StepsCard
-            goalId={goalId}
-            goalTitle={universityGoal.title}
-            steps={universityGoal.steps}
-            doneMap={doneMap}
-            onToggle={(stepId) => dispatch({ type: "toggleStep", goalId, stepId })}
-            heightClassName="h-[640px]"
-          />
-
-          <TimelineCard steps={universityGoal.steps} doneMap={doneMap} />
-        </div>
-
-        <div className="lg:col-span-1 space-y-6">
-          <ApplicationsCard goalId={goalId} />
-          <DeadlinesCard goalId={goalId} />
-          <ChecklistCard goalId={goalId} />
-        </div>
+        <ApplicationsCard goalId={GOAL_ID} />
+        <DeadlinesCard goalId={GOAL_ID} />
+        <ChecklistCard goalId={GOAL_ID} />
       </div>
     </div>
   );

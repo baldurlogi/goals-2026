@@ -1,47 +1,20 @@
-import { useGoalsStore } from "@/features/goals/goalStoreContext";
-import { youtubeChannelGoal } from "./youtubeChannelGoal";
-
-import { GoalPageHeader } from "@/features/goals/components/GoalPageHeader";
-import { StepsCard } from "@/features/goals/components/StepsCard";
-import { TimelineCard } from "@/features/goals/components/TimelineCard";
-
 import { UploadScheduleCard } from "./components/UploadScheduleCard";
 import { ContentPipelineCard } from "./components/ContentPipelineCard";
 import { MetricsCard } from "./components/MetricsCard";
 
+const GOAL_ID = "youtube-channel";
+
 export function YouTubeChannelGoalPage() {
-  const { state, dispatch } = useGoalsStore();
-
-  const goalId = youtubeChannelGoal.id;
-  const doneMap = state.done[goalId] ?? {};
-
   return (
     <div className="space-y-6">
-      <GoalPageHeader
-        goal={youtubeChannelGoal}
-        doneMap={doneMap}
-        onReset={() => dispatch({ type: "resetGoal", goalId })}
-      />
-
+      <div>
+        <h1 className="text-2xl font-semibold">🎬 YouTube Channel</h1>
+        <p className="text-muted-foreground text-sm mt-1">Track upload schedule, content pipeline, and metrics.</p>
+      </div>
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <StepsCard
-            goalId={goalId}
-            goalTitle={youtubeChannelGoal.title}
-            steps={youtubeChannelGoal.steps}
-            doneMap={doneMap}
-            onToggle={(stepId) => dispatch({ type: "toggleStep", goalId, stepId })}
-            heightClassName="h-[640px]"
-          />
-
-          <TimelineCard steps={youtubeChannelGoal.steps} doneMap={doneMap} />
-        </div>
-
-        <div className="lg:col-span-1 space-y-6">
-          <UploadScheduleCard goalId={goalId} />
-          <ContentPipelineCard goalId={goalId} />
-          <MetricsCard goalId={goalId} />
-        </div>
+        <UploadScheduleCard goalId={GOAL_ID} />
+        <ContentPipelineCard goalId={GOAL_ID} />
+        <MetricsCard goalId={GOAL_ID} />
       </div>
     </div>
   );

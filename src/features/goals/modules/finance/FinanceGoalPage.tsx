@@ -1,10 +1,4 @@
 import { useEffect, useState } from "react";
-import { useGoalsStore } from "@/features/goals/goalStoreContext";
-import { financeGoal } from "./financeGoal";
-
-import { GoalPageHeader } from "@/features/goals/components/GoalPageHeader";
-import { StepsCard } from "@/features/goals/components/StepsCard";
-import { TimelineCard } from "@/features/goals/components/TimelineCard";
 
 import { SavingsCard } from "./components/SavingsCard";
 import { ExpenseTrackerCard } from "./components/ExpenseTrackerCard";
@@ -18,59 +12,41 @@ import {
   type FinanceMonthState,
 } from "./financeStorage";
 
+const GOAL_ID = "finance";
+
 export function FinanceGoalPage() {
-  const { state, dispatch } = useGoalsStore();
-
-  const goalId = financeGoal.id;
-  const doneMap = state.done[goalId] ?? {};
-
   const [month, setMonth] = useState(() => getMonthKey());
   const [monthState, setMonthState] = useState<FinanceMonthState>(() => {
     try {
-      const raw = localStorage.getItem(`cache:finance:${goalId}:${getMonthKey()}`);
+      const raw = localStorage.getItem(`cache:finance:${GOAL_ID}:${getMonthKey()}`);
       return raw ? JSON.parse(raw) : defaultFinanceState(getMonthKey());
     } catch { return defaultFinanceState(getMonthKey()); }
   });
 
-
   useEffect(() => {
     let cancelled = false;
-    loadFinanceMonth(goalId, month).then((fresh) => {
+    loadFinanceMonth(GOAL_ID, month).then((fresh) => {
       if (!cancelled) setMonthState(fresh);
     });
     return () => { cancelled = true; };
-  }, [goalId, month]);
+  }, [month]);
 
   async function handleSetMonthState(next: FinanceMonthState) {
     setMonthState(next);
-    await saveFinanceMonth(goalId, next);
+    await saveFinanceMonth(GOAL_ID, next);
   }
 
   return (
     <div className="space-y-6">
-      <GoalPageHeader
-        goal={financeGoal}
-        doneMap={doneMap}
-        onReset={() => dispatch({ type: "resetGoal", goalId })}
-      />
+      <div>
+        <h1 className="text-2xl font-semibold">💰 Finance</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Track savings, monthly spending, and budget categories.
+        </p>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <StepsCard
-            goalId={goalId}
-            goalTitle={financeGoal.title}
-            steps={financeGoal.steps}
-            doneMap={doneMap}
-            onToggle={(stepId) => dispatch({ type: "toggleStep", goalId, stepId })}
-            heightClassName="h-[640px]"
-          />
-
-          <TimelineCard steps={financeGoal.steps} doneMap={doneMap} />
-        </div>
-
-        <div className="lg:col-span-1 space-y-6">
-          <SavingsCard goalId={goalId} target={75000} currency="DKK" />
-
           <ExpenseTrackerCard
             month={month}
             setMonth={setMonth}
@@ -79,8 +55,12 @@ export function FinanceGoalPage() {
           />
         </div>
 
+        <div className="lg:col-span-1 space-y-6">
+          <SavingsCard goalId={GOAL_ID} target={75000} currency="DKK" />
+        </div>
+
         <div className="lg:col-span-3">
-          <SpendingDonutCard goalId={goalId} month={month} />
+          <SpendingDonutCard goalId={GOAL_ID} month={month} />
         </div>
       </div>
     </div>

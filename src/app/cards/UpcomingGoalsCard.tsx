@@ -3,8 +3,7 @@ import { Target, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useGoalsDashboard } from "../hooks/useGoalsDashboard";
-import type { UpcomingItem } from "@/features/goals/goalUtils";
+import { useGoalsDashboard, type UpcomingItem } from "../hooks/useGoalsDashboard";
 
 function GoalRow({
   goalEmoji,
@@ -14,7 +13,7 @@ function GoalRow({
 }: {
   goalEmoji: string;
   goalTitle: string;
-  step: { label: string; idealFinish?: string };
+  step: { label: string; idealFinish: string | null };
   daysFromToday: number;
 }) {
   const overdue = daysFromToday < 0;
