@@ -18,7 +18,6 @@ import DashboardPage from "@/app/DashboardPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LoginPage } from "@/auth/LoginPage";
-import { GoalDetailPage } from "./features/goals/GoalsDetailPage";
 
 export default function App() {
   return (
@@ -49,18 +48,6 @@ export default function App() {
             <Route path="reading" element={<ReadingTab />} />
 
             <Route path="goals" element={<GoalsTab />} />
-
-            {/* Registry goal pages (hardcoded goalsRegistry) */}
-            <Route
-              path="goals/registry/:goalId"
-              element={
-                <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading…</div>}>
-                  <GoalDetailPage />
-                </Suspense>
-              }
-            />
-
-            {/* User-created goals (UUID ids from user_goals / loadUserGoals) */}
             <Route
               path="goals/:goalId"
               element={

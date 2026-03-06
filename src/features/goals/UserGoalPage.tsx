@@ -22,7 +22,6 @@ function toGoalStep(s: UserGoalStep) {
 
 export function UserGoalPage() {
   const { goalId } = useParams<{ goalId: string }>();
-  const navigate = useNavigate();
   const { state, dispatch } = useGoalsStore();
   const [goal, setGoal] = useState<UserGoal | null>(null);
   const [loading, setLoading] = useState(true);
