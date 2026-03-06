@@ -81,31 +81,30 @@
   --background: #060b14;
   --foreground: #f1f5f9;
 
-  /* glassy surfaces */
-  --card: rgba(255, 255, 255, 0.04);
+  /* make cards solid */
+  --card: #0b1220;
   --card-foreground: #f1f5f9;
 
-  --popover: rgba(255, 255, 255, 0.04);
+  --popover: #0b1220;
   --popover-foreground: #f1f5f9;
 
-  /* brand */
   --primary: #4ade80;
   --primary-foreground: #060b14;
 
-  --secondary: rgba(255, 255, 255, 0.04);
+  --secondary: #0f172a;
   --secondary-foreground: #f1f5f9;
 
-  --muted: rgba(255, 255, 255, 0.03);
+  --muted: #0f172a;
   --muted-foreground: #94a3b8;
 
-  --accent: rgba(255, 255, 255, 0.06);
+  --accent: #111c33;
   --accent-foreground: #f1f5f9;
 
   --destructive: #f87171;
   --destructive-foreground: #0b1220;
 
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.10);
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.12);
   --ring: rgba(74, 222, 128, 0.6);
 }
 

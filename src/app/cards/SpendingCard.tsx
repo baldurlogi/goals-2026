@@ -135,7 +135,7 @@ export function SpendingCard() {
 
         <div className="flex justify-end">
           <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-            <Link to="/goals/finance">
+            <Link to="/app/goals/finance">
               Full breakdown <ChevronRight className="h-3 w-3" />
             </Link>
           </Button>

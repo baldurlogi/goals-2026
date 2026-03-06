@@ -147,7 +147,7 @@ export function MacrosCard() {
             )}
           </div>
           <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-            <Link to="/nutrition">
+            <Link to="/app/nutrition">
               Log food <ChevronRight className="h-3 w-3" />
             </Link>
           </Button>

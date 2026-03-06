@@ -171,7 +171,7 @@ export function ScheduleCard() {
         <div className="flex items-center justify-between pt-2">
           <span className="text-[11px] text-muted-foreground">{viewLabel}</span>
           <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-            <Link to="/schedule">
+            <Link to="/app/schedule">
               Full schedule <ChevronRight className="h-3 w-3" />
             </Link>
           </Button>

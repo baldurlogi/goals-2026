@@ -159,7 +159,7 @@ export function TodoCard() {
         {/* Footer link */}
         <div className="flex justify-end pt-1">
           <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-            <Link to="/todos">
+            <Link to="/app/todos">
               See all <ChevronRight className="h-3 w-3" />
             </Link>
           </Button>

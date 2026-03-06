@@ -14,7 +14,7 @@ export function GenericGoalPage(props: { goalId: string; goal?: GoalDefinition }
     return (
       <div className="container mx-auto max-w-5xl p-6">
         <p className="text-muted-foreground">Goal not found.</p>
-        <Link to="/daily-plan/goals" className="underline">
+        <Link to="/app/daily-plan/goals" className="underline">
           Back to Goals
         </Link>
       </div>
@@ -33,7 +33,7 @@ export function GenericGoalPage(props: { goalId: string; goal?: GoalDefinition }
       <div className="flex items-start justify-between gap-6">
         <div className="space-y-1">
           <div className="text-sm text-muted-foreground">
-            <Link to="/daily-plan/goals" className="underline">
+            <Link to="/app/daily-plan/goals" className="underline">
               Back to Goals
             </Link>{" "}
             / <span>{goal.title}</span>

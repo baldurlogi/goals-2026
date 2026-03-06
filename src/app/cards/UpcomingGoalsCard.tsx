@@ -116,7 +116,7 @@ export function UpcomingGoalsCard() {
 
         <div className="flex justify-end pt-3">
           <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-            <Link to="/upcoming">
+            <Link to="/app/upcoming">
               All goals <ChevronRight className="h-3 w-3" />
             </Link>
           </Button>

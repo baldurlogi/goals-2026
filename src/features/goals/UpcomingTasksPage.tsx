@@ -94,7 +94,7 @@ export function UpcomingTasksPage() {
                     </div>
 
                     <Link
-                      to={`/goals/${goalId}`}
+                      to={`/app/goals/registry/${goalId}`}
                       className="text-sm underline underline-offset-4 text-muted-foreground hover:text-foreground"
                     >
                       Open
@@ -119,17 +119,17 @@ export function UpcomingTasksPage() {
                             <input
                               type="checkbox"
                               className="mt-1"
-                              checked={false}
-                                onChange={() => {
+                              checked={!!state.done[it.goalId]?.[it.step.id]}
+                              onChange={() => {
                                 dispatch({ type: "toggleStep", goalId: it.goalId, stepId: it.step.id });
 
                                 toast("Marked as done", {
-                                    description: `${it.goalEmoji} ${it.goalTitle} — ${it.step.label}`,
-                                    action: {
+                                  description: `${it.goalEmoji} ${it.goalTitle} — ${it.step.label}`,
+                                  action: {
                                     label: "Undo",
                                     onClick: () =>
-                                        dispatch({ type: "toggleStep", goalId: it.goalId, stepId: it.step.id }),
-                                    },
+                                      dispatch({ type: "toggleStep", goalId: it.goalId, stepId: it.step.id }),
+                                  },
                                 });
                               }}
                             />

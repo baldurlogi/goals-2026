@@ -83,7 +83,7 @@ export function FitnessCard() {
 
         <div className="flex justify-end pt-1">
           <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-            <Link to="/fitness">
+            <Link to="/app/fitness">
               All PRs <ChevronRight className="h-3 w-3" />
             </Link>
           </Button>

@@ -18,7 +18,7 @@ const PRIORITY_COLOR: Record<UserGoal["priority"], string> = {
   low:    "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
 };
 
-const EMOJI_SUGGESTIONS = ["🎯","💪","📚","💰","🏃","✈️","💻","🎬","🎓","🌱","🏋️","🎨","🚀","❤️","🧘"];
+const EMOJI_SUGGESTIONS = ["🎯","💪","📚","💰","🏃","✈️","💻","🎬","🎓","🌱","🏋️","🎨","🚀","❤️","🧘", "🧴", "🧠"]; 
 
 type Props = {
   initial?: UserGoal;          // if provided → edit mode
