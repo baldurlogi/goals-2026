@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScheduleCardSkeleton } from '@/features/dashboard/skeletons';
 import { useScheduleDashboard } from '../hooks/useScheduleDashboard';
+import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
 function ScheduleRow({
   time,
@@ -44,7 +45,7 @@ function ScheduleRow({
   );
 }
 
-export function ScheduleCard() {
+function ScheduleCardInner() {
   const {
     summary,
     nextBlock,
@@ -141,5 +142,23 @@ export function ScheduleCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+export function ScheduleCard() {
+  return (
+    <ErrorBoundary
+      variant="card"
+      fallback={(error, reset) => (
+        <CardErrorFallback
+          error={error}
+          onRetry={reset}
+          label="Schedule"
+          colSpan="lg:col-span-7"
+        />
+      )}
+    >
+      <ScheduleCardInner />
+    </ErrorBoundary>
   );
 }

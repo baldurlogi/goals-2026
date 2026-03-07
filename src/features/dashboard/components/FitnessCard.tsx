@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFitnessDashboard } from '../hooks/useFitnessDashboard';
 import { FitnessCardSkeleton } from '@/features/dashboard/skeletons';
+import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
 function MiniBar({
   pct,
@@ -22,7 +23,7 @@ function MiniBar({
   );
 }
 
-export function FitnessCard() {
+function FitnessCardInner() {
   const { topLifts, loading } = useFitnessDashboard();
 
   const cacheEmpty = topLifts.every((l) => l.best === null);
@@ -98,5 +99,23 @@ export function FitnessCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+export function FitnessCard() {
+  return (
+    <ErrorBoundary
+      variant="card"
+      fallback={(error, reset) => (
+        <CardErrorFallback
+          error={error}
+          onRetry={reset}
+          label="Fitness"
+          colSpan="lg:col-span-4"
+        />
+      )}
+    >
+      <FitnessCardInner />
+    </ErrorBoundary>
   );
 }

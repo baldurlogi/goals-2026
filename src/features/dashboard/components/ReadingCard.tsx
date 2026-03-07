@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useReadingDashboard } from "../hooks/useReadingDashboard";
 import { ReadingCardSkeleton } from "../skeletons";
+import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
 
 function Stat({ label, value, color = "text-foreground" }: {
@@ -19,7 +20,7 @@ function Stat({ label, value, color = "text-foreground" }: {
   );
 }
 
-export function ReadingCard() {
+function ReadingCardInner() {
   const { stats, hasReading, loading } = useReadingDashboard();
 
   // Only show skeleton if loading AND cache was empty (no data to show yet)
@@ -91,5 +92,23 @@ export function ReadingCard() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+export function ReadingCard() {
+  return (
+    <ErrorBoundary
+      variant="card"
+      fallback={(error, reset) => (
+        <CardErrorFallback
+          error={error}
+          onRetry={reset}
+          label="Reading"
+          colSpan="lg:col-span-5"
+        />
+      )}
+    >
+      <ReadingCardInner />
+    </ErrorBoundary>
   );
 }

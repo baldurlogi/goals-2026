@@ -6,6 +6,7 @@ import { PieChart, Pie, Tooltip, ResponsiveContainer } from 'recharts';
 import { SpendingCardSkeleton } from '@/features/dashboard/skeletons';
 import { makeShapeFn } from '@/app/pieShape';
 import { useSpendingDashboard } from '../hooks/useSpendingDashboard';
+import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
 const FINANCE_GOAL_ID = 'finance';
 
@@ -59,7 +60,7 @@ function DonutTooltip({
   );
 }
 
-export function SpendingCard() {
+function SpendingCardInner() {
   const { donutData, totalSpent, isEmpty, loading } = useSpendingDashboard(
     FINANCE_GOAL_ID,
   ) as ReturnType<typeof useSpendingDashboard> & {
@@ -165,5 +166,23 @@ export function SpendingCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+export function SpendingCard() {
+  return (
+    <ErrorBoundary
+      variant="card"
+      fallback={(error, reset) => (
+        <CardErrorFallback
+          error={error}
+          onRetry={reset}
+          label="Spending"
+          colSpan="lg:col-span-7"
+        />
+      )}
+    >
+      <SpendingCardInner />
+    </ErrorBoundary>
   );
 }

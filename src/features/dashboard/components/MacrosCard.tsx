@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MacrosCardSkeleton } from '@/features/dashboard/skeletons';
 import { useNutritionDashboard } from '../hooks/useNutritionDashboard';
+import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
 function pct(value: number, target: number) {
   return Math.min(
@@ -60,7 +61,7 @@ function MacroPill({
   );
 }
 
-export function MacrosCard() {
+function MacrosCardInner() {
   const {
     logged,
     target,
@@ -205,5 +206,23 @@ export function MacrosCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+export function MacrosCard() {
+  return (
+    <ErrorBoundary
+      variant="card"
+      fallback={(error, reset) => (
+        <CardErrorFallback
+          error={error}
+          onRetry={reset}
+          label="Macros"
+          colSpan="lg:col-span-5"
+        />
+      )}
+    >
+      <MacrosCardInner />
+    </ErrorBoundary>
   );
 }

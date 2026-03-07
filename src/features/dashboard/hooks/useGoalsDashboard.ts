@@ -53,11 +53,15 @@ function getUpcomingItems(
 
 export function useGoalsDashboard() {
   const { state: goalsState } = useGoalsStore();
-  const [goals, setGoals] = useState<UserGoal[]>(() => seedUserGoals());
+  const seed = seedUserGoals();
+  const [goals, setGoals] = useState<UserGoal[]>(seed);
+  const [loading, setLoading] = useState(seed.length === 0);
 
   useEffect(() => {
     let cancelled = false;
-    loadUserGoals().then((g) => { if (!cancelled) setGoals(g); });
+    loadUserGoals().then((g) => {
+      if (!cancelled) { setGoals(g); setLoading(false); }
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -75,5 +79,6 @@ export function useGoalsDashboard() {
     upcomingItems, previewItems, overdueCount,
     hasMore, extraCount,
     horizon: HORIZON, totalCount: upcomingItems.length,
+    loading,
   };
 }

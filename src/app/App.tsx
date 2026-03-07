@@ -1,23 +1,24 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense } from 'react';
-import { GoalStoreProvider } from '@/features/goals/goalStore';
-import { AuthProvider } from './providers/AuthProvider';
-import { RequireAuth } from '@/features/auth/RequireAuth';
-import { RequireOnboarding } from '@/features/onboarding/RequireOnboarding';
-import { AppLayout } from '@/app/AppLayout';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Suspense } from "react";
+import { GoalStoreProvider } from "@/features/goals/goalStore";
+import { AuthProvider } from "./providers/AuthProvider";
+import { RequireAuth } from "@/features/auth/RequireAuth";
+import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
+import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
+import { AppLayout } from "@/app/AppLayout";
 
-import { NutritionTab } from '@/features/nutrition/NutritionPage';
-import { ScheduleTab } from '@/features/schedule/SchedulePage';
-import { ReadingTab } from '@/features/reading/ReadingPage';
-import { GoalsTab } from '@/features/goals/GoalsPage';
-import { UpcomingTasksPage } from '@/features/goals/UpcomingTasksPage';
-import { UserGoalPage } from '@/features/goals/UserGoalPage';
-import { TodosPage } from '@/features/todos/TodosPage';
-import { FitnessGoalPage } from '@/features/goals/modules/fitness/FitnessGoalPage';
-import DashboardPage from '@/features/dashboard/DashboardPage';
-import { ProfilePage } from '@/features/profile/ProfilePage';
-import { LandingPage } from '@/features/landing/LandingPage';
-import { LoginPage } from '@/features/auth/LoginPage';
+import { NutritionTab } from "@/features/fitness/FitnessPage";
+import { ScheduleTab } from "@/features/schedule/SchedulePage";
+import { ReadingTab } from "@/features/reading/ReadingPage";
+import { GoalsTab } from "@/features/goals/GoalsPage";
+import { UpcomingTasksPage } from "@/features/goals/UpcomingTasksPage";
+import { UserGoalPage } from "@/features/goals/UserGoalPage";
+import { TodosPage } from "@/features/todos/TodosPage";
+import { FitnessGoalPage } from "@/features/goals/modules/fitness/FitnessGoalPage";
+import DashboardPage from "@/features/dashboard/DashboardPage";
+import { ProfilePage } from "@/features/profile/ProfilePage";
+import { LandingPage } from "@/features/landing/LandingPage";
+import { LoginPage } from "@/features/auth/LoginPage";
 
 export default function App() {
   return (
@@ -25,8 +26,8 @@ export default function App() {
       <AuthProvider>
         <Routes>
           {/* ── PUBLIC ────────────────────────────────────────── */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/auth" element={<LoginPage />} />
+          <Route path="/" element={<RedirectIfAuth><LandingPage /></RedirectIfAuth>} />
+          <Route path="/auth" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
 
           {/* ── PROTECTED APP ─────────────────────────────────── */}
           <Route
@@ -51,13 +52,7 @@ export default function App() {
             <Route
               path="goals/:goalId"
               element={
-                <Suspense
-                  fallback={
-                    <div className="p-8 text-sm text-muted-foreground">
-                      Loading…
-                    </div>
-                  }
-                >
+                <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading…</div>}>
                   <UserGoalPage />
                 </Suspense>
               }

@@ -1,68 +1,86 @@
-import type { DailySchedule } from "./scheduleTypes";
+import type { ScheduleConfig, ScheduleView, TimelineItem, UserScheduleTemplates } from "./scheduleTypes";
 
-export const dailySchedule: DailySchedule = {
+// ── Generic seed blocks ───────────────────────────────────────────────────
+// These are shown to new users before they customise their schedule.
+// No personal data — just a sensible starting point.
+
+function block(id: string, time: string, label: string, detail: string, icon: string, tag?: string): TimelineItem {
+  return { id, time, label, detail, icon, ...(tag ? { tag } : {}) };
+}
+
+export const DEFAULT_WFH_BLOCKS: TimelineItem[] = [
+  block("wfh-1",  "7:00",       "Wake up",           "Start your morning routine.",              "⏰"),
+  block("wfh-2",  "7:15",       "Morning exercise",  "Walk, stretch, or workout.",               "💪"),
+  block("wfh-3",  "7:45",       "Breakfast",         "Fuel up before the day starts.",           "🥣"),
+  block("wfh-4",  "8:00",       "Start work",        "Deep work — most important task first.",   "💻"),
+  block("wfh-5",  "12:30",      "Lunch break",       "Step away from the screen.",               "🥗"),
+  block("wfh-6",  "13:00",      "Back to work",      "Meetings, reviews, lighter tasks.",        "💻"),
+  block("wfh-7",  "17:00",      "Finish work",       "Close tabs. Protect your evening.",        "✅"),
+  block("wfh-8",  "17:30",      "Exercise / walk",   "Move your body before dinner.",            "🏃"),
+  block("wfh-9",  "19:00",      "Dinner",            "Cook or prepare something nourishing.",    "🍽️"),
+  block("wfh-10", "20:00",      "Personal project",  "Side project, learning, or reading.",      "🧠"),
+  block("wfh-11", "21:30",      "Wind down",         "No screens. Journal or read.",             "📖"),
+  block("wfh-12", "22:30",      "Bed",               "Consistent bedtime matters.",              "🌙"),
+];
+
+export const DEFAULT_OFFICE_BLOCKS: TimelineItem[] = [
+  block("off-1",  "6:30",       "Wake up",           "Earlier start for the commute.",           "⏰"),
+  block("off-2",  "6:45",       "Morning exercise",  "Quick workout or walk before leaving.",    "💪"),
+  block("off-3",  "7:15",       "Breakfast",         "Eat before you leave.",                    "🥣"),
+  block("off-4",  "7:45",       "Commute",           "Podcast, audiobook, or just relax.",       "🚶"),
+  block("off-5",  "8:30",       "Arrive at office",  "Get settled, check priorities.",           "🏢"),
+  block("off-6",  "12:30",      "Lunch",             "Take a real break away from your desk.",   "🥗"),
+  block("off-7",  "17:00",      "Leave office",      "Pack up, head home.",                      "🚶"),
+  block("off-8",  "18:00",      "Exercise",          "Gym or walk after commute.",               "🏋️"),
+  block("off-9",  "19:30",      "Dinner",            "Keep it simple on busy days.",             "🍽️"),
+  block("off-10", "20:30",      "Personal project",  "Even 30 min of focused work counts.",      "🧠"),
+  block("off-11", "22:00",      "Wind down & bed",   "Consistent bedtime.",                      "🌙"),
+];
+
+export const DEFAULT_WEEKEND_BLOCKS: TimelineItem[] = [
+  block("wkd-1",  "8:00",       "Wake up",           "Slightly later — you've earned it.",       "⏰"),
+  block("wkd-2",  "8:15",       "Breakfast",         "Take your time. Enjoy the morning.",       "🥣"),
+  block("wkd-3",  "9:00",       "Workout / sport",   "Run, swim, gym — whatever you enjoy.",     "🏃"),
+  block("wkd-4",  "11:00",      "Errands or chores", "Batch them so the week stays clean.",      "🏠"),
+  block("wkd-5",  "13:00",      "Lunch",             "Flexible — eat with family or friends.",   "🥗"),
+  block("wkd-6",  "14:00",      "Deep focus (1 hr)", "Side project, learning, or planning.",     "🧠"),
+  block("wkd-7",  "17:00",      "Social / free time","Protect this time.",                       "🎉"),
+  block("wkd-8",  "19:00",      "Dinner",            "Cook something you enjoy.",                "🍽️"),
+  block("wkd-9",  "21:00",      "Weekly review",     "Plan next week. Journal.",                 "📝"),
+  block("wkd-10", "22:30",      "Bed",               "Reset for the week ahead.",                "🌙"),
+];
+
+export const DEFAULT_USER_SCHEDULE: UserScheduleTemplates = {
+  wfh:     DEFAULT_WFH_BLOCKS,
+  office:  DEFAULT_OFFICE_BLOCKS,
+  weekend: DEFAULT_WEEKEND_BLOCKS,
+};
+
+// ── Static schedule config (colours, labels) ─────────────────────────────
+// Blocks come from Supabase; only the visual config is hardcoded here.
+
+export const SCHEDULE_CONFIG: Record<ScheduleView, Omit<ScheduleConfig, "blocks">> = {
   wfh: {
-    label: "Mon / Tue — Work From Home",
+    label: "Work From Home",
     colorClass: "text-emerald-600 dark:text-emerald-400",
     accentClass: "border-emerald-200/60 dark:border-emerald-900/60",
-    blocks: [
-      { time: "7:00", label: "Wake up", detail: "No snoozing. 50 Hard starts now.", icon: "⏰" },
-      { time: "7:05", label: "100 Pushups", detail: "Get them done before your brain fully wakes up. Break into sets as needed.", icon: "💪" },
-      { time: "7:25", label: "Breakfast", detail: "Overnight oats with protein — prepped last night.", icon: "🥣", tag: "480 kcal · 45g protein" },
-      { time: "7:45", label: "Read 20 pages", detail: "Read your daily goal pages.", icon: "📖" },
-      { time: "8:00", label: "Start work", detail: "WFH — no commute. Use saved time as buffer.", icon: "💻" },
-      { time: "12:30", label: "Lunch", detail: "Turkey/Chicken wrap — prepped on Sunday.", icon: "🥗", tag: "320 kcal · 28g protein" },
-      { time: "~3:30", label: "Afternoon snack", detail: "Cottage cheese + rice cakes + apple.", icon: "🍎", tag: "280 kcal · 22g protein" },
-      { time: "~4:00", label: "Done for the day", detail: "Head straight to gym. Don't get couch-trapped.", icon: "✅" },
-      { time: "4:15-5:15", label: "Workout", detail: "Per your weekly plan. 1 hour, focused.", icon: "🏋️" },
-      { time: "5:30", label: "Post-workout shake", detail: "Protein powder + milk.", icon: "🥤", tag: "260 kcal · 31g protein" },
-      { time: "5:45", label: "Shower", detail: "Hydrate. You're close to done for the day.", icon: "🚿" },
-      { time: "6:00", label: "Dinner", detail: "Hello Fresh meal. Cut the olive oil.", icon: "🍽️", tag: "550 kcal · 37g protein" },
-      { time: "7:00", label: "Frontend dev (1 hr)", detail: "Skill block. Build, learn, ship.", icon: "🧠" },
-      { time: "8:00", label: "Journaling", detail: "Reflect: what worked, what didn't.", icon: "📝" },
-      { time: "9:30-10:00", label: "Wind down & bed", detail: "Consistent bedtime. Non-negotiable.", icon: "🌙" },
-    ],
   },
-
   office: {
-    label: "Wed – Fri — Office Days",
+    label: "Office Day",
     colorClass: "text-amber-600 dark:text-amber-400",
     accentClass: "border-amber-200/60 dark:border-amber-900/60",
-    blocks: [
-      { time: "7:00", label: "Wake up", detail: "Same time as WFH days. Consistency is the point.", icon: "⏰" },
-      { time: "7:05", label: "100 Pushups", detail: "Before you even think about leaving.", icon: "💪" },
-      { time: "7:25", label: "Breakfast", detail: "Skyr bowl + PB + granola + banana.", icon: "🥣", tag: "400 kcal · 27g protein" },
-      { time: "7:45", label: "Read 20 pages", detail: "Read your daily goal pages.", icon: "📖" },
-      { time: "8:00", label: "Leave for work", detail: "Arrive ~8:30. Breakfast already done.", icon: "🚶" },
-      { time: "~12:30", label: "Lunch (provided)", detail: "Choose protein-heavy options.", icon: "🥗", tag: "~500 kcal · ~35g protein" },
-      { time: "~3:30", label: "Afternoon snack", detail: "Cottage cheese + rice cakes + apple.", icon: "🍎", tag: "280 kcal · 22g protein" },
-      { time: "~4:00", label: "Head home", detail: "Commute back. Save energy for gym.", icon: "🚶" },
-      { time: "4:30-5:30", label: "Workout", detail: "Per your weekly plan. Account for commute.", icon: "🏋️" },
-      { time: "5:45", label: "Post-workout shake", detail: "Protein powder + milk immediately after.", icon: "🥤", tag: "260 kcal · 31g protein" },
-      { time: "6:00", label: "Shower", detail: "Hydrate. Almost done.", icon: "🚿" },
-      { time: "6:15", label: "Dinner", detail: "Hello Fresh. Reduce olive oil.", icon: "🍽️", tag: "550 kcal · 37g protein" },
-      { time: "7:15", label: "Frontend dev (1 hr)", detail: "Skill block. Push through.", icon: "🧠" },
-      { time: "8:15", label: "Journaling", detail: "Quick reflection. What did you learn?", icon: "📝" },
-      { time: "9:30-10:00", label: "Wind down & bed", detail: "Same bedtime. Every night.", icon: "🌙" },
-    ],
   },
-
   weekend: {
-    label: "Sat / Sun — Weekend",
+    label: "Weekend",
     colorClass: "text-sky-600 dark:text-sky-400",
     accentClass: "border-sky-200/60 dark:border-sky-900/60",
-    blocks: [
-      { time: "7:00", label: "Wake up", detail: "Yes, even on weekends. 50 Hard.", icon: "⏰" },
-      { time: "7:05", label: "100 Pushups", detail: "The habit doesn't know what day it is.", icon: "💪" },
-      { time: "7:25", label: "Breakfast", detail: "Overnight oats or skyr bowl — your choice.", icon: "🥣", tag: "400-480 kcal · 27-45g protein" },
-      { time: "7:50", label: "Read 20 pages", detail: "Morning coffee + book. Enjoy it.", icon: "📖" },
-      { time: "~9:00", label: "Batch prep (Sunday)", detail: "Eggs/chicken/oats/wraps. Set up your week.", icon: "🍳" },
-      { time: "Morning/Afternoon", label: "Workout", detail: "Sat = swim. Sun = walk + mobility.", icon: "🏊" },
-      { time: "~12:30", label: "Lunch", detail: "Flexible — use prepped ingredients.", icon: "🥗", tag: "~350 kcal · ~30g protein" },
-      { time: "Afternoon", label: "Frontend dev (1 hr)", detail: "Longer focus session if you want.", icon: "🧠" },
-      { time: "Evening", label: "Dinner", detail: "Hello Fresh or simple home-cooked meal.", icon: "🍽️", tag: "550 kcal · 37g protein" },
-      { time: "Evening", label: "Journaling + wind down", detail: "Weekly reflection on Sunday.", icon: "📝" },
-      { time: "9:30-10:00", label: "Bed", detail: "Consistent. Always.", icon: "🌙" },
-    ],
   },
 };
+
+// Helper to merge config + user blocks into a full ScheduleConfig
+export function buildScheduleConfig(view: ScheduleView, blocks: TimelineItem[]): ScheduleConfig {
+  return { ...SCHEDULE_CONFIG[view], blocks };
+}
+
+// Re-export for legacy references
+export type { UserScheduleTemplates } from "./scheduleTypes";

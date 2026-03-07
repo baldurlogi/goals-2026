@@ -7,8 +7,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useTodoDashboard } from '../hooks/useTodoDashboard';
 import { addTodo, toggleTodo, deleteTodo } from '@/features/todos/todoStorage';
 import { TodoCardSkeleton } from '@/features/dashboard/skeletons';
+import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
-export function TodoCard() {
+function TodoCardInner() {
   const { preview, hasMore, extraCount, doneCount, total, loading } =
     useTodoDashboard();
 
@@ -123,5 +124,23 @@ export function TodoCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+export function TodoCard() {
+  return (
+    <ErrorBoundary
+      variant="card"
+      fallback={(error, reset) => (
+        <CardErrorFallback
+          error={error}
+          onRetry={reset}
+          label="Todo"
+          colSpan="lg:col-span-5"
+        />
+      )}
+    >
+      <TodoCardInner />
+    </ErrorBoundary>
   );
 }
