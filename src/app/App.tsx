@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense } from 'react';
 import { GoalStoreProvider } from '@/features/goals/goalStore';
-import { AuthProvider } from '@/auth/AuthProvider';
-import { RequireAuth } from '@/auth/RequireAuth';
+import { AuthProvider } from './providers/AuthProvider';
+import { RequireAuth } from '@/features/auth/RequireAuth';
 import { RequireOnboarding } from '@/features/onboarding/RequireOnboarding';
 import { AppLayout } from '@/app/AppLayout';
 
@@ -14,10 +14,10 @@ import { UpcomingTasksPage } from '@/features/goals/UpcomingTasksPage';
 import { UserGoalPage } from '@/features/goals/UserGoalPage';
 import { TodosPage } from '@/features/todos/TodosPage';
 import { FitnessGoalPage } from '@/features/goals/modules/fitness/FitnessGoalPage';
-import DashboardPage from '@/app/DashboardPage';
+import DashboardPage from '@/features/dashboard/DashboardPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
 import { LandingPage } from '@/features/landing/LandingPage';
-import { LoginPage } from '@/auth/LoginPage';
+import { LoginPage } from '@/features/auth/LoginPage';
 
 export default function App() {
   return (

@@ -2,13 +2,13 @@ import { Link } from "react-router-dom";
 import { Apple, BookOpen, Dumbbell, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-import { ReadingCard }       from "./cards/ReadingCard";
-import { MacrosCard }        from "./cards/MacrosCard";
-import { ScheduleCard }      from "./cards/ScheduleCard";
-import { UpcomingGoalsCard } from "./cards/UpcomingGoalsCard";
-import { SpendingCard }      from "./cards/SpendingCard";
-import { TodoCard }          from "./cards/TodoCard";
-import { FitnessCard }       from "./cards/FitnessCard";
+import { ReadingCard } from "./components/ReadingCard";
+import { MacrosCard } from "./components/MacrosCard";
+import { ScheduleCard } from "./components/ScheduleCard";
+import { UpcomingGoalsCard } from "./components/UpcomingGoalsCard";
+import { SpendingCard } from "./components/SpendingCard";
+import { TodoCard } from "./components/TodoCard";
+import { FitnessCard } from "./components/FitnessCard";
 
 function QuickAction({
   icon, label, sub, href, color,

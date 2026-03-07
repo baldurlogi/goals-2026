@@ -9,6 +9,7 @@ import {
   type UpcomingItem,
 } from '../hooks/useGoalsDashboard';
 
+
 function GoalRow({
   goalEmoji,
   goalTitle,
