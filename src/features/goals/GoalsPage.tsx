@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGoalsStore } from '@/features/goals/goalStoreContext';
 import { GoalCard } from './components/GoalCard';
 import { AddEditGoalModal } from './components/AddEditGoalModal';
-import { GoalsTabSkeleton } from '@/features/dashboard/skeletons';
+import { GoalsPageSkeleton } from '@/features/dashboard/skeletons';
 import {
   loadUserGoals,
   seedUserGoals,
@@ -13,26 +13,23 @@ import {
 import type { UserGoal } from './goalTypes';
 
 type SortMode = 'priority' | 'overdue';
+type ModalState = UserGoal | 'new' | 'ai' | null;
+
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
-export function GoalsTab() {
+export function GoalsPage() {
   const { state } = useGoalsStore();
-  const [goals, setGoals] = useState<UserGoal[]>(() => seedUserGoals());
+  const [goals, setGoals]     = useState<UserGoal[]>(() => seedUserGoals());
   const [loading, setLoading] = useState(goals.length === 0);
-  const [sort, setSort] = useState<SortMode>('priority');
-  const [modalGoal, setModalGoal] = useState<UserGoal | 'new' | null>(null);
+  const [sort, setSort]       = useState<SortMode>('priority');
+  const [modal, setModal]     = useState<ModalState>(null);
 
   useEffect(() => {
     let cancelled = false;
     loadUserGoals().then((fresh) => {
-      if (!cancelled) {
-        setGoals(fresh);
-        setLoading(false);
-      }
+      if (!cancelled) { setGoals(fresh); setLoading(false); }
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -41,10 +38,7 @@ export function GoalsTab() {
     const counts: Record<string, number> = {};
     for (const goal of goals) {
       counts[goal.id] = goal.steps.filter(
-        (s) =>
-          s.idealFinish &&
-          s.idealFinish < today &&
-          !state.done[goal.id]?.[s.id],
+        (s) => s.idealFinish && s.idealFinish < today && !state.done[goal.id]?.[s.id],
       ).length;
     }
     return counts;
@@ -53,21 +47,13 @@ export function GoalsTab() {
   const sorted = useMemo(() => {
     return [...goals].sort((a, b) => {
       if (sort === 'priority') {
-        const r =
-          (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
+        const r = (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
         if (r !== 0) return r;
-        return (
-          (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0)
-        );
+        return (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
       }
-
-      const od =
-        (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
+      const od = (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
       if (od !== 0) return od;
-
-      return (
-        (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99)
-      );
+      return (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
     });
   }, [goals, sort, overdueCountByGoal]);
 
@@ -80,18 +66,14 @@ export function GoalsTab() {
   function handleSaved(saved: UserGoal) {
     setGoals((prev) => {
       const idx = prev.findIndex((g) => g.id === saved.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = saved;
-        return next;
-      }
+      if (idx >= 0) { const next = [...prev]; next[idx] = saved; return next; }
       return [...prev, saved];
     });
-    setModalGoal(null);
+    setModal(null);
   }
 
   const cacheEmpty = goals.length === 0;
-  if (loading && cacheEmpty) return <GoalsTabSkeleton />;
+  if (loading && cacheEmpty) return <GoalsPageSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -108,41 +90,54 @@ export function GoalsTab() {
         <div className="flex items-center gap-2">
           {goals.length > 0 && (
             <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
-              <SortButton
-                active={sort === 'priority'}
-                onClick={() => setSort('priority')}
-              >
+              <SortButton active={sort === 'priority'} onClick={() => setSort('priority')}>
                 Priority
               </SortButton>
-              <SortButton
-                active={sort === 'overdue'}
-                onClick={() => setSort('overdue')}
-              >
+              <SortButton active={sort === 'overdue'} onClick={() => setSort('overdue')}>
                 Most overdue
               </SortButton>
             </div>
           )}
-          <Button onClick={() => setModalGoal('new')} className="gap-2">
+          {/* AI generate button */}
+          <Button
+            variant="outline"
+            onClick={() => setModal('ai')}
+            className="gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
+          >
+            <Sparkles className="h-4 w-4" /> Generate with AI
+          </Button>
+          <Button onClick={() => setModal('new')} className="gap-2">
             <Plus className="h-4 w-4" /> Add goal
           </Button>
         </div>
       </div>
 
+      {/* Empty state */}
       {!loading && goals.length === 0 && (
-        <div className="space-y-4 rounded-2xl border border-dashed p-12 text-center">
+        <div className="space-y-6 rounded-2xl border border-dashed p-12 text-center">
           <div className="text-4xl">🎯</div>
           <div>
             <div className="text-lg font-semibold">No goals yet</div>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              Create a goal, break it into steps, and track your progress here.
+              Describe what you want to achieve and let AI build a step-by-step plan — or create one manually.
             </p>
           </div>
-          <Button onClick={() => setModalGoal('new')} className="gap-2">
-            <Plus className="h-4 w-4" /> Add your first goal
-          </Button>
+          <div className="flex justify-center gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setModal('ai')}
+              className="gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
+            >
+              <Sparkles className="h-4 w-4" /> Generate with AI
+            </Button>
+            <Button onClick={() => setModal('new')} variant="ghost" className="gap-2">
+              <Plus className="h-4 w-4" /> Add manually
+            </Button>
+          </div>
         </div>
       )}
 
+      {/* Goal grid */}
       {!loading && sorted.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-2">
           {sorted.map((goal) => (
@@ -151,18 +146,20 @@ export function GoalsTab() {
               goal={goal}
               doneMap={state.done[goal.id]}
               overdueCount={overdueCountByGoal[goal.id] ?? 0}
-              onEdit={() => setModalGoal(goal)}
+              onEdit={() => setModal(goal)}
               onDelete={() => handleDelete(goal.id)}
             />
           ))}
         </div>
       )}
 
-      {modalGoal !== null && (
+      {/* Modal */}
+      {modal !== null && (
         <AddEditGoalModal
-          initial={modalGoal === 'new' ? undefined : modalGoal}
+          initial={modal === 'new' || modal === 'ai' ? undefined : modal}
+          startWithAI={modal === 'ai'}
           onSave={handleSaved}
-          onClose={() => setModalGoal(null)}
+          onClose={() => setModal(null)}
         />
       )}
     </div>
@@ -170,13 +167,9 @@ export function GoalsTab() {
 }
 
 function SortButton({
-  active,
-  onClick,
-  children,
+  active, onClick, children,
 }: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
+  active: boolean; onClick: () => void; children: React.ReactNode;
 }) {
   return (
     <button
@@ -184,9 +177,7 @@ function SortButton({
       onClick={onClick}
       className={[
         'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-        active
-          ? 'bg-foreground text-background'
-          : 'text-muted-foreground hover:text-foreground',
+        active ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
       ].join(' ')}
     >
       {children}

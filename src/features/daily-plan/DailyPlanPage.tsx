@@ -1,9 +1,9 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import { NutritionTab } from '@/features/nutrition/NutritionPage';
-import { ScheduleTab } from '@/features/schedule/SchedulePage';
-import { ReadingTab } from '@/features/reading/ReadingPage';
-import { GoalsTab } from '@/features/goals/GoalsPage';
+import { NutritionPage } from '@/features/nutrition/NutritionPage';
+import { SchedulePage } from '@/features/schedule/SchedulePage';
+import { ReadingPage } from '@/features/reading/ReadingPage';
+import { GoalsPage } from '@/features/goals/GoalsPage';
 
 export default function DailyPlanPage() {
   return (
@@ -24,19 +24,19 @@ export default function DailyPlanPage() {
       </TabsList>
 
       <TabsContent value="nutrition">
-        <NutritionTab />
+        <NutritionPage />
       </TabsContent>
 
       <TabsContent value="schedule">
-        <ScheduleTab />
+        <SchedulePage />
       </TabsContent>
 
       <TabsContent value="reading">
-        <ReadingTab />
+        <ReadingPage />
       </TabsContent>
 
       <TabsContent value="goals">
-        <GoalsTab />
+        <GoalsPage />
       </TabsContent>
     </Tabs>
   );

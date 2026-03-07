@@ -8,6 +8,12 @@ import { ScheduleCardSkeleton } from '@/features/dashboard/skeletons';
 import { useScheduleDashboard } from '../hooks/useScheduleDashboard';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
+type ScheduleBlock = {
+  time: string;
+  icon: string;
+  label: string;
+};
+
 function ScheduleRow({
   time,
   label,
@@ -46,6 +52,11 @@ function ScheduleRow({
 }
 
 function ScheduleCardInner() {
+  const dashboard = useScheduleDashboard() as ReturnType<typeof useScheduleDashboard> & {
+    isLoading?: boolean;
+    previewBlocks: ScheduleBlock[];
+  };
+
   const {
     summary,
     nextBlock,
@@ -55,9 +66,7 @@ function ScheduleCardInner() {
     viewLabel,
     totalBlocks,
     isLoading,
-  } = useScheduleDashboard() as ReturnType<typeof useScheduleDashboard> & {
-    isLoading?: boolean;
-  };
+  } = dashboard;
 
   const cacheEmpty =
     previewBlocks.length === 0 &&
@@ -111,15 +120,20 @@ function ScheduleCardInner() {
       </CardHeader>
 
       <CardContent className="space-y-0.5 pb-5">
-        {previewBlocks.map((item, i) => (
-          <ScheduleRow
-            key={`${item.time}-${i}`}
-            time={item.time}
-            label={`${item.icon} ${item.label}`}
-            isNext={i === nextBlockIndex}
-            done={completedSet.has(i)}
-          />
-        ))}
+        {previewBlocks.map(
+          (
+            item: { time: string; icon: string; label: string },
+            i: number
+          ) => (
+            <ScheduleRow
+              key={`${item.time}-${i}`}
+              time={item.time}
+              label={`${item.icon} ${item.label}`}
+              isNext={i === nextBlockIndex}
+              done={completedSet.has(i)}
+            />
+          )
+        )}
 
         {totalBlocks > 5 && (
           <p className="pl-2 pt-1 text-[11px] text-muted-foreground">

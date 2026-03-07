@@ -261,7 +261,7 @@ function EditableBlockList({
 
 // ── Main page ─────────────────────────────────────────────────────────────
 
-export function ScheduleTab() {
+export function SchedulePage() {
   const [log, setLog]           = useState(DEFAULT_SCHEDULE_LOG);
   const [templates, setTemplates] = useState(() => seedScheduleTemplates());
   const [editMode, setEditMode] = useState(false);

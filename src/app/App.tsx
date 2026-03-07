@@ -7,10 +7,10 @@ import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
 import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
 import { AppLayout } from "@/app/AppLayout";
 
-import { NutritionTab } from "@/features/fitness/FitnessPage";
-import { ScheduleTab } from "@/features/schedule/SchedulePage";
-import { ReadingTab } from "@/features/reading/ReadingPage";
-import { GoalsTab } from "@/features/goals/GoalsPage";
+import { NutritionPage } from "@/features/fitness/FitnessPage";
+import { SchedulePage } from "@/features/schedule/SchedulePage";
+import { ReadingPage } from "@/features/reading/ReadingPage";
+import { GoalsPage } from "@/features/goals/GoalsPage";
 import { UpcomingTasksPage } from "@/features/goals/UpcomingTasksPage";
 import { UserGoalPage } from "@/features/goals/UserGoalPage";
 import { TodosPage } from "@/features/todos/TodosPage";
@@ -44,11 +44,11 @@ export default function App() {
           >
             <Route index element={<DashboardPage />} />
 
-            <Route path="nutrition" element={<NutritionTab />} />
-            <Route path="schedule" element={<ScheduleTab />} />
-            <Route path="reading" element={<ReadingTab />} />
+            <Route path="nutrition" element={<NutritionPage />} />
+            <Route path="schedule" element={<SchedulePage />} />
+            <Route path="reading" element={<ReadingPage />} />
 
-            <Route path="goals" element={<GoalsTab />} />
+            <Route path="goals" element={<GoalsPage />} />
             <Route
               path="goals/:goalId"
               element={

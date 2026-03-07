@@ -220,7 +220,7 @@ function MealToggle({ id, label, eaten, onToggle }: {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export function NutritionTab() {
+export function NutritionPage() {
   const [breakfastChoice, setBreakfastChoice] = useState<1 | 2>(1);
 
     // ✅ safe defaults, then hydrate in the effect

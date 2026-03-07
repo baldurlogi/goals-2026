@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
-export function ReadingTab() {
+export function ReadingPage() {
   // ✅ always start with safe defaults
   const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
   const [currentDraft, setCurrentDraft] = useState(() => DEFAULT_READING_INPUTS.current);
