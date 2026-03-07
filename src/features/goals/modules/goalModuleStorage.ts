@@ -15,7 +15,11 @@ function readCache<T>(goalId: string, moduleKey: string, fallback: T): T {
 }
 
 function writeCache<T>(goalId: string, moduleKey: string, value: T) {
-  try { localStorage.setItem(cacheKey(goalId, moduleKey), JSON.stringify(value)); } catch {}
+  try {
+    localStorage.setItem(cacheKey(goalId, moduleKey), JSON.stringify(value));
+  } catch {
+    return;
+  }
 }
 
 export function seedCache<T>(goalId: string, moduleKey: string, fallback: T): T {

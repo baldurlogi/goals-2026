@@ -92,6 +92,12 @@ export function calculateMacros(
 
 const CACHE_KEY = "cache:profile:v1";
 
+export const PROFILE_CHANGED_EVENT = "profile:changed";
+
+function emitProfileChanged() {
+  window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
+}
+
 export function readProfileCache(): UserProfile | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -112,7 +118,13 @@ export async function loadProfile(): Promise<UserProfile | null> {
   if (error || !data) return null;
 
   const profile = data as UserProfile;
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(profile)); } catch {}
+
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+  } catch {
+    return profile;
+  }
+
   return profile;
 }
 
@@ -124,11 +136,16 @@ export async function saveProfile(patch: Partial<Omit<UserProfile, "id">>): Prom
     .from("profiles")
     .upsert({ id: user.id, ...patch }, { onConflict: "id" });
 
-  // Update cache
   const cached = readProfileCache();
   if (cached) {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...cached, ...patch })); } catch {}
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ ...cached, ...patch }));
+    } catch {
+      return;
+    }
   }
+
+  emitProfileChanged();
 }
 
 export async function completeOnboarding(profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">): Promise<void> {
