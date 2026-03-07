@@ -17,7 +17,7 @@ import {
   User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/features/auth/authContext';
+import { useAuth } from "@/features/auth/authContext";
 import { useTheme } from '../providers/theme-context';
 
 type NavItem = { label: string; href: string };

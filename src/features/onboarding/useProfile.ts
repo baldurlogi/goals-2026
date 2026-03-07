@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { loadProfile, readProfileCache, PROFILE_CHANGED_EVENT, type UserProfile } from "./profileStorage";
+import { loadProfile, readProfileCache, PROFILE_CHANGED_EVENT, type UserProfile } from "@/features/onboarding/profileStorage";
 
 
 export function useProfile() {
