@@ -1,11 +1,11 @@
-import { Link } from "react-router-dom";
-import { CalendarDays, Clock, ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ScheduleCardSkeleton } from "@/app/skeletons";
-import { useScheduleDashboard } from "../hooks/useScheduleDashboard";
+import { Link } from 'react-router-dom';
+import { CalendarDays, Clock, ChevronRight } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ScheduleCardSkeleton } from '@/features/dashboard/skeletons';
+import { useScheduleDashboard } from '../hooks/useScheduleDashboard';
 
 function ScheduleRow({
   time,
@@ -21,16 +21,16 @@ function ScheduleRow({
   return (
     <div
       className={`flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors ${
-        isNext && !done ? "bg-primary/8 ring-1 ring-primary/20" : ""
-      } ${done ? "opacity-50" : ""}`}
+        isNext && !done ? 'bg-primary/8 ring-1 ring-primary/20' : ''
+      } ${done ? 'opacity-50' : ''}`}
     >
       <span className="w-11 shrink-0 text-xs tabular-nums text-muted-foreground">
         {time}
       </span>
       <span
         className={`flex-1 text-sm ${
-          isNext && !done ? "font-semibold" : "font-medium"
-        } ${done ? "line-through text-muted-foreground" : ""}`}
+          isNext && !done ? 'font-semibold' : 'font-medium'
+        } ${done ? 'line-through text-muted-foreground' : ''}`}
       >
         {label}
       </span>
@@ -88,10 +88,10 @@ export function ScheduleCard() {
           <div className="mt-2 flex items-center gap-2">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              Next:{" "}
+              Next:{' '}
               <span className="font-bold text-foreground">
                 {nextBlock.icon} {nextBlock.label}
-              </span>{" "}
+              </span>{' '}
               · {nextBlock.time}
             </span>
           </div>
@@ -128,7 +128,12 @@ export function ScheduleCard() {
 
         <div className="flex items-center justify-between pt-2">
           <span className="text-[11px] text-muted-foreground">{viewLabel}</span>
-          <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+          >
             <Link to="/app/schedule">
               Full schedule <ChevronRight className="h-3 w-3" />
             </Link>

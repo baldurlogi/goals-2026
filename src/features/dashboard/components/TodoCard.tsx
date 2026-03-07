@@ -1,24 +1,24 @@
-import { useState, useRef } from "react";
-import { Link } from "react-router-dom";
-import { CheckSquare, ChevronRight, Plus, X } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useTodoDashboard } from "../hooks/useTodoDashboard";
-import { addTodo, toggleTodo, deleteTodo } from "@/features/todos/todoStorage";
-import { TodoCardSkeleton } from "@/app/skeletons";
+import { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { CheckSquare, ChevronRight, Plus, X } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useTodoDashboard } from '../hooks/useTodoDashboard';
+import { addTodo, toggleTodo, deleteTodo } from '@/features/todos/todoStorage';
+import { TodoCardSkeleton } from '@/features/dashboard/skeletons';
 
 export function TodoCard() {
   const { preview, hasMore, extraCount, doneCount, total, loading } =
     useTodoDashboard();
 
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleAdd() {
     if (!input.trim()) return;
     await addTodo(input);
-    setInput("");
+    setInput('');
     inputRef.current?.focus();
   }
 
@@ -64,7 +64,7 @@ export function TodoCard() {
                 />
                 <span
                   className={`flex-1 text-sm leading-snug ${
-                    item.done ? "line-through text-muted-foreground" : ""
+                    item.done ? 'line-through text-muted-foreground' : ''
                   }`}
                 >
                   {item.text}
@@ -93,7 +93,7 @@ export function TodoCard() {
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
             placeholder="Add a task…"
             className="flex-1 rounded-md border border-border bg-transparent px-2.5 py-1.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
           />
@@ -110,7 +110,12 @@ export function TodoCard() {
 
         {/* Footer link */}
         <div className="flex justify-end pt-1">
-          <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+          >
             <Link to="/app/todos">
               See all <ChevronRight className="h-3 w-3" />
             </Link>

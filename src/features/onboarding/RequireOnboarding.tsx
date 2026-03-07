@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/auth/authContext";
+import { useAuth } from "../auth/authContext";
 import { loadProfile, readProfileCache, type UserProfile } from "./profileStorage";
 import { OnboardingFlow } from "./OnboardingFlow";
 

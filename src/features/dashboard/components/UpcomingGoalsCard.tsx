@@ -1,10 +1,13 @@
-import { Link } from "react-router-dom";
-import { Target, ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { UpcomingGoalsCardSkeleton } from "@/app/skeletons";
-import { useGoalsDashboard, type UpcomingItem } from "../hooks/useGoalsDashboard";
+import { Link } from 'react-router-dom';
+import { Target, ChevronRight } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { UpcomingGoalsCardSkeleton } from '@/features/dashboard/skeletons';
+import {
+  useGoalsDashboard,
+  type UpcomingItem,
+} from '../hooks/useGoalsDashboard';
 
 function GoalRow({
   goalEmoji,
@@ -18,31 +21,32 @@ function GoalRow({
   daysFromToday: number;
 }) {
   const overdue = daysFromToday < 0;
-  const badge =
-    overdue
-      ? `${Math.abs(daysFromToday)}d overdue`
-      : daysFromToday === 0
-      ? "today"
+  const badge = overdue
+    ? `${Math.abs(daysFromToday)}d overdue`
+    : daysFromToday === 0
+      ? 'today'
       : daysFromToday === 1
-      ? "tomorrow"
-      : `in ${daysFromToday}d`;
+        ? 'tomorrow'
+        : `in ${daysFromToday}d`;
 
   return (
     <div className="flex items-start gap-3 py-1.5">
       <span className="mt-0.5 text-base leading-none">{goalEmoji}</span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium leading-tight">{step.label}</div>
+        <div className="truncate text-sm font-medium leading-tight">
+          {step.label}
+        </div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground">
-          {goalTitle} · {step.idealFinish ?? "—"}
+          {goalTitle} · {step.idealFinish ?? '—'}
         </div>
       </div>
       <span
         className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
           overdue
-            ? "bg-destructive/10 text-destructive"
+            ? 'bg-destructive/10 text-destructive'
             : daysFromToday === 0
-            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            : "bg-muted text-muted-foreground"
+              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+              : 'bg-muted text-muted-foreground'
         }`}
       >
         {badge}
@@ -65,9 +69,7 @@ export function UpcomingGoalsCard() {
   };
 
   const cacheEmpty =
-    previewItems.length === 0 &&
-    overdueCount === 0 &&
-    totalCount === 0;
+    previewItems.length === 0 && overdueCount === 0 && totalCount === 0;
 
   if (loading && cacheEmpty) return <UpcomingGoalsCardSkeleton />;
 
@@ -91,10 +93,12 @@ export function UpcomingGoalsCard() {
         </div>
 
         <p className="mt-1 text-sm text-muted-foreground">
-          Next <span className="font-semibold text-foreground">{horizon} days</span>
+          Next{' '}
+          <span className="font-semibold text-foreground">{horizon} days</span>
           {totalCount > 0 && (
             <span className="text-muted-foreground">
-              {" "}· {totalCount} step{totalCount !== 1 ? "s" : ""}
+              {' '}
+              · {totalCount} step{totalCount !== 1 ? 's' : ''}
             </span>
           )}
         </p>
@@ -131,7 +135,12 @@ export function UpcomingGoalsCard() {
         )}
 
         <div className="flex justify-end pt-3">
-          <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+          >
             <Link to="/app/upcoming">
               All goals <ChevronRight className="h-3 w-3" />
             </Link>

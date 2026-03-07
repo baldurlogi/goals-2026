@@ -1,23 +1,23 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Suspense } from "react";
-import { GoalStoreProvider } from "@/features/goals/goalStore";
-import { AuthProvider } from "@/auth/AuthProvider";
-import { RequireAuth } from "@/auth/RequireAuth";
-import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
-import { AppLayout } from "@/app/AppLayout";
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Suspense } from 'react';
+import { GoalStoreProvider } from '@/features/goals/goalStore';
+import { AuthProvider } from '@/auth/AuthProvider';
+import { RequireAuth } from '@/auth/RequireAuth';
+import { RequireOnboarding } from '@/features/onboarding/RequireOnboarding';
+import { AppLayout } from '@/app/AppLayout';
 
-import { NutritionTab } from "@/features/nutrition/NutritionTab";
-import { ScheduleTab } from "@/features/schedule/ScheduleTab";
-import { ReadingTab } from "@/features/reading/ReadingTab";
-import { GoalsTab } from "@/features/goals/GoalsTab";
-import { UpcomingTasksPage } from "@/features/goals/UpcomingTasksPage";
-import { UserGoalPage } from "@/features/goals/UserGoalPage";
-import { TodosPage } from "@/features/todos/TodosPage";
-import { FitnessGoalPage } from "@/features/goals/modules/fitness/FitnessGoalPage";
-import DashboardPage from "@/app/DashboardPage";
-import { ProfilePage } from "@/features/profile/ProfilePage";
-import { LandingPage } from "@/features/landing/LandingPage";
-import { LoginPage } from "@/auth/LoginPage";
+import { NutritionTab } from '@/features/nutrition/NutritionPage';
+import { ScheduleTab } from '@/features/schedule/SchedulePage';
+import { ReadingTab } from '@/features/reading/ReadingPage';
+import { GoalsTab } from '@/features/goals/GoalsPage';
+import { UpcomingTasksPage } from '@/features/goals/UpcomingTasksPage';
+import { UserGoalPage } from '@/features/goals/UserGoalPage';
+import { TodosPage } from '@/features/todos/TodosPage';
+import { FitnessGoalPage } from '@/features/goals/modules/fitness/FitnessGoalPage';
+import DashboardPage from '@/app/DashboardPage';
+import { ProfilePage } from '@/features/profile/ProfilePage';
+import { LandingPage } from '@/features/landing/LandingPage';
+import { LoginPage } from '@/auth/LoginPage';
 
 export default function App() {
   return (
@@ -51,7 +51,13 @@ export default function App() {
             <Route
               path="goals/:goalId"
               element={
-                <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading…</div>}>
+                <Suspense
+                  fallback={
+                    <div className="p-8 text-sm text-muted-foreground">
+                      Loading…
+                    </div>
+                  }
+                >
                   <UserGoalPage />
                 </Suspense>
               }

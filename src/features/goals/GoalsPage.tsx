@@ -1,26 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useGoalsStore } from "@/features/goals/goalStoreContext";
-import { GoalCard } from "./components/GoalCard";
-import { AddEditGoalModal } from "./components/AddEditGoalModal";
-import { GoalsTabSkeleton } from "@/app/skeletons";
+import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useGoalsStore } from '@/features/goals/goalStoreContext';
+import { GoalCard } from './components/GoalCard';
+import { AddEditGoalModal } from './components/AddEditGoalModal';
+import { GoalsTabSkeleton } from '@/features/dashboard/skeletons';
 import {
   loadUserGoals,
   seedUserGoals,
   deleteUserGoal,
-} from "./userGoalStorage";
-import type { UserGoal } from "./goalTypes";
+} from './userGoalStorage';
+import type { UserGoal } from './goalTypes';
 
-type SortMode = "priority" | "overdue";
+type SortMode = 'priority' | 'overdue';
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 export function GoalsTab() {
   const { state } = useGoalsStore();
   const [goals, setGoals] = useState<UserGoal[]>(() => seedUserGoals());
   const [loading, setLoading] = useState(goals.length === 0);
-  const [sort, setSort] = useState<SortMode>("priority");
-  const [modalGoal, setModalGoal] = useState<UserGoal | "new" | null>(null);
+  const [sort, setSort] = useState<SortMode>('priority');
+  const [modalGoal, setModalGoal] = useState<UserGoal | 'new' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,7 +41,10 @@ export function GoalsTab() {
     const counts: Record<string, number> = {};
     for (const goal of goals) {
       counts[goal.id] = goal.steps.filter(
-        (s) => s.idealFinish && s.idealFinish < today && !state.done[goal.id]?.[s.id]
+        (s) =>
+          s.idealFinish &&
+          s.idealFinish < today &&
+          !state.done[goal.id]?.[s.id],
       ).length;
     }
     return counts;
@@ -49,16 +52,22 @@ export function GoalsTab() {
 
   const sorted = useMemo(() => {
     return [...goals].sort((a, b) => {
-      if (sort === "priority") {
-        const r = (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
+      if (sort === 'priority') {
+        const r =
+          (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
         if (r !== 0) return r;
-        return (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
+        return (
+          (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0)
+        );
       }
 
-      const od = (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
+      const od =
+        (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
       if (od !== 0) return od;
 
-      return (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
+      return (
+        (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99)
+      );
     });
   }, [goals, sort, overdueCountByGoal]);
 
@@ -91,23 +100,29 @@ export function GoalsTab() {
           <h2 className="text-lg font-semibold">Goals</h2>
           <p className="text-sm text-muted-foreground">
             {goals.length === 0
-              ? "Add your first goal to get started."
-              : "Check off steps to update progress automatically."}
+              ? 'Add your first goal to get started.'
+              : 'Check off steps to update progress automatically.'}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {goals.length > 0 && (
             <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
-              <SortButton active={sort === "priority"} onClick={() => setSort("priority")}>
+              <SortButton
+                active={sort === 'priority'}
+                onClick={() => setSort('priority')}
+              >
                 Priority
               </SortButton>
-              <SortButton active={sort === "overdue"} onClick={() => setSort("overdue")}>
+              <SortButton
+                active={sort === 'overdue'}
+                onClick={() => setSort('overdue')}
+              >
                 Most overdue
               </SortButton>
             </div>
           )}
-          <Button onClick={() => setModalGoal("new")} className="gap-2">
+          <Button onClick={() => setModalGoal('new')} className="gap-2">
             <Plus className="h-4 w-4" /> Add goal
           </Button>
         </div>
@@ -122,7 +137,7 @@ export function GoalsTab() {
               Create a goal, break it into steps, and track your progress here.
             </p>
           </div>
-          <Button onClick={() => setModalGoal("new")} className="gap-2">
+          <Button onClick={() => setModalGoal('new')} className="gap-2">
             <Plus className="h-4 w-4" /> Add your first goal
           </Button>
         </div>
@@ -145,7 +160,7 @@ export function GoalsTab() {
 
       {modalGoal !== null && (
         <AddEditGoalModal
-          initial={modalGoal === "new" ? undefined : modalGoal}
+          initial={modalGoal === 'new' ? undefined : modalGoal}
           onSave={handleSaved}
           onClose={() => setModalGoal(null)}
         />
@@ -168,9 +183,11 @@ function SortButton({
       type="button"
       onClick={onClick}
       className={[
-        "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-        active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
-      ].join(" ")}
+        'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+        active
+          ? 'bg-foreground text-background'
+          : 'text-muted-foreground hover:text-foreground',
+      ].join(' ')}
     >
       {children}
     </button>

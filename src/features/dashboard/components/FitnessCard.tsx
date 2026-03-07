@@ -1,12 +1,17 @@
-import { Link } from "react-router-dom";
-import { ChevronRight, Dumbbell } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useFitnessDashboard } from "../hooks/useFitnessDashboard";
-import { FitnessCardSkeleton } from "@/app/skeletons";
+import { Link } from 'react-router-dom';
+import { ChevronRight, Dumbbell } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useFitnessDashboard } from '../hooks/useFitnessDashboard';
+import { FitnessCardSkeleton } from '@/features/dashboard/skeletons';
 
-
-function MiniBar({ pct, color = "bg-violet-500" }: { pct: number; color?: string }) {
+function MiniBar({
+  pct,
+  color = 'bg-violet-500',
+}: {
+  pct: number;
+  color?: string;
+}) {
   return (
     <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
       <div
@@ -61,7 +66,12 @@ export function FitnessCard() {
                     <span className="font-medium">{lift.label}</span>
                     <span className="tabular-nums text-muted-foreground">
                       {lift.best !== null ? (
-                        <><span className="font-semibold text-foreground">{lift.best}kg</span> / {lift.goal}kg</>
+                        <>
+                          <span className="font-semibold text-foreground">
+                            {lift.best}kg
+                          </span>{' '}
+                          / {lift.goal}kg
+                        </>
                       ) : (
                         <span className="italic">— / {lift.goal}kg</span>
                       )}
@@ -71,11 +81,16 @@ export function FitnessCard() {
                 </div>
               ))}
             </div>
-            </>
+          </>
         )}
 
         <div className="flex justify-end pt-1">
-          <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+          >
             <Link to="/app/fitness">
               All PRs <ChevronRight className="h-3 w-3" />
             </Link>

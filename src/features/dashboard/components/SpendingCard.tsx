@@ -1,16 +1,16 @@
-import { Link } from "react-router-dom";
-import { ChevronRight, Wallet } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PieChart, Pie, Tooltip, ResponsiveContainer } from "recharts";
-import { SpendingCardSkeleton } from "@/app/skeletons";
-import { makeShapeFn } from "../pieShape";
-import { useSpendingDashboard } from "../hooks/useSpendingDashboard";
+import { Link } from 'react-router-dom';
+import { ChevronRight, Wallet } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { PieChart, Pie, Tooltip, ResponsiveContainer } from 'recharts';
+import { SpendingCardSkeleton } from '@/features/dashboard/skeletons';
+import { makeShapeFn } from '@/app/pieShape';
+import { useSpendingDashboard } from '../hooks/useSpendingDashboard';
 
-const FINANCE_GOAL_ID = "finance";
+const FINANCE_GOAL_ID = 'finance';
 
 function formatDkk(n: number) {
-  return new Intl.NumberFormat("da-DK").format(Math.round(n));
+  return new Intl.NumberFormat('da-DK').format(Math.round(n));
 }
 
 function DonutTooltip({
@@ -21,27 +21,31 @@ function DonutTooltip({
   payload?: Array<{ name: string; value: number; payload: { color: string } }>;
 }) {
   if (!active || !payload?.length) return null;
-  const { name, value, payload: { color } } = payload[0];
+  const {
+    name,
+    value,
+    payload: { color },
+  } = payload[0];
 
   return (
     <div
       style={{
-        background: "hsl(var(--popover))",
-        border: "1px solid hsl(var(--border))",
+        background: 'hsl(var(--popover))',
+        border: '1px solid hsl(var(--border))',
         borderRadius: 8,
-        padding: "6px 10px",
-        color: "hsl(var(--popover-foreground))",
+        padding: '6px 10px',
+        color: 'hsl(var(--popover-foreground))',
         fontSize: 12,
         lineHeight: 1.5,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span
           style={{
-            display: "inline-block",
+            display: 'inline-block',
             width: 8,
             height: 8,
-            borderRadius: "50%",
+            borderRadius: '50%',
             background: color,
             flexShrink: 0,
           }}
@@ -49,17 +53,18 @@ function DonutTooltip({
         <span style={{ fontWeight: 600 }}>{name}</span>
       </div>
       <div style={{ marginTop: 2, paddingLeft: 14 }}>
-        {new Intl.NumberFormat("da-DK").format(Math.round(value))} DKK
+        {new Intl.NumberFormat('da-DK').format(Math.round(value))} DKK
       </div>
     </div>
   );
 }
 
 export function SpendingCard() {
-  const { donutData, totalSpent, isEmpty, loading } =
-    useSpendingDashboard(FINANCE_GOAL_ID) as ReturnType<typeof useSpendingDashboard> & {
-      loading?: boolean;
-    };
+  const { donutData, totalSpent, isEmpty, loading } = useSpendingDashboard(
+    FINANCE_GOAL_ID,
+  ) as ReturnType<typeof useSpendingDashboard> & {
+    loading?: boolean;
+  };
 
   const cacheEmpty = donutData.length === 0 && totalSpent === 0;
   if (loading && cacheEmpty) return <SpendingCardSkeleton />;
@@ -147,7 +152,12 @@ export function SpendingCard() {
         )}
 
         <div className="flex justify-end">
-          <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+          >
             <Link to="/app/goals/finance">
               Full breakdown <ChevronRight className="h-3 w-3" />
             </Link>

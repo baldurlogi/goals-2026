@@ -1,13 +1,16 @@
-import { Link } from "react-router-dom";
-import { Flame, ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { MacrosCardSkeleton } from "@/app/skeletons";
-import { useNutritionDashboard } from "../hooks/useNutritionDashboard";
+import { Link } from 'react-router-dom';
+import { Flame, ChevronRight } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { MacrosCardSkeleton } from '@/features/dashboard/skeletons';
+import { useNutritionDashboard } from '../hooks/useNutritionDashboard';
 
 function pct(value: number, target: number) {
-  return Math.min(Math.max(target > 0 ? Math.round((value / target) * 100) : 0, 0), 100);
+  return Math.min(
+    Math.max(target > 0 ? Math.round((value / target) * 100) : 0, 0),
+    100,
+  );
 }
 
 function MacroPill({
@@ -34,7 +37,10 @@ function MacroPill({
         </span>
         <span className="tabular-nums">
           <span className="font-semibold">{value}</span>
-          <span className="text-muted-foreground">/{target}{unit}</span>
+          <span className="text-muted-foreground">
+            /{target}
+            {unit}
+          </span>
         </span>
       </div>
       <div className="relative h-2 overflow-hidden rounded-full bg-muted">
@@ -47,8 +53,8 @@ function MacroPill({
         {remaining > 0
           ? `${remaining}${unit} left`
           : remaining === 0
-          ? "✓"
-          : `${Math.abs(remaining)}${unit} over`}
+            ? '✓'
+            : `${Math.abs(remaining)}${unit} over`}
       </div>
     </div>
   );
@@ -83,13 +89,13 @@ export function MacrosCard() {
             </span>
             <span
               className={[
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                phase === "cut"
-                  ? "bg-rose-500/10 text-rose-500"
-                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-              ].join(" ")}
+                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                phase === 'cut'
+                  ? 'bg-rose-500/10 text-rose-500'
+                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+              ].join(' ')}
             >
-              {phase === "cut" ? "✂️ Cut" : "💪 Maintain"}
+              {phase === 'cut' ? '✂️ Cut' : '💪 Maintain'}
             </span>
           </div>
           <span className="text-[10px] text-muted-foreground">
@@ -98,8 +104,12 @@ export function MacrosCard() {
         </div>
 
         <div className="mt-2 flex items-end gap-2">
-          <span className="text-3xl font-bold tabular-nums leading-none">{logged.cal}</span>
-          <span className="mb-0.5 text-sm text-muted-foreground">/ {target.cal} kcal</span>
+          <span className="text-3xl font-bold tabular-nums leading-none">
+            {logged.cal}
+          </span>
+          <span className="mb-0.5 text-sm text-muted-foreground">
+            / {target.cal} kcal
+          </span>
         </div>
       </CardHeader>
 
@@ -107,9 +117,11 @@ export function MacrosCard() {
         <div className="relative h-3 overflow-hidden rounded-full bg-muted">
           <div
             className={[
-              "absolute inset-y-0 left-0 rounded-full transition-all duration-500",
-              calPct > 100 ? "bg-destructive" : "bg-gradient-to-r from-orange-500 to-amber-400",
-            ].join(" ")}
+              'absolute inset-y-0 left-0 rounded-full transition-all duration-500',
+              calPct > 100
+                ? 'bg-destructive'
+                : 'bg-gradient-to-r from-orange-500 to-amber-400',
+            ].join(' ')}
             style={{ width: `${Math.min(calPct, 100)}%` }}
           />
         </div>
@@ -142,20 +154,26 @@ export function MacrosCard() {
           <p className="text-[11px] text-muted-foreground">
             {logged.cal === 0 ? (
               <>
-                No meals logged yet — head to <strong>Nutrition</strong> to check off meals.
+                No meals logged yet — head to <strong>Nutrition</strong> to
+                check off meals.
               </>
             ) : caloriesRemaining > 0 ? (
               <>
-                <span className="font-semibold text-foreground">{caloriesRemaining} kcal</span> remaining ·{" "}
+                <span className="font-semibold text-foreground">
+                  {caloriesRemaining} kcal
+                </span>{' '}
+                remaining ·{' '}
                 <span className="font-semibold text-foreground">
                   {Math.max(0, proteinRemaining)}g protein
-                </span>{" "}
+                </span>{' '}
                 to go
               </>
             ) : (
               <>
-                <span className="font-semibold text-orange-500">Over target</span> by{" "}
-                {Math.abs(caloriesRemaining)} kcal
+                <span className="font-semibold text-orange-500">
+                  Over target
+                </span>{' '}
+                by {Math.abs(caloriesRemaining)} kcal
               </>
             )}
           </p>
@@ -174,7 +192,12 @@ export function MacrosCard() {
               </Badge>
             )}
           </div>
-          <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+          >
             <Link to="/app/nutrition">
               Log food <ChevronRight className="h-3 w-3" />
             </Link>

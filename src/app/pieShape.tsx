@@ -1,6 +1,6 @@
-import { Sector } from "recharts";
-import type { PieSectorShapeProps } from "recharts";
-import type { DonutDatum } from "@/app/hooks/useSpendingDashboard";
+import { Sector } from 'recharts';
+import type { PieSectorShapeProps } from 'recharts';
+import type { DonutDatum } from '@/features/dashboard/hooks/useSpendingDashboard';
 
 /**
  * Drop-in replacement for the deprecated <Cell> pattern.
@@ -8,7 +8,15 @@ import type { DonutDatum } from "@/app/hooks/useSpendingDashboard";
  */
 export function makeShapeFn(donutData: DonutDatum[]) {
   return function ColoredSector(props: PieSectorShapeProps) {
-    const entry = donutData.find((d) => d.name === (props as { name?: string }).name);
-    return <Sector {...props} fill={entry?.color ?? "#94A3B8"} stroke="transparent" />;
+    const entry = donutData.find(
+      (d) => d.name === (props as { name?: string }).name,
+    );
+    return (
+      <Sector
+        {...props}
+        fill={entry?.color ?? '#94A3B8'}
+        stroke="transparent"
+      />
+    );
   };
 }
