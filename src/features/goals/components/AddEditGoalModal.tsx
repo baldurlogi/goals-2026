@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Plus, Sparkles, ArrowLeft, Loader2 } from "lucide-react";
+import { Trash2, Plus, Sparkles, ArrowLeft, Loader2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +19,7 @@ const PRIORITY_COLOR: Record<UserGoal["priority"], string> = {
   low:    "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
 };
 
-const EMOJI_SUGGESTIONS = ["🎯","💪","📚","💰","🏃","✈️","💻","🎬","🎓","🌱","🏋️","🎨","🚀","❤️","🧘","🧴","🧠", "💼"];
+const EMOJI_SUGGESTIONS = ["🎯","💪","📚","💰","🏃","✈️","💻","🎬","🎓","🌱","🏋️","🎨","🚀","❤️","🧘","🧴","🧠","💼"];
 
 const PROMPT_EXAMPLES = [
   "I want to run a marathon by October",
@@ -36,9 +36,37 @@ type Props = {
   initial?: UserGoal;
   onSave: (goal: UserGoal) => void;
   onClose: () => void;
-  /** If true, opens directly in AI mode */
   startWithAI?: boolean;
 };
+
+// ── Types ─────────────────────────────────────────────────────────────────
+
+type AIUsage = {
+  prompts_used: number;
+  monthly_limit: number;
+  remaining: number;
+  tier: string;
+};
+
+type AILimitPayload = {
+  error: "monthly_limit_reached";
+  message: string;
+  tier: string;
+  monthly_limit: number;
+  prompts_used: number;
+  upgrade_required: boolean;
+};
+
+class AILimitError extends Error {
+  tier: string;
+  limit: number;
+  constructor(payload: AILimitPayload) {
+    super(payload.message);
+    this.name = "AILimitError";
+    this.tier = payload.tier;
+    this.limit = payload.monthly_limit;
+  }
+}
 
 // ── AI generation ─────────────────────────────────────────────────────────
 
@@ -51,45 +79,36 @@ function isPriority(value: unknown): value is UserGoal["priority"] {
 async function generateGoalFromPrompt(
   prompt: string,
   stepCount: number
-): Promise<UserGoal> {
+): Promise<{ goal: UserGoal; usage: AIUsage }> {
   if (USE_MOCK_AI) {
     const blank = createBlankGoal();
     return {
-      ...blank,
-      title: "Run marathon by October",
-      subtitle:
-        "Build up endurance and complete a marathon by your target month.",
-      emoji: "🏃",
-      priority: "high",
-      steps: Array.from({ length: stepCount }, (_, i) => ({
-        ...createBlankStep(i),
-        label:
-          [
-            "Choose a marathon race",
-            "Set a weekly running schedule",
-            "Build base mileage",
-            "Add a long run each week",
-            "Improve pacing and recovery",
-            "Practice fueling strategy",
-            "Run a half-marathon benchmark",
-            "Start taper plan",
-            "Finalize race logistics",
-            "Run the marathon",
+      goal: {
+        ...blank,
+        title: "Run marathon by October",
+        subtitle: "Build up endurance and complete a marathon by your target month.",
+        emoji: "🏃",
+        priority: "high",
+        steps: Array.from({ length: stepCount }, (_, i) => ({
+          ...createBlankStep(i),
+          label: [
+            "Choose a marathon race", "Set a weekly running schedule",
+            "Build base mileage", "Add a long run each week",
+            "Improve pacing and recovery", "Practice fueling strategy",
+            "Run a half-marathon benchmark", "Start taper plan",
+            "Finalize race logistics", "Run the marathon",
           ][i] ?? `Complete milestone ${i + 1}`,
-        notes: "AI mock step for UI testing.",
-        idealFinish: null,
-        estimatedTime: i === stepCount - 1 ? "ongoing" : "1-2 hours",
-      })),
+          notes: "AI mock step for UI testing.",
+          idealFinish: null,
+          estimatedTime: i === stepCount - 1 ? "ongoing" : "1-2 hours",
+        })),
+      },
+      usage: { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: "free" },
     };
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
-    throw new Error("You must be signed in to generate AI goals.");
-  }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("You must be signed in to generate AI goals.");
 
   const response = await fetch(
     "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder",
@@ -99,85 +118,66 @@ async function generateGoalFromPrompt(
         "Content-Type": "application/json",
         "Authorization": `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        prompt,
-        stepCount,
-      }),
+      body: JSON.stringify({ prompt, stepCount }),
     }
   );
 
   const raw = await response.text();
 
-  if (!response.ok) {
-    console.error("Edge function error:", raw);
-
-    let message = `Edge function failed (${response.status})`;
-
+  // Tier limit — show upgrade UI instead of generic error
+  if (response.status === 429) {
     try {
-      const parsedError = JSON.parse(raw) as {
-        error?: string;
-        details?: string;
-        raw_text?: string;
-      };
-
-      if (parsedError.error) {
-        message = parsedError.error;
-        if (parsedError.details) message += `: ${parsedError.details}`;
-        if (parsedError.raw_text) message += `: ${parsedError.raw_text}`;
-      }
-    } catch {
-      if (raw) message = `${message}: ${raw}`;
+      const payload = JSON.parse(raw) as AILimitPayload;
+      if (payload.error === "monthly_limit_reached") throw new AILimitError(payload);
+    } catch (e) {
+      if (e instanceof AILimitError) throw e;
     }
+  }
 
+  if (!response.ok) {
+    let message = `Edge function failed (${response.status})`;
+    try {
+      const e = JSON.parse(raw) as { error?: string; details?: string; raw_text?: string };
+      if (e.error) {
+        message = e.error;
+        if (e.details)  message += `: ${e.details}`;
+        if (e.raw_text) message += `: ${e.raw_text}`;
+      }
+    } catch { if (raw) message += `: ${raw}`; }
     throw new Error(message);
   }
 
-  let result: {
-    title?: unknown;
-    subtitle?: unknown;
-    emoji?: unknown;
-    priority?: unknown;
-    steps?: Array<{
-      label?: unknown;
-      notes?: unknown;
-      idealFinish?: unknown;
-      estimatedTime?: unknown;
-    }>;
-  };
+  // Response shape: { goal, usage }
+  let data: { goal?: unknown; usage?: unknown };
+  try { data = JSON.parse(raw); }
+  catch { throw new Error("AI returned invalid response. Please try again."); }
 
-  try {
-    result = JSON.parse(raw);
-  } catch {
-    console.error("Invalid JSON from edge function:", raw);
-    throw new Error("AI returned invalid goal JSON. Please try again.");
-  }
+  // Fallback: if edge function still returns bare goal (old deploy), handle gracefully
+  const result = (data.goal ?? data) as Record<string, unknown>;
+  const usage = (data.usage ?? { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: "free" }) as AIUsage;
 
   const blank = createBlankGoal();
-
-  const safeSteps = Array.isArray(result.steps)
-    ? result.steps
-        .filter((s) => typeof s?.label === "string" && s.label.trim().length > 0)
-        .slice(0, stepCount)
-        .map((s, i) => ({
-          ...createBlankStep(i),
-          label: typeof s.label === "string" ? s.label : "",
-          notes: typeof s.notes === "string" ? s.notes : "",
-          idealFinish: typeof s.idealFinish === "string" ? s.idealFinish : null,
-          estimatedTime: typeof s.estimatedTime === "string" ? s.estimatedTime : "",
-        }))
-    : [];
-
-  return {
+  const goal: UserGoal = {
     ...blank,
-    title: typeof result.title === "string" ? result.title : "",
+    title:    typeof result.title    === "string" ? result.title    : "",
     subtitle: typeof result.subtitle === "string" ? result.subtitle : "",
-    emoji:
-      typeof result.emoji === "string" && result.emoji.trim()
-        ? result.emoji
-        : "🎯",
+    emoji:    typeof result.emoji    === "string" && result.emoji.trim() ? result.emoji : "🎯",
     priority: isPriority(result.priority) ? result.priority : "medium",
-    steps: safeSteps,
+    steps: Array.isArray(result.steps)
+      ? (result.steps as Record<string, unknown>[])
+          .filter((s) => typeof s?.label === "string" && (s.label as string).trim().length > 0)
+          .slice(0, stepCount)
+          .map((s, i) => ({
+            ...createBlankStep(i),
+            label:         typeof s.label         === "string" ? s.label         : "",
+            notes:         typeof s.notes         === "string" ? s.notes         : "",
+            idealFinish:   typeof s.idealFinish   === "string" ? s.idealFinish   : null,
+            estimatedTime: typeof s.estimatedTime === "string" ? s.estimatedTime : "",
+          }))
+      : [],
   };
+
+  return { goal, usage };
 }
 
 // ── AI prompt screen ──────────────────────────────────────────────────────
@@ -189,30 +189,69 @@ function AIPromptScreen({
   onGenerated: (goal: UserGoal) => void;
   onBack: () => void;
 }) {
-  const [prompt, setPrompt] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [prompt, setPrompt]       = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [limitHit, setLimitHit]   = useState(false);
+  const [limitTier, setLimitTier] = useState("free");
+  const [usage, setUsage]         = useState<AIUsage | null>(null);
   const [stepCount, setStepCount] = useState(8);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
+  useEffect(() => { textareaRef.current?.focus(); }, []);
 
   async function handleGenerate() {
     if (!prompt.trim()) return;
-
     setLoading(true);
     setError(null);
+    setLimitHit(false);
 
     try {
-      const goal = await generateGoalFromPrompt(prompt.trim(), stepCount);
+      const { goal, usage: u } = await generateGoalFromPrompt(prompt.trim(), stepCount);
+      setUsage(u);
       onGenerated(goal);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      if (e instanceof AILimitError) {
+        setLimitTier(e.tier);
+        setLimitHit(true);
+      } else {
+        setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  // ── Limit reached ─────────────────────────────────────────────────────
+  if (limitHit) {
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center px-5 py-10 text-center space-y-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
+          <Zap className="h-5 w-5 text-amber-500" />
+        </div>
+        <div>
+          <p className="text-base font-semibold">Monthly AI limit reached</p>
+          <p className="mt-1 text-sm text-muted-foreground max-w-xs">
+            {limitTier === "free"
+              ? "You've used all 10 free AI prompts this month. Upgrade to Pro for 200 prompts/month."
+              : limitTier === "pro"
+              ? "You've used all 200 Pro prompts this month. Upgrade to Pro Max for 1,000 prompts/month."
+              : "You've used all 1,000 prompts this month. Your limit resets on the 1st."}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            Create manually
+          </Button>
+          {limitTier !== "pro_max" && (
+            <Button size="sm" className="gap-1.5">
+              <Zap className="h-3.5 w-3.5" />
+              {limitTier === "free" ? "Upgrade to Pro" : "Upgrade to Pro Max"}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -235,9 +274,7 @@ function AIPromptScreen({
         rows={4}
         className="resize-none text-sm"
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            handleGenerate();
-          }
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
         }}
       />
 
@@ -265,6 +302,19 @@ function AIPromptScreen({
       {error && (
         <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {/* Remaining prompts shown after a successful generation */}
+      {usage && (
+        <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <Sparkles className="h-3 w-3 shrink-0 text-primary" />
+          <span>
+            <span className="font-semibold text-foreground">{usage.remaining}</span> AI prompts remaining this month
+            {usage.tier !== "pro_max" && (
+              <> · <button type="button" className="underline hover:text-foreground">Upgrade for more</button></>
+            )}
+          </span>
         </div>
       )}
 
@@ -308,15 +358,9 @@ function AIPromptScreen({
           className="min-w-36 gap-2"
         >
           {loading ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Generating…
-            </>
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…</>
           ) : (
-            <>
-              <Sparkles className="h-3.5 w-3.5" />
-              Generate plan
-            </>
+            <><Sparkles className="h-3.5 w-3.5" /> Generate plan</>
           )}
         </Button>
       </div>
@@ -407,13 +451,12 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
         className="relative w-full sm:max-w-2xl max-h-[92dvh] flex flex-col rounded-t-2xl sm:rounded-2xl border bg-card shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold">
               {isEdit ? "Edit goal" : mode === "ai" ? "AI goal planner" : "New goal"}
             </h2>
-            {/* Badge shown after AI generation in review mode */}
             {mode === "manual" && goal.title && !isEdit && goal.steps.length > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                 <Sparkles className="h-2.5 w-2.5" /> AI generated · review & edit
@@ -443,16 +486,15 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
           </div>
         </div>
 
-        {/* ── AI screen ── */}
+        {/* AI screen */}
         {mode === "ai" && (
           <AIPromptScreen onGenerated={handleAIGenerated} onBack={() => setMode("manual")} />
         )}
 
-        {/* ── Manual / review form ── */}
+        {/* Manual / review form */}
         {mode === "manual" && (
           <>
             <div className="overflow-y-auto flex-1 px-5 py-5 space-y-5">
-
               {/* Emoji + Title */}
               <div className="flex items-start gap-3">
                 <div className="relative">
