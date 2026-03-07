@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { GoalCard } from "./components/GoalCard";
 import { AddEditGoalModal } from "./components/AddEditGoalModal";
+import { GoalsTabSkeleton } from "@/app/skeletons";
 import {
   loadUserGoals,
   seedUserGoals,
@@ -21,17 +22,21 @@ export function GoalsTab() {
   const [sort, setSort] = useState<SortMode>("priority");
   const [modalGoal, setModalGoal] = useState<UserGoal | "new" | null>(null);
 
-  // Load from Supabase on mount
   useEffect(() => {
     let cancelled = false;
     loadUserGoals().then((fresh) => {
-      if (!cancelled) { setGoals(fresh); setLoading(false); }
+      if (!cancelled) {
+        setGoals(fresh);
+        setLoading(false);
+      }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Overdue counts per goal
   const today = new Date().toISOString().slice(0, 10);
+
   const overdueCountByGoal = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const goal of goals) {
@@ -49,8 +54,10 @@ export function GoalsTab() {
         if (r !== 0) return r;
         return (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
       }
+
       const od = (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
       if (od !== 0) return od;
+
       return (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
     });
   }, [goals, sort, overdueCountByGoal]);
@@ -64,11 +71,18 @@ export function GoalsTab() {
   function handleSaved(saved: UserGoal) {
     setGoals((prev) => {
       const idx = prev.findIndex((g) => g.id === saved.id);
-      if (idx >= 0) { const next = [...prev]; next[idx] = saved; return next; }
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = saved;
+        return next;
+      }
       return [...prev, saved];
     });
     setModalGoal(null);
   }
+
+  const cacheEmpty = goals.length === 0;
+  if (loading && cacheEmpty) return <GoalsTabSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -99,26 +113,12 @@ export function GoalsTab() {
         </div>
       </div>
 
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {[1, 2].map((i) => (
-            <div key={i} className="rounded-2xl border bg-card p-5 space-y-4 animate-pulse">
-              <div className="h-5 w-2/3 rounded bg-muted" />
-              <div className="h-3 w-1/2 rounded bg-muted" />
-              <div className="h-2 rounded bg-muted" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
       {!loading && goals.length === 0 && (
-        <div className="rounded-2xl border border-dashed p-12 text-center space-y-4">
+        <div className="space-y-4 rounded-2xl border border-dashed p-12 text-center">
           <div className="text-4xl">🎯</div>
           <div>
-            <div className="font-semibold text-lg">No goals yet</div>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+            <div className="text-lg font-semibold">No goals yet</div>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
               Create a goal, break it into steps, and track your progress here.
             </p>
           </div>
@@ -128,7 +128,6 @@ export function GoalsTab() {
         </div>
       )}
 
-      {/* Goals grid */}
       {!loading && sorted.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-2">
           {sorted.map((goal) => (
@@ -144,7 +143,6 @@ export function GoalsTab() {
         </div>
       )}
 
-      {/* Modal */}
       {modalGoal !== null && (
         <AddEditGoalModal
           initial={modalGoal === "new" ? undefined : modalGoal}
@@ -156,15 +154,21 @@ export function GoalsTab() {
   );
 }
 
-function SortButton({ active, onClick, children }: {
-  active: boolean; onClick: () => void; children: React.ReactNode;
+function SortButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+        "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
         active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
       ].join(" ")}
     >

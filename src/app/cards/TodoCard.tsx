@@ -6,55 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTodoDashboard } from "../hooks/useTodoDashboard";
 import { addTodo, toggleTodo, deleteTodo } from "@/features/todos/todoStorage";
-
-function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-muted ${className}`} />;
-}
-
-function TodoCardSkeleton() {
-  return (
-    <Card className="relative overflow-hidden lg:col-span-4">
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-sky-500 via-blue-400 to-indigo-400" />
-
-      <CardHeader className="pb-2 pt-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="h-3.5 w-3.5 text-sky-500" />
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              To-do
-            </span>
-          </div>
-          <Skeleton className="h-4 w-16 rounded-full" />
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-2 pb-4">
-        {/* list */}
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-md px-1 py-1">
-              <Skeleton className="h-4 w-4 rounded" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-3 w-3 rounded" />
-            </div>
-          ))}
-          <Skeleton className="h-3 w-40" />
-        </div>
-
-        {/* quick add */}
-        <div className="flex items-center gap-1.5 pt-2">
-          <Skeleton className="h-9 w-full" />
-          <Skeleton className="h-8 w-8 rounded-md" />
-        </div>
-
-        {/* footer */}
-        <div className="flex justify-end pt-1">
-          <Skeleton className="h-7 w-24 rounded-md" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+import { TodoCardSkeleton } from "@/app/skeletons";
 
 export function TodoCard() {
   const { preview, hasMore, extraCount, doneCount, total, loading } =
@@ -73,7 +25,7 @@ export function TodoCard() {
   if (loading) return <TodoCardSkeleton />;
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-4">
+    <Card className="relative overflow-hidden lg:col-span-3">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-sky-500 via-blue-400 to-indigo-400" />
 
       <CardHeader className="pb-2 pt-5">

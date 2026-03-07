@@ -5,10 +5,8 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useReadingDashboard } from "../hooks/useReadingDashboard";
+import { ReadingCardSkeleton } from "../skeletons";
 
-function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-muted ${className}`} />;
-}
 
 function Stat({ label, value, color = "text-foreground" }: {
   label: string; value: string; color?: string;
@@ -18,32 +16,6 @@ function Stat({ label, value, color = "text-foreground" }: {
       <div className={`text-base font-bold tabular-nums ${color}`}>{value}</div>
       <div className="mt-0.5 text-[10px] text-muted-foreground">{label}</div>
     </div>
-  );
-}
-
-function ReadingCardSkeleton() {
-  return (
-    <Card className="relative overflow-hidden lg:col-span-5">
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500" />
-      <CardHeader className="pb-2 pt-5">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-3.5 w-3.5 text-emerald-500" />
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Reading now
-          </span>
-        </div>
-        <Skeleton className="mt-2 h-5 w-3/4" />
-        <Skeleton className="h-3 w-1/2" />
-      </CardHeader>
-      <CardContent className="space-y-3 pb-5">
-        <Skeleton className="h-2.5 w-full rounded-full" />
-        <div className="grid grid-cols-3 gap-2">
-          <Skeleton className="h-14 rounded-lg" />
-          <Skeleton className="h-14 rounded-lg" />
-          <Skeleton className="h-14 rounded-lg" />
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

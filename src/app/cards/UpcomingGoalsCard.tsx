@@ -3,6 +3,7 @@ import { Target, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { UpcomingGoalsCardSkeleton } from "@/app/skeletons";
 import { useGoalsDashboard, type UpcomingItem } from "../hooks/useGoalsDashboard";
 
 function GoalRow({
@@ -30,8 +31,8 @@ function GoalRow({
     <div className="flex items-start gap-3 py-1.5">
       <span className="mt-0.5 text-base leading-none">{goalEmoji}</span>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium leading-tight truncate">{step.label}</div>
-        <div className="mt-0.5 text-xs text-muted-foreground truncate">
+        <div className="truncate text-sm font-medium leading-tight">{step.label}</div>
+        <div className="mt-0.5 truncate text-xs text-muted-foreground">
           {goalTitle} · {step.idealFinish ?? "—"}
         </div>
       </div>
@@ -51,8 +52,24 @@ function GoalRow({
 }
 
 export function UpcomingGoalsCard() {
-  const { previewItems, overdueCount, hasMore, extraCount, horizon, totalCount } =
-    useGoalsDashboard();
+  const {
+    previewItems,
+    overdueCount,
+    hasMore,
+    extraCount,
+    horizon,
+    totalCount,
+    loading,
+  } = useGoalsDashboard() as ReturnType<typeof useGoalsDashboard> & {
+    loading?: boolean;
+  };
+
+  const cacheEmpty =
+    previewItems.length === 0 &&
+    overdueCount === 0 &&
+    totalCount === 0;
+
+  if (loading && cacheEmpty) return <UpcomingGoalsCardSkeleton />;
 
   return (
     <Card className="relative overflow-hidden lg:col-span-5">

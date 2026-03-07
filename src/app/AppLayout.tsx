@@ -1,11 +1,11 @@
 import { Outlet } from "react-router-dom";
 import { DailyPlanHeader } from "@/app/daily-plan/DailyPlanHeader";
+import { ThemeProvider } from "@/app/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
-
 
 export function AppLayout() {
   return (
-    <>
+    <ThemeProvider>
       <Toaster />
       <div className="min-h-screen bg-background text-foreground">
         <DailyPlanHeader />
@@ -13,6 +13,6 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
-    </>
+    </ThemeProvider>
   );
 }

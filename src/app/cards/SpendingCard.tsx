@@ -3,23 +3,26 @@ import { ChevronRight, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Tooltip, ResponsiveContainer } from "recharts";
+import { SpendingCardSkeleton } from "@/app/skeletons";
 import { makeShapeFn } from "../pieShape";
 import { useSpendingDashboard } from "../hooks/useSpendingDashboard";
 
-const FINANCE_GOAL_ID = "finance"; // must match the id in your financeGoal definition
+const FINANCE_GOAL_ID = "finance";
 
 function formatDkk(n: number) {
   return new Intl.NumberFormat("da-DK").format(Math.round(n));
 }
 
-
-// Custom tooltip — uses CSS vars so it works in both light and dark mode
-function DonutTooltip({ active, payload }: {
+function DonutTooltip({
+  active,
+  payload,
+}: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; payload: { color: string } }>;
 }) {
   if (!active || !payload?.length) return null;
   const { name, value, payload: { color } } = payload[0];
+
   return (
     <div
       style={{
@@ -33,7 +36,16 @@ function DonutTooltip({ active, payload }: {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+        <span
+          style={{
+            display: "inline-block",
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: color,
+            flexShrink: 0,
+          }}
+        />
         <span style={{ fontWeight: 600 }}>{name}</span>
       </div>
       <div style={{ marginTop: 2, paddingLeft: 14 }}>
@@ -44,14 +56,18 @@ function DonutTooltip({ active, payload }: {
 }
 
 export function SpendingCard() {
-  const { donutData, totalSpent, isEmpty } = useSpendingDashboard(FINANCE_GOAL_ID);
+  const { donutData, totalSpent, isEmpty, loading } =
+    useSpendingDashboard(FINANCE_GOAL_ID) as ReturnType<typeof useSpendingDashboard> & {
+      loading?: boolean;
+    };
 
-  // Top 3 categories for the compact legend
+  const cacheEmpty = donutData.length === 0 && totalSpent === 0;
+  if (loading && cacheEmpty) return <SpendingCardSkeleton />;
+
   const topCategories = donutData.slice(0, 3);
 
   return (
     <Card className="relative overflow-hidden lg:col-span-5">
-      {/* accent stripe */}
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -64,7 +80,6 @@ export function SpendingCard() {
           </div>
         </div>
 
-        {/* big total */}
         <div className="mt-2 flex items-end gap-1.5">
           <span className="text-3xl font-bold tabular-nums leading-none">
             {formatDkk(totalSpent)}
@@ -83,7 +98,6 @@ export function SpendingCard() {
           </div>
         ) : (
           <div className="flex items-center gap-4">
-            {/* Mini donut */}
             <div className="relative h-24 w-24 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -101,7 +115,6 @@ export function SpendingCard() {
               </ResponsiveContainer>
             </div>
 
-            {/* Top categories */}
             <div className="min-w-0 flex-1 space-y-1.5">
               {topCategories.map((d) => {
                 const pct = totalSpent > 0 ? (d.value / totalSpent) * 100 : 0;
