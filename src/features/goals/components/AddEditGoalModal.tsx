@@ -10,6 +10,7 @@ import {
   saveUserGoal,
 } from "../userGoalStorage";
 import type { UserGoal, UserGoalStep } from "../goalTypes";
+import { supabase } from "@/lib/supabaseClient";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 const PRIORITY_COLOR: Record<UserGoal["priority"], string> = {
@@ -41,107 +42,169 @@ type Props = {
 
 // ── AI generation ─────────────────────────────────────────────────────────
 
-async function generateGoalFromPrompt(prompt: string, stepCount: number): Promise<UserGoal> {
-  const today = new Date().toISOString().slice(0, 10);
+const USE_MOCK_AI = import.meta.env.VITE_USE_MOCK_AI === "true";
 
-  const systemPrompt = `You are a goal planning assistant. Given a user's goal description, generate a structured goal plan.
-
-Return ONLY valid JSON matching this exact schema — no markdown, no explanation:
-{
-  "title": "string (concise, 3-6 words)",
-  "subtitle": "string (one sentence describing the goal)",
-  "emoji": "string (single relevant emoji)",
-  "priority": "high" | "medium" | "low",
-  "steps": [
-    {
-      "label": "string (action-oriented step, starts with verb)",
-      "notes": "string (helpful detail or how-to, 1-2 sentences)",
-      "idealFinish": "YYYY-MM-DD or null",
-      "estimatedTime": "string (e.g. '2 hours', '30 min', 'ongoing') or empty string"
-    }
-  ]
+function isPriority(value: unknown): value is UserGoal["priority"] {
+  return value === "high" || value === "medium" || value === "low";
 }
 
-Rules:
-- Generate exactly ${stepCount} concrete, actionable steps
-- Steps ordered logically (foundation before advanced)
-- idealFinish dates realistic and spread over the goal timeline
-- Today's date is ${today}
-- Priority: high = life-changing/time-sensitive, medium = important, low = nice-to-have
-- Keep titles short and motivating
-- Steps specific enough to know when they're done`;
+async function generateGoalFromPrompt(
+  prompt: string,
+  stepCount: number
+): Promise<UserGoal> {
+  if (USE_MOCK_AI) {
+    const blank = createBlankGoal();
+    return {
+      ...blank,
+      title: "Run marathon by October",
+      subtitle:
+        "Build up endurance and complete a marathon by your target month.",
+      emoji: "🏃",
+      priority: "high",
+      steps: Array.from({ length: stepCount }, (_, i) => ({
+        ...createBlankStep(i),
+        label:
+          [
+            "Choose a marathon race",
+            "Set a weekly running schedule",
+            "Build base mileage",
+            "Add a long run each week",
+            "Improve pacing and recovery",
+            "Practice fueling strategy",
+            "Run a half-marathon benchmark",
+            "Start taper plan",
+            "Finalize race logistics",
+            "Run the marathon",
+          ][i] ?? `Complete milestone ${i + 1}`,
+        notes: "AI mock step for UI testing.",
+        idealFinish: null,
+        estimatedTime: i === stepCount - 1 ? "ongoing" : "1-2 hours",
+      })),
+    };
+  }
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1500,
-      system: systemPrompt,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (!response.ok) throw new Error(`API error ${response.status}`);
+  if (!session?.access_token) {
+    throw new Error("You must be signed in to generate AI goals.");
+  }
 
-  const data = await response.json();
-  const text = data.content
-    .map((c: { type: string; text?: string }) => c.type === "text" ? c.text ?? "" : "")
-    .join("")
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
+  const response = await fetch(
+    "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        prompt,
+        stepCount,
+      }),
+    }
+  );
 
-  const parsed = JSON.parse(text);
-  const blank  = createBlankGoal();
+  const raw = await response.text();
+
+  if (!response.ok) {
+    console.error("Edge function error:", raw);
+
+    let message = `Edge function failed (${response.status})`;
+
+    try {
+      const parsedError = JSON.parse(raw) as {
+        error?: string;
+        details?: string;
+        raw_text?: string;
+      };
+
+      if (parsedError.error) {
+        message = parsedError.error;
+        if (parsedError.details) message += `: ${parsedError.details}`;
+        if (parsedError.raw_text) message += `: ${parsedError.raw_text}`;
+      }
+    } catch {
+      if (raw) message = `${message}: ${raw}`;
+    }
+
+    throw new Error(message);
+  }
+
+  let result: {
+    title?: unknown;
+    subtitle?: unknown;
+    emoji?: unknown;
+    priority?: unknown;
+    steps?: Array<{
+      label?: unknown;
+      notes?: unknown;
+      idealFinish?: unknown;
+      estimatedTime?: unknown;
+    }>;
+  };
+
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    console.error("Invalid JSON from edge function:", raw);
+    throw new Error("AI returned invalid goal JSON. Please try again.");
+  }
+
+  const blank = createBlankGoal();
+
+  const safeSteps = Array.isArray(result.steps)
+    ? result.steps
+        .filter((s) => typeof s?.label === "string" && s.label.trim().length > 0)
+        .slice(0, stepCount)
+        .map((s, i) => ({
+          ...createBlankStep(i),
+          label: typeof s.label === "string" ? s.label : "",
+          notes: typeof s.notes === "string" ? s.notes : "",
+          idealFinish: typeof s.idealFinish === "string" ? s.idealFinish : null,
+          estimatedTime: typeof s.estimatedTime === "string" ? s.estimatedTime : "",
+        }))
+    : [];
 
   return {
     ...blank,
-    title:    parsed.title    ?? "",
-    subtitle: parsed.subtitle ?? "",
-    emoji:    parsed.emoji    ?? "🎯",
-    priority: parsed.priority ?? "medium",
-    steps: (parsed.steps ?? []).map((
-      s: { label?: string; notes?: string; idealFinish?: string | null; estimatedTime?: string },
-      i: number
-    ) => ({
-      ...createBlankStep(i),
-      label:         s.label         ?? "",
-      notes:         s.notes         ?? "",
-      idealFinish:   s.idealFinish   ?? null,
-      estimatedTime: s.estimatedTime ?? "",
-    })),
+    title: typeof result.title === "string" ? result.title : "",
+    subtitle: typeof result.subtitle === "string" ? result.subtitle : "",
+    emoji:
+      typeof result.emoji === "string" && result.emoji.trim()
+        ? result.emoji
+        : "🎯",
+    priority: isPriority(result.priority) ? result.priority : "medium",
+    steps: safeSteps,
   };
 }
 
 // ── AI prompt screen ──────────────────────────────────────────────────────
 
-async function AIPromptScreen({
+function AIPromptScreen({
   onGenerated,
   onBack,
 }: {
   onGenerated: (goal: UserGoal) => void;
   onBack: () => void;
 }) {
-  const [prompt, setPrompt]   = useState("");
+  const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [error, setError] = useState<string | null>(null);
   const [stepCount, setStepCount] = useState(8);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const goal = await generateGoalFromPrompt(prompt.trim(), stepCount);
-
-  useEffect(() => { textareaRef.current?.focus(); }, []);
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   async function handleGenerate() {
     if (!prompt.trim()) return;
+
     setLoading(true);
     setError(null);
+
     try {
       const goal = await generateGoalFromPrompt(prompt.trim(), stepCount);
       onGenerated(goal);
@@ -166,15 +229,38 @@ async function AIPromptScreen({
 
       <Textarea
         ref={textareaRef}
-        placeholder="e.g. I want to run a marathon by October, or Save 50,000 DKK before end of year"
+        placeholder="e.g. I want to run a marathon by October"
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         rows={4}
         className="resize-none text-sm"
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            handleGenerate();
+          }
         }}
       />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">How many steps?</p>
+        <div className="flex flex-wrap gap-2">
+          {[5, 6, 8, 10, 12].map((count) => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => setStepCount(count)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                stepCount === count
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              {count} steps
+            </button>
+          ))}
+        </div>
+      </div>
 
       {error && (
         <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -203,24 +289,34 @@ async function AIPromptScreen({
           <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
           <div>
             <p className="text-sm font-medium">Generating your goal plan…</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Claude is creating steps and due dates</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Claude is creating {stepCount} steps and due dates
+            </p>
           </div>
         </div>
       )}
 
       <div className="flex items-center justify-between gap-3 pt-1">
         <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5">
-          <ArrowLeft className="h-3.5 w-3.5" /> Manual
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Manual
         </Button>
+
         <Button
           onClick={handleGenerate}
           disabled={!prompt.trim() || loading}
           className="min-w-36 gap-2"
         >
           {loading ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…</>
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Generating…
+            </>
           ) : (
-            <><Sparkles className="h-3.5 w-3.5" /> Generate plan</>
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              Generate plan
+            </>
           )}
         </Button>
       </div>
@@ -278,10 +374,23 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
 
   async function handleSave() {
     if (!goal.title.trim()) return;
+
+    const trimmedGoal = {
+      ...goal,
+      title: goal.title.trim(),
+      subtitle: goal.subtitle.trim(),
+      steps: goal.steps.map((step) => ({
+        ...step,
+        label: step.label.trim(),
+        notes: step.notes.trim(),
+        estimatedTime: step.estimatedTime.trim(),
+      })),
+    };
+
     setSaving(true);
     try {
-      await saveUserGoal({ ...goal, title: goal.title.trim(), subtitle: goal.subtitle.trim() });
-      onSave(goal);
+      await saveUserGoal(trimmedGoal);
+      onSave(trimmedGoal);
     } finally {
       setSaving(false);
     }

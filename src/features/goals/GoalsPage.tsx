@@ -106,7 +106,7 @@ export function GoalsPage() {
           >
             <Sparkles className="h-4 w-4" /> Generate with AI
           </Button>
-          <Button onClick={() => setModal('new')} className="gap-2">
+          <Button onClick={() => setModal('new')} className="gap-2 hover:border-primary/30 hover:text-white bg-primary/5 text-primary">
             <Plus className="h-4 w-4" /> Add goal
           </Button>
         </div>
