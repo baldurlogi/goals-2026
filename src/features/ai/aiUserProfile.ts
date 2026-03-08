@@ -104,41 +104,74 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
   ]);
 
   // ── Goals summary ─────────────────────────────────────────────────────
-  const activeGoals = goals.filter((g) => {
-    const total = g.steps.length;
-    if (total === 0) return true;
-    // Consider "active" if less than 80% complete (no access to done map here,
-    // so we use step count as a proxy — goals with steps are being tracked)
-    return true;
-  });
+  const activeGoals = goals;
 
   const goalLines = activeGoals
-    .slice(0, 8) // cap at 8 to keep context concise
+    .slice(0, 8)
     .map((g) => {
       const stepCount = g.steps.length;
-      return `- ${g.emoji} "${g.title}" (${g.priority} priority, ${stepCount} steps)`;
+      const nextStep = g.steps[0];
+      return `- ${g.emoji} "${g.title}" (${g.priority} priority, ${stepCount} steps${nextStep ? `, next action: "${nextStep.label}"` : ", no steps yet"})`;
     })
     .join("\n");
 
   // ── Fitness summary ───────────────────────────────────────────────────
-  const fitnessSummary = fitnessStore
+  const allLiftEntries = fitnessStore
+    ? Object.values(fitnessStore.lifts).flatMap((l) => l.history.map((e) => e.date))
+    : [];
+  const lastWorkoutDate = allLiftEntries.sort().at(-1) ?? null;
+  const daysSinceWorkout = lastWorkoutDate
+    ? Math.floor((Date.now() - new Date(lastWorkoutDate).getTime()) / 86400000)
+    : null;
+
+  const liftLines = fitnessStore
     ? Object.values(fitnessStore.lifts)
-        .filter((l) => l.history.length > 0)
         .map((l) => {
-          const best = Math.max(...l.history.map((e) => e.value));
-          return `${l.label}: ${best}${l.unit} PR (goal: ${l.goal}${l.unit})`;
+          const best = l.history.length > 0 ? Math.max(...l.history.map((e) => e.value)) : null;
+          const pct = best ? Math.round((best / l.goal) * 100) : 0;
+          return best
+            ? `${l.label}: PR ${best}${l.unit} (${pct}% of ${l.goal}${l.unit} goal)`
+            : `${l.label}: no PR yet (goal: ${l.goal}${l.unit})`;
         })
-        .join(", ") || "No lifts logged yet"
-    : "No fitness data";
+        .join(", ")
+    : null;
+
+  const fitnessSummary = liftLines
+    ? `${liftLines}. Last workout: ${daysSinceWorkout !== null ? `${daysSinceWorkout} day(s) ago` : "never logged"}`
+    : "No fitness data logged yet";
 
   // ── Nutrition summary ─────────────────────────────────────────────────
   const profileMacros = nutritionPhase === "cut"
     ? profile?.macro_cut
     : profile?.macro_maintain;
 
+  const mealsLogged = nutritionLog
+    ? Object.values(nutritionLog.eaten ?? {}).filter(Boolean).length
+    : 0;
   const nutritionSummary = nutritionLog
-    ? `Phase: ${nutritionPhase}, ${Object.values(nutritionLog.eaten ?? {}).filter(Boolean).length} meals logged today`
+    ? `Phase: ${nutritionPhase}, ${mealsLogged}/7 meals logged today${profileMacros ? `. Calorie target: ${profileMacros.cal}kcal, protein target: ${profileMacros.protein}g` : ""}`
     : "No nutrition data today";
+
+  // ── Reading summary ───────────────────────────────────────────────────
+  // Pull from localStorage — always current, avoids extra async roundtrip
+  let readingSummary = "No reading data";
+  try {
+    const readingRaw = localStorage.getItem("daily-life:reading:v2");
+    if (readingRaw) {
+      const rd = JSON.parse(readingRaw);
+      const book = rd?.current ?? rd?.book;
+      const streak = rd?.streak?.streak ?? 0;
+      const todayMin = rd?.minutes?.minutes ?? 0;
+      const targetMin = rd?.minutes?.target ?? 30;
+      if (book?.title && book.title !== "Current book") {
+        const pagesLeft = (book.totalPages || 0) - (book.currentPage || 0);
+        const pct = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
+        readingSummary = `Reading "${book.title}"${book.author ? ` by ${book.author}` : ""} — ${pct}% done (${book.currentPage}/${book.totalPages} pages, ${pagesLeft} left). Streak: ${streak} day(s). Today: ${todayMin}/${targetMin} min.`;
+      } else {
+        readingSummary = `No book set. Reading streak: ${streak} day(s). Today: ${todayMin}/${targetMin} min.`;
+      }
+    }
+  } catch { /* ignore — not critical */ }
 
   // ── Profile summary ───────────────────────────────────────────────────
   const profileSummary = profile
@@ -148,8 +181,7 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
         profile.sex ? `Sex: ${profile.sex}` : null,
         profile.weight_kg ? `Weight: ${profile.weight_kg}kg` : null,
         profile.height_cm ? `Height: ${profile.height_cm}cm` : null,
-        profile.activity_level ? `Activity: ${profile.activity_level}` : null,
-        profileMacros ? `Daily targets: ${profileMacros.cal}kcal, ${profileMacros.protein}g protein` : null,
+        profile.activity_level ? `Activity level: ${profile.activity_level}` : null,
       ].filter(Boolean).join(", ")
     : "No profile data";
 
@@ -170,6 +202,7 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
     goalCount: activeGoals.length,
     fitness: fitnessSummary,
     nutrition: nutritionSummary,
+    reading: readingSummary,
     enabledModules,
     personalityNotes,
     preferredTone,
@@ -219,6 +252,9 @@ ${snapshot.fitness}
 
 ## Nutrition Today
 ${snapshot.nutrition}
+
+## Reading
+${snapshot.reading}
 
 ## Modules the user tracks
 ${(snapshot.enabledModules as string[]).join(", ")}

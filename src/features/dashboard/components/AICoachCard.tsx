@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { buildAIContext } from "@/features/ai/aiUserProfile";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
+import { NUTRITION_CHANGED_EVENT } from "@/features/nutrition/nutritionStorage";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ type CoachSuggestion = {
   reason: string;
   href: string;
   emoji: string;
+  module?: string;
 };
 
 type CacheEntry = {
@@ -21,9 +23,11 @@ type CacheEntry = {
   builtAt: number;
 };
 
-const CACHE_KEY   = "cache:ai-coach:v1";
-const CACHE_TTL   = 60 * 60 * 1000; // 1 hour — refreshes naturally each session
+const CACHE_KEY          = "cache:ai-coach:v1";
+const LAST_MODULE_KEY    = "cache:ai-coach:last-module";
+const CACHE_TTL          = 0; // instant expiration since we persist the last module separately and use it to skip processing in the edge function, so the cache is effectively "warm" on next load even if we clear it after each fetch
 const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
 
@@ -40,6 +44,10 @@ function readCache(): CoachSuggestion | null {
 function writeCache(suggestion: CoachSuggestion) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ suggestion, builtAt: Date.now() }));
+    // Persist the module so next refresh avoids repeating it
+    if (suggestion.module) {
+      localStorage.setItem(LAST_MODULE_KEY, suggestion.module);
+    }
   } catch { /* storage full */ }
 }
 
@@ -47,13 +55,18 @@ function clearCache() {
   try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
 }
 
+function readLastModule(): string | null {
+  try { return localStorage.getItem(LAST_MODULE_KEY); } catch { return null; }
+}
+
 // ── Fetch from edge function ──────────────────────────────────────────────────
 
-async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
+async function fetchCoachSuggestion(forceFreshContext = false): Promise<CoachSuggestion> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("Not signed in");
 
-  const { systemContext } = await buildAIContext();
+  const { systemContext } = await buildAIContext(forceFreshContext);
+  const lastSuggestedModule = readLastModule();
 
   const res = await fetch(SUPABASE_FN, {
     method: "POST",
@@ -64,6 +77,7 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
     body: JSON.stringify({
       action: "coach",
       userContext: systemContext,
+      lastSuggestedModule,
     }),
   });
 
@@ -100,14 +114,17 @@ function AICoachCardInner() {
   const load = useCallback(async (force = false) => {
     if (!force) {
       const cached = readCache();
-      if (cached) { setSuggestion(cached); return; }
+      if (cached) {
+        setSuggestion(cached);
+        return;
+      }
     }
 
     setLoading(true);
     setError(null);
 
     try {
-      const s = await fetchCoachSuggestion();
+      const s = await fetchCoachSuggestion(force);
       writeCache(s);
       setSuggestion(s);
     } catch (e) {
@@ -116,6 +133,18 @@ function AICoachCardInner() {
       setLoading(false);
     }
   }, []);
+
+    useEffect(() => {
+    const onNutritionChanged = () => {
+      clearCache();
+      void load(true);
+    };
+
+    window.addEventListener(NUTRITION_CHANGED_EVENT, onNutritionChanged);
+    return () => {
+      window.removeEventListener(NUTRITION_CHANGED_EVENT, onNutritionChanged);
+    };
+  }, [load]);
 
   // Load on mount if no cache
   useEffect(() => { load(false); }, [load]);
@@ -214,7 +243,7 @@ function AICoachCardInner() {
         {/* Powered by badge */}
         <div className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground/40">
           <Zap className="h-2.5 w-2.5" />
-          <span>AI-powered · updates hourly · uses your goals, fitness & nutrition data</span>
+          <span>AI-powered · updates hourly · uses your goals, fitness, reading & nutrition data</span>
         </div>
       </CardContent>
     </Card>
