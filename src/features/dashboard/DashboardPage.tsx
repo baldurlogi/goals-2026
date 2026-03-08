@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Apple, BookOpen, Dumbbell, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,9 +14,30 @@ import { AICoachCard } from "./components/AICoachCard";
 import { WaterIntakeCard } from "./components/WaterIntakeCard";
 import { LifeProgressCard } from "./components/LifeProgressCard";
 import { AchievementsCard } from "./components/AchievementsCard";
+import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
+import { loadUserGoals } from "@/features/goals/userGoalStorage";
+
+const DASHBOARD_START_CARD_DISMISSED_KEY =
+  "dashboard:start-card:dismissed:v1";
+
+function readStartCardDismissed() {
+  try {
+    return localStorage.getItem(DASHBOARD_START_CARD_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeStartCardDismissed() {
+  try {
+    localStorage.setItem(DASHBOARD_START_CARD_DISMISSED_KEY, "1");
+  } catch {
+    return;
+  }
+}
 
 function QuickAction({
   icon,
@@ -35,7 +57,9 @@ function QuickAction({
       to={href}
       className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-all hover:shadow-sm hover:ring-1 hover:ring-border"
     >
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${color}`}>
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${color}`}
+      >
         {icon}
       </span>
       <div className="min-w-0">
@@ -64,6 +88,31 @@ export default function DashboardPage() {
   const tier = useTier();
   const isPro = tierMeets(tier, "pro");
   const has = (id: string) => modules.has(id as never);
+
+  const [goalCount, setGoalCount] = useState<number | null>(null);
+  const [startCardDismissed, setStartCardDismissed] = useState(
+    readStartCardDismissed,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadUserGoals().then((fresh) => {
+      if (cancelled) return;
+      setGoalCount(fresh.length);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const showStartHere = goalCount === 0 && !startCardDismissed;
+
+  function dismissStartHere() {
+    setStartCardDismissed(true);
+    writeStartCardDismissed();
+  }
 
   const quickActions = [
     has("nutrition") && {
@@ -128,6 +177,8 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {showStartHere && <DashboardStartHereCard onDismiss={dismissStartHere} />}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
         {isPro && <AICoachCard />}

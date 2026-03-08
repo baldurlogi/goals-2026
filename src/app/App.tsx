@@ -21,6 +21,7 @@ import { AchievementsPage } from "@/features/achievements/AchievementPage";
 import { UpgradePage } from "@/features/subscription/UpgradePage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
+import { AuthCallbackPage } from "@/features/auth/AuthCallbackPage";
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
           {/* ── PUBLIC ────────────────────────────────────────── */}
           <Route path="/" element={<RedirectIfAuth><LandingPage /></RedirectIfAuth>} />
           <Route path="/auth" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
           {/* ── PROTECTED APP ─────────────────────────────────── */}
           <Route
