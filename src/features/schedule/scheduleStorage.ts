@@ -100,7 +100,11 @@ function readTemplateCache(): UserScheduleTemplates | null {
 }
 
 function writeTemplateCache(t: UserScheduleTemplates) {
-  try { localStorage.setItem(TEMPLATE_CACHE_KEY, JSON.stringify(t)); } catch {}
+  try {
+    localStorage.setItem(TEMPLATE_CACHE_KEY, JSON.stringify(t));
+  } catch {
+    return;
+  }
 }
 
 export function seedScheduleTemplates(): UserScheduleTemplates {

@@ -13,7 +13,11 @@ function readCache(): UserGoal[] {
 }
 
 function writeCache(goals: UserGoal[]) {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(goals)); } catch {}
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(goals));
+  } catch {
+    return;
+  }
 }
 
 // -- Load all goals for the current user ------------------------------

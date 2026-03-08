@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { loadModuleState, saveModuleState, seedCache } from "@/features/goals/modules/goalModuleStorage";
 
 type SavingsState = { saved: number };
@@ -40,6 +41,7 @@ export function SavingsCard(props: {
   async function persist(next: number) {
     setSaved(next);
     await saveModuleState<SavingsState>(goalId, "savings", { saved: next });
+    toast.success("Savings updated");
   }
 
   const pct = useMemo(() => {

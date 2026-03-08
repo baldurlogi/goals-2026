@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckSquare, ChevronDown, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  listTodos,
+  loadTodos,
   addTodo,
   toggleTodo,
   deleteTodo,
@@ -13,59 +14,47 @@ import {
 } from "@/features/todos/todoStorage";
 
 export function TodosPage() {
-  const [todos, setTodos] = useState<TodoItem[]>([]);
-
-  const [input, setInput] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [showDone, setShowDone] = useState(false);
+  const [todos, setTodos]           = useState<TodoItem[]>([]);
+  const [input, setInput]           = useState("");
+  const [showDone, setShowDone]     = useState(false);
+  const inputRef                    = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    let alive = true;
-
-    const load = async () => {
-      const data = await listTodos();
-      if (alive) setTodos(data as TodoItem[]);
-    };
-
-    load();
-
-    const onChanged = () => load();
-    window.addEventListener(TODO_CHANGED_EVENT, onChanged);
-
+    const sync = async () => setTodos(await loadTodos());
+    sync(); // initial load
+    window.addEventListener(TODO_CHANGED_EVENT, sync);
+    window.addEventListener("storage", sync);
     return () => {
-      alive = false;
-      window.removeEventListener(TODO_CHANGED_EVENT, onChanged);
+      window.removeEventListener(TODO_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", sync);
     };
   }, []);
 
-  async function handleAdd() {
-    const text = input.trim();
-    if (!text) return;
-
-    await addTodo(text); // addTodo is async in your storage
+  function handleAdd() {
+    if (!input.trim()) return;
+    addTodo(input);
     setInput("");
     inputRef.current?.focus();
-    // no need to call listTodos() here because TODO_CHANGED_EVENT should fire,
-    // but it's fine either way.
+    toast.success("Task added");
   }
 
   const incomplete = todos.filter((t) => !t.done);
-  const done = todos.filter((t) => t.done);
+  const done       = todos.filter((t) => t.done);
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CheckSquare className="h-5 w-5 text-sky-500" />
           <h1 className="text-xl font-semibold">To-do</h1>
         </div>
-
         {done.length > 0 && (
           <Button
             variant="ghost"
             size="sm"
             className="h-7 gap-1 text-xs text-muted-foreground"
-            onClick={() => clearCompleted()}
+            onClick={clearCompleted}
           >
             <Trash2 className="h-3 w-3" />
             Clear completed
@@ -73,6 +62,7 @@ export function TodosPage() {
         )}
       </div>
 
+      {/* Quick-add */}
       <div className="flex items-center gap-2">
         <input
           ref={inputRef}
@@ -87,6 +77,7 @@ export function TodosPage() {
         </Button>
       </div>
 
+      {/* Incomplete list */}
       {incomplete.length === 0 ? (
         <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
           All clear 🎉 — nothing left to do.
@@ -99,17 +90,16 @@ export function TodosPage() {
         </div>
       )}
 
+      {/* Completed — collapsed by default */}
       {done.length > 0 && (
         <div>
           <button
             type="button"
-            onClick={() => setShowDone((s: boolean) => !s)}
+            onClick={() => setShowDone((s) => !s)}
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronDown
-              className={`h-3.5 w-3.5 transition-transform ${
-                showDone ? "rotate-180" : ""
-              }`}
+              className={`h-3.5 w-3.5 transition-transform ${showDone ? "rotate-180" : ""}`}
             />
             {done.length} completed
           </button>

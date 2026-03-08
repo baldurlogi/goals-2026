@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X, Trash2, BookMarked, ChevronDown, ChevronUp } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -24,17 +25,11 @@ import {
   type MealKey,
   type SavedMeal,
   type CustomEntry,
-  NUTRITION_CHANGED_EVENT, // if you export it; otherwise keep "nutrition:changed"
+  type NutritionLog,
 } from "./nutritionStorage";
 import type { Macros } from "./nutritionTypes";
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
-
-type NutritionLog = {
-  date: string;
-  eaten: Record<string, boolean>;
-  customEntries: CustomEntry[];
-};
 
 function MacroInputRow({
   label, value, unit, onChange,
@@ -99,6 +94,7 @@ function ManualEntryForm({
 
   return (
     <div className="space-y-3 rounded-xl border bg-muted/20 p-3">
+      {/* Meal name + emoji */}
       <div className="flex gap-2">
         <input
           type="text"
@@ -117,6 +113,7 @@ function ManualEntryForm({
         />
       </div>
 
+      {/* Macro inputs */}
       <div className="grid grid-cols-4 gap-2">
         <MacroInputRow label="Calories" value={cal}     unit="kcal" onChange={setCal}     />
         <MacroInputRow label="Protein"  value={protein} unit="g"    onChange={setProtein} />
@@ -124,6 +121,7 @@ function ManualEntryForm({
         <MacroInputRow label="Fat"      value={fat}     unit="g"    onChange={setFat}     />
       </div>
 
+      {/* Actions */}
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
@@ -181,7 +179,7 @@ function SavedMealPill({
   );
 }
 
-// ── Custom entry row ───────────────────────────────────────────────────────────
+// ── Custom entry row (today's logged items) ────────────────────────────────────
 
 function CustomEntryRow({
   entry, onRemove,
@@ -225,70 +223,36 @@ function MealToggle({ id, label, eaten, onToggle }: {
 
 export function NutritionPage() {
   const [breakfastChoice, setBreakfastChoice] = useState<1 | 2>(1);
-
-  const [log, setLog] = useState<NutritionLog>({
-    date: new Date().toISOString().slice(0, 10),
-    eaten: {},
-    customEntries: [],
-  });
-
-  // Start with safe defaults, then hydrate async
-  const [phase, setPhase] = useState<NutritionPhase>("maintain");
-  const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
-  const [showManual, setShowManual] = useState(false);
+  const [phase,       setPhase]       = useState<NutritionPhase>("maintain");
+  const [log,         setLog]         = useState<NutritionLog>({ date: new Date().toISOString().slice(0,10), eaten: {}, customEntries: [] });
+  const [savedMeals,  setSavedMeals]  = useState<SavedMeal[]>([]);
+  const [showManual,  setShowManual]  = useState(false);
   const [showLibrary, setShowLibrary] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
+    async function init() {
+      const [freshLog, freshPhase, freshMeals] = await Promise.all([
+        loadNutritionLog(), loadPhase(), loadSavedMeals(),
+      ]);
+      setLog(freshLog);
+      setPhase(freshPhase);
+      setSavedMeals(freshMeals);
+    }
+    init();
 
     const sync = async () => {
-      const [nextLog, nextPhase, nextSaved] = await Promise.all([
-        loadNutritionLog(),
-        loadPhase(),
-        loadSavedMeals(),
+      const [freshLog, freshPhase, freshMeals] = await Promise.all([
+        loadNutritionLog(), loadPhase(), loadSavedMeals(),
       ]);
-
-      if (cancelled) return;
-
-      setLog(nextLog);          // no cast
-      setPhase(nextPhase);
-      setSavedMeals(nextSaved);
+      setLog(freshLog);
+      setPhase(freshPhase);
+      setSavedMeals(freshMeals);
     };
-
-    const onEvent: EventListener = () => {
-      void sync();
-    };
-
-    void sync();
-
-    window.addEventListener(NUTRITION_CHANGED_EVENT ?? "nutrition:changed", onEvent);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(NUTRITION_CHANGED_EVENT ?? "nutrition:changed", onEvent);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const sync = async () => {
-      const [nextLog, nextPhase, nextSaved] = await Promise.all([
-        loadNutritionLog(),
-        loadPhase(),
-        loadSavedMeals(),
-      ]);
-      if (cancelled) return;
-      setLog(nextLog);
-      setPhase(nextPhase);
-      setSavedMeals(nextSaved);
-    };
-
-    sync();
-
     window.addEventListener("nutrition:changed", sync);
+    window.addEventListener("storage", sync);
     return () => {
-      cancelled = true;
-      window.removeEventListener(NUTRITION_CHANGED_EVENT ?? "nutrition:changed", sync);
+      window.removeEventListener("nutrition:changed", sync);
+      window.removeEventListener("storage", sync);
     };
   }, []);
 
@@ -296,28 +260,33 @@ export function NutritionPage() {
     const next: NutritionPhase = phase === "maintain" ? "cut" : "maintain";
     await savePhase(next);
     setPhase(next);
+    toast.success(`Switched to ${next} phase`);
   };
 
   const handleToggle = async (key: MealKey, eaten: boolean) => {
     await toggleMeal(key, eaten);
     setLog(await loadNutritionLog());
+    if (eaten) toast.success("Meal logged");
   };
 
   const handleManualAdd = async (name: string, macros: Macros) => {
     await addCustomEntry(name, macros);
     setLog(await loadNutritionLog());
+    toast.success(`${name} added`);
   };
 
   const handleSaveAndAdd = async (name: string, macros: Macros, emoji: string) => {
-    await saveNewMeal(name, macros, emoji);
+    saveNewMeal(name, macros, emoji);
     await addCustomEntry(name, macros);
     setLog(await loadNutritionLog());
     setSavedMeals(await loadSavedMeals());
+    toast.success(`${name} saved to meals`);
   };
 
   const handleQuickAdd = async (meal: SavedMeal) => {
     await logSavedMeal(meal);
     setLog(await loadNutritionLog());
+    toast.success(`${meal.name} logged`);
   };
 
   const handleRemoveCustom = async (id: string) => {
@@ -330,9 +299,9 @@ export function NutritionPage() {
     setSavedMeals(await loadSavedMeals());
   };
 
-  const targets = useMemo(() => getTargets(phase), [phase]);
-  const logged = useMemo(() => getLoggedMacros(log), [log]);
-  const breakfast = breakfastChoice === 1 ? meals.breakfast.option1 : meals.breakfast.option2;
+  const targets    = useMemo(() => getTargets(phase), [phase]);
+  const logged     = useMemo(() => getLoggedMacros(log), [log]);
+  const breakfast  = breakfastChoice === 1 ? meals.breakfast.option1 : meals.breakfast.option2;
   const breakfastKey: MealKey = breakfastChoice === 1 ? "breakfast1" : "breakfast2";
   const totalEntries = Object.values(log.eaten).filter(Boolean).length + log.customEntries.length;
 
@@ -357,12 +326,10 @@ export function NutritionPage() {
             phase === "cut" ? "bg-rose-500" : "bg-muted",
           ].join(" ")}
         >
-          <span
-            className={[
-              "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transform transition-transform duration-200",
-              phase === "cut" ? "translate-x-5" : "translate-x-0",
-            ].join(" ")}
-          />
+          <span className={[
+            "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transform transition-transform duration-200",
+            phase === "cut" ? "translate-x-5" : "translate-x-0",
+          ].join(" ")} />
         </button>
       </div>
 
@@ -381,7 +348,7 @@ export function NutritionPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <MacroRow label="Calories" value={logged.cal} target={targets.cal} unit="kcal" mode="max" />
+              <MacroRow label="Calories" value={logged.cal}     target={targets.cal}     unit="kcal" mode="max" />
               <MacroRow label="Protein"  value={logged.protein} target={targets.protein}  unit="g"    mode="min" />
               <Separator />
               <MacroRow label="Carbs"    value={logged.carbs}   target={targets.carbs}    unit="g"    mode="range" />
@@ -495,7 +462,7 @@ export function NutritionPage() {
                 <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Logged today
                 </p>
-                {log.customEntries.map((entry) => (
+                {log.customEntries.map((entry: CustomEntry) => (
                   <CustomEntryRow
                     key={entry.id}
                     entry={entry}

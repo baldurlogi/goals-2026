@@ -35,4 +35,4 @@ const DEFAULT: UniversityState = {
 
 export function seedUniversityState(goalId: string) { return seedCache(goalId, "state", DEFAULT); }
 export async function getUniversityState(goalId: string) { return loadModuleState(goalId, "state", DEFAULT); }
-export async function setUniversityState(goalId: string, next: UniversityState) { await saveModuleState(goalId, "state", next); }``
+export async function setUniversityState(goalId: string, next: UniversityState) { await saveModuleState(goalId, "state", next); }

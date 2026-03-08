@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "../auth/authContext";
-import { loadProfile, readProfileCache, type UserProfile } from "./profileStorage";
+import { useAuth } from "@/features/auth/authContext";
+import { loadProfile, readProfileCache, type UserProfile } from "@/features/onboarding/profileStorage";
 import { OnboardingFlow } from "./OnboardingFlow";
 
 type Props = { children: React.ReactNode };

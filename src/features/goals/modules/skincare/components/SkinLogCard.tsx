@@ -25,6 +25,7 @@ export function SkinLogCard({ goalId }: { goalId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+
     getSkinLog(goalId).then((fresh) => {
       if (!cancelled) {
         setState(fresh);
@@ -37,8 +38,11 @@ export function SkinLogCard({ goalId }: { goalId: string }) {
         }
       }
     });
-    return () => { cancelled = true; };
-  }, [goalId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [goalId, today]);
 
   async function save() {
     const entry = {

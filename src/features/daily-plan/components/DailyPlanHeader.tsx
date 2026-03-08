@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, LayoutDashboard, LogOut, Moon, Sun, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/authContext";
-import { useTheme } from "@/app/providers/ThemeProvider";
+import { useTheme } from "@/app/providers/theme-context";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { ALL_MODULES } from "@/features/modules/modules";
 

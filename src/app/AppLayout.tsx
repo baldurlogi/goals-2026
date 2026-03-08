@@ -1,7 +1,8 @@
-import { Outlet } from 'react-router-dom';
-import { DailyPlanHeader } from '@/features/daily-plan/components/DailyPlanHeader';
-import { ThemeProvider } from '@/app/providers/ThemeProvider';
-import { Toaster } from '@/components/ui/sonner';
+import { Outlet } from "react-router-dom";
+import { DailyPlanHeader } from "@/app/daily-plan/DailyPlanHeader";
+import { ThemeProvider } from "@/app/providers/ThemeProvider";
+import { Toaster } from "@/components/ui/sonner";
+import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 
 export function AppLayout() {
   return (
@@ -13,6 +14,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <PWAInstallBanner />
     </ThemeProvider>
   );
 }

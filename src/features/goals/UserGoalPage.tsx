@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useGoalsStore } from "@/features/goals/goalStoreContext";
@@ -139,6 +140,7 @@ export function UserGoalPage() {
             setGoal(updated);
             saveUserGoal(updated);
             setEditing(false);
+            toast.success("Goal updated");
           }}
           onClose={() => setEditing(false)}
         />

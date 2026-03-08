@@ -87,8 +87,8 @@ export async function loadFinanceMonth(goalId: string, month: string): Promise<F
     .select("state")
     .eq("user_id", user.id)
     .eq("goal_id", goalId)
-    .eq("month",   month)
-    .single();
+    .eq("month", month)
+    .maybeSingle();
 
   if (error || !data) {
     return readCache(goalId, month) ?? defaultFinanceState(month);

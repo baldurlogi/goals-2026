@@ -18,6 +18,21 @@ import {
   type UserProfile,
 } from "@/features/onboarding/profileStorage";
 
+type EditableProfileFields = Pick<
+  UserProfile,
+  | "display_name"
+  | "sex"
+  | "age"
+  | "weight_kg"
+  | "height_cm"
+  | "activity_level"
+  | "onboarding_done"
+  | "macro_maintain"
+  | "macro_cut"
+  | "default_schedule_view"
+  | "daily_reading_goal"
+>;
+
 // ---------- shared bits from onboarding ----------
 function PillSelect<T extends string>({
   options,
@@ -113,7 +128,7 @@ function profileToForm(p: UserProfile): Form {
   };
 }
 
-function formToFullPatch(f: Form): Omit<UserProfile, "id"> {
+function formToFullPatch(f: Form): EditableProfileFields {
   return {
     display_name: f.display_name.trim() || null,
     sex: f.sex,
@@ -121,7 +136,7 @@ function formToFullPatch(f: Form): Omit<UserProfile, "id"> {
     weight_kg: f.weight_kg ? Number(f.weight_kg) : null,
     height_cm: f.height_cm ? Number(f.height_cm) : null,
     activity_level: f.activity_level,
-    onboarding_done: true, // keep true
+    onboarding_done: true,
     macro_maintain: f.macro_maintain ?? null,
     macro_cut: f.macro_cut ?? null,
     default_schedule_view: f.default_schedule_view,
@@ -133,12 +148,22 @@ function shallowEqualJSON(a: unknown, b: unknown) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-function diffPatch(original: Omit<UserProfile, "id">, next: Omit<UserProfile, "id">) {
-  const patch: Partial<Omit<UserProfile, "id">> = {};
-  (Object.keys(next) as (keyof typeof next)[]).forEach((k) => {
-    const same = shallowEqualJSON(original[k], next[k]);
-    if (!same) patch[k] = next[k] as any;
-  });
+function diffPatch(original: EditableProfileFields, next: EditableProfileFields) {
+  const patch: Partial<EditableProfileFields> = {};
+
+  const setPatchValue = <K extends keyof EditableProfileFields>(
+    key: K,
+    value: EditableProfileFields[K],
+  ) => {
+    patch[key] = value;
+  };
+
+  for (const key of Object.keys(next) as Array<keyof EditableProfileFields>) {
+    if (!shallowEqualJSON(original[key], next[key])) {
+      setPatchValue(key, next[key]);
+    }
+  }
+
   return patch;
 }
 
@@ -168,8 +193,8 @@ export function ProfilePage() {
 
   const originalFull = useMemo(() => {
     if (!profile) return null;
-    // Use current profile as original baseline for diffing
-    const base: Omit<UserProfile, "id"> = {
+
+    const base: EditableProfileFields = {
       display_name: profile.display_name,
       weight_kg: profile.weight_kg,
       height_cm: profile.height_cm,
@@ -182,6 +207,7 @@ export function ProfilePage() {
       default_schedule_view: profile.default_schedule_view,
       daily_reading_goal: profile.daily_reading_goal,
     };
+
     return base;
   }, [profile]);
 
