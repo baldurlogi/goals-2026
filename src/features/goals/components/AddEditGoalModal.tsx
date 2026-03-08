@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Trash2, Plus, Sparkles, ArrowLeft, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { getAISystemContext } from "@/features/ai/aiUserProfile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -111,6 +112,10 @@ async function generateGoalFromPrompt(
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("You must be signed in to generate AI goals.");
 
+  // Build personalised context — falls back gracefully if profile not set up yet
+  let userContext = "";
+  try { userContext = await getAISystemContext(); } catch { /* non-fatal */ }
+
   const response = await fetch(
     "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder",
     {
@@ -119,7 +124,7 @@ async function generateGoalFromPrompt(
         "Content-Type": "application/json",
         "Authorization": `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ prompt, stepCount }),
+      body: JSON.stringify({ prompt, stepCount, userContext }),
     }
   );
 
