@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, RefreshCw, Trophy, ArrowRight } from "lucide-react";
+import { Check, RefreshCw, Trophy, ArrowRight, Sparkles, Brain } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,12 @@ import {
   DEFAULT_MODULES,
   type ModuleId,
 } from "@/features/modules/modules";
+import {
+  loadAIProfile,
+  saveAIProfile,
+  type PreferredTone,
+} from "@/features/ai/aiUserProfile";
+import { toast } from "sonner";
 
 type EditableProfileFields = Pick<
   UserProfile,
@@ -250,6 +256,13 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [form, setForm] = useState<Form | null>(null);
 
+  // AI profile state
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiTone, setAiTone] = useState<PreferredTone>("direct");
+  const [aiGoalsSummary, setAiGoalsSummary] = useState("");
+  const [aiLifestyleNotes, setAiLifestyleNotes] = useState("");
+  const [aiFocusAreas, setAiFocusAreas] = useState<string[]>([]);
+
   useEffect(() => {
     let alive = true;
 
@@ -265,6 +278,17 @@ export function ProfilePage() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  // Load AI profile
+  useEffect(() => {
+    loadAIProfile().then((ai) => {
+      if (!ai) return;
+      setAiTone(ai.preferred_tone ?? "direct");
+      setAiGoalsSummary(ai.goals_summary ?? "");
+      setAiLifestyleNotes(ai.lifestyle_notes ?? "");
+      setAiFocusAreas(ai.active_modules ?? []);
+    });
   }, []);
 
   const originalFull = useMemo(() => {
@@ -338,6 +362,24 @@ export function ProfilePage() {
       setError("Could not save profile. Please try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveAI() {
+    setAiSaving(true);
+    try {
+      await saveAIProfile({
+        preferred_tone: aiTone,
+        goals_summary: aiGoalsSummary.trim() || null,
+        lifestyle_notes: aiLifestyleNotes.trim() || null,
+        active_modules: aiFocusAreas.length > 0 ? aiFocusAreas : null,
+      });
+      toast.success("AI settings saved");
+    } catch (e) {
+      console.error(e);
+      toast.error("Could not save AI settings");
+    } finally {
+      setAiSaving(false);
     }
   }
 
@@ -670,6 +712,167 @@ export function ProfilePage() {
           </CardContent>
         </Card>
       </Link>
+
+      {/* ── AI Coach Settings ───────────────────────────────────────────── */}
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15">
+              <Sparkles className="h-4 w-4 text-violet-400" />
+            </div>
+            <div>
+              <CardTitle className="text-base">AI Coach Settings</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Help your AI coach understand you better
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+
+          {/* Preferred tone */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Brain className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-sm font-medium">Coaching tone</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {([
+                { value: "encouraging", label: "Encouraging", emoji: "🌱", desc: "Warm & positive" },
+                { value: "direct",      label: "Direct",      emoji: "⚡", desc: "No-nonsense" },
+                { value: "analytical",  label: "Analytical",  emoji: "📊", desc: "Data-driven" },
+                { value: "tough_love",  label: "Tough Love",  emoji: "🔥", desc: "High standards" },
+              ] as { value: PreferredTone; label: string; emoji: string; desc: string }[]).map(t => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setAiTone(t.value)}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-all",
+                    aiTone === t.value
+                      ? "border-violet-500/60 bg-violet-500/10 text-violet-300"
+                      : "border-border bg-muted/30 text-muted-foreground hover:border-violet-500/30 hover:text-foreground",
+                  )}
+                >
+                  <span className="text-lg">{t.emoji}</span>
+                  <span className="text-xs font-semibold">{t.label}</span>
+                  <span className="text-[10px] opacity-70">{t.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Goals summary */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              What are you optimising for?
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Tell the AI your big picture goal. e.g. "Lose 10kg before summer while building a side project"
+            </p>
+            <textarea
+              value={aiGoalsSummary}
+              onChange={e => setAiGoalsSummary(e.target.value)}
+              placeholder="I'm trying to..."
+              rows={3}
+              maxLength={400}
+              className={cn(
+                "w-full resize-none rounded-xl border bg-muted/30 px-3 py-2.5 text-sm",
+                "placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-violet-500/50",
+                "transition-colors"
+              )}
+            />
+            <p className="text-right text-[10px] text-muted-foreground">
+              {aiGoalsSummary.length}/400
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Lifestyle notes */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Lifestyle context
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Anything the AI should know about your life. e.g. "I work night shifts", "I have a 6-month-old", "I travel every other week"
+            </p>
+            <textarea
+              value={aiLifestyleNotes}
+              onChange={e => setAiLifestyleNotes(e.target.value)}
+              placeholder="Things to know about my situation..."
+              rows={3}
+              maxLength={400}
+              className={cn(
+                "w-full resize-none rounded-xl border bg-muted/30 px-3 py-2.5 text-sm",
+                "placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-violet-500/50",
+                "transition-colors"
+              )}
+            />
+            <p className="text-right text-[10px] text-muted-foreground">
+              {aiLifestyleNotes.length}/400
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Focus areas */}
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Focus areas</label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Which areas should the AI prioritise in suggestions?
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ALL_MODULES.map(m => {
+                const active = aiFocusAreas.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setAiFocusAreas(prev =>
+                      active ? prev.filter(x => x !== m.id) : [...prev, m.id]
+                    )}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                      active
+                        ? "border-violet-500/60 bg-violet-500/10 text-violet-300"
+                        : "border-border bg-muted/30 text-muted-foreground hover:border-violet-500/30 hover:text-foreground",
+                    )}
+                  >
+                    <span>{m.emoji}</span>
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+            {aiFocusAreas.length === 0 && (
+              <p className="text-xs text-muted-foreground/60">
+                No focus areas selected — AI will consider all modules equally.
+              </p>
+            )}
+          </div>
+
+          {/* Save button */}
+          <div className="flex justify-end pt-2">
+            <Button
+              onClick={handleSaveAI}
+              disabled={aiSaving}
+              className="gap-2 min-w-[140px]"
+            >
+              {aiSaving ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              {aiSaving ? "Saving…" : "Save AI settings"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
