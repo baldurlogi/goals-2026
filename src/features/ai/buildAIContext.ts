@@ -26,6 +26,8 @@ function buildSystemPrompt(
       "Be warm and encouraging. Celebrate progress and reduce overwhelm.",
     analytical:
       "Be precise and data-driven. Reference concrete numbers when useful.",
+    tough_love:
+      "Be firm, honest, and action-oriented. Push the user to stop avoiding the obvious next step without being insulting.",
   };
 
   const topGoals =
