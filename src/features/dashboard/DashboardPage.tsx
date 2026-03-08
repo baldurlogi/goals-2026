@@ -15,6 +15,7 @@ import { LifeProgressCard } from "./components/LifeProgressCard";
 import { AchievementsCard } from "./components/AchievementsCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
+import { useTier, tierMeets } from "@/features/subscription/useTier";
 
 function QuickAction({
   icon,
@@ -60,7 +61,8 @@ export default function DashboardPage() {
   });
 
   const { modules } = useEnabledModules();
-
+  const tier = useTier();
+  const isPro = tierMeets(tier, "pro");
   const has = (id: string) => modules.has(id as never);
 
   const quickActions = [
@@ -128,7 +130,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
-        <AICoachCard />
+        {isPro && <AICoachCard />}
         <LifeProgressCard />
         {has("reading") && <ReadingCard />}
         {has("nutrition") && <MacrosCard />}

@@ -18,6 +18,7 @@ import { FitnessGoalPage } from "@/features/goals/modules/fitness/FitnessGoalPag
 import DashboardPage from "@/features/dashboard/DashboardPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { AchievementsPage } from "@/features/achievements/AchievementPage";
+import { UpgradePage } from "@/features/subscription/UpgradePage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="fitness" element={<FitnessGoalPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="achievements" element={<AchievementsPage />} />
+            <Route path="upgrade" element={<UpgradePage />} />
 
             <Route path="daily-plan" element={<Navigate to="/app" replace />} />
           </Route>

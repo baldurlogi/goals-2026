@@ -8,12 +8,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, LayoutDashboard, LogOut, Moon, Sun, User } from "lucide-react";
+import { ChevronDown, LayoutDashboard, LogOut, Moon, Sparkles, Sun, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/authContext";
 import { useTheme } from "@/app/providers/theme-context";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { ALL_MODULES } from "@/features/modules/modules";
+import { useTier, TIER_LABELS, TIER_BADGE } from "@/features/subscription/useTier";
 
 function getInitials(user: { email?: string; user_metadata?: { full_name?: string; name?: string } } | null) {
   if (!user) return "?";
@@ -35,6 +36,7 @@ export function DailyPlanHeader() {
   const { user, signOut } = useAuth();
   const { theme, toggle } = useTheme();
   const { modules } = useEnabledModules();
+  const tier = useTier();
 
   // Build nav dynamically from enabled modules
   const enabledDefs = ALL_MODULES.filter((m) => modules.has(m.id));
@@ -150,6 +152,15 @@ export function DailyPlanHeader() {
               <Link to="/app/profile" className="flex items-center gap-2">
                 <User className="h-3.5 w-3.5" />
                 <span>Profile settings</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/app/upgrade" className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-violet-400" />
+                <span>Upgrade plan</span>
+                <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold ${TIER_BADGE[tier]}`}>
+                  {TIER_LABELS[tier]}
+                </span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

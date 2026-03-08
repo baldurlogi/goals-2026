@@ -8,6 +8,8 @@ import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { StepsCard } from "@/features/goals/components/StepsCard";
 import { AddEditGoalModal } from "@/features/goals/components/AddEditGoalModal";
 import { ImproveGoalModal } from "@/features/goals/components/ImproveGoalModal";
+import { UpgradeBanner } from "@/features/subscription/UpgradeBanner";
+import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { loadUserGoals, saveUserGoal } from "@/features/goals/userGoalStorage";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
 
@@ -29,6 +31,8 @@ export function UserGoalPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [improving, setImproving] = useState(false);
+  const tier = useTier();
+  const isPro = tierMeets(tier, "pro");
 
   useEffect(() => {
     let cancelled = false;
@@ -100,14 +104,16 @@ export function UserGoalPage() {
 
         <div className="flex flex-col gap-2 items-end shrink-0">
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setImproving(true)}
-              className="gap-2 border-violet-500/30 text-violet-400 hover:bg-violet-500/10 hover:text-violet-400"
-            >
-              <Sparkles className="h-3.5 w-3.5" /> Improve with AI
-            </Button>
+            {isPro && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImproving(true)}
+                className="gap-2 border-violet-500/30 text-violet-400 hover:bg-violet-500/10 hover:text-violet-400"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Improve with AI
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="gap-2">
               <Pencil className="h-3.5 w-3.5" /> Edit goal
             </Button>
@@ -120,6 +126,11 @@ export function UserGoalPage() {
           </Button>
         </div>
       </div>
+
+      {/* Upgrade banner — shown only for free tier */}
+      {!isPro && (
+        <UpgradeBanner feature="AI goal optimization" requiredTier="pro" />
+      )}
 
       {/* Steps */}
       {goal.steps.length === 0 ? (

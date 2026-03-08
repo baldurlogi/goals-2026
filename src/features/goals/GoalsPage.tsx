@@ -7,6 +7,7 @@ import { GoalCard } from './components/GoalCard';
 import { AddEditGoalModal } from './components/AddEditGoalModal';
 import { ImproveGoalModal } from './components/ImproveGoalModal';
 import { GoalsPageSkeleton } from '@/features/dashboard/skeletons';
+import { useTier, tierMeets } from '@/features/subscription/useTier';
 import {
   loadUserGoals,
   seedUserGoals,
@@ -27,6 +28,8 @@ export function GoalsPage() {
   const [sort, setSort]             = useState<SortMode>('priority');
   const [modal, setModal]           = useState<ModalState>(null);
   const [improvingGoal, setImprovingGoal] = useState<UserGoal | null>(null);
+  const tier = useTier();
+  const isPro = tierMeets(tier, "pro");
 
   useEffect(() => {
     let cancelled = false;
@@ -152,7 +155,7 @@ export function GoalsPage() {
               overdueCount={overdueCountByGoal[goal.id] ?? 0}
               onEdit={() => setModal(goal)}
               onDelete={() => handleDelete(goal.id)}
-              onImprove={() => setImprovingGoal(goal)}
+              onImprove={isPro ? () => setImprovingGoal(goal) : undefined}
             />
           ))}
         </div>
