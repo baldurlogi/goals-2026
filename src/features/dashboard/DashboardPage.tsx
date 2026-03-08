@@ -11,6 +11,7 @@ import { TodoCard } from "./components/TodoCard";
 import { FitnessCard } from "./components/FitnessCard";
 import { AICoachCard } from "./components/AICoachCard";
 import { WaterIntakeCard } from "./components/WaterIntakeCard";
+import { LifeProgressCard } from "./components/LifeProgressCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
 
@@ -127,6 +128,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
         <AICoachCard />
+        <LifeProgressCard />
         {has("reading") && <ReadingCard />}
         {has("nutrition") && <MacrosCard />}
         {has("schedule") && <ScheduleCard />}
