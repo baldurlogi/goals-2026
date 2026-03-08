@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { X, Sparkles, Check, ChevronRight, RotateCcw, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
-import { getAISystemContext } from "@/features/ai/aiUserProfile";
+import { getAISystemContext } from "@/features/ai/buildAIContext";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
 
 const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";

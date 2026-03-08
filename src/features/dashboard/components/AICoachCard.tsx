@@ -1,14 +1,17 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, RefreshCw, ArrowRight, Zap } from "lucide-react";
+import { ArrowRight, RefreshCw, Sparkles, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
-import { buildAIContext } from "@/features/ai/aiUserProfile";
+import { buildAISignals } from "@/features/ai/aiSignals";
+import {
+  buildSuggestionCandidates,
+  type SuggestionCandidate,
+} from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { NUTRITION_CHANGED_EVENT } from "@/features/nutrition/nutritionStorage";
-
-// ── Types ────────────────────────────────────────────────────────────────────
+import { PROFILE_CHANGED_EVENT } from "@/features/onboarding/profileStorage";
 
 type CoachSuggestion = {
   action: string;
@@ -23,72 +26,118 @@ type CacheEntry = {
   builtAt: number;
 };
 
-const CACHE_KEY          = "cache:ai-coach:v1";
-const LAST_MODULE_KEY    = "cache:ai-coach:last-module";
-const CACHE_TTL          = 0; // instant expiration since we persist the last module separately and use it to skip processing in the edge function, so the cache is effectively "warm" on next load even if we clear it after each fetch
-const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
-
-
-// ── Cache helpers ─────────────────────────────────────────────────────────────
+const CACHE_KEY = "cache:ai-coach:v2";
+const LAST_MODULE_KEY = "cache:ai-coach:last-module:v2";
+const CACHE_TTL_MS = 20 * 60 * 1000;
+const SUPABASE_FN =
+  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
 
 function readCache(): CoachSuggestion | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-    const entry: CacheEntry = JSON.parse(raw);
-    if (Date.now() - entry.builtAt > CACHE_TTL) return null;
-    return entry.suggestion;
-  } catch { return null; }
+
+    const entry = JSON.parse(raw) as CacheEntry;
+    const age = Date.now() - entry.builtAt;
+    return age <= CACHE_TTL_MS ? entry.suggestion : null;
+  } catch {
+    return null;
+  }
 }
 
 function writeCache(suggestion: CoachSuggestion) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ suggestion, builtAt: Date.now() }));
-    // Persist the module so next refresh avoids repeating it
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ suggestion, builtAt: Date.now() }),
+    );
+
     if (suggestion.module) {
       localStorage.setItem(LAST_MODULE_KEY, suggestion.module);
     }
-  } catch { /* storage full */ }
+  } catch {
+    // ignore
+  }
 }
 
 function clearCache() {
-  try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 function readLastModule(): string | null {
-  try { return localStorage.getItem(LAST_MODULE_KEY); } catch { return null; }
+  try {
+    return localStorage.getItem(LAST_MODULE_KEY);
+  } catch {
+    return null;
+  }
 }
 
-// ── Fetch from edge function ──────────────────────────────────────────────────
+function candidateToSuggestion(
+  candidate: SuggestionCandidate,
+  quotaMessage?: string,
+): CoachSuggestion {
+  return {
+    action: candidate.action,
+    reason: quotaMessage ?? candidate.reason,
+    href: candidate.href,
+    emoji: candidate.emoji,
+    module: candidate.module,
+  };
+}
 
-async function fetchCoachSuggestion(forceFreshContext = false): Promise<CoachSuggestion> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error("Not signed in");
+async function fetchCoachSuggestion(
+  forceFreshSignals = false,
+): Promise<CoachSuggestion> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  const { systemContext } = await buildAIContext(forceFreshContext);
-  const lastSuggestedModule = readLastModule();
+  if (!session?.access_token) {
+    throw new Error("Not signed in");
+  }
+
+  const signals = await buildAISignals(forceFreshSignals);
+  const candidates = buildSuggestionCandidates(signals);
+  const deterministicFallback = candidates[0]
+    ? candidateToSuggestion(candidates[0])
+    : {
+        action: "Review your upcoming tasks",
+        reason: "A quick scan helps you choose your next step.",
+        href: "/app/upcoming",
+        emoji: "💡",
+        module: "goals",
+      };
 
   const res = await fetch(SUPABASE_FN, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({
       action: "coach",
-      userContext: systemContext,
-      lastSuggestedModule,
+      signals,
+      candidates,
+      lastSuggestedModule: readLastModule(),
     }),
   });
 
   if (res.status === 429) {
-    // Quota hit — return a graceful fallback instead of crashing
-    return {
-      emoji: "💡",
-      action: "Review your upcoming goals for today.",
-      reason: "You've hit your monthly AI limit — upgrade for more suggestions.",
-      href: "/app/upcoming",
-    };
+    return candidateToSuggestion(
+      candidates[0] ?? {
+        module: "goals",
+        priority: 0,
+        action: "Review your upcoming tasks",
+        reason: "A quick scan helps you choose your next step.",
+        href: "/app/upcoming",
+        emoji: "💡",
+      },
+      "You've hit your monthly AI limit — here’s the best next move from your current data.",
+    );
   }
 
   if (!res.ok) {
@@ -96,20 +145,23 @@ async function fetchCoachSuggestion(forceFreshContext = false): Promise<CoachSug
     throw new Error(err.error ?? "Failed to fetch suggestion");
   }
 
-  const data = await res.json();
-  const s = data.suggestion as CoachSuggestion;
+  const data = (await res.json()) as {
+    suggestion?: CoachSuggestion;
+  };
 
-  // Validate shape
-  if (!s?.action || !s?.href) throw new Error("Invalid suggestion shape");
-  return s;
+  if (!data.suggestion?.action || !data.suggestion?.href) {
+    return deterministicFallback;
+  }
+
+  return data.suggestion;
 }
 
-// ── Card inner ────────────────────────────────────────────────────────────────
-
 function AICoachCardInner() {
-  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(() => readCache());
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(() =>
+    readCache(),
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (force = false) => {
     if (!force) {
@@ -124,9 +176,9 @@ function AICoachCardInner() {
     setError(null);
 
     try {
-      const s = await fetchCoachSuggestion(force);
-      writeCache(s);
-      setSuggestion(s);
+      const next = await fetchCoachSuggestion(force);
+      writeCache(next);
+      setSuggestion(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -134,29 +186,32 @@ function AICoachCardInner() {
     }
   }, []);
 
-    useEffect(() => {
-    const onNutritionChanged = () => {
+  useEffect(() => {
+    const handleDataChanged = () => {
       clearCache();
       void load(true);
     };
 
-    window.addEventListener(NUTRITION_CHANGED_EVENT, onNutritionChanged);
+    window.addEventListener(NUTRITION_CHANGED_EVENT, handleDataChanged);
+    window.addEventListener(PROFILE_CHANGED_EVENT, handleDataChanged);
+
     return () => {
-      window.removeEventListener(NUTRITION_CHANGED_EVENT, onNutritionChanged);
+      window.removeEventListener(NUTRITION_CHANGED_EVENT, handleDataChanged);
+      window.removeEventListener(PROFILE_CHANGED_EVENT, handleDataChanged);
     };
   }, [load]);
 
-  // Load on mount if no cache
-  useEffect(() => { load(false); }, [load]);
+  useEffect(() => {
+    void load(false);
+  }, [load]);
 
   function handleRefresh() {
     clearCache();
-    load(true);
+    void load(true);
   }
 
   return (
     <Card className="relative overflow-hidden lg:col-span-12">
-      {/* Animated gradient top border */}
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-fuchsia-400 via-pink-400 to-orange-400" />
 
       <CardHeader className="pb-3 pt-5">
@@ -177,13 +232,14 @@ function AICoachCardInner() {
             className="rounded-md p-1.5 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground disabled:opacity-30"
             title="Get a new suggestion"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+            />
           </button>
         </div>
       </CardHeader>
 
       <CardContent className="pb-5">
-        {/* Loading state */}
         {loading && !suggestion && (
           <div className="flex items-center gap-3 py-1">
             <div className="flex gap-1">
@@ -191,29 +247,34 @@ function AICoachCardInner() {
               <span className="h-2 w-2 animate-bounce rounded-full bg-fuchsia-400 [animation-delay:150ms]" />
               <span className="h-2 w-2 animate-bounce rounded-full bg-pink-400 [animation-delay:300ms]" />
             </div>
-            <span className="text-sm text-muted-foreground">Thinking about your day…</span>
+            <span className="text-sm text-muted-foreground">
+              Thinking about your day…
+            </span>
           </div>
         )}
 
-        {/* Error state */}
         {error && !suggestion && (
           <div className="flex items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">Couldn't load suggestion right now.</p>
-            <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-7 shrink-0 text-xs">
+            <p className="text-sm text-muted-foreground">
+              Couldn't load suggestion right now.
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              className="h-7 shrink-0 text-xs"
+            >
               Try again
             </Button>
           </div>
         )}
 
-        {/* Suggestion */}
         {suggestion && (
           <div className="flex items-center gap-4">
-            {/* Emoji badge */}
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-2xl">
               {suggestion.emoji}
             </div>
 
-            {/* Text */}
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold leading-snug">
                 {loading ? (
@@ -222,14 +283,20 @@ function AICoachCardInner() {
                   suggestion.action
                 )}
               </p>
+
               {suggestion.reason && !loading && (
-                <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   {suggestion.reason}
                 </p>
               )}
+
+              {suggestion.module && !loading && (
+                <div className="mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {suggestion.module}
+                </div>
+              )}
             </div>
 
-            {/* CTA */}
             {!loading && (
               <Button asChild size="sm" className="shrink-0 gap-1.5">
                 <Link to={suggestion.href}>
@@ -240,17 +307,16 @@ function AICoachCardInner() {
           </div>
         )}
 
-        {/* Powered by badge */}
         <div className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground/40">
           <Zap className="h-2.5 w-2.5" />
-          <span>AI-powered · updates hourly · uses your goals, fitness, reading & nutrition data</span>
+          <span>
+            AI-powered · guided by your goals, nutrition, reading and fitness signals
+          </span>
         </div>
       </CardContent>
     </Card>
   );
 }
-
-// ── Export with error boundary ────────────────────────────────────────────────
 
 export function AICoachCard() {
   return (
