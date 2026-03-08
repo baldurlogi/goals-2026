@@ -697,7 +697,7 @@ export function ProfilePage() {
       </Card>
 
       <Link to="/app/achievements">
-        <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5 transition-all hover:bg-amber-500/10 hover:shadow-sm cursor-pointer">
+        <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5 transition-all hover:bg-amber-500/10 hover:shadow-sm cursor-pointer mb-6">
           <CardContent className="flex items-center gap-4 py-5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
               <Trophy className="h-5 w-5 text-amber-500" />

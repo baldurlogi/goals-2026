@@ -23,6 +23,8 @@ import { WeeklyReportPage } from "@/features/dashboard/WeeklyReportPage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { AuthCallbackPage } from "@/features/auth/AuthCallbackPage";
+import { PrivacyPage } from "@/features/legal/PrivacyPage";
+import { TermsPage } from "@/features/legal/TermsPage";
 
 export default function App() {
   return (
@@ -33,6 +35,8 @@ export default function App() {
           <Route path="/" element={<RedirectIfAuth><LandingPage /></RedirectIfAuth>} />
           <Route path="/auth" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
 
           {/* ── PROTECTED APP ─────────────────────────────────── */}
           <Route
