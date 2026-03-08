@@ -7,7 +7,7 @@ import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
 import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
 import { AppLayout } from "@/app/AppLayout";
 
-import { NutritionPage } from "@/features/fitness/FitnessPage";
+import { NutritionPage } from "@/features/nutrition/NutritionPage";
 import { SchedulePage } from "@/features/schedule/SchedulePage";
 import { ReadingPage } from "@/features/reading/ReadingPage";
 import { GoalsPage } from "@/features/goals/GoalsPage";

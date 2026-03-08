@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Trash2, Plus, Sparkles, ArrowLeft, Loader2, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -434,7 +435,10 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
     setSaving(true);
     try {
       await saveUserGoal(trimmedGoal);
+      toast.success(isEdit ? "Goal updated" : "Goal created");
       onSave(trimmedGoal);
+    } catch {
+      toast.error("Couldn't save goal. Please try again.");
     } finally {
       setSaving(false);
     }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { SavingsCard } from "./components/SavingsCard";
 import { ExpenseTrackerCard } from "./components/ExpenseTrackerCard";
@@ -34,6 +35,7 @@ export function FinanceGoalPage() {
   async function handleSetMonthState(next: FinanceMonthState) {
     setMonthState(next);
     await saveFinanceMonth(GOAL_ID, next);
+    toast.success("Finance saved");
   }
 
   return (
