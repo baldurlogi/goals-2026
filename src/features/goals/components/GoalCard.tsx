@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Sparkles } from "lucide-react";
 import type { UserGoal } from "../goalTypes";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -16,17 +16,18 @@ type Props = {
   overdueCount?: number;
   onEdit?: () => void;
   onDelete?: () => void;
+  onImprove?: () => void;
 };
 
-export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelete }: Props) {
+export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelete, onImprove }: Props) {
   const total = goal.steps.length;
-  const doneCount = goal.steps.filter((step) => doneMap[step.id]).length;
+  const doneCount = goal.steps.filter((s) => doneMap[s.id]).length;
   const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
-  
+
   // Count overdue steps
-  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const today = new Date().toISOString().slice(0, 10);
   const overdueSteps = goal.steps.filter(
-    (step) => step.idealFinish && step.idealFinish < today && !doneMap[step.id]
+    (s) => s.idealFinish && s.idealFinish < today && !doneMap[s.id]
   ).length;
   const displayOverdue = overdueCount || overdueSteps;
 
@@ -38,17 +39,13 @@ export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelet
             <span className="text-lg">{goal.emoji}</span>
             <h3 className="text-base font-semibold">{goal.title}</h3>
 
-            {/* Priority badge */}
-            <span
-              className={[
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize",
-                PRIORITY_COLOR[goal.priority] ?? PRIORITY_COLOR.low,
-              ].join(" ")}
-            >
+            <span className={[
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize",
+              PRIORITY_COLOR[goal.priority] ?? PRIORITY_COLOR.low,
+            ].join(" ")}>
               {goal.priority}
             </span>
 
-            {/* Overdue badge */}
             {displayOverdue > 0 && (
               <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
                 {displayOverdue} overdue
@@ -76,25 +73,34 @@ export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelet
       </div>
 
       <div className="flex items-center justify-between gap-2">
-          <div className="flex gap-1">
-            {onEdit && (
-              <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 w-8 p-0">
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                variant="ghost" size="sm" onClick={onDelete}
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
+        <div className="flex gap-1">
+          {onEdit && (
+            <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 w-8 p-0">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              variant="ghost" size="sm" onClick={onDelete}
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {onImprove && goal.steps.length > 0 && (
+            <Button
+              variant="ghost" size="sm" onClick={onImprove}
+              className="h-8 gap-1.5 px-2 text-xs text-violet-400 hover:bg-violet-500/10 hover:text-violet-400"
+              title="Improve with AI"
+            >
+              <Sparkles className="h-3 w-3" /> AI
+            </Button>
+          )}
+        </div>
 
-          <Button asChild variant="secondary" size="sm">
-            <Link to={`/app/goals/${goal.id}`}>View details</Link>
-          </Button>
+        <Button asChild variant="secondary" size="sm">
+          <Link to={`/app/goals/${goal.id}`}>View details</Link>
+        </Button>
       </div>
     </div>
   );

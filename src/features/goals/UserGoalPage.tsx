@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Pencil } from "lucide-react";
+import { Pencil, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useGoalsStore } from "@/features/goals/goalStoreContext";
 import { StepsCard } from "@/features/goals/components/StepsCard";
 import { AddEditGoalModal } from "@/features/goals/components/AddEditGoalModal";
+import { ImproveGoalModal } from "@/features/goals/components/ImproveGoalModal";
+import { UpgradeBanner } from "@/features/subscription/UpgradeBanner";
+import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { loadUserGoals, saveUserGoal } from "@/features/goals/userGoalStorage";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
 
@@ -27,6 +30,9 @@ export function UserGoalPage() {
   const [goal, setGoal] = useState<UserGoal | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [improving, setImproving] = useState(false);
+  const tier = useTier();
+  const isPro = tierMeets(tier, "pro");
 
   useEffect(() => {
     let cancelled = false;
@@ -97,9 +103,21 @@ export function UserGoalPage() {
         </div>
 
         <div className="flex flex-col gap-2 items-end shrink-0">
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="gap-2">
-            <Pencil className="h-3.5 w-3.5" /> Edit goal
-          </Button>
+          <div className="flex gap-2">
+            {isPro && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImproving(true)}
+                className="gap-2 border-violet-500/30 text-violet-400 hover:bg-violet-500/10 hover:text-violet-400"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Improve with AI
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="gap-2">
+              <Pencil className="h-3.5 w-3.5" /> Edit goal
+            </Button>
+          </div>
           <Button
             variant="ghost" size="sm"
             onClick={() => dispatch({ type: "resetGoal", goalId: goal.id })}
@@ -108,6 +126,11 @@ export function UserGoalPage() {
           </Button>
         </div>
       </div>
+
+      {/* Upgrade banner — shown only for free tier */}
+      {!isPro && (
+        <UpgradeBanner feature="AI goal optimization" requiredTier="pro" />
+      )}
 
       {/* Steps */}
       {goal.steps.length === 0 ? (
@@ -143,6 +166,25 @@ export function UserGoalPage() {
             toast.success("Goal updated");
           }}
           onClose={() => setEditing(false)}
+        />
+      )}
+
+      {/* Improve modal */}
+      {improving && (
+        <ImproveGoalModal
+          goal={goal}
+          onApply={(newSteps) => {
+            const updated: UserGoal = {
+              ...goal,
+              steps: newSteps,
+              updatedAt: new Date().toISOString(),
+            };
+            setGoal(updated);
+            saveUserGoal(updated);
+            setImproving(false);
+            toast.success("Goal steps improved ✨");
+          }}
+          onClose={() => setImproving(false)}
         />
       )}
     </div>

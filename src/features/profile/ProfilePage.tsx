@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Check, RefreshCw, Trophy, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -485,6 +486,22 @@ export function ProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* --- Achievements --- */}
+      <Link to="/app/achievements">
+        <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5 transition-all hover:bg-amber-500/10 hover:shadow-sm cursor-pointer">
+          <CardContent className="flex items-center gap-4 py-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+              <Trophy className="h-5 w-5 text-amber-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold">🏆 Achievements</div>
+              <div className="text-sm text-muted-foreground">View your badges and progress</div>
+            </div>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
     </div>
   );
 }

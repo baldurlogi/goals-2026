@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useGoalsStore } from '@/features/goals/goalStoreContext';
 import { GoalCard } from './components/GoalCard';
 import { AddEditGoalModal } from './components/AddEditGoalModal';
+import { ImproveGoalModal } from './components/ImproveGoalModal';
 import { GoalsPageSkeleton } from '@/features/dashboard/skeletons';
+import { useTier, tierMeets } from '@/features/subscription/useTier';
 import {
   loadUserGoals,
   seedUserGoals,
   deleteUserGoal,
+  saveUserGoal,
 } from './userGoalStorage';
 import type { UserGoal } from './goalTypes';
 
@@ -19,10 +23,13 @@ const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 export function GoalsPage() {
   const { state } = useGoalsStore();
-  const [goals, setGoals]     = useState<UserGoal[]>(() => seedUserGoals());
-  const [loading, setLoading] = useState(goals.length === 0);
-  const [sort, setSort]       = useState<SortMode>('priority');
-  const [modal, setModal]     = useState<ModalState>(null);
+  const [goals, setGoals]           = useState<UserGoal[]>(() => seedUserGoals());
+  const [loading, setLoading]       = useState(goals.length === 0);
+  const [sort, setSort]             = useState<SortMode>('priority');
+  const [modal, setModal]           = useState<ModalState>(null);
+  const [improvingGoal, setImprovingGoal] = useState<UserGoal | null>(null);
+  const tier = useTier();
+  const isPro = tierMeets(tier, "pro");
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +155,7 @@ export function GoalsPage() {
               overdueCount={overdueCountByGoal[goal.id] ?? 0}
               onEdit={() => setModal(goal)}
               onDelete={() => handleDelete(goal.id)}
+              onImprove={isPro ? () => setImprovingGoal(goal) : undefined}
             />
           ))}
         </div>
@@ -160,6 +168,25 @@ export function GoalsPage() {
           startWithAI={modal === 'ai'}
           onSave={handleSaved}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {/* Improve modal */}
+      {improvingGoal && (
+        <ImproveGoalModal
+          goal={improvingGoal}
+          onApply={(newSteps) => {
+            const updated: UserGoal = {
+              ...improvingGoal,
+              steps: newSteps,
+              updatedAt: new Date().toISOString(),
+            };
+            handleSaved(updated);
+            saveUserGoal(updated);
+            setImprovingGoal(null);
+            toast.success('Goal steps improved ✨');
+          }}
+          onClose={() => setImprovingGoal(null)}
         />
       )}
     </div>

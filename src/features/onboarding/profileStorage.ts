@@ -1,47 +1,45 @@
 import { supabase } from "@/lib/supabaseClient";
 
-export type Sex            = "male" | "female";
-export type ActivityLevel  = "sedentary" | "light" | "moderate" | "active" | "very_active";
-export type ScheduleView   = "wfh" | "office" | "weekend";
+export type Sex = "male" | "female";
+export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "very_active";
+export type ScheduleView = "wfh" | "office" | "weekend";
 
 export type MacroTargets = {
-  cal:     number;
+  cal: number;
   protein: number;
-  carbs:   number;
-  fat:     number;
+  carbs: number;
+  fat: number;
 };
 
 export type UserProfile = {
-  id:                   string;
-  display_name:         string | null;
-  weight_kg:            number | null;
-  height_cm:            number | null;
-  age:                  number | null;
-  sex:                  Sex | null;
-  activity_level:       ActivityLevel;
-  onboarding_done:      boolean;
-  macro_maintain:       MacroTargets | null;
-  macro_cut:            MacroTargets | null;
+  id: string;
+  display_name: string | null;
+  weight_kg: number | null;
+  height_cm: number | null;
+  age: number | null;
+  sex: Sex | null;
+  activity_level: ActivityLevel;
+  onboarding_done: boolean;
+  macro_maintain: MacroTargets | null;
+  macro_cut: MacroTargets | null;
   default_schedule_view: ScheduleView;
-  daily_reading_goal:   number;
-  /** Modules the user enabled during onboarding. null = legacy (show all). */
-  enabled_modules:      string[] | null;
-  tier:                 "free" | "pro" | "pro_max";
+  daily_reading_goal: number;
+  tier: "free" | "pro" | "pro_max";
 };
 
 export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
-  sedentary:   "Sedentary (desk job, little/no exercise)",
-  light:       "Light (1-3 workouts/week)",
-  moderate:    "Moderate (3-5 workouts/week)",
-  active:      "Active (6-7 workouts/week)",
+  sedentary: "Sedentary (desk job, little/no exercise)",
+  light: "Light (1-3 workouts/week)",
+  moderate: "Moderate (3-5 workouts/week)",
+  active: "Active (6-7 workouts/week)",
   very_active: "Very active (2x/day or physical job)",
 };
 
 export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
-  sedentary:   1.2,
-  light:       1.375,
-  moderate:    1.55,
-  active:      1.725,
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  active: 1.725,
   very_active: 1.9,
 };
 
@@ -74,35 +72,60 @@ export function calculateMacros(
   const protein = Math.round(weight_kg * 2);
 
   // Maintain
-  const mCal   = tdee;
-  const mFat   = Math.round((mCal * 0.27) / 9);
+  const mCal = tdee;
+  const mFat = Math.round((mCal * 0.27) / 9);
   const mCarbs = Math.round((mCal - protein * 4 - mFat * 9) / 4);
 
   // Cut: 400 kcal deficit, higher protein
-  const cCal    = tdee - 400;
+  const cCal = tdee - 400;
   const cProtein = Math.round(weight_kg * 2.2);
-  const cFat    = Math.round((cCal * 0.25) / 9);
-  const cCarbs  = Math.round((cCal - cProtein * 4 - cFat * 9) / 4);
+  const cFat = Math.round((cCal * 0.25) / 9);
+  const cCarbs = Math.round((cCal - cProtein * 4 - cFat * 9) / 4);
 
   return {
-    maintain: { cal: mCal,  protein,          carbs: Math.max(0, mCarbs), fat: mFat },
-    cut:      { cal: cCal,  protein: cProtein, carbs: Math.max(0, cCarbs), fat: cFat },
+    maintain: { cal: mCal, protein, carbs: Math.max(0, mCarbs), fat: mFat },
+    cut: { cal: cCal, protein: cProtein, carbs: Math.max(0, cCarbs), fat: cFat },
   };
 }
 
 const CACHE_KEY = "cache:profile:v1";
 
 export const PROFILE_CHANGED_EVENT = "profile:changed";
+const emitProfileChanged = () => window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
 
-function emitProfileChanged() {
-  window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
+function defaultProfile(id: string): UserProfile {
+  return {
+    id,
+    display_name: null,
+    weight_kg: null,
+    height_cm: null,
+    age: null,
+    sex: null,
+    activity_level: "active",
+    onboarding_done: false,
+    macro_maintain: null,
+    macro_cut: null,
+    default_schedule_view: "wfh",
+    daily_reading_goal: 20,
+    tier: "free",
+  };
 }
 
 export function readProfileCache(): UserProfile | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileCache(profile: UserProfile) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+  } catch (e) {
+    console.warn("write cache failed", e);
+  }
 }
 
 export async function loadProfile(): Promise<UserProfile | null> {
@@ -118,13 +141,7 @@ export async function loadProfile(): Promise<UserProfile | null> {
   if (error || !data) return null;
 
   const profile = data as UserProfile;
-
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
-  } catch {
-    return profile;
-  }
-
+  writeProfileCache(profile);
   return profile;
 }
 
@@ -132,34 +149,45 @@ export async function saveProfile(patch: Partial<Omit<UserProfile, "id">>): Prom
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
-  await supabase
+  const { error } = await supabase
     .from("profiles")
     .upsert({ id: user.id, ...patch }, { onConflict: "id" });
 
-  const cached = readProfileCache();
-  if (cached) {
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ ...cached, ...patch }));
-    } catch {
-      return;
-    }
-  }
+  if (error) throw error;
 
+  // Update cache (even if it doesn't exist yet)
+  const cached = readProfileCache();
+  const next = cached
+    ? ({ ...cached, ...patch } as UserProfile)
+    : ({ ...defaultProfile(user.id), ...patch } as UserProfile);
+
+  writeProfileCache(next);
+
+  // Notify app listeners (useProfile, etc.)
   emitProfileChanged();
 }
 
-export async function completeOnboarding(profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">): Promise<void> {
+export async function completeOnboarding(
+  profile: Omit<UserProfile, "id" | "onboarding_done">,
+): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
-  const macros = (profile.weight_kg && profile.height_cm && profile.age && profile.sex)
-    ? calculateMacros(profile.weight_kg, profile.height_cm, profile.age, profile.sex, profile.activity_level)
-    : null;
+  const macros =
+    profile.weight_kg && profile.height_cm && profile.age && profile.sex
+      ? calculateMacros(
+          profile.weight_kg,
+          profile.height_cm,
+          profile.age,
+          profile.sex,
+          profile.activity_level,
+        )
+      : null;
 
   await saveProfile({
     ...profile,
-    macro_maintain:  macros?.maintain ?? null,
-    macro_cut:       macros?.cut      ?? null,
+    macro_maintain: macros?.maintain ?? null,
+    macro_cut: macros?.cut ?? null,
     onboarding_done: true,
   });
 }
