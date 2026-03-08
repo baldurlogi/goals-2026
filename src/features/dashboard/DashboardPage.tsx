@@ -9,7 +9,9 @@ import { UpcomingGoalsCard } from "./components/UpcomingGoalsCard";
 import { SpendingCard }      from "./components/SpendingCard";
 import { TodoCard }          from "./components/TodoCard";
 import { FitnessCard }       from "./components/FitnessCard";
+import { AICoachCard }       from "./components/AICoachCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
+import { useProfile } from "../onboarding/useProfile";
 
 function QuickAction({
   icon, label, sub, href, color,
@@ -34,6 +36,9 @@ function QuickAction({
 }
 
 export default function DashboardPage() {
+  const profile = useProfile();
+  const firstName = profile?.display_name?.trim().split(/\s+/)[0] ?? "";
+  
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
@@ -56,7 +61,7 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{today}</p>
-          <h1 className="mt-0.5 text-2xl font-bold tracking-tight">{greeting} 👋</h1>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight">{greeting} {firstName ? ` ${firstName}` : ""} 👋</h1>
         </div>
         <div className="flex gap-2">
           {has("nutrition") && (
@@ -74,6 +79,7 @@ export default function DashboardPage() {
 
       {/* Bento grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+        <AICoachCard />
         {has("reading")   && <ReadingCard />}
         {has("nutrition") && <MacrosCard />}
         {has("schedule")  && <ScheduleCard />}

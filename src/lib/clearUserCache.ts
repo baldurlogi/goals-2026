@@ -5,6 +5,7 @@
 export function clearUserCache(): void {
   // Exact known keys
   const exactKeys = [
+    "cache:ai-coach:v1",
     "cache:profile:v1",
     "cache:user_goals:v1",
     "cache:fitness:v1",
@@ -29,7 +30,7 @@ export function clearUserCache(): void {
 
   exactKeys.forEach((key) => {
     try { localStorage.removeItem(key); } catch {
-        return;
+      return;
     }
   });
 
@@ -46,7 +47,7 @@ export function clearUserCache(): void {
     allKeys.forEach((key) => {
       if (prefixes.some((p) => key.startsWith(p))) {
         try { localStorage.removeItem(key); } catch {
-            return;
+          return;
         }
       }
     });
