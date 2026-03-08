@@ -12,6 +12,7 @@ import { FitnessCard } from "./components/FitnessCard";
 import { AICoachCard } from "./components/AICoachCard";
 import { WaterIntakeCard } from "./components/WaterIntakeCard";
 import { LifeProgressCard } from "./components/LifeProgressCard";
+import { AchievementsCard } from "./components/AchievementsCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
 
@@ -137,6 +138,7 @@ export default function DashboardPage() {
         {has("todos") && <TodoCard />}
         {has("fitness") && <FitnessCard />}
         {has("nutrition") && <WaterIntakeCard />}
+        <AchievementsCard />
 
         {quickActions.length > 0 && (
           <div className="md:col-span-2 lg:col-span-12">

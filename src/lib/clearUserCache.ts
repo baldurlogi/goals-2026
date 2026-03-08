@@ -6,6 +6,7 @@ export function clearUserCache(): void {
   // Exact known keys
   const exactKeys = [
     "cache:ai-coach:v1",
+  "cache:achievements:v1",
     "cache:profile:v1",
     "cache:user_goals:v1",
     "cache:fitness:v1",

@@ -13,7 +13,7 @@
  *  - Schedule  → loadScheduleLog()    (Supabase)
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Target, Dumbbell, Apple, BookOpen, CheckSquare, CalendarDays,
@@ -369,17 +369,9 @@ function LifeProgressCardInner() {
   const [progress, setProgress] = useState<ModuleProgress[]>(seedProgress);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    if (enabledModules.size === 0) return;
-    const data = await buildProgress(enabledModules);
-    setProgress(data);
-    setLoading(false);
-  }, [enabledModules]);
-
   useEffect(() => {
-    load();
+    let cancelled = false;
 
-    // Re-sync when any module changes
     const events = [
       "fitness:changed",
       "nutrition:changed",
@@ -388,9 +380,39 @@ function LifeProgressCardInner() {
       READING_CHANGED_EVENT,
       "goal_module:changed",
     ];
-    events.forEach(e => window.addEventListener(e, load));
-    return () => events.forEach(e => window.removeEventListener(e, load));
-  }, [load]);
+
+    async function refresh() {
+      await Promise.resolve();
+
+      if (cancelled) return;
+
+      if (enabledModules.size === 0) {
+        setProgress([]);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+
+      const data = await buildProgress(enabledModules);
+      if (cancelled) return;
+
+      setProgress(data);
+      setLoading(false);
+    }
+
+    const handleChange = () => {
+      void refresh();
+    };
+
+    void refresh();
+    events.forEach((e) => window.addEventListener(e, handleChange));
+
+    return () => {
+      cancelled = true;
+      events.forEach((e) => window.removeEventListener(e, handleChange));
+    };
+  }, [enabledModules]);
 
   const skeletonCount = Math.max(enabledModules.size, 3);
 

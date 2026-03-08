@@ -17,6 +17,7 @@ import { TodosPage } from "@/features/todos/TodosPage";
 import { FitnessGoalPage } from "@/features/goals/modules/fitness/FitnessGoalPage";
 import DashboardPage from "@/features/dashboard/DashboardPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
+import { AchievementsPage } from "@/features/achievements/AchievementPage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 
@@ -62,6 +63,7 @@ export default function App() {
             <Route path="todos" element={<TodosPage />} />
             <Route path="fitness" element={<FitnessGoalPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="achievements" element={<AchievementsPage />} />
 
             <Route path="daily-plan" element={<Navigate to="/app" replace />} />
           </Route>
