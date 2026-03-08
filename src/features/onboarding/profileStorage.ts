@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import type { ModuleId } from "@/features/modules/modules";
 
 export type Sex = "male" | "female";
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "very_active";
@@ -24,6 +25,7 @@ export type UserProfile = {
   macro_cut: MacroTargets | null;
   default_schedule_view: ScheduleView;
   daily_reading_goal: number;
+  enabled_modules: ModuleId[] | null;
   tier: "free" | "pro" | "pro_max";
 };
 
@@ -107,6 +109,7 @@ function defaultProfile(id: string): UserProfile {
     macro_cut: null,
     default_schedule_view: "wfh",
     daily_reading_goal: 20,
+    enabled_modules: null,
     tier: "free",
   };
 }
@@ -168,7 +171,7 @@ export async function saveProfile(patch: Partial<Omit<UserProfile, "id">>): Prom
 }
 
 export async function completeOnboarding(
-  profile: Omit<UserProfile, "id" | "onboarding_done">,
+  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">,
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
