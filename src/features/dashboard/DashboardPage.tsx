@@ -14,6 +14,7 @@ import { AICoachCard } from "./components/AICoachCard";
 import { WaterIntakeCard } from "./components/WaterIntakeCard";
 import { LifeProgressCard } from "./components/LifeProgressCard";
 import { AchievementsCard } from "./components/AchievementsCard";
+import { WeeklyReportCard } from "./components/WeeklyReportCard";
 import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
@@ -183,6 +184,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
         {isPro && <AICoachCard />}
         <LifeProgressCard />
+        {isPro && <WeeklyReportCard />}
         {has("reading") && <ReadingCard />}
         {has("nutrition") && <MacrosCard />}
         {has("schedule") && <ScheduleCard />}

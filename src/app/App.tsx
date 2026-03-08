@@ -19,6 +19,7 @@ import DashboardPage from "@/features/dashboard/DashboardPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { AchievementsPage } from "@/features/achievements/AchievementPage";
 import { UpgradePage } from "@/features/subscription/UpgradePage";
+import { WeeklyReportPage } from "@/features/dashboard/WeeklyReportPage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { AuthCallbackPage } from "@/features/auth/AuthCallbackPage";
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="achievements" element={<AchievementsPage />} />
             <Route path="upgrade" element={<UpgradePage />} />
+            <Route path="weekly-report" element={<WeeklyReportPage />} />
 
             <Route path="daily-plan" element={<Navigate to="/app" replace />} />
           </Route>
