@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react"
 import { GoalStoreProvider } from "@/features/goals/goalStore";
 import { AuthProvider } from "./providers/AuthProvider";
 import { RequireAuth } from "@/features/auth/RequireAuth";
@@ -33,6 +34,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Analytics />
+      <SpeedInsights />
       <AuthProvider>
         <Routes>
           {/* ── PUBLIC ────────────────────────────────────────── */}
