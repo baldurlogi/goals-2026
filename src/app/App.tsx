@@ -29,7 +29,6 @@ import { PrivacyPage } from "@/features/legal/PrivacyPage";
 import { TermsPage } from "@/features/legal/TermsPage";
 
 
-
 export default function App() {
   return (
     <BrowserRouter>
