@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Trash2, Plus, Sparkles, ArrowLeft, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { getAISystemContext } from "@/features/ai/aiUserProfile";
+import { getAISystemContext } from "@/features/ai/buildAIContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

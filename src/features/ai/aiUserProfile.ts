@@ -16,7 +16,7 @@ import { loadNutritionLog, loadPhase } from "@/features/nutrition/nutritionStora
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export type PreferredTone = "direct" | "encouraging" | "analytical";
+export type PreferredTone = "direct" | "encouraging" | "analytical" | "tough_love";
 
 export type AIUserProfile = {
   user_id: string;
@@ -237,6 +237,7 @@ function buildSystemPrompt(
     direct:       "Be direct and concise. Skip preamble. Lead with the action.",
     encouraging:  "Be warm and encouraging. Celebrate progress. Frame challenges positively.",
     analytical:   "Be precise and data-driven. Reference specific numbers and trends.",
+    tough_love:   "Be honest and no-nonsense. Don't sugarcoat gaps. High expectations, zero excuses.",
   };
 
   return `You are a personal life coach AI embedded in the user's daily life dashboard.

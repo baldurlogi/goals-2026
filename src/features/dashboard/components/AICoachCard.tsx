@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { buildAIContext } from "@/features/ai/aiUserProfile";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
-import { NUTRITION_CHANGED_EVENT } from "@/features/nutrition/nutritionStorage";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,9 +24,8 @@ type CacheEntry = {
 
 const CACHE_KEY          = "cache:ai-coach:v1";
 const LAST_MODULE_KEY    = "cache:ai-coach:last-module";
-const CACHE_TTL          = 0; // instant expiration since we persist the last module separately and use it to skip processing in the edge function, so the cache is effectively "warm" on next load even if we clear it after each fetch
+const CACHE_TTL          = 60 * 60 * 1000; // 1 hour
 const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
-
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
 
@@ -61,11 +59,11 @@ function readLastModule(): string | null {
 
 // ── Fetch from edge function ──────────────────────────────────────────────────
 
-async function fetchCoachSuggestion(forceFreshContext = false): Promise<CoachSuggestion> {
+async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("Not signed in");
 
-  const { systemContext } = await buildAIContext(forceFreshContext);
+  const { systemContext } = await buildAIContext();
   const lastSuggestedModule = readLastModule();
 
   const res = await fetch(SUPABASE_FN, {
@@ -82,7 +80,12 @@ async function fetchCoachSuggestion(forceFreshContext = false): Promise<CoachSug
   });
 
   if (res.status === 429) {
-    // Quota hit — return a graceful fallback instead of crashing
+    const data = await res.json().catch(() => ({}));
+    // Distinguish per-minute rate limit from monthly quota
+    if (data.error === "rate_limit_exceeded") {
+      throw new Error(data.message ?? "Too many requests. Please wait a moment.");
+    }
+    // Monthly quota hit — return graceful fallback
     return {
       emoji: "💡",
       action: "Review your upcoming goals for today.",
@@ -114,17 +117,14 @@ function AICoachCardInner() {
   const load = useCallback(async (force = false) => {
     if (!force) {
       const cached = readCache();
-      if (cached) {
-        setSuggestion(cached);
-        return;
-      }
+      if (cached) { setSuggestion(cached); return; }
     }
 
     setLoading(true);
     setError(null);
 
     try {
-      const s = await fetchCoachSuggestion(force);
+      const s = await fetchCoachSuggestion();
       writeCache(s);
       setSuggestion(s);
     } catch (e) {
@@ -133,18 +133,6 @@ function AICoachCardInner() {
       setLoading(false);
     }
   }, []);
-
-    useEffect(() => {
-    const onNutritionChanged = () => {
-      clearCache();
-      void load(true);
-    };
-
-    window.addEventListener(NUTRITION_CHANGED_EVENT, onNutritionChanged);
-    return () => {
-      window.removeEventListener(NUTRITION_CHANGED_EVENT, onNutritionChanged);
-    };
-  }, [load]);
 
   // Load on mount if no cache
   useEffect(() => { load(false); }, [load]);

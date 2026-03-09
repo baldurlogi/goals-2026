@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense } from "react";
-import { SpeedInsights } from "@vercel/speed-insights/react";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react"
 import { GoalStoreProvider } from "@/features/goals/goalStore";
 import { AuthProvider } from "./providers/AuthProvider";
 import { RequireAuth } from "@/features/auth/RequireAuth";
@@ -20,17 +21,27 @@ import DashboardPage from "@/features/dashboard/DashboardPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { AchievementsPage } from "@/features/achievements/AchievementPage";
 import { UpgradePage } from "@/features/subscription/UpgradePage";
+import { WeeklyReportPage } from "@/features/dashboard/WeeklyReportPage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
+import { AuthCallbackPage } from "@/features/auth/AuthCallbackPage";
+import { PrivacyPage } from "@/features/legal/PrivacyPage";
+import { TermsPage } from "@/features/legal/TermsPage";
+
 
 export default function App() {
   return (
     <BrowserRouter>
+      <Analytics />
+      <SpeedInsights />
       <AuthProvider>
         <Routes>
           {/* ── PUBLIC ────────────────────────────────────────── */}
           <Route path="/" element={<RedirectIfAuth><LandingPage /></RedirectIfAuth>} />
           <Route path="/auth" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
 
           {/* ── PROTECTED APP ─────────────────────────────────── */}
           <Route
@@ -67,6 +78,7 @@ export default function App() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="achievements" element={<AchievementsPage />} />
             <Route path="upgrade" element={<UpgradePage />} />
+            <Route path="weekly-report" element={<WeeklyReportPage />} />
 
             <Route path="daily-plan" element={<Navigate to="/app" replace />} />
           </Route>

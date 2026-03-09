@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { loadProfile } from "@/features/onboarding/profileStorage";
+import {
+  loadProfile,
+  PROFILE_CHANGED_EVENT,
+} from "@/features/onboarding/profileStorage";
 import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
 import { supabase } from "@/lib/supabaseClient";
 
-/**
- * Returns the set of module IDs the current user has enabled.
- * Falls back to DEFAULT_MODULES for legacy/new users.
- * Re-runs when the auth session changes so switching users always reflects
- * the correct modules immediately.
- */
 export function useEnabledModules(): {
   modules: Set<ModuleId>;
   loading: boolean;
@@ -21,7 +18,6 @@ export function useEnabledModules(): {
     () => new Set(DEFAULT_MODULES),
   );
 
-  // Track auth state so we re-fetch when user changes
   useEffect(() => {
     let mounted = true;
 
@@ -45,15 +41,13 @@ export function useEnabledModules(): {
     };
   }, []);
 
-  // Re-fetch profile whenever userId changes
   useEffect(() => {
-    if (!authResolved || userId === null) {
-      return;
-    }
+    if (!authResolved || userId === null) return;
 
     let cancelled = false;
 
-    loadProfile().then((profile) => {
+    const syncModules = async () => {
+      const profile = await loadProfile();
       if (cancelled) return;
 
       const mods = profile?.enabled_modules;
@@ -64,10 +58,18 @@ export function useEnabledModules(): {
 
       setLoadedModules(nextModules);
       setLoadedUserId(userId);
-    });
+    };
+
+    const handleProfileChanged = () => {
+      void syncModules();
+    };
+
+    void syncModules();
+    window.addEventListener(PROFILE_CHANGED_EVENT, handleProfileChanged);
 
     return () => {
       cancelled = true;
+      window.removeEventListener(PROFILE_CHANGED_EVENT, handleProfileChanged);
     };
   }, [authResolved, userId]);
 
