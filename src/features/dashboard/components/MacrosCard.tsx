@@ -28,7 +28,7 @@ function MacroPill({
   color: string;
 }) {
   const fillPct = pct(value, target);
-  const remaining = target - value;
+  const remaining = Math.floor(target - value);
 
   return (
     <div className="space-y-1">
@@ -37,7 +37,7 @@ function MacroPill({
           {label}
         </span>
         <span className="tabular-nums">
-          <span className="font-semibold">{value}</span>
+          <span className="font-semibold">{Math.floor(value)}</span>
           <span className="text-muted-foreground">
             /{target}
             {unit}

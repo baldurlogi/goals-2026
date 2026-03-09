@@ -45,8 +45,8 @@ export function MacroRow(props: {
                     {label}
                 </span>
                 <div className="flex items-baseline gap-1 tabular-nums">
-                    <span className={`text-sm font-semibold ${color}`}>{value}</span>
-                    <span className="text-xs text-muted-foreground">/ {target} {unit} </span>
+                    <span className={`text-sm font-semibold ${color}`}>{Math.floor(value)}</span>
+                    <span className="text-xs text-muted-foreground">/ {Math.floor(target)} {unit} </span>
                 </div>
             </div>
 
@@ -63,10 +63,10 @@ export function MacroRow(props: {
                 {value === 0
                     ? `${target} ${unit} to go`
                     : remaining > 0
-                    ? `${remaining} ${unit} remaining`
+                    ? `${Math.floor(remaining)} ${unit} remaining`
                     : remaining === 0
                     ? `✓ Target hit`
-                    : `${Math.abs(remaining)} ${unit} over`}
+                    : `${Math.floor(remaining)} ${unit} over`}
             </div>
         </div>
     );
