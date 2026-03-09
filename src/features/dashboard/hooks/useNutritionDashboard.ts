@@ -7,6 +7,7 @@ import {
   type NutritionLog,
 } from "@/features/nutrition/nutritionStorage";
 import { getTargets, type NutritionPhase } from "@/features/nutrition/nutritionData";
+import { useTodayDate } from "@/hooks/useTodayDate";
 
 const LOG_CACHE   = "cache:nutrition_log:v1";
 const PHASE_CACHE = "cache:nutrition_phase:v1";
@@ -18,10 +19,9 @@ function pct(value: number, target: number) {
   return clamp(target > 0 ? Math.round((value / target) * 100) : 0);
 }
 
-function readLogCache(): NutritionLog {
+function readLogCache(today = new Date().toISOString().slice(0, 10)): NutritionLog {
   try {
     const raw = localStorage.getItem(LOG_CACHE);
-    const today = new Date().toISOString().slice(0, 10);
     if (!raw) return { date: today, eaten: {}, customEntries: [] };
     const parsed = JSON.parse(raw) as NutritionLog;
     // stale day — return empty
@@ -35,7 +35,8 @@ function readPhaseCache(): NutritionPhase {
 }
 
 export function useNutritionDashboard() {
-  const [log,     setLog]     = useState<NutritionLog>(readLogCache);
+  const today = useTodayDate();
+  const [log,     setLog]     = useState<NutritionLog>(() => readLogCache(today));
   const [phase,   setPhase]   = useState<NutritionPhase>(readPhaseCache);
   const [loading, setLoading] = useState(true);
 
@@ -74,13 +75,17 @@ export function useNutritionDashboard() {
   const logged  = useMemo(() => getLoggedMacros(log), [log]);
   const calPct  = pct(logged.cal, target.cal);
 
-  const mealsEaten        = Object.values(log.eaten).filter(Boolean).length;
+  const presetMealsEaten  = Object.values(log.eaten).filter(Boolean).length;
+  const customCount       = (log.customEntries ?? []).length;
+  const itemsLogged       = presetMealsEaten + customCount;
   const caloriesRemaining = target.cal - logged.cal;
-  const proteinRemaining  = target.protein  - logged.protein;
+  const proteinRemaining  = target.protein - logged.protein;
 
   return {
     logged, target, phase, calPct,
-    mealsEaten, totalMeals: 5,
+    itemsLogged,
+    presetMealsEaten,
+    customCount,
     caloriesRemaining, proteinRemaining,
     loading,
   };

@@ -5,12 +5,12 @@ import {
   loadWaterLog,
   readWaterCache,
   saveWaterLog,
-  todayKey,
   type WaterLog,
 } from "@/features/water/waterStorage";
+import { useTodayDate } from "@/hooks/useTodayDate";
 
 export function useWaterDashboard() {
-  const date = todayKey();
+  const date = useTodayDate();
   const cached = readWaterCache(date);
 
   const [log, setLog] = useState<WaterLog>(() => cached ?? defaultWaterLog(date));

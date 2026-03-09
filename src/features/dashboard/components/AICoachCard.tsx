@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, RefreshCw, ArrowRight, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -114,12 +114,7 @@ function AICoachCardInner() {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
 
-  const load = useCallback(async (force = false) => {
-    if (!force) {
-      const cached = readCache();
-      if (cached) { setSuggestion(cached); return; }
-    }
-
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -134,12 +129,9 @@ function AICoachCardInner() {
     }
   }, []);
 
-  // Load on mount if no cache
-  useEffect(() => { load(false); }, [load]);
-
   function handleRefresh() {
     clearCache();
-    load(true);
+    load();
   }
 
   return (

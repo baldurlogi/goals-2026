@@ -10,35 +10,33 @@ import {
   buildScheduleConfig,
 } from "@/features/schedule/scheduleData";
 import type { TimelineItem } from "@/features/schedule/scheduleTypes";
+import { useTodayDate } from "@/hooks/useTodayDate";
 
 const CACHE_KEY = "cache:schedule_log:v1";
 
-function emptyScheduleLogForToday(): ScheduleLog {
+function emptyScheduleLogForToday(today: string): ScheduleLog {
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: today,
     view: "wfh",
     completed: [],
   };
 }
 
-function readCache(): ScheduleLog {
+function readCache(today: string): ScheduleLog {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    const today = new Date().toISOString().slice(0, 10);
-
-    if (!raw) return emptyScheduleLogForToday();
-
+    if (!raw) return emptyScheduleLogForToday(today);
     const parsed = JSON.parse(raw) as ScheduleLog;
-    if (parsed.date !== today) return emptyScheduleLogForToday();
-
+    if (parsed.date !== today) return emptyScheduleLogForToday(today);
     return parsed;
   } catch {
-    return emptyScheduleLogForToday();
+    return emptyScheduleLogForToday(today);
   }
 }
 
 export function useScheduleDashboard() {
-  const [scheduleLog, setScheduleLog] = useState<ScheduleLog>(readCache);
+  const today = useTodayDate();
+  const [scheduleLog, setScheduleLog] = useState<ScheduleLog>(() => readCache(today));
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

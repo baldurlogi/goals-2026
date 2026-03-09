@@ -137,16 +137,15 @@ async function buildProgress(enabledModules: Set<string>): Promise<ModuleProgres
       const log = await loadNutritionLog();
       const mealsLogged = Object.values(log.eaten ?? {}).filter(Boolean).length;
       const customCount = (log.customEntries ?? []).length;
-      const totalTracked = mealsLogged + customCount;
-      const totalMeals = 7;
-      const pct = Math.min(Math.round((totalTracked / totalMeals) * 100), 100);
+      const itemsLogged = mealsLogged + customCount;
+      const pct = Math.min(Math.round((itemsLogged / 5) * 100), 100);
 
       results.push({
         id: "nutrition", label: "Nutrition", href: "/app/nutrition",
         icon: <Apple className="h-3.5 w-3.5" />,
         pct,
-        primaryStat: `${totalTracked}/${totalMeals} meals today`,
-        secondaryStat: customCount > 0 ? `+${customCount} custom` : undefined,
+        primaryStat: `${itemsLogged} item${itemsLogged !== 1 ? "s" : ""} logged`,
+        secondaryStat: customCount > 0 ? `${customCount} custom` : undefined,
         color: "orange",
         accentClass: "bg-orange-500",
       });
