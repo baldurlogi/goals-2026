@@ -1,18 +1,10 @@
-/**
- * useTodayDate.ts
- *
- * Returns today's ISO date string (YYYY-MM-DD) as reactive state.
- * Re-evaluates at midnight so any component using this hook automatically
- * gets the new date without a page refresh.
- *
- * Also clears stale daily localStorage caches when the date rolls over,
- * so dashboard cards don't flash yesterday's data on first paint.
- */
-
 import { useEffect, useState } from "react";
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+export function getLocalDateKey(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 /** Cache keys that are date-specific and must be cleared on a new day */
@@ -25,14 +17,11 @@ const DAILY_CACHE_KEYS = [
 
 const LAST_SEEN_DATE_KEY = "app:last-seen-date";
 
-/**
- * Clears stale daily caches when the date has changed since last visit.
- * Call once at app startup (in AppLayout or AuthProvider).
- */
 export function clearStaleDailyCaches(): void {
   try {
     const lastSeen = localStorage.getItem(LAST_SEEN_DATE_KEY);
-    const today = todayISO();
+    const today = getLocalDateKey();
+
     if (lastSeen !== today) {
       DAILY_CACHE_KEYS.forEach((key) => localStorage.removeItem(key));
       localStorage.setItem(LAST_SEEN_DATE_KEY, today);
@@ -42,29 +31,23 @@ export function clearStaleDailyCaches(): void {
   }
 }
 
-/**
- * Hook that returns today's date string and re-renders at midnight.
- * Use this instead of inline `new Date().toISOString().slice(0,10)`
- * in any hook or component that must stay correct across midnight.
- */
 export function useTodayDate(): string {
-  const [today, setToday] = useState(todayISO);
+  const [today, setToday] = useState(getLocalDateKey);
 
   useEffect(() => {
     function scheduleNextTick() {
       const now = new Date();
-      // ms until next midnight
+
       const msUntilMidnight =
         new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() -
         now.getTime();
 
       const timer = setTimeout(() => {
-        const newDay = todayISO();
-        // Clear stale daily caches before re-rendering
+        const newDay = getLocalDateKey();
         clearStaleDailyCaches();
         setToday(newDay);
-        scheduleNextTick(); // reschedule for the following midnight
-      }, msUntilMidnight + 100); // +100ms buffer past midnight
+        scheduleNextTick();
+      }, msUntilMidnight + 100);
 
       return timer;
     }

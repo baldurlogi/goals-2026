@@ -138,7 +138,7 @@ async function buildProgress(enabledModules: Set<string>): Promise<ModuleProgres
       const mealsLogged = Object.values(log.eaten ?? {}).filter(Boolean).length;
       const customCount = (log.customEntries ?? []).length;
       const itemsLogged = mealsLogged + customCount;
-      const pct = Math.min(Math.round((itemsLogged / 5) * 100), 100);
+      const pct = Math.min(Math.round((itemsLogged / 4) * 100), 100);
 
       results.push({
         id: "nutrition", label: "Nutrition", href: "/app/nutrition",

@@ -1,33 +1,41 @@
-import { useEffect, useMemo, useState } from "react";
-import { useGoalsStore } from "@/features/goals/goalStoreContext";
-import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
-import type { UserGoal } from "@/features/goals/goalTypes";
+import { useEffect, useMemo, useState } from 'react';
+import { useGoalsStore } from '@/features/goals/goalStoreContext';
+import { loadUserGoals, seedUserGoals } from '@/features/goals/userGoalStorage';
+import type { UserGoal } from '@/features/goals/goalTypes';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
 
-const HORIZON       = 14;
+const HORIZON = 14;
 const PREVIEW_LIMIT = 6;
 
 export type UpcomingItem = {
   goalId: string;
   goalTitle: string;
   goalEmoji: string;
-  step: { id: string; label: string; idealFinish: string | null; estimatedTime: string };
+  step: {
+    id: string;
+    label: string;
+    idealFinish: string | null;
+    estimatedTime: string;
+  };
   daysFromToday: number;
 };
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateKey();
 }
 
 function diffDays(isoA: string, isoB: string) {
   return Math.round(
-    (new Date(isoB + "T00:00:00").getTime() - new Date(isoA + "T00:00:00").getTime()) / 86400000
+    (new Date(isoB + 'T00:00:00').getTime() -
+      new Date(isoA + 'T00:00:00').getTime()) /
+      86400000,
   );
 }
 
 function getUpcomingItems(
   goals: UserGoal[],
   doneMap: Record<string, Record<string, boolean>>,
-  horizonDays: number
+  horizonDays: number,
 ): UpcomingItem[] {
   const today = todayISO();
   const items: UpcomingItem[] = [];
@@ -60,25 +68,37 @@ export function useGoalsDashboard() {
   useEffect(() => {
     let cancelled = false;
     loadUserGoals().then((g) => {
-      if (!cancelled) { setGoals(g); setLoading(false); }
+      if (!cancelled) {
+        setGoals(g);
+        setLoading(false);
+      }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const upcomingItems = useMemo<UpcomingItem[]>(
     () => getUpcomingItems(goals, goalsState.done, HORIZON),
-    [goals, goalsState.done]
+    [goals, goalsState.done],
   );
 
-  const overdueCount  = useMemo(() => upcomingItems.filter((i) => i.daysFromToday < 0).length, [upcomingItems]);
-  const previewItems  = upcomingItems.slice(0, PREVIEW_LIMIT);
-  const hasMore       = upcomingItems.length > PREVIEW_LIMIT;
-  const extraCount    = upcomingItems.length - PREVIEW_LIMIT;
+  const overdueCount = useMemo(
+    () => upcomingItems.filter((i) => i.daysFromToday < 0).length,
+    [upcomingItems],
+  );
+  const previewItems = upcomingItems.slice(0, PREVIEW_LIMIT);
+  const hasMore = upcomingItems.length > PREVIEW_LIMIT;
+  const extraCount = upcomingItems.length - PREVIEW_LIMIT;
 
   return {
-    upcomingItems, previewItems, overdueCount,
-    hasMore, extraCount,
-    horizon: HORIZON, totalCount: upcomingItems.length,
+    upcomingItems,
+    previewItems,
+    overdueCount,
+    hasMore,
+    extraCount,
+    horizon: HORIZON,
+    totalCount: upcomingItems.length,
     loading,
   };
 }

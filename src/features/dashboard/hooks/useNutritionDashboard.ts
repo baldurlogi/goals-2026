@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 import {
   loadNutritionLog,
   loadPhase,
   getLoggedMacros,
   NUTRITION_CHANGED_EVENT,
   type NutritionLog,
-} from "@/features/nutrition/nutritionStorage";
-import { getTargets, type NutritionPhase } from "@/features/nutrition/nutritionData";
-import { useTodayDate } from "@/hooks/useTodayDate";
+} from '@/features/nutrition/nutritionStorage';
+import {
+  getTargets,
+  type NutritionPhase,
+} from '@/features/nutrition/nutritionData';
+import { useTodayDate } from '@/hooks/useTodayDate';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
 
-const LOG_CACHE   = "cache:nutrition_log:v1";
-const PHASE_CACHE = "cache:nutrition_phase:v1";
+const LOG_CACHE = 'cache:nutrition_log:v1';
+const PHASE_CACHE = 'cache:nutrition_phase:v1';
 
 function clamp(v: number, lo = 0, hi = 100) {
   return Math.min(Math.max(v, lo), hi);
@@ -19,41 +23,53 @@ function pct(value: number, target: number) {
   return clamp(target > 0 ? Math.round((value / target) * 100) : 0);
 }
 
-function readLogCache(today = new Date().toISOString().slice(0, 10)): NutritionLog {
+function readLogCache(today = getLocalDateKey()): NutritionLog {
   try {
     const raw = localStorage.getItem(LOG_CACHE);
     if (!raw) return { date: today, eaten: {}, customEntries: [] };
     const parsed = JSON.parse(raw) as NutritionLog;
     // stale day — return empty
-    if (parsed.date !== today) return { date: today, eaten: {}, customEntries: [] };
+    if (parsed.date !== today)
+      return { date: today, eaten: {}, customEntries: [] };
     return parsed;
-  } catch { return { date: new Date().toISOString().slice(0, 10), eaten: {}, customEntries: [] }; }
+  } catch {
+    return {
+      date: getLocalDateKey(),
+      eaten: {},
+      customEntries: [],
+    };
+  }
 }
 
 function readPhaseCache(): NutritionPhase {
-  return (localStorage.getItem(PHASE_CACHE) as NutritionPhase | null) ?? "maintain";
+  return (
+    (localStorage.getItem(PHASE_CACHE) as NutritionPhase | null) ?? 'maintain'
+  );
 }
 
 export function useNutritionDashboard() {
   const today = useTodayDate();
-  const [log,     setLog]     = useState<NutritionLog>(() => readLogCache(today));
-  const [phase,   setPhase]   = useState<NutritionPhase>(readPhaseCache);
+  const [log, setLog] = useState<NutritionLog>(() => readLogCache(today));
+  const [phase, setPhase] = useState<NutritionPhase>(readPhaseCache);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetch() {
-      const [freshLog, freshPhase] = await Promise.all([loadNutritionLog(), loadPhase()]);
+      const [freshLog, freshPhase] = await Promise.all([
+        loadNutritionLog(),
+        loadPhase(),
+      ]);
       if (!cancelled) {
         setLog(freshLog);
         setPhase(freshPhase);
         setLoading(false);
         try {
-          localStorage.setItem(LOG_CACHE,   JSON.stringify(freshLog));
+          localStorage.setItem(LOG_CACHE, JSON.stringify(freshLog));
           localStorage.setItem(PHASE_CACHE, freshPhase);
-        } catch(e) {
-          console.warn("read cache failed", e);
+        } catch (e) {
+          console.warn('read cache failed', e);
           return {};
         }
       }
@@ -63,30 +79,34 @@ export function useNutritionDashboard() {
 
     const sync = () => fetch();
     window.addEventListener(NUTRITION_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
+    window.addEventListener('storage', sync);
     return () => {
       cancelled = true;
       window.removeEventListener(NUTRITION_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      window.removeEventListener('storage', sync);
     };
   }, []);
 
-  const target  = useMemo(() => getTargets(phase), [phase]);
-  const logged  = useMemo(() => getLoggedMacros(log), [log]);
-  const calPct  = pct(logged.cal, target.cal);
+  const target = useMemo(() => getTargets(phase), [phase]);
+  const logged = useMemo(() => getLoggedMacros(log), [log]);
+  const calPct = pct(logged.cal, target.cal);
 
-  const presetMealsEaten  = Object.values(log.eaten).filter(Boolean).length;
-  const customCount       = (log.customEntries ?? []).length;
-  const itemsLogged       = presetMealsEaten + customCount;
+  const presetMealsEaten = Object.values(log.eaten).filter(Boolean).length;
+  const customCount = (log.customEntries ?? []).length;
+  const itemsLogged = presetMealsEaten + customCount;
   const caloriesRemaining = target.cal - logged.cal;
-  const proteinRemaining  = target.protein - logged.protein;
+  const proteinRemaining = target.protein - logged.protein;
 
   return {
-    logged, target, phase, calPct,
+    logged,
+    target,
+    phase,
+    calPct,
     itemsLogged,
     presetMealsEaten,
     customCount,
-    caloriesRemaining, proteinRemaining,
+    caloriesRemaining,
+    proteinRemaining,
     loading,
   };
 }

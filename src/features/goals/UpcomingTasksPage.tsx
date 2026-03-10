@@ -5,9 +5,10 @@ import { useGoalsStore } from '@/features/goals/goalStoreContext';
 import { loadUserGoals, seedUserGoals } from './userGoalStorage';
 import type { UserGoal } from './goalTypes';
 import type { UpcomingItem } from '@/features/dashboard/hooks/useGoalsDashboard';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateKey();
 }
 function diffDays(isoA: string, isoB: string) {
   return Math.round(

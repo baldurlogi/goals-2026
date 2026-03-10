@@ -1,17 +1,19 @@
-import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { Pencil, Sparkles } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { useGoalsStore } from "@/features/goals/goalStoreContext";
-import { StepsCard } from "@/features/goals/components/StepsCard";
-import { AddEditGoalModal } from "@/features/goals/components/AddEditGoalModal";
-import { ImproveGoalModal } from "@/features/goals/components/ImproveGoalModal";
-import { UpgradeBanner } from "@/features/subscription/UpgradeBanner";
-import { useTier, tierMeets } from "@/features/subscription/useTier";
-import { loadUserGoals, saveUserGoal } from "@/features/goals/userGoalStorage";
-import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { Pencil, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { useGoalsStore } from '@/features/goals/goalStoreContext';
+import { StepsCard } from '@/features/goals/components/StepsCard';
+import { AddEditGoalModal } from '@/features/goals/components/AddEditGoalModal';
+import { ImproveGoalModal } from '@/features/goals/components/ImproveGoalModal';
+import { UpgradeBanner } from '@/features/subscription/UpgradeBanner';
+import { useTier, tierMeets } from '@/features/subscription/useTier';
+import { loadUserGoals, saveUserGoal } from '@/features/goals/userGoalStorage';
+import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
+
 
 // Convert UserGoalStep → GoalStep shape that StepsCard expects
 function toGoalStep(s: UserGoalStep) {
@@ -32,7 +34,7 @@ export function UserGoalPage() {
   const [editing, setEditing] = useState(false);
   const [improving, setImproving] = useState(false);
   const tier = useTier();
-  const isPro = tierMeets(tier, "pro");
+  const isPro = tierMeets(tier, 'pro');
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +44,9 @@ export function UserGoalPage() {
         setLoading(false);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [goalId]);
 
   if (loading) {
@@ -72,7 +76,9 @@ export function UserGoalPage() {
   const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
 
   const PRIORITY_COLOR: Record<string, string> = {
-    high: "text-rose-400", medium: "text-amber-400", low: "text-emerald-400",
+    high: 'text-rose-400',
+    medium: 'text-amber-400',
+    low: 'text-emerald-400',
   };
 
   return (
@@ -81,21 +87,30 @@ export function UserGoalPage() {
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <div className="text-sm text-muted-foreground">
-            <Link to="/app/goals" className="underline">Goals</Link> / {goal.title}
+            <Link to="/app/goals" className="underline">
+              Goals
+            </Link>{' '}
+            / {goal.title}
           </div>
-          <h1 className="text-2xl font-semibold">{goal.emoji} {goal.title}</h1>
+          <h1 className="text-2xl font-semibold">
+            {goal.emoji} {goal.title}
+          </h1>
           {goal.subtitle && (
             <p className="text-muted-foreground">{goal.subtitle}</p>
           )}
           <div className="text-sm text-muted-foreground">
-            {doneCount}/{total} steps · Priority:{" "}
-            <span className={`capitalize font-medium ${PRIORITY_COLOR[goal.priority]}`}>
+            {doneCount}/{total} steps · Priority:{' '}
+            <span
+              className={`capitalize font-medium ${PRIORITY_COLOR[goal.priority]}`}
+            >
               {goal.priority}
             </span>
           </div>
           <div className="mt-3 max-w-xl">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{doneCount}/{total} steps</span>
+              <span>
+                {doneCount}/{total} steps
+              </span>
               <span>{pct}%</span>
             </div>
             <Progress value={pct} className="mt-2 h-2" />
@@ -114,13 +129,19 @@ export function UserGoalPage() {
                 <Sparkles className="h-3.5 w-3.5" /> Improve with AI
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(true)}
+              className="gap-2"
+            >
               <Pencil className="h-3.5 w-3.5" /> Edit goal
             </Button>
           </div>
           <Button
-            variant="ghost" size="sm"
-            onClick={() => dispatch({ type: "resetGoal", goalId: goal.id })}
+            variant="ghost"
+            size="sm"
+            onClick={() => dispatch({ type: 'resetGoal', goalId: goal.id })}
           >
             Reset steps
           </Button>
@@ -142,7 +163,9 @@ export function UserGoalPage() {
               Edit this goal to add steps and track your progress.
             </p>
           </div>
-          <Button variant="outline" onClick={() => setEditing(true)}>Add steps</Button>
+          <Button variant="outline" onClick={() => setEditing(true)}>
+            Add steps
+          </Button>
         </div>
       ) : (
         <StepsCard
@@ -150,7 +173,9 @@ export function UserGoalPage() {
           goalTitle={goal.title}
           steps={goal.steps.map(toGoalStep)}
           doneMap={doneMap}
-          onToggle={(stepId) => dispatch({ type: "toggleStep", goalId: goal.id, stepId })}
+          onToggle={(stepId) =>
+            dispatch({ type: 'toggleStep', goalId: goal.id, stepId })
+          }
           heightClassName="h-[600px]"
         />
       )}
@@ -163,7 +188,7 @@ export function UserGoalPage() {
             setGoal(updated);
             saveUserGoal(updated);
             setEditing(false);
-            toast.success("Goal updated");
+            toast.success('Goal updated');
           }}
           onClose={() => setEditing(false)}
         />
@@ -177,12 +202,12 @@ export function UserGoalPage() {
             const updated: UserGoal = {
               ...goal,
               steps: newSteps,
-              updatedAt: new Date().toISOString(),
+              updatedAt: getLocalDateKey(),
             };
             setGoal(updated);
             saveUserGoal(updated);
             setImproving(false);
-            toast.success("Goal steps improved ✨");
+            toast.success('Goal steps improved ✨');
           }}
           onClose={() => setImproving(false)}
         />

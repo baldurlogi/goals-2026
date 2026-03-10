@@ -1,13 +1,14 @@
-import { loadProfile } from "@/features/onboarding/profileStorage";
-import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
-import { loadUserGoals } from "@/features/goals/userGoalStorage";
-import { loadFitness } from "@/features/fitness/fitnessStorage";
+import { loadProfile } from '@/features/onboarding/profileStorage';
+import { DEFAULT_MODULES, type ModuleId } from '@/features/modules/modules';
+import { loadUserGoals } from '@/features/goals/userGoalStorage';
+import { loadFitness } from '@/features/fitness/fitnessStorage';
 import {
   loadNutritionLog,
   loadPhase,
-} from "@/features/nutrition/nutritionStorage";
+} from '@/features/nutrition/nutritionStorage';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
 
-const CACHE_KEY = "cache:ai-signals:v1";
+const CACHE_KEY = 'cache:ai-signals:v1';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 type GoalLike = {
@@ -55,7 +56,7 @@ export type AISignals = {
     activityLevel: string | null;
     preferredScheduleView: string | null;
     dailyReadingGoal: number | null;
-    tier: "free" | "pro" | "pro_max" | null;
+    tier: 'free' | 'pro' | 'pro_max' | null;
   };
   goals: {
     count: number;
@@ -71,7 +72,7 @@ export type AISignals = {
     }>;
   };
   nutrition: {
-    phase: "maintain" | "cut";
+    phase: 'maintain' | 'cut';
     mealsLoggedToday: number;
     calorieTarget: number | null;
     proteinTarget: number | null;
@@ -122,7 +123,7 @@ function normalizeModules(modules: ModuleId[] | null | undefined): ModuleId[] {
 
 function readReadingState(): ReadingState {
   try {
-    const raw = localStorage.getItem("daily-life:reading:v2");
+    const raw = localStorage.getItem('daily-life:reading:v2');
     if (!raw) {
       return {
         currentBookTitle: null,
@@ -156,18 +157,21 @@ function readReadingState(): ReadingState {
 
     return {
       currentBookTitle:
-        typeof book?.title === "string" && book.title !== "Current book"
+        typeof book?.title === 'string' && book.title !== 'Current book'
           ? book.title
           : null,
-      author: typeof book?.author === "string" ? book.author : null,
+      author: typeof book?.author === 'string' ? book.author : null,
       currentPage:
-        typeof book?.currentPage === "number" ? book.currentPage : null,
-      totalPages: typeof book?.totalPages === "number" ? book.totalPages : null,
-      streak: typeof parsed.streak?.streak === "number" ? parsed.streak.streak : 0,
+        typeof book?.currentPage === 'number' ? book.currentPage : null,
+      totalPages: typeof book?.totalPages === 'number' ? book.totalPages : null,
+      streak:
+        typeof parsed.streak?.streak === 'number' ? parsed.streak.streak : 0,
       minutesToday:
-        typeof parsed.minutes?.minutes === "number" ? parsed.minutes.minutes : 0,
+        typeof parsed.minutes?.minutes === 'number'
+          ? parsed.minutes.minutes
+          : 0,
       targetMinutes:
-        typeof parsed.minutes?.target === "number" ? parsed.minutes.target : 30,
+        typeof parsed.minutes?.target === 'number' ? parsed.minutes.target : 30,
     };
   } catch {
     return {
@@ -182,9 +186,9 @@ function readReadingState(): ReadingState {
   }
 }
 
-function readTodosSignal(): AISignals["todos"] {
+function readTodosSignal(): AISignals['todos'] {
   try {
-    const raw = localStorage.getItem("todos_v1");
+    const raw = localStorage.getItem('todos_v1');
     if (!raw) return null;
 
     const todos = JSON.parse(raw) as Array<{
@@ -194,9 +198,10 @@ function readTodosSignal(): AISignals["todos"] {
 
     if (!Array.isArray(todos)) return null;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateKey();
     const todayTodos = todos.filter(
-      (t) => typeof t.created_at === "string" && t.created_at.slice(0, 10) === today,
+      (t) =>
+        typeof t.created_at === 'string' && t.created_at.slice(0, 10) === today,
     );
 
     return {
@@ -208,14 +213,14 @@ function readTodosSignal(): AISignals["todos"] {
   }
 }
 
-function readScheduleSignal(): AISignals["schedule"] {
+function readScheduleSignal(): AISignals['schedule'] {
   return null;
 }
 
 function priorityRank(priority: string | undefined): number {
-  if (priority === "high") return 0;
-  if (priority === "medium") return 1;
-  if (priority === "low") return 2;
+  if (priority === 'high') return 0;
+  if (priority === 'medium') return 1;
+  if (priority === 'low') return 2;
   return 99;
 }
 
@@ -226,9 +231,7 @@ function daysSince(isoDate: string | null): number | null {
   return Math.floor((Date.now() - t) / 86_400_000);
 }
 
-export async function buildAISignals(
-  forceRefresh = false,
-): Promise<AISignals> {
+export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
   if (!forceRefresh) {
     const cached = readCache();
     if (cached) return cached;
@@ -240,7 +243,7 @@ export async function buildAISignals(
       Promise.resolve(loadUserGoals()).catch(() => []),
       Promise.resolve(loadFitness()).catch(() => null),
       Promise.resolve(loadNutritionLog()).catch(() => null),
-      Promise.resolve(loadPhase()).catch(() => "maintain" as const),
+      Promise.resolve(loadPhase()).catch(() => 'maintain' as const),
     ]);
 
   const reading = readReadingState();
@@ -254,7 +257,7 @@ export async function buildAISignals(
     (a, b) => priorityRank(a.priority) - priorityRank(b.priority),
   );
   const highestPriorityGoal = sortedGoals[0] ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
 
   const overdueSteps = goalList.reduce((count, goal) => {
     const steps = Array.isArray(goal.steps) ? goal.steps : [];
@@ -262,7 +265,7 @@ export async function buildAISignals(
       count +
       steps.filter(
         (s) =>
-          typeof s.idealFinish === "string" &&
+          typeof s.idealFinish === 'string' &&
           s.idealFinish.length > 0 &&
           s.idealFinish < today,
       ).length
@@ -274,58 +277,58 @@ export async function buildAISignals(
 
   const allWorkoutDates = lifts.flatMap((lift) =>
     Array.isArray(lift.history)
-      ? lift.history
-          .map((entry) => (typeof entry.date === "string" ? entry.date : null))
-          .filter(Boolean) as string[]
+      ? (lift.history
+          .map((entry) => (typeof entry.date === 'string' ? entry.date : null))
+          .filter(Boolean) as string[])
       : [],
   );
 
-  const latestWorkoutDate =
-    [...allWorkoutDates].sort().at(-1) ?? null;
+  const latestWorkoutDate = [...allWorkoutDates].sort().at(-1) ?? null;
 
   const liftProgress = lifts
     .map((lift) => {
       const history = Array.isArray(lift.history) ? lift.history : [];
       const best = history.reduce<number | null>((acc, entry) => {
-        if (typeof entry.value !== "number") return acc;
+        if (typeof entry.value !== 'number') return acc;
         if (acc === null || entry.value > acc) return entry.value;
         return acc;
       }, null);
 
-      const goal = typeof lift.goal === "number" ? lift.goal : null;
+      const goal = typeof lift.goal === 'number' ? lift.goal : null;
       const pct =
-        best !== null && goal && goal > 0 ? Math.round((best / goal) * 100) : null;
+        best !== null && goal && goal > 0
+          ? Math.round((best / goal) * 100)
+          : null;
 
       return {
         label: lift.label ?? null,
         pct,
       };
     })
-    .filter((lift) => typeof lift.label === "string");
+    .filter((lift) => typeof lift.label === 'string');
 
   const strongestLift =
     [...liftProgress]
-      .filter((l) => typeof l.pct === "number")
+      .filter((l) => typeof l.pct === 'number')
       .sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))[0]?.label ?? null;
 
   const weakestLift =
     [...liftProgress]
-      .filter((l) => typeof l.pct === "number")
+      .filter((l) => typeof l.pct === 'number')
       .sort((a, b) => (a.pct ?? 0) - (b.pct ?? 0))[0]?.label ?? null;
 
   const profileMacros =
-    nutritionPhase === "cut"
-      ? profile?.macro_cut
-      : profile?.macro_maintain;
+    nutritionPhase === 'cut' ? profile?.macro_cut : profile?.macro_maintain;
 
   const mealsLoggedToday =
-    nutritionLog && typeof nutritionLog === "object"
-      ? Object.values((nutritionLog as { eaten?: Record<string, boolean> }).eaten ?? {})
-          .filter(Boolean).length
+    nutritionLog && typeof nutritionLog === 'object'
+      ? Object.values(
+          (nutritionLog as { eaten?: Record<string, boolean> }).eaten ?? {},
+        ).filter(Boolean).length
       : 0;
 
   const signals: AISignals = {
-    builtAt: new Date().toISOString(),
+    builtAt: getLocalDateKey(),
     modules,
     profile: {
       displayName: profile?.display_name ?? null,
@@ -341,21 +344,21 @@ export async function buildAISignals(
       overdueSteps,
       nextStepLabel:
         Array.isArray(highestPriorityGoal?.steps) &&
-        typeof highestPriorityGoal?.steps[0]?.label === "string"
-          ? highestPriorityGoal.steps[0].label ?? null
+        typeof highestPriorityGoal?.steps[0]?.label === 'string'
+          ? (highestPriorityGoal.steps[0].label ?? null)
           : null,
       topGoals: sortedGoals.slice(0, 5).map((goal) => ({
-        title: goal.title ?? "Untitled goal",
+        title: goal.title ?? 'Untitled goal',
         priority: goal.priority ?? null,
         nextStepLabel:
-          Array.isArray(goal.steps) && typeof goal.steps[0]?.label === "string"
-            ? goal.steps[0].label ?? null
+          Array.isArray(goal.steps) && typeof goal.steps[0]?.label === 'string'
+            ? (goal.steps[0].label ?? null)
             : null,
         stepCount: Array.isArray(goal.steps) ? goal.steps.length : 0,
       })),
     },
     nutrition: {
-      phase: nutritionPhase === "cut" ? "cut" : "maintain",
+      phase: nutritionPhase === 'cut' ? 'cut' : 'maintain',
       mealsLoggedToday,
       calorieTarget: profileMacros?.cal ?? null,
       proteinTarget: profileMacros?.protein ?? null,

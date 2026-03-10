@@ -1,38 +1,59 @@
-import { useEffect, useRef, useState } from "react";
-import { Trash2, Plus, Sparkles, ArrowLeft, Loader2, Zap } from "lucide-react";
-import { toast } from "sonner";
-import { getAISystemContext } from "@/features/ai/buildAIContext";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { useEffect, useRef, useState } from 'react';
+import { Trash2, Plus, Sparkles, ArrowLeft, Loader2, Zap } from 'lucide-react';
+import { toast } from 'sonner';
+import { getAISystemContext } from '@/features/ai/buildAIContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import {
   createBlankGoal,
   createBlankStep,
   saveUserGoal,
-} from "../userGoalStorage";
-import type { UserGoal, UserGoalStep } from "../goalTypes";
-import { supabase } from "@/lib/supabaseClient";
+} from '../userGoalStorage';
+import type { UserGoal, UserGoalStep } from '../goalTypes';
+import { supabase } from '@/lib/supabaseClient';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
 
-const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
-const PRIORITY_COLOR: Record<UserGoal["priority"], string> = {
-  high:   "border-rose-500/40 bg-rose-500/10 text-rose-400",
-  medium: "border-amber-500/40 bg-amber-500/10 text-amber-400",
-  low:    "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
+
+const PRIORITY_OPTIONS: UserGoal['priority'][] = ['high', 'medium', 'low'];
+const PRIORITY_COLOR: Record<UserGoal['priority'], string> = {
+  high: 'border-rose-500/40 bg-rose-500/10 text-rose-400',
+  medium: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+  low: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
 };
 
-const EMOJI_SUGGESTIONS = ["🎯","💪","📚","💰","🏃","✈️","💻","🎬","🎓","🌱","🏋️","🎨","🚀","❤️","🧘","🧴","🧠","💼"];
-
-const PROMPT_EXAMPLES = [
-  "I want to run a marathon by October",
-  "Save 50,000 DKK before end of year",
-  "Launch my freelance business and get 3 clients",
-  "Read 24 books this year",
-  "Learn TypeScript and React deeply",
-  "Build a consistent skincare routine",
+const EMOJI_SUGGESTIONS = [
+  '🎯',
+  '💪',
+  '📚',
+  '💰',
+  '🏃',
+  '✈️',
+  '💻',
+  '🎬',
+  '🎓',
+  '🌱',
+  '🏋️',
+  '🎨',
+  '🚀',
+  '❤️',
+  '🧘',
+  '🧴',
+  '🧠',
+  '💼',
 ];
 
-type Mode = "ai" | "manual";
+const PROMPT_EXAMPLES = [
+  'I want to run a marathon by October',
+  'Save 50,000 DKK before end of year',
+  'Launch my freelance business and get 3 clients',
+  'Read 24 books this year',
+  'Learn TypeScript and React deeply',
+  'Build a consistent skincare routine',
+];
+
+type Mode = 'ai' | 'manual';
 
 type Props = {
   initial?: UserGoal;
@@ -51,7 +72,7 @@ type AIUsage = {
 };
 
 type AILimitPayload = {
-  error: "monthly_limit_reached";
+  error: 'monthly_limit_reached';
   message: string;
   tier: string;
   monthly_limit: number;
@@ -64,7 +85,7 @@ class AILimitError extends Error {
   limit: number;
   constructor(payload: AILimitPayload) {
     super(payload.message);
-    this.name = "AILimitError";
+    this.name = 'AILimitError';
     this.tier = payload.tier;
     this.limit = payload.monthly_limit;
   }
@@ -72,60 +93,74 @@ class AILimitError extends Error {
 
 // ── AI generation ─────────────────────────────────────────────────────────
 
-const USE_MOCK_AI = import.meta.env.VITE_USE_MOCK_AI === "true";
+const USE_MOCK_AI = import.meta.env.VITE_USE_MOCK_AI === 'true';
 
-function isPriority(value: unknown): value is UserGoal["priority"] {
-  return value === "high" || value === "medium" || value === "low";
+function isPriority(value: unknown): value is UserGoal['priority'] {
+  return value === 'high' || value === 'medium' || value === 'low';
 }
 
 async function generateGoalFromPrompt(
   prompt: string,
-  stepCount: number
+  stepCount: number,
 ): Promise<{ goal: UserGoal; usage: AIUsage }> {
   if (USE_MOCK_AI) {
     const blank = createBlankGoal();
     return {
       goal: {
         ...blank,
-        title: "Run marathon by October",
-        subtitle: "Build up endurance and complete a marathon by your target month.",
-        emoji: "🏃",
-        priority: "high",
+        title: 'Run marathon by October',
+        subtitle:
+          'Build up endurance and complete a marathon by your target month.',
+        emoji: '🏃',
+        priority: 'high',
         steps: Array.from({ length: stepCount }, (_, i) => ({
           ...createBlankStep(i),
-          label: [
-            "Choose a marathon race", "Set a weekly running schedule",
-            "Build base mileage", "Add a long run each week",
-            "Improve pacing and recovery", "Practice fueling strategy",
-            "Run a half-marathon benchmark", "Start taper plan",
-            "Finalize race logistics", "Run the marathon",
-          ][i] ?? `Complete milestone ${i + 1}`,
-          notes: "AI mock step for UI testing.",
+          label:
+            [
+              'Choose a marathon race',
+              'Set a weekly running schedule',
+              'Build base mileage',
+              'Add a long run each week',
+              'Improve pacing and recovery',
+              'Practice fueling strategy',
+              'Run a half-marathon benchmark',
+              'Start taper plan',
+              'Finalize race logistics',
+              'Run the marathon',
+            ][i] ?? `Complete milestone ${i + 1}`,
+          notes: 'AI mock step for UI testing.',
           idealFinish: null,
-          estimatedTime: i === stepCount - 1 ? "ongoing" : "1-2 hours",
+          estimatedTime: i === stepCount - 1 ? 'ongoing' : '1-2 hours',
         })),
       },
-      usage: { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: "free" },
+      usage: { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: 'free' },
     };
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error("You must be signed in to generate AI goals.");
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token)
+    throw new Error('You must be signed in to generate AI goals.');
 
   // Build personalised context — falls back gracefully if profile not set up yet
-  let userContext = "";
-  try { userContext = await getAISystemContext(); } catch { /* non-fatal */ }
+  let userContext = '';
+  try {
+    userContext = await getAISystemContext();
+  } catch {
+    /* non-fatal */
+  }
 
   const response = await fetch(
-    "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder",
+    'https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder',
     {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ prompt, stepCount, userContext }),
-    }
+    },
   );
 
   const raw = await response.text();
@@ -134,7 +169,8 @@ async function generateGoalFromPrompt(
   if (response.status === 429) {
     try {
       const payload = JSON.parse(raw) as AILimitPayload;
-      if (payload.error === "monthly_limit_reached") throw new AILimitError(payload);
+      if (payload.error === 'monthly_limit_reached')
+        throw new AILimitError(payload);
     } catch (e) {
       if (e instanceof AILimitError) throw e;
     }
@@ -143,42 +179,65 @@ async function generateGoalFromPrompt(
   if (!response.ok) {
     let message = `Edge function failed (${response.status})`;
     try {
-      const e = JSON.parse(raw) as { error?: string; details?: string; raw_text?: string };
+      const e = JSON.parse(raw) as {
+        error?: string;
+        details?: string;
+        raw_text?: string;
+      };
       if (e.error) {
         message = e.error;
-        if (e.details)  message += `: ${e.details}`;
+        if (e.details) message += `: ${e.details}`;
         if (e.raw_text) message += `: ${e.raw_text}`;
       }
-    } catch { if (raw) message += `: ${raw}`; }
+    } catch {
+      if (raw) message += `: ${raw}`;
+    }
     throw new Error(message);
   }
 
   // Response shape: { goal, usage }
   let data: { goal?: unknown; usage?: unknown };
-  try { data = JSON.parse(raw); }
-  catch { throw new Error("AI returned invalid response. Please try again."); }
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error('AI returned invalid response. Please try again.');
+  }
 
   // Fallback: if edge function still returns bare goal (old deploy), handle gracefully
   const result = (data.goal ?? data) as Record<string, unknown>;
-  const usage = (data.usage ?? { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: "free" }) as AIUsage;
+  const usage = (data.usage ?? {
+    prompts_used: 1,
+    monthly_limit: 10,
+    remaining: 9,
+    tier: 'free',
+  }) as AIUsage;
 
   const blank = createBlankGoal();
   const goal: UserGoal = {
     ...blank,
-    title:    typeof result.title    === "string" ? result.title    : "",
-    subtitle: typeof result.subtitle === "string" ? result.subtitle : "",
-    emoji:    typeof result.emoji    === "string" && result.emoji.trim() ? result.emoji : "🎯",
-    priority: isPriority(result.priority) ? result.priority : "medium",
+    title: typeof result.title === 'string' ? result.title : '',
+    subtitle: typeof result.subtitle === 'string' ? result.subtitle : '',
+    emoji:
+      typeof result.emoji === 'string' && result.emoji.trim()
+        ? result.emoji
+        : '🎯',
+    priority: isPriority(result.priority) ? result.priority : 'medium',
     steps: Array.isArray(result.steps)
       ? (result.steps as Record<string, unknown>[])
-          .filter((s) => typeof s?.label === "string" && (s.label as string).trim().length > 0)
+          .filter(
+            (s) =>
+              typeof s?.label === 'string' &&
+              (s.label as string).trim().length > 0,
+          )
           .slice(0, stepCount)
           .map((s, i) => ({
             ...createBlankStep(i),
-            label:         typeof s.label         === "string" ? s.label         : "",
-            notes:         typeof s.notes         === "string" ? s.notes         : "",
-            idealFinish:   typeof s.idealFinish   === "string" ? s.idealFinish   : null,
-            estimatedTime: typeof s.estimatedTime === "string" ? s.estimatedTime : "",
+            label: typeof s.label === 'string' ? s.label : '',
+            notes: typeof s.notes === 'string' ? s.notes : '',
+            idealFinish:
+              typeof s.idealFinish === 'string' ? s.idealFinish : null,
+            estimatedTime:
+              typeof s.estimatedTime === 'string' ? s.estimatedTime : '',
           }))
       : [],
   };
@@ -195,16 +254,18 @@ function AIPromptScreen({
   onGenerated: (goal: UserGoal) => void;
   onBack: () => void;
 }) {
-  const [prompt, setPrompt]       = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-  const [limitHit, setLimitHit]   = useState(false);
-  const [limitTier, setLimitTier] = useState("free");
-  const [usage, setUsage]         = useState<AIUsage | null>(null);
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [limitHit, setLimitHit] = useState(false);
+  const [limitTier, setLimitTier] = useState('free');
+  const [usage, setUsage] = useState<AIUsage | null>(null);
   const [stepCount, setStepCount] = useState(8);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { textareaRef.current?.focus(); }, []);
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   async function handleGenerate() {
     if (!prompt.trim()) return;
@@ -213,7 +274,10 @@ function AIPromptScreen({
     setLimitHit(false);
 
     try {
-      const { goal, usage: u } = await generateGoalFromPrompt(prompt.trim(), stepCount);
+      const { goal, usage: u } = await generateGoalFromPrompt(
+        prompt.trim(),
+        stepCount,
+      );
       setUsage(u);
       onGenerated(goal);
     } catch (e) {
@@ -221,7 +285,9 @@ function AIPromptScreen({
         setLimitTier(e.tier);
         setLimitHit(true);
       } else {
-        setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+        setError(
+          e instanceof Error ? e.message : 'Something went wrong. Try again.',
+        );
       }
     } finally {
       setLoading(false);
@@ -238,21 +304,21 @@ function AIPromptScreen({
         <div>
           <p className="text-base font-semibold">Monthly AI limit reached</p>
           <p className="mt-1 text-sm text-muted-foreground max-w-xs">
-            {limitTier === "free"
+            {limitTier === 'free'
               ? "You've used all 10 free AI prompts this month. Upgrade to Pro for 200 prompts/month."
-              : limitTier === "pro"
-              ? "You've used all 200 Pro prompts this month. Upgrade to Pro Max for 1,000 prompts/month."
-              : "You've used all 1,000 prompts this month. Your limit resets on the 1st."}
+              : limitTier === 'pro'
+                ? "You've used all 200 Pro prompts this month. Upgrade to Pro Max for 1,000 prompts/month."
+                : "You've used all 1,000 prompts this month. Your limit resets on the 1st."}
           </p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" size="sm" onClick={onBack}>
             Create manually
           </Button>
-          {limitTier !== "pro_max" && (
+          {limitTier !== 'pro_max' && (
             <Button size="sm" className="gap-1.5">
               <Zap className="h-3.5 w-3.5" />
-              {limitTier === "free" ? "Upgrade to Pro" : "Upgrade to Pro Max"}
+              {limitTier === 'free' ? 'Upgrade to Pro' : 'Upgrade to Pro Max'}
             </Button>
           )}
         </div>
@@ -268,7 +334,8 @@ function AIPromptScreen({
           <span className="text-sm font-semibold">Describe your goal</span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Tell Claude what you want to achieve — it will create a structured plan with steps and due dates.
+          Tell Claude what you want to achieve — it will create a structured
+          plan with steps and due dates.
         </p>
       </div>
 
@@ -280,12 +347,14 @@ function AIPromptScreen({
         rows={4}
         className="resize-none text-sm"
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleGenerate();
         }}
       />
 
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">How many steps?</p>
+        <p className="text-xs font-medium text-muted-foreground">
+          How many steps?
+        </p>
         <div className="flex flex-wrap gap-2">
           {[5, 6, 8, 10, 12].map((count) => (
             <button
@@ -293,10 +362,10 @@ function AIPromptScreen({
               type="button"
               onClick={() => setStepCount(count)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                 stepCount === count
-                  ? "border-primary/40 bg-primary/10 text-primary"
-                  : "border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? 'border-primary/40 bg-primary/10 text-primary'
+                  : 'border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
               {count} steps
@@ -316,16 +385,30 @@ function AIPromptScreen({
         <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <Sparkles className="h-3 w-3 shrink-0 text-primary" />
           <span>
-            <span className="font-semibold text-foreground">{usage.remaining}</span> AI prompts remaining this month
-            {usage.tier !== "pro_max" && (
-              <> · <button type="button" className="underline hover:text-foreground">Upgrade for more</button></>
+            <span className="font-semibold text-foreground">
+              {usage.remaining}
+            </span>{' '}
+            AI prompts remaining this month
+            {usage.tier !== 'pro_max' && (
+              <>
+                {' '}
+                ·{' '}
+                <button
+                  type="button"
+                  className="underline hover:text-foreground"
+                >
+                  Upgrade for more
+                </button>
+              </>
             )}
           </span>
         </div>
       )}
 
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">Try an example</p>
+        <p className="text-xs font-medium text-muted-foreground">
+          Try an example
+        </p>
         <div className="flex flex-wrap gap-2">
           {PROMPT_EXAMPLES.map((ex) => (
             <button
@@ -364,9 +447,13 @@ function AIPromptScreen({
           className="min-w-36 gap-2"
         >
           {loading ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…</>
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…
+            </>
           ) : (
-            <><Sparkles className="h-3.5 w-3.5" /> Generate plan</>
+            <>
+              <Sparkles className="h-3.5 w-3.5" /> Generate plan
+            </>
           )}
         </Button>
       </div>
@@ -376,26 +463,35 @@ function AIPromptScreen({
 
 // ── Main modal ────────────────────────────────────────────────────────────
 
-export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false }: Props) {
+export function AddEditGoalModal({
+  initial,
+  onSave,
+  onClose,
+  startWithAI = false,
+}: Props) {
   const isEdit = !!initial;
-  const [mode, setMode]     = useState<Mode>(isEdit ? "manual" : (startWithAI ? "ai" : "manual"));
-  const [goal, setGoal]     = useState<UserGoal>(() => initial ?? createBlankGoal());
+  const [mode, setMode] = useState<Mode>(
+    isEdit ? 'manual' : startWithAI ? 'ai' : 'manual',
+  );
+  const [goal, setGoal] = useState<UserGoal>(
+    () => initial ?? createBlankGoal(),
+  );
   const [saving, setSaving] = useState(false);
-  const [openStepId, setOpenStepId]           = useState<string | null>(null);
+  const [openStepId, setOpenStepId] = useState<string | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (mode === "manual") titleRef.current?.focus();
+    if (mode === 'manual') titleRef.current?.focus();
   }, [mode]);
 
   function updateGoal(patch: Partial<UserGoal>) {
-    setGoal((g) => ({ ...g, ...patch, updatedAt: new Date().toISOString() }));
+    setGoal((g) => ({ ...g, ...patch, updatedAt: getLocalDateKey() }));
   }
 
   function handleAIGenerated(generated: UserGoal) {
     setGoal(generated);
-    setMode("manual");
+    setMode('manual');
   }
 
   function addStep() {
@@ -405,7 +501,9 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
   }
 
   function updateStep(id: string, patch: Partial<UserGoalStep>) {
-    updateGoal({ steps: goal.steps.map((s) => s.id === id ? { ...s, ...patch } : s) });
+    updateGoal({
+      steps: goal.steps.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+    });
   }
 
   function removeStep(id: string) {
@@ -415,8 +513,8 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
 
   function moveStep(id: string, dir: -1 | 1) {
     const steps = [...goal.steps];
-    const idx   = steps.findIndex((s) => s.id === id);
-    const next  = idx + dir;
+    const idx = steps.findIndex((s) => s.id === id);
+    const next = idx + dir;
     if (next < 0 || next >= steps.length) return;
     [steps[idx], steps[next]] = [steps[next], steps[idx]];
     updateGoal({ steps: steps.map((s, i) => ({ ...s, sortOrder: i })) });
@@ -440,7 +538,7 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
     setSaving(true);
     try {
       await saveUserGoal(trimmedGoal);
-      toast.success(isEdit ? "Goal updated" : "Goal created");
+      toast.success(isEdit ? 'Goal updated' : 'Goal created');
       onSave(trimmedGoal);
     } catch {
       toast.error("Couldn't save goal. Please try again.");
@@ -454,7 +552,9 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center px-0 sm:px-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="relative w-full sm:max-w-2xl max-h-[92dvh] flex flex-col rounded-t-2xl sm:rounded-2xl border bg-card shadow-2xl overflow-hidden"
@@ -464,44 +564,58 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold">
-              {isEdit ? "Edit goal" : mode === "ai" ? "AI goal planner" : "New goal"}
+              {isEdit
+                ? 'Edit goal'
+                : mode === 'ai'
+                  ? 'AI goal planner'
+                  : 'New goal'}
             </h2>
-            {mode === "manual" && goal.title && !isEdit && goal.steps.length > 0 && (
-              <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                <Sparkles className="h-2.5 w-2.5" /> AI generated · review & edit
-              </span>
-            )}
+            {mode === 'manual' &&
+              goal.title &&
+              !isEdit &&
+              goal.steps.length > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  <Sparkles className="h-2.5 w-2.5" /> AI generated · review &
+                  edit
+                </span>
+              )}
           </div>
 
           <div className="flex items-center gap-2">
             {!isEdit && (
               <button
                 type="button"
-                onClick={() => setMode((m) => m === "ai" ? "manual" : "ai")}
+                onClick={() => setMode((m) => (m === 'ai' ? 'manual' : 'ai'))}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  mode === "ai"
-                    ? "border-primary/40 bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
+                  'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                  mode === 'ai'
+                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:text-foreground',
                 )}
               >
                 <Sparkles className="h-3 w-3" />
-                {mode === "ai" ? "AI mode" : "Use AI"}
+                {mode === 'ai' ? 'AI mode' : 'Use AI'}
               </button>
             )}
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">
+            <button
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground text-xl leading-none"
+            >
               ×
             </button>
           </div>
         </div>
 
         {/* AI screen */}
-        {mode === "ai" && (
-          <AIPromptScreen onGenerated={handleAIGenerated} onBack={() => setMode("manual")} />
+        {mode === 'ai' && (
+          <AIPromptScreen
+            onGenerated={handleAIGenerated}
+            onBack={() => setMode('manual')}
+          />
         )}
 
         {/* Manual / review form */}
-        {mode === "manual" && (
+        {mode === 'manual' && (
           <>
             <div className="overflow-y-auto flex-1 px-5 py-5 space-y-5">
               {/* Emoji + Title */}
@@ -517,34 +631,57 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
                   {emojiPickerOpen && (
                     <div className="absolute top-14 left-0 z-10 flex flex-wrap gap-1.5 p-3 rounded-xl border bg-popover shadow-xl w-56">
                       {EMOJI_SUGGESTIONS.map((e) => (
-                        <button key={e} type="button"
-                          onClick={() => { updateGoal({ emoji: e }); setEmojiPickerOpen(false); }}
+                        <button
+                          key={e}
+                          type="button"
+                          onClick={() => {
+                            updateGoal({ emoji: e });
+                            setEmojiPickerOpen(false);
+                          }}
                           className="text-xl w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted"
-                        >{e}</button>
+                        >
+                          {e}
+                        </button>
                       ))}
                     </div>
                   )}
                 </div>
                 <div className="flex-1 space-y-2">
-                  <Input ref={titleRef} placeholder="Goal title *" value={goal.title}
+                  <Input
+                    ref={titleRef}
+                    placeholder="Goal title *"
+                    value={goal.title}
                     onChange={(e) => updateGoal({ title: e.target.value })}
-                    className="text-base font-medium" />
-                  <Input placeholder="Short description (optional)" value={goal.subtitle}
-                    onChange={(e) => updateGoal({ subtitle: e.target.value })} />
+                    className="text-base font-medium"
+                  />
+                  <Input
+                    placeholder="Short description (optional)"
+                    value={goal.subtitle}
+                    onChange={(e) => updateGoal({ subtitle: e.target.value })}
+                  />
                 </div>
               </div>
 
               {/* Priority */}
               <div className="space-y-1.5">
-                <div className="text-xs text-muted-foreground font-medium">Priority</div>
+                <div className="text-xs text-muted-foreground font-medium">
+                  Priority
+                </div>
                 <div className="flex gap-2">
                   {PRIORITY_OPTIONS.map((p) => (
-                    <button key={p} type="button" onClick={() => updateGoal({ priority: p })}
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => updateGoal({ priority: p })}
                       className={cn(
-                        "rounded-full border px-4 py-1.5 text-xs font-semibold capitalize transition-all",
-                        goal.priority === p ? PRIORITY_COLOR[p] : "border-border text-muted-foreground hover:border-primary/40"
+                        'rounded-full border px-4 py-1.5 text-xs font-semibold capitalize transition-all',
+                        goal.priority === p
+                          ? PRIORITY_COLOR[p]
+                          : 'border-border text-muted-foreground hover:border-primary/40',
                       )}
-                    >{p}</button>
+                    >
+                      {p}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -555,7 +692,12 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
                   <div className="text-xs text-muted-foreground font-medium">
                     Steps ({goal.steps.length})
                   </div>
-                  <Button variant="ghost" size="sm" onClick={addStep} className="gap-1 h-7 text-xs">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={addStep}
+                    className="gap-1 h-7 text-xs"
+                  >
                     <Plus className="h-3 w-3" /> Add step
                   </Button>
                 </div>
@@ -570,46 +712,102 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
                   {goal.steps.map((step, idx) => {
                     const isOpen = openStepId === step.id;
                     return (
-                      <div key={step.id} className="rounded-xl border bg-muted/20">
+                      <div
+                        key={step.id}
+                        className="rounded-xl border bg-muted/20"
+                      >
                         <div className="flex items-center gap-2 px-3 py-2.5">
                           <div className="flex flex-col gap-0.5 shrink-0">
-                            <button type="button" onClick={() => moveStep(step.id, -1)} disabled={idx === 0}
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 leading-none text-xs">▲</button>
-                            <button type="button" onClick={() => moveStep(step.id, 1)} disabled={idx === goal.steps.length - 1}
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 leading-none text-xs">▼</button>
+                            <button
+                              type="button"
+                              onClick={() => moveStep(step.id, -1)}
+                              disabled={idx === 0}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 leading-none text-xs"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveStep(step.id, 1)}
+                              disabled={idx === goal.steps.length - 1}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 leading-none text-xs"
+                            >
+                              ▼
+                            </button>
                           </div>
-                          <span className="text-xs text-muted-foreground w-5 text-center shrink-0">{idx + 1}</span>
-                          <Input placeholder="Step label *" value={step.label}
-                            onChange={(e) => updateStep(step.id, { label: e.target.value })}
+                          <span className="text-xs text-muted-foreground w-5 text-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <Input
+                            placeholder="Step label *"
+                            value={step.label}
+                            onChange={(e) =>
+                              updateStep(step.id, { label: e.target.value })
+                            }
                             className="flex-1 h-8 text-sm"
-                            onClick={() => setOpenStepId(isOpen ? null : step.id)} />
-                          <button type="button" onClick={() => setOpenStepId(isOpen ? null : step.id)}
-                            className="text-xs text-muted-foreground hover:text-foreground shrink-0">
-                            {isOpen ? "▲" : "▼"}
+                            onClick={() =>
+                              setOpenStepId(isOpen ? null : step.id)
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenStepId(isOpen ? null : step.id)
+                            }
+                            className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+                          >
+                            {isOpen ? '▲' : '▼'}
                           </button>
-                          <button type="button" onClick={() => removeStep(step.id)}
-                            className="text-muted-foreground hover:text-destructive shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => removeStep(step.id)}
+                            className="text-muted-foreground hover:text-destructive shrink-0"
+                          >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
 
                         {isOpen && (
                           <div className="px-3 pb-3 space-y-2 border-t pt-3">
-                            <Textarea placeholder="Notes (optional)" value={step.notes}
-                              onChange={(e) => updateStep(step.id, { notes: e.target.value })}
-                              rows={2} className="text-sm resize-none" />
+                            <Textarea
+                              placeholder="Notes (optional)"
+                              value={step.notes}
+                              onChange={(e) =>
+                                updateStep(step.id, { notes: e.target.value })
+                              }
+                              rows={2}
+                              className="text-sm resize-none"
+                            />
                             <div className="grid grid-cols-2 gap-2">
                               <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">Due date</div>
-                                <Input type="date" value={step.idealFinish ?? ""}
-                                  onChange={(e) => updateStep(step.id, { idealFinish: e.target.value || null })}
-                                  className="h-8 text-sm" />
+                                <div className="text-xs text-muted-foreground">
+                                  Due date
+                                </div>
+                                <Input
+                                  type="date"
+                                  value={step.idealFinish ?? ''}
+                                  onChange={(e) =>
+                                    updateStep(step.id, {
+                                      idealFinish: e.target.value || null,
+                                    })
+                                  }
+                                  className="h-8 text-sm"
+                                />
                               </div>
                               <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">Est. time</div>
-                                <Input placeholder="e.g. 30 min" value={step.estimatedTime}
-                                  onChange={(e) => updateStep(step.id, { estimatedTime: e.target.value })}
-                                  className="h-8 text-sm" />
+                                <div className="text-xs text-muted-foreground">
+                                  Est. time
+                                </div>
+                                <Input
+                                  placeholder="e.g. 30 min"
+                                  value={step.estimatedTime}
+                                  onChange={(e) =>
+                                    updateStep(step.id, {
+                                      estimatedTime: e.target.value,
+                                    })
+                                  }
+                                  className="h-8 text-sm"
+                                />
                               </div>
                             </div>
                           </div>
@@ -623,9 +821,15 @@ export function AddEditGoalModal({ initial, onSave, onClose, startWithAI = false
 
             {/* Footer */}
             <div className="flex items-center justify-between gap-3 px-5 py-4 border-t shrink-0">
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleSave} disabled={!isValid || saving} className="min-w-28">
-                {saving ? "Saving…" : isEdit ? "Save changes" : "Create goal"}
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={!isValid || saving}
+                className="min-w-28"
+              >
+                {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create goal'}
               </Button>
             </div>
           </>

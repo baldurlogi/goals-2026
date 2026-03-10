@@ -1,13 +1,15 @@
-import { Link } from "react-router-dom";
-import { Pencil, Trash2, Sparkles } from "lucide-react";
-import type { UserGoal } from "../goalTypes";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
+import { Link } from 'react-router-dom';
+import { Pencil, Trash2, Sparkles } from 'lucide-react';
+import type { UserGoal } from '../goalTypes';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
+
 
 const PRIORITY_COLOR: Record<string, string> = {
-  high:   "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-  medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  low:    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  high: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+  medium: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  low: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
 };
 
 type Props = {
@@ -19,15 +21,22 @@ type Props = {
   onImprove?: () => void;
 };
 
-export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelete, onImprove }: Props) {
+export function GoalCard({
+  goal,
+  doneMap = {},
+  overdueCount = 0,
+  onEdit,
+  onDelete,
+  onImprove,
+}: Props) {
   const total = goal.steps.length;
   const doneCount = goal.steps.filter((s) => doneMap[s.id]).length;
   const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
 
   // Count overdue steps
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
   const overdueSteps = goal.steps.filter(
-    (s) => s.idealFinish && s.idealFinish < today && !doneMap[s.id]
+    (s) => s.idealFinish && s.idealFinish < today && !doneMap[s.id],
   ).length;
   const displayOverdue = overdueCount || overdueSteps;
 
@@ -39,10 +48,12 @@ export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelet
             <span className="text-lg">{goal.emoji}</span>
             <h3 className="text-base font-semibold">{goal.title}</h3>
 
-            <span className={[
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize",
-              PRIORITY_COLOR[goal.priority] ?? PRIORITY_COLOR.low,
-            ].join(" ")}>
+            <span
+              className={[
+                'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
+                PRIORITY_COLOR[goal.priority] ?? PRIORITY_COLOR.low,
+              ].join(' ')}
+            >
               {goal.priority}
             </span>
 
@@ -54,12 +65,16 @@ export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelet
           </div>
 
           {goal.subtitle && (
-            <p className="mt-1 text-sm text-muted-foreground">{goal.subtitle}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {goal.subtitle}
+            </p>
           )}
         </div>
 
         <div className="shrink-0 text-right">
-          <div className="text-sm font-semibold tabular-nums">{doneCount}/{total}</div>
+          <div className="text-sm font-semibold tabular-nums">
+            {doneCount}/{total}
+          </div>
           <div className="text-xs text-muted-foreground">steps</div>
         </div>
       </div>
@@ -75,13 +90,20 @@ export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelet
       <div className="flex items-center justify-between gap-2">
         <div className="flex gap-1">
           {onEdit && (
-            <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 w-8 p-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEdit}
+              className="h-8 w-8 p-0"
+            >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
           )}
           {onDelete && (
             <Button
-              variant="ghost" size="sm" onClick={onDelete}
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
               className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -89,7 +111,9 @@ export function GoalCard({ goal, doneMap = {}, overdueCount = 0, onEdit, onDelet
           )}
           {onImprove && goal.steps.length > 0 && (
             <Button
-              variant="ghost" size="sm" onClick={onImprove}
+              variant="ghost"
+              size="sm"
+              onClick={onImprove}
               className="h-8 gap-1.5 px-2 text-xs text-violet-400 hover:bg-violet-500/10 hover:text-violet-400"
               title="Improve with AI"
             >

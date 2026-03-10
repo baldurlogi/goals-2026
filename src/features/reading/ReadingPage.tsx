@@ -1,29 +1,35 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ReadingFieldPath, ReadingInputs } from "./readingTypes";
-import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan } from "./readingUtils";
-import { ReadingInputsCard } from "./components/ReadingInputsCard";
-import { Button } from "@/components/ui/button";
-import { ReadingNowCard } from "./components/ReadingNowCard";
-import { ReadingNextCard } from "./components/ReadingNextCard";
+import { useEffect, useMemo, useState } from 'react';
+import type { ReadingFieldPath, ReadingInputs } from './readingTypes';
+import {
+  canAcceptDigitsOrBlank,
+  getReadingStats,
+  inputsToPlan,
+} from './readingUtils';
+import { ReadingInputsCard } from './components/ReadingInputsCard';
+import { Button } from '@/components/ui/button';
+import { ReadingNowCard } from './components/ReadingNowCard';
+import { ReadingNextCard } from './components/ReadingNextCard';
 import {
   loadReadingInputs,
   saveReadingInputs,
   DEFAULT_READING_INPUTS,
   READING_CHANGED_EVENT,
-} from "./readingStorage";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+} from './readingStorage';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 export function ReadingPage() {
   // ✅ always start with safe defaults
   const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
-  const [currentDraft, setCurrentDraft] = useState(() => DEFAULT_READING_INPUTS.current);
-
+  const [currentDraft, setCurrentDraft] = useState(
+    () => DEFAULT_READING_INPUTS.current,
+  );
 
   // Draft inputs for adding to queue
-  const [draft, setDraft] = useState({ title: "", author: "", totalPages: "" });
+  const [draft, setDraft] = useState({ title: '', author: '', totalPages: '' });
 
   // ✅ hydrate from storage (works for sync or async storage)
   useEffect(() => {
@@ -40,12 +46,12 @@ export function ReadingPage() {
     sync();
 
     window.addEventListener(READING_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
+    window.addEventListener('storage', sync);
 
     return () => {
       cancelled = true;
       window.removeEventListener(READING_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      window.removeEventListener('storage', sync);
     };
   }, []);
 
@@ -64,12 +70,12 @@ export function ReadingPage() {
     void sync();
 
     window.addEventListener(READING_CHANGED_EVENT, onEvent);
-    window.addEventListener("storage", onEvent);
+    window.addEventListener('storage', onEvent);
 
     return () => {
       cancelled = true;
       window.removeEventListener(READING_CHANGED_EVENT, onEvent);
-      window.removeEventListener("storage", onEvent);
+      window.removeEventListener('storage', onEvent);
     };
   }, []);
 
@@ -90,18 +96,22 @@ export function ReadingPage() {
 
   function updateField(path: ReadingFieldPath, value: string) {
     const digitOnlyPaths: ReadingFieldPath[] = [
-      "current.currentPage",
-      "current.totalPages",
-      "dailyGoalPages",
+      'current.currentPage',
+      'current.totalPages',
+      'dailyGoalPages',
     ];
     if (digitOnlyPaths.includes(path) && !canAcceptDigitsOrBlank(value)) return;
 
     setAndPersist((prev) => {
-      if (path === "current.title") return { ...prev, current: { ...prev.current, title: value } };
-      if (path === "current.author") return { ...prev, current: { ...prev.current, author: value } };
-      if (path === "current.currentPage") return { ...prev, current: { ...prev.current, currentPage: value } };
-      if (path === "current.totalPages") return { ...prev, current: { ...prev.current, totalPages: value } };
-      if (path === "dailyGoalPages") return { ...prev, dailyGoalPages: value };
+      if (path === 'current.title')
+        return { ...prev, current: { ...prev.current, title: value } };
+      if (path === 'current.author')
+        return { ...prev, current: { ...prev.current, author: value } };
+      if (path === 'current.currentPage')
+        return { ...prev, current: { ...prev.current, currentPage: value } };
+      if (path === 'current.totalPages')
+        return { ...prev, current: { ...prev.current, totalPages: value } };
+      if (path === 'dailyGoalPages') return { ...prev, dailyGoalPages: value };
       return prev;
     });
   }
@@ -114,7 +124,7 @@ export function ReadingPage() {
       upNext: [...prev.upNext, { ...draft }],
     }));
 
-    setDraft({ title: "", author: "", totalPages: "" });
+    setDraft({ title: '', author: '', totalPages: '' });
   }
 
   function removeFromQueue(index: number) {
@@ -126,9 +136,12 @@ export function ReadingPage() {
 
   function markCurrentCompleted() {
     setAndPersist((prev) => {
-      const finishedAt = new Date().toISOString();
+      const finishedAt = getLocalDateKey();
 
-      const totalPagesNum = Math.max(1, parseInt(prev.current.totalPages || "0", 10) || 0);
+      const totalPagesNum = Math.max(
+        1,
+        parseInt(prev.current.totalPages || '0', 10) || 0,
+      );
 
       const completedBook = {
         title: prev.current.title,
@@ -143,10 +156,10 @@ export function ReadingPage() {
         ? {
             title: next.title,
             author: next.author,
-            currentPage: "0",
+            currentPage: '0',
             totalPages: next.totalPages,
           }
-        : { title: "", author: "", currentPage: "", totalPages: "" };
+        : { title: '', author: '', currentPage: '', totalPages: '' };
 
       return {
         ...prev,
@@ -168,21 +181,23 @@ export function ReadingPage() {
         <ReadingInputsCard
           value={{ ...inputs, current: currentDraft }}
           onChange={(path, v) => {
-            if (path === "current.currentPage") {
+            if (path === 'current.currentPage') {
               setCurrentDraft((p) => ({ ...p, currentPage: v }));
-              updateField("current.currentPage", v); // ✅ updates inputs + NowReading live
+              updateField('current.currentPage', v); // ✅ updates inputs + NowReading live
               return;
             }
 
-            if (path === "current.totalPages") {
+            if (path === 'current.totalPages') {
               setCurrentDraft((p) => ({ ...p, totalPages: v }));
-              updateField("current.totalPages", v); // optional: keep stats live too
+              updateField('current.totalPages', v); // optional: keep stats live too
               return;
             }
 
             // keep these local-only (no lag)
-            if (path === "current.title") setCurrentDraft((p) => ({ ...p, title: v }));
-            if (path === "current.author") setCurrentDraft((p) => ({ ...p, author: v }));
+            if (path === 'current.title')
+              setCurrentDraft((p) => ({ ...p, title: v }));
+            if (path === 'current.author')
+              setCurrentDraft((p) => ({ ...p, author: v }));
           }}
         />
 
@@ -201,7 +216,9 @@ export function ReadingPage() {
           <Button
             variant="secondary"
             onClick={markCurrentCompleted}
-            disabled={!inputs.current.title.trim() && !inputs.current.author.trim()}
+            disabled={
+              !inputs.current.title.trim() && !inputs.current.author.trim()
+            }
           >
             Mark current as completed
           </Button>
@@ -215,11 +232,21 @@ export function ReadingPage() {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Title</Label>
-                <Input value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} />
+                <Input
+                  value={draft.title}
+                  onChange={(e) =>
+                    setDraft((p) => ({ ...p, title: e.target.value }))
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <Label>Author</Label>
-                <Input value={draft.author} onChange={(e) => setDraft((p) => ({ ...p, author: e.target.value }))} />
+                <Input
+                  value={draft.author}
+                  onChange={(e) =>
+                    setDraft((p) => ({ ...p, author: e.target.value }))
+                  }
+                />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Total pages</Label>
@@ -237,7 +264,10 @@ export function ReadingPage() {
 
             <Separator />
 
-            <Button onClick={addToQueue} disabled={!draft.title.trim() && !draft.author.trim()}>
+            <Button
+              onClick={addToQueue}
+              disabled={!draft.title.trim() && !draft.author.trim()}
+            >
               Add to queue
             </Button>
           </CardContent>
@@ -251,18 +281,22 @@ export function ReadingPage() {
 
         <Card className="border-amber-500">
           <CardHeader className="pb-1">
-            <CardTitle className="text-md text-amber-400">Completed this year</CardTitle>
+            <CardTitle className="text-md text-amber-400">
+              Completed this year
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {inputs.completed.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No completed books yet.</div>
+              <div className="text-sm text-muted-foreground">
+                No completed books yet.
+              </div>
             ) : (
               <div className="space-y-3">
                 {inputs.completed.map((b, idx) => (
                   <div key={`${b.finishedAt}-${idx}`} className="text-sm">
-                    <div className="font-medium">{b.title || "Untitled"}</div>
+                    <div className="font-medium">{b.title || 'Untitled'}</div>
                     <div className="text-muted-foreground">
-                      {b.author || "Unknown author"} · {b.totalPages} pages ·{" "}
+                      {b.author || 'Unknown author'} · {b.totalPages} pages ·{' '}
                       {new Date(b.finishedAt).toLocaleDateString()}
                     </div>
                   </div>

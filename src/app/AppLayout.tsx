@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import { DailyPlanHeader } from "@/app/daily-plan/DailyPlanHeader";
+import { DailyPlanHeader } from "@/features/daily-plan/components/DailyPlanHeader";
 import { ThemeProvider } from "./providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
