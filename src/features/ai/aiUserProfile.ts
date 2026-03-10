@@ -1,24 +1,12 @@
-/**
- * aiUserProfile.ts
- *
- * Two responsibilities:
- *  1. CRUD for the ai_user_profiles table
- *  2. buildAIContext() — assembles a rich prompt-ready string from all
- *     user data sources (profile, goals, fitness, nutrition, reading)
- *     and saves a snapshot back to the table for debugging / future use.
- */
-
 import { supabase } from '@/lib/supabaseClient';
 import { loadProfile } from '@/features/onboarding/profileStorage';
 import { loadUserGoals } from '@/features/goals/userGoalStorage';
-import { loadFitness } from '@/features/fitness/fitnessStorage';
+import { loadPRGoals, type PRGoal } from '@/features/fitness/fitnessStorage';
 import {
   loadNutritionLog,
   loadPhase,
 } from '@/features/nutrition/nutritionStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
-
-// ── Types ──────────────────────────────────────────────────────────────────
 
 export type PreferredTone =
   | 'direct'
@@ -42,15 +30,58 @@ export type AIUserProfile = {
   updated_at: string | null;
 };
 
-/** The assembled context passed into every AI call */
 export type AIContext = {
-  /** Full prompt-ready string — inject directly into system prompt */
   systemContext: string;
-  /** Structured snapshot for debugging / storage */
   snapshot: Record<string, unknown>;
 };
 
-// ── Load / save ai_user_profiles ─────────────────────────────────────────
+function getLatestWorkoutDate(prGoals: PRGoal[]): string | null {
+  const allDates = prGoals.flatMap((goal) =>
+    Array.isArray(goal.history)
+      ? goal.history
+          .map((entry) => (typeof entry.date === 'string' ? entry.date : null))
+          .filter((date): date is string => Boolean(date))
+      : [],
+  );
+
+  return [...allDates].sort().at(-1) ?? null;
+}
+
+function daysSince(isoDate: string | null): number | null {
+  if (!isoDate) return null;
+  const time = new Date(isoDate).getTime();
+  if (Number.isNaN(time)) return null;
+  return Math.floor((Date.now() - time) / 86400000);
+}
+
+function buildFitnessSummary(prGoals: PRGoal[]): string {
+  if (!Array.isArray(prGoals) || prGoals.length === 0) {
+    return 'No fitness data logged yet';
+  }
+
+  const liftLines = prGoals
+    .map((goal) => {
+      const history = Array.isArray(goal.history) ? goal.history : [];
+      const best =
+        history.length > 0 ? Math.max(...history.map((entry) => entry.value)) : null;
+      const pct =
+        best !== null && goal.goal > 0
+          ? Math.round((best / goal.goal) * 100)
+          : 0;
+
+      return best !== null
+        ? `${goal.label}: PR ${best}${goal.unit} (${pct}% of ${goal.goal}${goal.unit} goal)`
+        : `${goal.label}: no PR yet (goal: ${goal.goal}${goal.unit})`;
+    })
+    .join(', ');
+
+  const lastWorkoutDate = getLatestWorkoutDate(prGoals);
+  const daysSinceWorkout = daysSince(lastWorkoutDate);
+
+  return `${liftLines}. Last workout: ${
+    daysSinceWorkout !== null ? `${daysSinceWorkout} day(s) ago` : 'never logged'
+  }`;
+}
 
 export async function loadAIProfile(): Promise<AIUserProfile | null> {
   const {
@@ -68,6 +99,7 @@ export async function loadAIProfile(): Promise<AIUserProfile | null> {
     console.warn('loadAIProfile error:', error);
     return null;
   }
+
   return data as AIUserProfile | null;
 }
 
@@ -86,19 +118,9 @@ export async function saveAIProfile(
   if (error) console.warn('saveAIProfile error:', error);
 }
 
-// ── Context builder ───────────────────────────────────────────────────────
-
-/**
- * Assembles everything we know about the user into a single rich context
- * object. Call this before any AI request that benefits from personalisation.
- *
- * Fast path: if a snapshot exists and is <30 min old, return cached version.
- * Otherwise rebuild from all data sources and persist the snapshot.
- */
 export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
   const aiProfile = await loadAIProfile();
 
-  // Use cached snapshot if fresh enough (30 min)
   if (
     !forceRefresh &&
     aiProfile?.last_context_snapshot &&
@@ -106,6 +128,7 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
   ) {
     const age =
       Date.now() - new Date(aiProfile.last_context_built_at).getTime();
+
     if (age < 30 * 60 * 1000) {
       return {
         systemContext: buildSystemPrompt(
@@ -117,17 +140,15 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
     }
   }
 
-  // ── Gather all data sources in parallel ──────────────────────────────
-  const [profile, goals, fitnessStore, nutritionLog, nutritionPhase] =
+  const [profile, goals, prGoals, nutritionLog, nutritionPhase] =
     await Promise.all([
-      loadProfile(),
-      loadUserGoals(),
-      loadFitness().catch(() => null),
-      loadNutritionLog().catch(() => null),
-      loadPhase().catch(() => 'maintain' as const),
+      Promise.resolve(loadProfile()).catch(() => null),
+      Promise.resolve(loadUserGoals()).catch(() => []),
+      Promise.resolve(loadPRGoals()).catch(() => []),
+      Promise.resolve(loadNutritionLog()).catch(() => null),
+      Promise.resolve(loadPhase()).catch(() => 'maintain' as const),
     ]);
 
-  // ── Goals summary ─────────────────────────────────────────────────────
   const activeGoals = goals;
 
   const goalLines = activeGoals
@@ -135,53 +156,29 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
     .map((g) => {
       const stepCount = g.steps.length;
       const nextStep = g.steps[0];
-      return `- ${g.emoji} "${g.title}" (${g.priority} priority, ${stepCount} steps${nextStep ? `, next action: "${nextStep.label}"` : ', no steps yet'})`;
+      return `- ${g.emoji} "${g.title}" (${g.priority} priority, ${stepCount} steps${
+        nextStep ? `, next action: "${nextStep.label}"` : ', no steps yet'
+      })`;
     })
     .join('\n');
 
-  // ── Fitness summary ───────────────────────────────────────────────────
-  const allLiftEntries = fitnessStore
-    ? Object.values(fitnessStore.lifts).flatMap((l) =>
-        l.history.map((e) => e.date),
-      )
-    : [];
-  const lastWorkoutDate = allLiftEntries.sort().at(-1) ?? null;
-  const daysSinceWorkout = lastWorkoutDate
-    ? Math.floor((Date.now() - new Date(lastWorkoutDate).getTime()) / 86400000)
-    : null;
+  const fitnessSummary = buildFitnessSummary(prGoals);
 
-  const liftLines = fitnessStore
-    ? Object.values(fitnessStore.lifts)
-        .map((l) => {
-          const best =
-            l.history.length > 0
-              ? Math.max(...l.history.map((e) => e.value))
-              : null;
-          const pct = best ? Math.round((best / l.goal) * 100) : 0;
-          return best
-            ? `${l.label}: PR ${best}${l.unit} (${pct}% of ${l.goal}${l.unit} goal)`
-            : `${l.label}: no PR yet (goal: ${l.goal}${l.unit})`;
-        })
-        .join(', ')
-    : null;
-
-  const fitnessSummary = liftLines
-    ? `${liftLines}. Last workout: ${daysSinceWorkout !== null ? `${daysSinceWorkout} day(s) ago` : 'never logged'}`
-    : 'No fitness data logged yet';
-
-  // ── Nutrition summary ─────────────────────────────────────────────────
   const profileMacros =
     nutritionPhase === 'cut' ? profile?.macro_cut : profile?.macro_maintain;
 
   const mealsLogged = nutritionLog
     ? Object.values(nutritionLog.eaten ?? {}).filter(Boolean).length
     : 0;
+
   const nutritionSummary = nutritionLog
-    ? `Phase: ${nutritionPhase}, ${mealsLogged}/7 meals logged today${profileMacros ? `. Calorie target: ${profileMacros.cal}kcal, protein target: ${profileMacros.protein}g` : ''}`
+    ? `Phase: ${nutritionPhase}, ${mealsLogged}/7 meals logged today${
+        profileMacros
+          ? `. Calorie target: ${profileMacros.cal}kcal, protein target: ${profileMacros.protein}g`
+          : ''
+      }`
     : 'No nutrition data today';
 
-  // ── Reading summary ───────────────────────────────────────────────────
-  // Pull from localStorage — always current, avoids extra async roundtrip
   let readingSummary = 'No reading data';
   try {
     const readingRaw = localStorage.getItem('daily-life:reading:v2');
@@ -191,21 +188,24 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
       const streak = rd?.streak?.streak ?? 0;
       const todayMin = rd?.minutes?.minutes ?? 0;
       const targetMin = rd?.minutes?.target ?? 30;
+
       if (book?.title && book.title !== 'Current book') {
         const pagesLeft = (book.totalPages || 0) - (book.currentPage || 0);
         const pct = book.totalPages
           ? Math.round((book.currentPage / book.totalPages) * 100)
           : 0;
-        readingSummary = `Reading "${book.title}"${book.author ? ` by ${book.author}` : ''} — ${pct}% done (${book.currentPage}/${book.totalPages} pages, ${pagesLeft} left). Streak: ${streak} day(s). Today: ${todayMin}/${targetMin} min.`;
+
+        readingSummary = `Reading "${book.title}"${
+          book.author ? ` by ${book.author}` : ''
+        } — ${pct}% done (${book.currentPage}/${book.totalPages} pages, ${pagesLeft} left). Streak: ${streak} day(s). Today: ${todayMin}/${targetMin} min.`;
       } else {
         readingSummary = `No book set. Reading streak: ${streak} day(s). Today: ${todayMin}/${targetMin} min.`;
       }
     }
   } catch {
-    /* ignore — not critical */
+    // ignore
   }
 
-  // ── Profile summary ───────────────────────────────────────────────────
   const profileSummary = profile
     ? [
         profile.display_name ? `Name: ${profile.display_name}` : null,
@@ -213,26 +213,21 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
         profile.sex ? `Sex: ${profile.sex}` : null,
         profile.weight_kg ? `Weight: ${profile.weight_kg}kg` : null,
         profile.height_cm ? `Height: ${profile.height_cm}cm` : null,
-        profile.activity_level
-          ? `Activity level: ${profile.activity_level}`
-          : null,
+        profile.activity_level ? `Activity level: ${profile.activity_level}` : null,
       ]
         .filter(Boolean)
         .join(', ')
     : 'No profile data';
 
-  // ── Enabled modules ───────────────────────────────────────────────────
   const enabledModules = (profile as unknown as { enabled_modules?: string[] })
     ?.enabled_modules ?? ['goals', 'fitness', 'nutrition', 'reading'];
 
-  // ── AI profile notes ──────────────────────────────────────────────────
   const personalityNotes =
     aiProfile?.personality_notes ??
     'User may have ADHD — prefer concrete, actionable suggestions. Break things into small steps.';
 
   const preferredTone = aiProfile?.preferred_tone ?? 'direct';
 
-  // ── Assemble snapshot ─────────────────────────────────────────────────
   const snapshot: Record<string, unknown> = {
     profile: profileSummary,
     activeGoals: goalLines || 'No goals set yet',
@@ -248,7 +243,6 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
     builtAt: getLocalDateKey(),
   };
 
-  // ── Persist snapshot ──────────────────────────────────────────────────
   await saveAIProfile({
     last_context_snapshot: snapshot,
     last_context_built_at: getLocalDateKey(),
@@ -263,13 +257,12 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
   };
 }
 
-// ── System prompt assembler ───────────────────────────────────────────────
-
 function buildSystemPrompt(
   snapshot: Record<string, unknown>,
   aiProfile: AIUserProfile | null,
 ): string {
   const tone = aiProfile?.preferred_tone ?? 'direct';
+
   const toneInstructions: Record<PreferredTone, string> = {
     direct: 'Be direct and concise. Skip preamble. Lead with the action.',
     encouraging:
@@ -311,12 +304,6 @@ Keep responses focused and actionable. Never repeat back information the user al
 When suggesting actions, tie them to their specific goals above.`;
 }
 
-// ── Convenience: get context string only ─────────────────────────────────
-
-/**
- * Quick helper for AI calls that just need the system prompt string.
- * Uses cache if available.
- */
 export async function getAISystemContext(): Promise<string> {
   const { systemContext } = await buildAIContext();
   return systemContext;

@@ -42,6 +42,10 @@ export type ReadingInputs = {
   }>;
   completed: CompletedBook[];
   dailyGoalPages: string;
+  /** ISO date string (YYYY-MM-DD) of the last day pages were updated */
+  lastReadDate: string | null;
+  /** Consecutive days with at least one page update */
+  streak: number;
 };
 
 export type ReadingFieldPath =

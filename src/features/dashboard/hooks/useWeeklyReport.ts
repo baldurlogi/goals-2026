@@ -201,30 +201,29 @@ function collectReadingData(modules: Set<string>) {
   try {
     const raw = localStorage.getItem('daily-life:reading:v2');
     if (!raw) return undefined;
-    const data = JSON.parse(raw);
+    // ReadingInputs shape: { current, upNext, completed, dailyGoalPages, streak, lastReadDate }
+    const data = JSON.parse(raw) as {
+      current?: { title?: string; currentPage?: string; totalPages?: string };
+      dailyGoalPages?: string;
+      streak?: number;
+      lastReadDate?: string | null;
+      completed?: Array<unknown>;
+    };
     const profile = readProfileCache();
 
-    const weekStart = getCurrentWeekStart();
-    const sessions: Array<{ date: string; minutes: number; pages: number }> =
-      data.sessions ?? [];
-    const weekSessions = sessions.filter(
-      (s: { date: string }) => s.date >= weekStart,
-    );
-    const minutesThisWeek = weekSessions.reduce(
-      (sum: number, s: { minutes: number }) => sum + (s.minutes ?? 0),
-      0,
-    );
-    const pagesRead = weekSessions.reduce(
-      (sum: number, s: { pages: number }) => sum + (s.pages ?? 0),
-      0,
-    );
+    const currentPage = Number(data.current?.currentPage ?? 0);
+    const totalPages = Math.max(1, Number(data.current?.totalPages ?? 1));
+    const pct = Math.round((currentPage / totalPages) * 100);
 
     return {
-      minutesThisWeek,
-      targetMinutesPerDay: profile?.daily_reading_goal ?? 20,
+      currentBook: data.current?.title ?? null,
+      currentPage,
+      totalPages,
+      pct,
       streak: data.streak ?? 0,
-      currentBook: data.currentBook?.title ?? null,
-      pagesRead,
+      lastReadDate: data.lastReadDate ?? null,
+      dailyGoalPages: Number(data.dailyGoalPages ?? profile?.daily_reading_goal ?? 20),
+      booksCompletedTotal: (data.completed ?? []).length,
     };
   } catch {
     return undefined;

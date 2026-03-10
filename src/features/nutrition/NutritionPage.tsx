@@ -24,6 +24,7 @@ import {
 } from "./nutritionStorage";
 import type { Macros } from "./nutritionTypes";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { PROFILE_CHANGED_EVENT } from "@/features/onboarding/profileStorage";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -261,7 +262,15 @@ export function NutritionPage() {
     setSavedMeals(await loadSavedMeals());
   };
 
-  const targets      = useMemo(() => getTargets(phase), [phase]);
+  // Re-read macro targets whenever user saves new profile macros
+  const [profileVersion, setProfileVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setProfileVersion((v) => v + 1);
+    window.addEventListener(PROFILE_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(PROFILE_CHANGED_EVENT, bump);
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const targets = useMemo(() => getTargets(phase), [phase, profileVersion]);
   const logged       = useMemo(() => getLoggedMacros(log), [log]);
   const totalEntries = log.customEntries.length;
 

@@ -164,19 +164,6 @@ export default function DashboardPage() {
             {firstName ? ` ${firstName}` : ""} 👋
           </h1>
         </div>
-
-        <div className="flex gap-2">
-          {has("nutrition") && (
-            <Button asChild variant="outline" size="sm">
-              <Link to="/app/nutrition">Log food</Link>
-            </Button>
-          )}
-          {has("reading") && (
-            <Button asChild size="sm">
-              <Link to="/app/reading">Update reading</Link>
-            </Button>
-          )}
-        </div>
       </div>
 
       {showStartHere && <DashboardStartHereCard onDismiss={dismissStartHere} />}

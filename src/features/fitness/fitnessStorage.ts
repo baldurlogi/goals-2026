@@ -1,5 +1,4 @@
 import { supabase } from "@/lib/supabaseClient";
-import { loadModuleState, saveModuleState, seedCache } from "@/features/goals/modules/goalModuleStorage";
 
 export const FITNESS_CHANGED_EVENT = "fitness:changed";
 function emit() {
@@ -8,246 +7,215 @@ function emit() {
   }
 }
 
-export type LiftId = "bench" | "squat" | "ohp" | "clean" | "snatch";
-export type SkillId =
-  | "butterfly_pullups"
-  | "muscle_ups"
-  | "hsw"
-  | "freestanding_hspu"
-  | "strict_hspu"
-  | "swim_100m"
-  | "swim_200m";
-export type SkillMetricType = "reps" | "metres" | "seconds";
+// ── Core PR types ─────────────────────────────────────────────────────────────
+
+export type MetricType = "kg" | "reps" | "metres" | "seconds" | "km" | "lbs";
+export type PRCategory = "barbell" | "crossfit" | "swimming" | "cardio" | "custom";
 
 export type PREntry = { value: number; date: string; notes?: string };
 
-export type LiftRecord = {
-  id: LiftId;
+export type PRGoal = {
+  id: string;
   label: string;
-  unit: "kg";
+  unit: MetricType;
   goal: number;
+  goalLabel: string;
+  category: PRCategory;
   history: PREntry[];
+  createdAt: string;
 };
 
-export type SkillRecord = {
-  id: SkillId;
+// ── Suggestions ───────────────────────────────────────────────────────────────
+
+export type PRSuggestion = {
+  id: string;
   label: string;
-  category: "crossfit" | "swimming";
-  metricType: SkillMetricType;
-  unit: string;
-  goal: number;
-  goalLabel?: string;
-  history: PREntry[];
+  unit: MetricType;
+  defaultGoal: number;
+  defaultGoalLabel: string;
+  category: PRCategory;
 };
 
-export type FitnessStore = {
-  lifts: Record<LiftId, LiftRecord>;
-  skills: Record<SkillId, SkillRecord>;
+export const PR_SUGGESTIONS: PRSuggestion[] = [
+  { id: "bench_press",       label: "Bench Press",       unit: "kg",      defaultGoal: 100,  defaultGoalLabel: "100 kg",       category: "barbell"  },
+  { id: "back_squat",        label: "Back Squat",         unit: "kg",      defaultGoal: 140,  defaultGoalLabel: "140 kg",       category: "barbell"  },
+  { id: "deadlift",          label: "Deadlift",           unit: "kg",      defaultGoal: 180,  defaultGoalLabel: "180 kg",       category: "barbell"  },
+  { id: "ohp",               label: "Overhead Press",     unit: "kg",      defaultGoal: 70,   defaultGoalLabel: "70 kg",        category: "barbell"  },
+  { id: "power_clean",       label: "Power Clean",        unit: "kg",      defaultGoal: 90,   defaultGoalLabel: "90 kg",        category: "barbell"  },
+  { id: "snatch",            label: "Snatch",             unit: "kg",      defaultGoal: 70,   defaultGoalLabel: "70 kg",        category: "barbell"  },
+  { id: "front_squat",       label: "Front Squat",        unit: "kg",      defaultGoal: 120,  defaultGoalLabel: "120 kg",       category: "barbell"  },
+  { id: "clean_and_jerk",    label: "Clean & Jerk",       unit: "kg",      defaultGoal: 100,  defaultGoalLabel: "100 kg",       category: "barbell"  },
+  { id: "butterfly_pullups", label: "Butterfly Pull-ups", unit: "reps",    defaultGoal: 20,   defaultGoalLabel: "20 unbroken",  category: "crossfit" },
+  { id: "muscle_ups",        label: "Muscle-ups",         unit: "reps",    defaultGoal: 5,    defaultGoalLabel: "5 unbroken",   category: "crossfit" },
+  { id: "strict_hspu",       label: "Strict HSPU",        unit: "reps",    defaultGoal: 10,   defaultGoalLabel: "10 strict",    category: "crossfit" },
+  { id: "freestanding_hspu", label: "Freestanding HSPU",  unit: "reps",    defaultGoal: 3,    defaultGoalLabel: "3 reps",       category: "crossfit" },
+  { id: "hsw",               label: "Handstand Walk",     unit: "metres",  defaultGoal: 25,   defaultGoalLabel: "25m",          category: "crossfit" },
+  { id: "double_unders",     label: "Double-Unders",      unit: "reps",    defaultGoal: 100,  defaultGoalLabel: "100 unbroken", category: "crossfit" },
+  { id: "swim_100m",         label: "100m Freestyle",     unit: "seconds", defaultGoal: 75,   defaultGoalLabel: "Sub 1:15",     category: "swimming" },
+  { id: "swim_200m",         label: "200m Freestyle",     unit: "seconds", defaultGoal: 180,  defaultGoalLabel: "Sub 3:00",     category: "swimming" },
+  { id: "swim_400m",         label: "400m Freestyle",     unit: "seconds", defaultGoal: 420,  defaultGoalLabel: "Sub 7:00",     category: "swimming" },
+  { id: "run_5k",            label: "5K Run",             unit: "seconds", defaultGoal: 1500, defaultGoalLabel: "Sub 25:00",    category: "cardio"   },
+  { id: "run_10k",           label: "10K Run",            unit: "seconds", defaultGoal: 3300, defaultGoalLabel: "Sub 55:00",    category: "cardio"   },
+  { id: "run_half",          label: "Half Marathon",      unit: "seconds", defaultGoal: 7200, defaultGoalLabel: "Sub 2h",       category: "cardio"   },
+];
+
+export const CATEGORY_LABELS: Record<PRCategory, string> = {
+  barbell:  "🏋️ Barbell",
+  crossfit: "🤸 CrossFit",
+  swimming: "🏊 Swimming",
+  cardio:   "🏃 Cardio",
+  custom:   "⚡ Custom",
 };
 
-export const DEFAULT_STORE: FitnessStore = {
-  lifts: {
-    bench: { id: "bench", label: "Bench Press", unit: "kg", goal: 100, history: [] },
-    squat: { id: "squat", label: "Back Squat", unit: "kg", goal: 140, history: [] },
-    ohp: { id: "ohp", label: "Overhead Press", unit: "kg", goal: 70, history: [] },
-    clean: { id: "clean", label: "Power Clean", unit: "kg", goal: 90, history: [] },
-    snatch: { id: "snatch", label: "Snatch", unit: "kg", goal: 70, history: [] },
-  },
-  skills: {
-    butterfly_pullups: {
-      id: "butterfly_pullups",
-      label: "Butterfly Pull-ups",
-      category: "crossfit",
-      metricType: "reps",
-      unit: "reps",
-      goal: 20,
-      goalLabel: "20 unbroken",
-      history: [],
-    },
-    muscle_ups: {
-      id: "muscle_ups",
-      label: "Muscle-ups",
-      category: "crossfit",
-      metricType: "reps",
-      unit: "reps",
-      goal: 5,
-      goalLabel: "5 unbroken",
-      history: [],
-    },
-    hsw: {
-      id: "hsw",
-      label: "Handstand Walk",
-      category: "crossfit",
-      metricType: "metres",
-      unit: "m",
-      goal: 25,
-      goalLabel: "25m",
-      history: [],
-    },
-    freestanding_hspu: {
-      id: "freestanding_hspu",
-      label: "Freestanding HSPU",
-      category: "crossfit",
-      metricType: "reps",
-      unit: "reps",
-      goal: 3,
-      goalLabel: "3 reps",
-      history: [],
-    },
-    strict_hspu: {
-      id: "strict_hspu",
-      label: "Strict HSPU",
-      category: "crossfit",
-      metricType: "reps",
-      unit: "reps",
-      goal: 10,
-      goalLabel: "10 strict",
-      history: [],
-    },
-    swim_100m: {
-      id: "swim_100m",
-      label: "100m Freestyle",
-      category: "swimming",
-      metricType: "seconds",
-      unit: "s",
-      goal: 75,
-      goalLabel: "Sub 1:15",
-      history: [],
-    },
-    swim_200m: {
-      id: "swim_200m",
-      label: "200m Freestyle",
-      category: "swimming",
-      metricType: "seconds",
-      unit: "s",
-      goal: 180,
-      goalLabel: "Sub 3:00",
-      history: [],
-    },
-  },
-};
+export const UNIT_OPTIONS: { value: MetricType; label: string }[] = [
+  { value: "kg",      label: "kg (weight)"    },
+  { value: "lbs",     label: "lbs (weight)"   },
+  { value: "reps",    label: "reps"            },
+  { value: "metres",  label: "metres"          },
+  { value: "km",      label: "km (distance)"  },
+  { value: "seconds", label: "seconds (time)" },
+];
 
-export async function loadFitness(): Promise<FitnessStore> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return structuredClone(DEFAULT_STORE);
+// ── Cache ─────────────────────────────────────────────────────────────────────
 
-  const [{ data: liftsData }, { data: skillsData }] = await Promise.all([
-    supabase.from("fitness_lifts").select("lift_id, goal, history").eq("user_id", user.id),
-    supabase
-      .from("fitness_skills")
-      .select("skill_id, goal, goal_label, history")
-      .eq("user_id", user.id),
-  ]);
+const PR_CACHE_KEY = "cache:fitness_prs:v1";
 
-  const store = structuredClone(DEFAULT_STORE);
-
-  for (const row of liftsData ?? []) {
-    const id = row.lift_id as LiftId;
-    if (store.lifts[id]) {
-      store.lifts[id].goal = row.goal;
-      store.lifts[id].history = (row.history ?? []) as PREntry[];
-    }
-  }
-
-  for (const row of skillsData ?? []) {
-    const id = row.skill_id as SkillId;
-    if (store.skills[id]) {
-      store.skills[id].goal = row.goal;
-
-      const rawLabel = row.goal_label;
-      store.skills[id].goalLabel =
-        typeof rawLabel === "string" ? rawLabel : store.skills[id].goalLabel;
-
-      store.skills[id].history = (row.history ?? []) as PREntry[];
-    }
-  }
-  return store;
+export function readPRCache(): PRGoal[] {
+  try {
+    const raw = localStorage.getItem(PR_CACHE_KEY);
+    if (raw) return JSON.parse(raw) as PRGoal[];
+  } catch { /* ignore */ }
+  return [];
 }
 
-export async function logPR(
-  kind: "lift" | "skill",
-  id: LiftId | SkillId,
+function writePRCache(goals: PRGoal[]): void {
+  try { localStorage.setItem(PR_CACHE_KEY, JSON.stringify(goals)); } catch { /* ignore */ }
+}
+
+// ── Supabase CRUD ─────────────────────────────────────────────────────────────
+
+export async function loadPRGoals(): Promise<PRGoal[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return readPRCache();
+
+  const { data } = await supabase
+    .from("fitness_prs")
+    .select("pr_id, label, unit, goal, goal_label, category, history, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+
+  if (data && data.length > 0) {
+    const goals: PRGoal[] = data.map((row) => ({
+      id:        row.pr_id,
+      label:     row.label,
+      unit:      row.unit as MetricType,
+      goal:      row.goal,
+      goalLabel: row.goal_label ?? `${row.goal} ${row.unit}`,
+      category:  (row.category ?? "custom") as PRCategory,
+      history:   (row.history ?? []) as PREntry[],
+      createdAt: row.created_at ?? todayISO(),
+    }));
+    writePRCache(goals);
+    return goals;
+  }
+  return readPRCache();
+}
+
+export async function addPRGoal(
+  goal: Omit<PRGoal, "history" | "createdAt">
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("fitness_prs").insert({
+    user_id:    user.id,
+    pr_id:      goal.id,
+    label:      goal.label,
+    unit:       goal.unit,
+    goal:       goal.goal,
+    goal_label: goal.goalLabel,
+    category:   goal.category,
+    history:    [],
+    created_at: todayISO(),
+  });
+  emit();
+}
+
+export async function updatePRGoal(
+  id: string,
+  patch: Partial<Pick<PRGoal, "goal" | "goalLabel" | "label">>
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const payload: Record<string, unknown> = {};
+  if (patch.goal      !== undefined) payload.goal       = patch.goal;
+  if (patch.goalLabel !== undefined) payload.goal_label = patch.goalLabel;
+  if (patch.label     !== undefined) payload.label      = patch.label;
+  await supabase
+    .from("fitness_prs")
+    .update(payload)
+    .eq("user_id", user.id)
+    .eq("pr_id", id);
+  emit();
+}
+
+export async function deletePRGoal(id: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase
+    .from("fitness_prs")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("pr_id", id);
+  emit();
+}
+
+export async function logPREntry(
+  id: string,
   value: number,
   notes?: string
 ): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
   const entry: PREntry = { value, date: todayISO(), notes };
-
-  const table = kind === "lift" ? "fitness_lifts" : "fitness_skills";
-  const idCol = kind === "lift" ? "lift_id" : "skill_id";
-
   const { data } = await supabase
-    .from(table)
+    .from("fitness_prs")
     .select("history")
     .eq("user_id", user.id)
-    .eq(idCol, id)
+    .eq("pr_id", id)
     .maybeSingle();
 
-  const history = [entry, ...(((data?.history as PREntry[]) ?? []) as PREntry[])];
-
+  const history = [entry, ...((data?.history as PREntry[]) ?? [])];
   await supabase
-    .from(table)
-    .upsert({ user_id: user.id, [idCol]: id, history }, { onConflict: `user_id,${idCol}` });
-
+    .from("fitness_prs")
+    .update({ history })
+    .eq("user_id", user.id)
+    .eq("pr_id", id);
   emit();
 }
 
-export async function updateGoal(
-  kind: "lift" | "skill",
-  id: LiftId | SkillId,
-  goal: number,
-  goalLabel?: string
-): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function deletePREntry(id: string, index: number): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-
-  const table = kind === "lift" ? "fitness_lifts" : "fitness_skills";
-  const idCol = kind === "lift" ? "lift_id" : "skill_id";
-
-  const payload: Record<string, unknown> = { user_id: user.id, [idCol]: id, goal };
-  if (goalLabel !== undefined) payload.goal_label = goalLabel;
-
-  await supabase.from(table).upsert(payload, { onConflict: `user_id,${idCol}` });
-  emit();
-}
-
-export async function deleteEntry(
-  kind: "lift" | "skill",
-  id: LiftId | SkillId,
-  index: number
-): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const table = kind === "lift" ? "fitness_lifts" : "fitness_skills";
-  const idCol = kind === "lift" ? "lift_id" : "skill_id";
 
   const { data } = await supabase
-    .from(table)
+    .from("fitness_prs")
     .select("history")
     .eq("user_id", user.id)
-    .eq(idCol, id)
+    .eq("pr_id", id)
     .maybeSingle();
 
-  const history = [...(((data?.history as PREntry[]) ?? []) as PREntry[])];
+  const history = [...((data?.history as PREntry[]) ?? [])];
   history.splice(index, 1);
-
   await supabase
-    .from(table)
-    .upsert({ user_id: user.id, [idCol]: id, history }, { onConflict: `user_id,${idCol}` });
-
+    .from("fitness_prs")
+    .update({ history })
+    .eq("user_id", user.id)
+    .eq("pr_id", id);
   emit();
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function currentBest(history: PREntry[]): number | null {
   if (!history.length) return null;
@@ -259,15 +227,31 @@ export function progressPct(best: number | null, goal: number): number {
   return Math.min(Math.round((best / goal) * 100), 100);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Date helpers + streak + weekly split (LOCAL, no Supabase tables needed)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function todayISO(d = new Date()) {
-  return d.toISOString().slice(0, 10);
+export function fmtValue(value: number, unit: MetricType): string {
+  if (unit === "seconds") {
+    const h = Math.floor(value / 3600);
+    const m = Math.floor((value % 3600) / 60);
+    const s = value % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+  return `${value} ${unit}`;
 }
 
-function toUTCDate(iso: string) {
+export function slugify(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+export function todayISO(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function toUTCDate(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
 }
@@ -275,52 +259,141 @@ function toUTCDate(iso: string) {
 export function diffDays(aISO: string, bISO: string): number {
   const a = toUTCDate(aISO);
   const b = toUTCDate(bISO);
-  const ms = b.getTime() - a.getTime();
-  return Math.round(ms / (1000 * 60 * 60 * 24));
+  return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export type StreakState = {
-  lastWorkoutISO: string | null;
+export function yesterdayISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return todayISO(d);
+}
+
+// ── Weekly split (unchanged) ──────────────────────────────────────────────────
+
+export type DayKey = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
+export const DAY_KEYS: DayKey[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+export type DaySplit = { label: string; completedDate: string | null };
+
+export type WeeklySplitConfig = {
+  days: Record<DayKey, DaySplit>;
   streak: number;
+  lastStreakDate: string | null;
 };
 
-export function seedStreak(goalId: string): StreakState {
-  return seedCache(goalId, "fitness_streak", { lastWorkoutISO: null, streak: 0 });
+export const DEFAULT_SPLIT_LABELS: Record<DayKey, string> = {
+  Mon: "Push", Tue: "Pull", Wed: "Legs", Thu: "Rest", Fri: "Push", Sat: "Cardio", Sun: "Rest",
+};
+
+export function makeDefaultSplit(): WeeklySplitConfig {
+  const days = {} as Record<DayKey, DaySplit>;
+  for (const dk of DAY_KEYS) days[dk] = { label: DEFAULT_SPLIT_LABELS[dk], completedDate: null };
+  return { days, streak: 0, lastStreakDate: null };
 }
 
-export async function getStreak(goalId: string): Promise<StreakState> {
-  return loadModuleState(goalId, "fitness_streak", { lastWorkoutISO: null, streak: 0 });
+export function todayDayKey(): DayKey {
+  const map: DayKey[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return map[new Date().getDay()];
 }
 
-export async function setStreak(goalId: string, state: StreakState): Promise<void> {
-  await saveModuleState(goalId, "fitness_streak", state);
+const SPLIT_CACHE_KEY = "cache:fitness_split:v1";
+
+export function readSplitCache(): WeeklySplitConfig {
+  try {
+    const raw = localStorage.getItem(SPLIT_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as WeeklySplitConfig;
+      for (const dk of DAY_KEYS) {
+        if (!parsed.days[dk]) parsed.days[dk] = { label: DEFAULT_SPLIT_LABELS[dk], completedDate: null };
+      }
+      return parsed;
+    }
+  } catch { /* ignore */ }
+  return makeDefaultSplit();
+}
+
+function writeSplitCache(cfg: WeeklySplitConfig): void {
+  try { localStorage.setItem(SPLIT_CACHE_KEY, JSON.stringify(cfg)); } catch { /* ignore */ }
+}
+
+export async function loadWeeklySplit(): Promise<WeeklySplitConfig> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return readSplitCache();
+
+  const { data } = await supabase
+    .from("fitness_weekly_split")
+    .select("config")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (data?.config) {
+    const cfg = data.config as WeeklySplitConfig;
+    for (const dk of DAY_KEYS) {
+      if (!cfg.days[dk]) cfg.days[dk] = { label: DEFAULT_SPLIT_LABELS[dk], completedDate: null };
+    }
+    writeSplitCache(cfg);
+    return cfg;
+  }
+  return readSplitCache();
+}
+
+export async function saveWeeklySplit(cfg: WeeklySplitConfig): Promise<void> {
+  writeSplitCache(cfg);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase
+    .from("fitness_weekly_split")
+    .upsert({ user_id: user.id, config: cfg }, { onConflict: "user_id" });
   emit();
 }
 
-export function getMondayISO(d = new Date()) {
-  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const day = dt.getUTCDay(); // 0=Sun..6=Sat
-  const diff = (day === 0 ? -6 : 1) - day; // shift to Monday
-  dt.setUTCDate(dt.getUTCDate() + diff);
-  return dt.toISOString().slice(0, 10);
+export async function toggleDayCompletion(
+  cfg: WeeklySplitConfig,
+  day: DayKey
+): Promise<WeeklySplitConfig> {
+  const today = todayISO();
+  const isToday = day === todayDayKey();
+  const wasCompleted = cfg.days[day].completedDate === today;
+
+  const updatedDays: Record<DayKey, DaySplit> = {
+    ...cfg.days,
+    [day]: { ...cfg.days[day], completedDate: wasCompleted ? null : today },
+  };
+
+  let { streak, lastStreakDate } = cfg;
+
+  if (isToday) {
+    if (!wasCompleted) {
+      if (!lastStreakDate) {
+        streak = 1;
+      } else {
+        const delta = diffDays(lastStreakDate, today);
+        if (delta === 1) streak = streak + 1;
+        else if (delta !== 0) streak = 1;
+      }
+      lastStreakDate = today;
+    } else {
+      if (lastStreakDate === today) {
+        streak = Math.max(0, streak - 1);
+        lastStreakDate = streak === 0 ? null : yesterdayISO();
+      }
+    }
+  }
+
+  const next: WeeklySplitConfig = { days: updatedDays, streak, lastStreakDate };
+  await saveWeeklySplit(next);
+  return next;
 }
 
-export type WeeklySplitState = {
-  weekStartISO: string;
-  doneByDay: Record<"Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun", boolean>;
-};
-
-const weeklySplitDefault = (): WeeklySplitState => ({
-  weekStartISO: getMondayISO(),
-  doneByDay: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false },
-});
-export function seedWeeklySplit(goalId: string): WeeklySplitState {
-  return seedCache(goalId, "fitness_weekly", weeklySplitDefault());
-}
-export async function getWeeklySplit(goalId: string): Promise<WeeklySplitState> {
-  return loadModuleState(goalId, "fitness_weekly", weeklySplitDefault());
-}
-export async function setWeeklySplit(goalId: string, state: WeeklySplitState): Promise<void> {
-  await saveModuleState(goalId, "fitness_weekly", state);
-  emit();
+export async function updateDayLabel(
+  cfg: WeeklySplitConfig,
+  day: DayKey,
+  label: string
+): Promise<WeeklySplitConfig> {
+  const next: WeeklySplitConfig = {
+    ...cfg,
+    days: { ...cfg.days, [day]: { ...cfg.days[day], label } },
+  };
+  await saveWeeklySplit(next);
+  return next;
 }

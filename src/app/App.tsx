@@ -16,7 +16,7 @@ import { GoalsPage } from "@/features/goals/GoalsPage";
 import { UpcomingTasksPage } from "@/features/goals/UpcomingTasksPage";
 import { UserGoalPage } from "@/features/goals/UserGoalPage";
 import { TodosPage } from "@/features/todos/TodosPage";
-import { FitnessGoalPage } from "@/features/goals/modules/fitness/FitnessGoalPage";
+import { FitnessPage } from "@/features/fitness/FitnessPage";
 import DashboardPage from "@/features/dashboard/DashboardPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { AchievementsPage } from "@/features/achievements/AchievementPage";
@@ -74,7 +74,7 @@ export default function App() {
 
             <Route path="upcoming" element={<UpcomingTasksPage />} />
             <Route path="todos" element={<TodosPage />} />
-            <Route path="fitness" element={<FitnessGoalPage />} />
+            <Route path="fitness" element={<FitnessPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="achievements" element={<AchievementsPage />} />
             <Route path="upgrade" element={<UpgradePage />} />

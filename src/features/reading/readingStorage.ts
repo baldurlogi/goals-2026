@@ -1,34 +1,32 @@
 // src/features/reading/readingStorage.ts
-import { getLocalDateKey } from '@/hooks/useTodayDate';
-import type { ReadingInputs } from './readingTypes';
-import { supabase } from '@/lib/supabaseClient';
+import type { ReadingInputs } from "./readingTypes";
+import { supabase } from "@/lib/supabaseClient";
 
 // Local key only used for optional legacy fallback + migration safety
-const STORAGE_KEY = 'daily-life:reading:v2';
+const STORAGE_KEY = "daily-life:reading:v2";
 
-export const READING_CHANGED_EVENT = 'daily-life:reading:changed';
+export const READING_CHANGED_EVENT = "daily-life:reading:changed";
 function emitReadingChanged() {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(READING_CHANGED_EVENT));
   }
 }
 
 export const DEFAULT_READING_INPUTS: ReadingInputs = {
-  current: { title: '', author: '', currentPage: '', totalPages: '' },
+  current: { title: "", author: "", currentPage: "", totalPages: "" },
   upNext: [],
   completed: [],
-  dailyGoalPages: '20',
+  dailyGoalPages: "20",
+  lastReadDate: null,
+  streak: 0,
 };
 
 // helper: merge partial into defaults safely
-function normalizeReadingInputs(
-  parsed: Partial<ReadingInputs> | null | undefined,
-): ReadingInputs {
+function normalizeReadingInputs(parsed: Partial<ReadingInputs> | null | undefined): ReadingInputs {
   const p = parsed ?? {};
-  const dailyGoalPages =
-    typeof p.dailyGoalPages === 'string'
-      ? p.dailyGoalPages
-      : DEFAULT_READING_INPUTS.dailyGoalPages;
+  const dailyGoalPages = typeof p.dailyGoalPages === "string"
+    ? p.dailyGoalPages
+    : DEFAULT_READING_INPUTS.dailyGoalPages;
   return {
     ...DEFAULT_READING_INPUTS,
     ...p,
@@ -36,6 +34,8 @@ function normalizeReadingInputs(
     upNext: Array.isArray(p.upNext) ? p.upNext : [],
     completed: Array.isArray(p.completed) ? p.completed : [],
     dailyGoalPages,
+    lastReadDate: typeof p.lastReadDate === "string" ? p.lastReadDate : null,
+    streak: typeof p.streak === "number" ? p.streak : 0,
   };
 }
 
@@ -55,15 +55,13 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
     // If not logged in, fall back to local (so UI still works on auth screens/dev)
     if (!user) {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw
-        ? normalizeReadingInputs(JSON.parse(raw))
-        : DEFAULT_READING_INPUTS;
+      return raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
     }
 
     const { data, error } = await supabase
-      .from('reading_state')
-      .select('state')
-      .eq('user_id', user.id)
+      .from("reading_state")
+      .select("state")
+      .eq("user_id", user.id)
       .maybeSingle();
 
     if (error) throw error;
@@ -72,21 +70,14 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
     const state = (data?.state ?? null) as Partial<ReadingInputs> | null;
     if (!state) {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw
-        ? normalizeReadingInputs(JSON.parse(raw))
-        : DEFAULT_READING_INPUTS;
+      return raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
     }
 
     return normalizeReadingInputs(state);
   } catch (e) {
-    console.warn(
-      'loadReadingInputs failed, falling back to defaults/local:',
-      e,
-    );
+    console.warn("loadReadingInputs failed, falling back to defaults/local:", e);
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw
-      ? normalizeReadingInputs(JSON.parse(raw))
-      : DEFAULT_READING_INPUTS;
+    return raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
   }
 }
 
@@ -111,14 +102,16 @@ export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
     return;
   }
 
-  const { error } = await supabase.from('reading_state').upsert(
-    {
-      user_id: user.id,
-      state: value,
-      updated_at: getLocalDateKey(),
-    },
-    { onConflict: 'user_id' },
-  );
+  const { error } = await supabase
+    .from("reading_state")
+    .upsert(
+      {
+        user_id: user.id,
+        state: value,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    );
 
   if (error) throw error;
 

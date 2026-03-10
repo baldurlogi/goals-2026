@@ -1,14 +1,3 @@
-/**
- * useAchievements.ts
- *
- * Checks all achievement conditions against live data and unlocks newly
- * earned badges. Exposes a queue of newly-unlocked achievements so the
- * UI can show the celebration modal one at a time.
- *
- * Usage:
- *   const { unlocked, newlyUnlocked, dismissNew } = useAchievements();
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ACHIEVEMENTS,
@@ -20,7 +9,12 @@ import {
   unlockAchievement,
   ACHIEVEMENTS_CHANGED_EVENT,
 } from './achievementStorage';
-import { loadFitness } from '@/features/fitness/fitnessStorage';
+import {
+  loadPRGoals,
+  type PRGoal,
+  type PREntry,
+  type MetricType,
+} from '@/features/fitness/fitnessStorage';
 import { loadNutritionLog } from '@/features/nutrition/nutritionStorage';
 import { loadUserGoals } from '@/features/goals/userGoalStorage';
 import { loadReadingInputs } from '@/features/reading/readingStorage';
@@ -30,22 +24,45 @@ import { loadProfile } from '@/features/onboarding/profileStorage';
 import { supabase } from '@/lib/supabaseClient';
 import type { UnlockedAchievement } from './achievementDefinitions';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
-getLocalDateKey
 
-// ── Data snapshot builder ─────────────────────────────────────────────────────
+type LegacyFitnessLift = {
+  label: string;
+  goal: number;
+  unit: MetricType;
+  history: PREntry[];
+};
+
+type LegacyFitnessStore = {
+  lifts: Record<string, LegacyFitnessLift>;
+};
+
+function toLegacyFitness(prGoals: PRGoal[]): LegacyFitnessStore {
+  return {
+    lifts: Object.fromEntries(
+      prGoals.map((goal) => [
+        goal.id,
+        {
+          label: goal.label,
+          goal: goal.goal,
+          unit: goal.unit,
+          history: Array.isArray(goal.history) ? goal.history : [],
+        },
+      ]),
+    ),
+  };
+}
 
 async function buildCheckData(): Promise<AchievementCheckData> {
-  const [goals, fitness, nutritionLog, reading, todos, profile] =
+  const [goals, prGoals, nutritionLog, reading, todos, profile] =
     await Promise.all([
       loadUserGoals().catch(() => []),
-      loadFitness().catch(() => null),
+      loadPRGoals().catch(() => []),
       loadNutritionLog().catch(() => null),
       loadReadingInputs().catch(() => null),
       listTodos().catch(() => []),
       loadProfile().catch(() => null),
     ]);
 
-  // Reading streak
   let readingStreak = 0;
   try {
     const s = await loadModuleState<{ streak: number }>(
@@ -55,55 +72,53 @@ async function buildCheckData(): Promise<AchievementCheckData> {
     );
     readingStreak = s?.streak ?? 0;
   } catch {
-    /* ignore */
+    // ignore
   }
 
-  // Books completed = reading.completed array length
   const readingBooksCompleted = (reading?.completed ?? []).length;
 
-  // Nutrition logs across multiple days — fetch last 30 days
   let nutritionLogsThisWeek = 0;
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
     if (user) {
       const { data } = await supabase
         .from('nutrition_logs')
         .select('log_date')
         .eq('user_id', user.id);
+
       nutritionLogsThisWeek = (data ?? []).length;
     }
   } catch {
-    /* ignore */
+    // ignore
   }
 
-  // Todos completed total (count done=true rows)
   const todosCompletedTotal = todos.filter((t) => t.done).length;
 
-  // Enabled modules
   const enabledModules =
     (profile as unknown as { enabled_modules?: string[] })?.enabled_modules ??
     [];
 
-  // Account age
   let accountAgeDays = 0;
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
     if (user?.created_at) {
       accountAgeDays = Math.floor(
         (Date.now() - new Date(user.created_at).getTime()) / 86400000,
       );
     }
   } catch {
-    /* ignore */
+    // ignore
   }
 
   return {
     goals,
-    fitness,
+    fitness: toLegacyFitness(prGoals) as AchievementCheckData['fitness'],
     nutritionLog,
     nutritionLogsThisWeek,
     reading,
@@ -116,16 +131,10 @@ async function buildCheckData(): Promise<AchievementCheckData> {
   };
 }
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
-
 export type UseAchievementsResult = {
-  /** All achievements the user has unlocked */
   unlocked: UnlockedAchievement[];
-  /** Queue of newly-unlocked achievements to show modals for */
   newlyUnlocked: UnlockedAchievement[];
-  /** Call after showing modal to dismiss the front of the queue */
   dismissNew: () => void;
-  /** Is the initial load still in progress? */
   loading: boolean;
 };
 
@@ -150,7 +159,8 @@ export function useAchievements(): UseAchievementsResult {
       const newlyEarned: UnlockedAchievement[] = [];
 
       for (const def of ACHIEVEMENTS) {
-        if (existingIds.has(def.id)) continue; // already unlocked
+        if (existingIds.has(def.id)) continue;
+
         try {
           if (def.check(checkData)) {
             const isNew = await unlockAchievement(def.id);
@@ -159,11 +169,10 @@ export function useAchievements(): UseAchievementsResult {
             }
           }
         } catch {
-          /* individual check failure shouldn't crash */
+          // ignore individual check failure
         }
       }
 
-      // Reload full list
       const updated = await loadUnlockedAchievements();
       setUnlocked(updated);
 
@@ -177,9 +186,8 @@ export function useAchievements(): UseAchievementsResult {
   }, []);
 
   useEffect(() => {
-    check();
+    void check();
 
-    // Re-check when any module emits a change
     const events = [
       'fitness:changed',
       'nutrition:changed',
@@ -189,6 +197,7 @@ export function useAchievements(): UseAchievementsResult {
       'goal_module:changed',
       ACHIEVEMENTS_CHANGED_EVENT,
     ];
+
     events.forEach((e) => window.addEventListener(e, check));
     return () => events.forEach((e) => window.removeEventListener(e, check));
   }, [check]);

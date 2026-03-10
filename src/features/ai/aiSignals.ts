@@ -1,7 +1,7 @@
 import { loadProfile } from '@/features/onboarding/profileStorage';
 import { DEFAULT_MODULES, type ModuleId } from '@/features/modules/modules';
 import { loadUserGoals } from '@/features/goals/userGoalStorage';
-import { loadFitness } from '@/features/fitness/fitnessStorage';
+import { loadPRGoals, type PRGoal } from '@/features/fitness/fitnessStorage';
 import {
   loadNutritionLog,
   loadPhase,
@@ -20,22 +20,6 @@ type GoalLike = {
     label?: string;
     idealFinish?: string | null;
   }>;
-};
-
-type FitnessHistoryEntryLike = {
-  value?: number;
-  date?: string;
-};
-
-type FitnessLiftLike = {
-  label?: string;
-  goal?: number;
-  unit?: string;
-  history?: FitnessHistoryEntryLike[];
-};
-
-type FitnessStoreLike = {
-  lifts?: Record<string, FitnessLiftLike>;
 };
 
 type ReadingState = {
@@ -231,17 +215,56 @@ function daysSince(isoDate: string | null): number | null {
   return Math.floor((Date.now() - t) / 86_400_000);
 }
 
+function getLatestWorkoutDate(prGoals: PRGoal[]): string | null {
+  const allWorkoutDates = prGoals.flatMap((goal) =>
+    Array.isArray(goal.history)
+      ? goal.history
+          .map((entry) => (typeof entry.date === 'string' ? entry.date : null))
+          .filter((date): date is string => Boolean(date))
+      : [],
+  );
+
+  return [...allWorkoutDates].sort().at(-1) ?? null;
+}
+
+function getLiftProgress(prGoals: PRGoal[]) {
+  return prGoals
+    .map((goal) => {
+      const history = Array.isArray(goal.history) ? goal.history : [];
+
+      const best = history.reduce<number | null>((acc, entry) => {
+        if (typeof entry.value !== 'number') return acc;
+        if (acc === null || entry.value > acc) return entry.value;
+        return acc;
+      }, null);
+
+      const pct =
+        best !== null && typeof goal.goal === 'number' && goal.goal > 0
+          ? Math.round((best / goal.goal) * 100)
+          : null;
+
+      return {
+        label: goal.label ?? null,
+        pct,
+      };
+    })
+    .filter(
+      (goal): goal is { label: string; pct: number | null } =>
+        typeof goal.label === 'string',
+    );
+}
+
 export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
   if (!forceRefresh) {
     const cached = readCache();
     if (cached) return cached;
   }
 
-  const [profile, goals, fitnessStore, nutritionLog, nutritionPhase] =
+  const [profile, goals, prGoals, nutritionLog, nutritionPhase] =
     await Promise.all([
       Promise.resolve(loadProfile()).catch(() => null),
       Promise.resolve(loadUserGoals()).catch(() => []),
-      Promise.resolve(loadFitness()).catch(() => null),
+      Promise.resolve(loadPRGoals()).catch(() => []),
       Promise.resolve(loadNutritionLog()).catch(() => null),
       Promise.resolve(loadPhase()).catch(() => 'maintain' as const),
     ]);
@@ -272,40 +295,8 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
     );
   }, 0);
 
-  const fitness = (fitnessStore ?? null) as FitnessStoreLike | null;
-  const lifts = fitness?.lifts ? Object.values(fitness.lifts) : [];
-
-  const allWorkoutDates = lifts.flatMap((lift) =>
-    Array.isArray(lift.history)
-      ? (lift.history
-          .map((entry) => (typeof entry.date === 'string' ? entry.date : null))
-          .filter(Boolean) as string[])
-      : [],
-  );
-
-  const latestWorkoutDate = [...allWorkoutDates].sort().at(-1) ?? null;
-
-  const liftProgress = lifts
-    .map((lift) => {
-      const history = Array.isArray(lift.history) ? lift.history : [];
-      const best = history.reduce<number | null>((acc, entry) => {
-        if (typeof entry.value !== 'number') return acc;
-        if (acc === null || entry.value > acc) return entry.value;
-        return acc;
-      }, null);
-
-      const goal = typeof lift.goal === 'number' ? lift.goal : null;
-      const pct =
-        best !== null && goal && goal > 0
-          ? Math.round((best / goal) * 100)
-          : null;
-
-      return {
-        label: lift.label ?? null,
-        pct,
-      };
-    })
-    .filter((lift) => typeof lift.label === 'string');
+  const latestWorkoutDate = getLatestWorkoutDate(prGoals);
+  const liftProgress = getLiftProgress(prGoals);
 
   const strongestLift =
     [...liftProgress]

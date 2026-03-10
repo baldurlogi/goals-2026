@@ -12,6 +12,7 @@ import {
 } from '@/features/nutrition/nutritionData';
 import { useTodayDate } from '@/hooks/useTodayDate';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { PROFILE_CHANGED_EVENT } from '@/features/onboarding/profileStorage';
 
 const LOG_CACHE = 'cache:nutrition_log:v1';
 const PHASE_CACHE = 'cache:nutrition_phase:v1';
@@ -87,7 +88,15 @@ export function useNutritionDashboard() {
     };
   }, []);
 
-  const target = useMemo(() => getTargets(phase), [phase]);
+  // Re-read targets whenever user saves new profile macros
+  const [profileVersion, setProfileVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setProfileVersion((v) => v + 1);
+    window.addEventListener(PROFILE_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(PROFILE_CHANGED_EVENT, bump);
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const target = useMemo(() => getTargets(phase), [phase, profileVersion]);
   const logged = useMemo(() => getLoggedMacros(log), [log]);
   const calPct = pct(logged.cal, target.cal);
 

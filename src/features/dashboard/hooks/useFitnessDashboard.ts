@@ -1,48 +1,106 @@
 import { useEffect, useState } from "react";
 import {
-  loadFitness,
+  loadPRGoals,
+  readPRCache,
   FITNESS_CHANGED_EVENT,
   currentBest,
   progressPct,
-  DEFAULT_STORE,
-  type FitnessStore,
+  type PRGoal,
+  type PREntry,
+  type MetricType,
 } from "@/features/fitness/fitnessStorage";
 
-const CACHE_KEY = "cache:fitness:v1";
+type FitnessDashboardLift = {
+  label: string;
+  goal: number;
+  unit: MetricType;
+  history: PREntry[];
+};
 
-function readCache(): FitnessStore {
+type FitnessDashboardStore = {
+  lifts: Record<string, FitnessDashboardLift>;
+};
+
+const EMPTY_STORE: FitnessDashboardStore = { lifts: {} };
+
+function toStore(prGoals: PRGoal[]): FitnessDashboardStore {
+  return {
+    lifts: Object.fromEntries(
+      prGoals.map((goal) => [
+        goal.id,
+        {
+          label: goal.label,
+          goal: goal.goal,
+          unit: goal.unit,
+          history: Array.isArray(goal.history) ? goal.history : [],
+        },
+      ]),
+    ),
+  };
+}
+
+function readCache(): FitnessDashboardStore {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : DEFAULT_STORE;
-  } catch { return DEFAULT_STORE; }
+    return toStore(readPRCache());
+  } catch {
+    return EMPTY_STORE;
+  }
+}
+
+function findLift(
+  store: FitnessDashboardStore,
+  ids: string[],
+  fallbackLabel: string,
+) {
+  for (const id of ids) {
+    const lift = store.lifts[id];
+    if (lift) {
+      const best = currentBest(lift.history);
+      return {
+        id,
+        label: lift.label,
+        best,
+        goal: lift.goal,
+        pct: progressPct(best, lift.goal),
+      };
+    }
+  }
+
+  return {
+    id: ids[0],
+    label: fallbackLabel,
+    best: null,
+    goal: 0,
+    pct: 0,
+  };
 }
 
 export function useFitnessDashboard() {
-  const [store,   setStore]   = useState<FitnessStore>(readCache);
+  const [store, setStore] = useState<FitnessDashboardStore>(readCache);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetch() {
-      const fresh = await loadFitness();
+    async function fetchData() {
+      const prGoals = await loadPRGoals();
+      const fresh = toStore(prGoals);
+
       if (!cancelled) {
         setStore(fresh);
         setLoading(false);
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
-        } catch(e) {
-          console.warn("read cache failed", e);
-          return {};
-        }
       }
     }
 
-    fetch();
+    void fetchData();
 
-    const sync = () => fetch();
+    const sync = () => {
+      void fetchData();
+    };
+
     window.addEventListener(FITNESS_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
+
     return () => {
       cancelled = true;
       window.removeEventListener(FITNESS_CHANGED_EVENT, sync);
@@ -50,11 +108,11 @@ export function useFitnessDashboard() {
     };
   }, []);
 
-  const topLifts = (["bench", "squat", "ohp"] as const).map((id) => {
-    const r    = store.lifts[id];
-    const best = currentBest(r.history);
-    return { id, label: r.label, best, goal: r.goal, pct: progressPct(best, r.goal) };
-  });
+  const topLifts = [
+    findLift(store, ["bench_press", "bench"], "Bench Press"),
+    findLift(store, ["back_squat", "squat"], "Back Squat"),
+    findLift(store, ["ohp", "overhead_press"], "Overhead Press"),
+  ];
 
   return { store, topLifts, loading };
 }

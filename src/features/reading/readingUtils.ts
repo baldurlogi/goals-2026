@@ -1,6 +1,37 @@
 import { clamp, digitsOnly, toInt } from "@/lib/utils";
 import type { ReadingInputs, ReadingPlan, ReadingStats } from "./readingTypes";
 
+/**
+ * Call whenever the user updates currentPage.
+ * - If today already recorded: keep streak as-is (idempotent).
+ * - If yesterday was lastReadDate: increment streak.
+ * - If older / null: reset streak to 1.
+ * Returns a partial ReadingInputs with updated streak + lastReadDate.
+ */
+export function updateReadingStreak(
+  inputs: ReadingInputs,
+  todayKey: string,
+): Pick<ReadingInputs, "streak" | "lastReadDate"> {
+  const last = inputs.lastReadDate ?? null;
+
+  // Already logged today — no change
+  if (last === todayKey) {
+    return { streak: inputs.streak ?? 1, lastReadDate: last };
+  }
+
+  // Check if last was yesterday
+  const yesterday = new Date(todayKey);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = yesterday.toISOString().slice(0, 10);
+
+  if (last === yesterdayKey) {
+    return { streak: (inputs.streak ?? 0) + 1, lastReadDate: todayKey };
+  }
+
+  // Gap of 2+ days — reset
+  return { streak: 1, lastReadDate: todayKey };
+}
+
 export function inputsToPlan(inputs: ReadingInputs): ReadingPlan {
   const first = inputs.upNext?.[0];
 
