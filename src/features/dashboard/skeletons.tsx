@@ -14,14 +14,16 @@ export function Skeleton({ className }: { className?: string }) {
 function SkeletonCard({
   colSpan,
   accentColor,
+  className,
   children,
 }: {
   colSpan?: string;
   accentColor?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <Card className={cn("relative overflow-hidden", colSpan)}>
+    <Card className={cn("relative overflow-hidden", colSpan, className)}>
       {accentColor && (
         <div className={cn("absolute inset-x-0 top-0 h-0.5", accentColor)} />
       )}
@@ -83,20 +85,38 @@ export function MacrosCardSkeleton() {
 export function ScheduleCardSkeleton() {
   return (
     <SkeletonCard
-      colSpan="lg:col-span-3"
-      accentColor="bg-gradient-to-r from-blue-500 via-indigo-400 to-violet-400"
+      colSpan="lg:col-span-7"
+      className="min-h-[320px]"
+      accentColor="bg-gradient-to-r from-violet-500 via-purple-400 to-fuchsia-400"
     >
       <CardHeader className="space-y-2 pb-2 pt-5">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-5 w-2/3" />
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-4 w-14 rounded-full" />
+        </div>
+
+        <Skeleton className="h-4 w-2/3" />
+
+        <div className="mt-3 space-y-1">
+          <Skeleton className="h-1.5 w-full rounded-full" />
+          <div className="flex justify-end">
+            <Skeleton className="h-3 w-8" />
+          </div>
+        </div>
       </CardHeader>
+
       <CardContent className="space-y-2 pb-5">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="flex items-center gap-3">
             <Skeleton className="h-3 w-10 shrink-0" />
             <Skeleton className="h-8 flex-1 rounded-lg" />
           </div>
         ))}
+
+        <div className="flex items-center justify-between pt-2">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-7 w-24 rounded-md" />
+        </div>
       </CardContent>
     </SkeletonCard>
   );

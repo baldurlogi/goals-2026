@@ -19,8 +19,42 @@ import { type PRCategory, type PRGoal } from "./types";
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as PRCategory[];
 
+function PRCardPlaceholder() {
+  return (
+    <div className="min-h-[260px] animate-pulse rounded-2xl border bg-card p-4">
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-32 rounded bg-muted" />
+            <div className="h-3 w-24 rounded bg-muted" />
+          </div>
+          <div className="h-8 w-8 rounded bg-muted" />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-14 rounded bg-muted" />
+            <div className="h-3 w-10 rounded bg-muted" />
+          </div>
+          <div className="h-2 w-full rounded-full bg-muted" />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <div className="h-8 w-20 rounded bg-muted" />
+          <div className="h-8 w-20 rounded bg-muted" />
+        </div>
+
+        <div className="h-24 rounded-xl bg-muted/60" />
+      </div>
+    </div>
+  );
+}
+
 export function FitnessPage() {
   const [goals, setGoals] = useState<PRGoal[]>(() => readPRCache());
+  const [initialSyncDone, setInitialSyncDone] = useState(
+    () => readPRCache().length > 0,
+  );
   const [showAdd, setShowAdd] = useState(false);
   const [filterCat, setFilterCat] = useState<PRCategory | "all">("all");
 
@@ -28,8 +62,12 @@ export function FitnessPage() {
     let cancelled = false;
 
     async function sync() {
-      const fresh = await loadPRGoals();
-      if (!cancelled) setGoals(fresh);
+      try {
+        const fresh = await loadPRGoals();
+        if (!cancelled) setGoals(fresh);
+      } finally {
+        if (!cancelled) setInitialSyncDone(true);
+      }
     }
 
     void sync();
@@ -98,9 +136,14 @@ export function FitnessPage() {
   );
 
   const usedCategories = useMemo(
-    () => CATEGORIES.filter((cat) => goals.some((goal) => goal.category === cat)),
+    () =>
+      CATEGORIES.filter((cat) =>
+        goals.some((goal) => goal.category === cat),
+      ),
     [goals],
   );
+
+  const showInitialPlaceholder = !initialSyncDone && goals.length === 0;
 
   return (
     <div className="space-y-6">
@@ -169,7 +212,13 @@ export function FitnessPage() {
           </div>
         )}
 
-        {goals.length === 0 && (
+        {showInitialPlaceholder ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <PRCardPlaceholder key={i} />
+            ))}
+          </div>
+        ) : goals.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-10 text-center">
             <Dumbbell className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
             <p className="text-sm font-medium text-muted-foreground">
@@ -183,9 +232,7 @@ export function FitnessPage() {
               Add PR Goal
             </Button>
           </div>
-        )}
-
-        {visibleGoals.length > 0 && (
+        ) : visibleGoals.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visibleGoals.map((goal) => (
               <PRCard
@@ -198,7 +245,7 @@ export function FitnessPage() {
               />
             ))}
           </div>
-        )}
+        ) : null}
       </div>
 
       {showAdd && (

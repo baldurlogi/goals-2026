@@ -166,8 +166,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {showStartHere && <DashboardStartHereCard onDismiss={dismissStartHere} />}
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
         {isPro && <AICoachCard />}
         <LifeProgressCard />
@@ -189,6 +187,12 @@ export default function DashboardPage() {
                 <QuickAction key={qa.href} {...qa} />
               ))}
             </div>
+          </div>
+        )}
+
+        {showStartHere && (
+          <div className="md:col-span-2 lg:col-span-12">
+            <DashboardStartHereCard onDismiss={dismissStartHere} />
           </div>
         )}
       </div>
