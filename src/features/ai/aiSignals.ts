@@ -33,8 +33,8 @@ type ReadingState = {
   currentPage: number | null;
   totalPages: number | null;
   streak: number;
-  minutesToday: number;
-  targetMinutes: number;
+  pagesReadToday: number;
+  targetPages: number;
 };
 
 export type AISignals = {
@@ -140,8 +140,8 @@ function readReadingState(): ReadingState {
         currentPage: null,
         totalPages: null,
         streak: 0,
-        minutesToday: 0,
-        targetMinutes: 30,
+        pagesReadToday: 0,
+        targetPages: 20,
       };
     }
 
@@ -149,41 +149,48 @@ function readReadingState(): ReadingState {
       current?: {
         title?: string;
         author?: string;
-        currentPage?: number;
-        totalPages?: number;
+        currentPage?: string | number;
+        totalPages?: string | number;
       };
       book?: {
         title?: string;
         author?: string;
-        currentPage?: number;
-        totalPages?: number;
+        currentPage?: string | number;
+        totalPages?: string | number;
       };
-      streak?: { streak?: number };
+      // New schema: streak is a top-level number
+      streak?: number | { streak?: number };
+      // Old schema (legacy)
       minutes?: { minutes?: number; target?: number };
+      dailyGoalPages?: string | number;
     };
 
     const book = parsed.current ?? parsed.book;
 
+    // Handle both new schema (streak: number) and old schema (streak: { streak: number })
+    const streakVal =
+      typeof parsed.streak === 'number'
+        ? parsed.streak
+        : typeof parsed.streak === 'object' && typeof parsed.streak?.streak === 'number'
+          ? parsed.streak.streak
+          : 0;
+
     return {
       currentBookTitle:
-        typeof book?.title === 'string' && book.title !== 'Current book'
+        typeof book?.title === 'string' && book.title.trim().length > 0 && book.title !== 'Current book'
           ? book.title
           : null,
-      author: typeof book?.author === 'string' ? book.author : null,
+      author: typeof book?.author === 'string' && book.author.trim().length > 0 ? book.author : null,
       currentPage:
-        typeof book?.currentPage === 'number' ? book.currentPage : null,
+        book?.currentPage != null ? parseInt(String(book.currentPage)) || null : null,
       totalPages:
-        typeof book?.totalPages === 'number' ? book.totalPages : null,
-      streak:
-        typeof parsed.streak?.streak === 'number' ? parsed.streak.streak : 0,
-      minutesToday:
-        typeof parsed.minutes?.minutes === 'number'
-          ? parsed.minutes.minutes
-          : 0,
-      targetMinutes:
-        typeof parsed.minutes?.target === 'number'
-          ? parsed.minutes.target
-          : 30,
+        book?.totalPages != null ? parseInt(String(book.totalPages)) || null : null,
+      streak: streakVal,
+      pagesReadToday: 0, // not tracked per-day in localStorage — streak is what matters
+      targetPages:
+        typeof parsed.dailyGoalPages === 'string' || typeof parsed.dailyGoalPages === 'number'
+          ? parseInt(String(parsed.dailyGoalPages)) || 20
+          : 20,
     };
   } catch {
     return {
@@ -192,15 +199,16 @@ function readReadingState(): ReadingState {
       currentPage: null,
       totalPages: null,
       streak: 0,
-      minutesToday: 0,
-      targetMinutes: 30,
+      pagesReadToday: 0,
+      targetPages: 20,
     };
   }
 }
 
 function readTodosSignal(): AISignals['todos'] {
   try {
-    const raw = localStorage.getItem('todos_v1');
+    // Try new cache key first, fall back to legacy
+    const raw = localStorage.getItem('cache:todos:v1') ?? localStorage.getItem('todos_v1');
     if (!raw) return null;
 
     const todos = JSON.parse(raw) as Array<{
@@ -210,16 +218,10 @@ function readTodosSignal(): AISignals['todos'] {
 
     if (!Array.isArray(todos)) return null;
 
-    const today = getLocalDateKey();
-    const todayTodos = todos.filter(
-      (todo) =>
-        typeof todo.created_at === 'string' &&
-        todo.created_at.slice(0, 10) === today,
-    );
-
+    // All todos count (not just today's — todos aren't date-filtered)
     return {
-      totalToday: todayTodos.length,
-      doneToday: todayTodos.filter((todo) => Boolean(todo.done)).length,
+      totalToday: todos.length,
+      doneToday: todos.filter((todo) => Boolean(todo.done)).length,
     };
   } catch {
     return null;
@@ -279,9 +281,14 @@ export async function buildAISignals(
 
   const mealsLoggedToday =
     nutritionLog && typeof nutritionLog === 'object'
-      ? Object.values(
-          (nutritionLog as { eaten?: Record<string, boolean> }).eaten ?? {},
-        ).filter(Boolean).length
+      ? (
+          // Count custom entries (the current logging method)
+          ((nutritionLog as { customEntries?: unknown[] }).customEntries ?? []).length +
+          // Also count legacy eaten checkboxes for backwards compatibility
+          Object.values(
+            (nutritionLog as { eaten?: Record<string, boolean> }).eaten ?? {},
+          ).filter(Boolean).length
+        )
       : 0;
 
   const signals: AISignals = {

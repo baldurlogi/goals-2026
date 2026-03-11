@@ -90,12 +90,12 @@ export function buildSuggestionCandidates(
   }
 
   if (hasModule(signals, "reading")) {
-    if (signals.reading.currentBookTitle && signals.reading.minutesToday === 0) {
+    if (signals.reading.currentBookTitle && signals.reading.streak >= 0) {
       items.push({
         module: "reading",
         priority: 78,
-        action: `Read for ${Math.min(signals.reading.targetMinutes || 20, 20)} minutes`,
-        reason: `Keep "${signals.reading.currentBookTitle}" moving and protect your streak.`,
+        action: `Read ${signals.reading.targetPages} pages of ${signals.reading.currentBookTitle}`,
+        reason: `You have a ${signals.reading.streak}-day streak to protect.`,
         href: "/app/reading",
         icon: BookOpen,
       });

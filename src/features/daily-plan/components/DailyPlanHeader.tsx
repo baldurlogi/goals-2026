@@ -29,9 +29,13 @@ import {
 import { useTier, TIER_LABELS, TIER_BADGE } from "@/features/subscription/useTier";
 
 function getInitials(
-  user: { email?: string; user_metadata?: { full_name?: string; name?: string } } | null,
+  user: {
+    email?: string;
+    user_metadata?: { full_name?: string; name?: string };
+  } | null,
 ) {
   if (!user) return "?";
+
   const name = user.user_metadata?.full_name ?? user.user_metadata?.name;
   if (name) {
     return name
@@ -41,14 +45,23 @@ function getInitials(
       .join("")
       .toUpperCase();
   }
+
   return (user.email ?? "?")[0].toUpperCase();
 }
 
 function getDisplayName(
-  user: { email?: string; user_metadata?: { full_name?: string; name?: string } } | null,
+  user: {
+    email?: string;
+    user_metadata?: { full_name?: string; name?: string };
+  } | null,
 ) {
   if (!user) return "";
-  return user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email ?? "";
+  return (
+    user.user_metadata?.full_name ??
+    user.user_metadata?.name ??
+    user.email ??
+    ""
+  );
 }
 
 type NavItem = {
@@ -103,7 +116,9 @@ export function DailyPlanHeader() {
     }));
 
   const sections: NavSection[] = [
-    ...(dailyItems.length > 0 ? [{ label: "Daily Plan", items: dailyItems }] : []),
+    ...(dailyItems.length > 0
+      ? [{ label: "Daily Plan", items: dailyItems }]
+      : []),
     ...(goalsItems.length > 0 ? [{ label: "Goals", items: goalsItems }] : []),
     ...(otherItems.length > 0 ? [{ label: "Other", items: otherItems }] : []),
   ];
@@ -116,6 +131,8 @@ export function DailyPlanHeader() {
   const displayName = getDisplayName(user);
   const email = user?.email ?? "";
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+
+  const CurrentIcon = currentItem?.icon;
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -135,10 +152,14 @@ export function DailyPlanHeader() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="flex items-center gap-1.5 px-2 text-sm font-medium">
-              {currentItem ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-1.5 px-2 text-sm font-medium"
+            >
+              {currentItem && CurrentIcon ? (
                 <>
-                  <currentItem.icon className="h-4 w-4 text-muted-foreground" />
+                  <CurrentIcon className="h-4 w-4 text-muted-foreground" />
                   <span>{currentItem.label}</span>
                 </>
               ) : (
@@ -190,10 +211,18 @@ export function DailyPlanHeader() {
         <button
           type="button"
           onClick={toggle}
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={
+            theme === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
           className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
         </button>
 
         <DropdownMenu>
@@ -226,7 +255,9 @@ export function DailyPlanHeader() {
               <p className="truncate text-sm font-semibold leading-tight">
                 {displayName || "Account"}
               </p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">{email}</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {email}
+              </p>
             </div>
 
             <DropdownMenuSeparator />
@@ -242,7 +273,9 @@ export function DailyPlanHeader() {
               <Link to="/app/upgrade" className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-violet-400" />
                 <span>Upgrade plan</span>
-                <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold ${TIER_BADGE[tier]}`}>
+                <span
+                  className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold ${TIER_BADGE[tier]}`}
+                >
                   {TIER_LABELS[tier]}
                 </span>
               </Link>

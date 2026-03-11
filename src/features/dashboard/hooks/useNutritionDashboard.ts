@@ -104,7 +104,7 @@ export function useNutritionDashboard() {
   const customCount = (log.customEntries ?? []).length;
   const itemsLogged = presetMealsEaten + customCount;
   const caloriesRemaining = target.cal - logged.cal;
-  const proteinRemaining = target.protein - logged.protein;
+  const proteinRemaining = Math.floor(target.protein - logged.protein);
 
   return {
     logged,

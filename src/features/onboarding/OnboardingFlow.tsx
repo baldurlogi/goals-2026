@@ -163,11 +163,18 @@ function Step1Profile({ data, onChange }: { data: OnboardingData; onChange: (p: 
   );
 }
 
-function Step2Modules({ data, onChange }: { data: OnboardingData; onChange: (p: Partial<OnboardingData>) => void }) {
+function Step2Modules({
+  data,
+  onChange,
+}: {
+  data: OnboardingData;
+  onChange: (p: Partial<OnboardingData>) => void;
+}) {
   function toggle(id: ModuleId) {
     const next = data.enabled_modules.includes(id)
       ? data.enabled_modules.filter((m) => m !== id)
       : [...data.enabled_modules, id];
+
     if (next.length === 0) return;
     onChange({ enabled_modules: next });
   }
@@ -177,16 +184,21 @@ function Step2Modules({ data, onChange }: { data: OnboardingData; onChange: (p: 
       <div>
         <h2 className="text-xl font-bold">What do you want to track?</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose the areas of your life to include. You can change this any time in settings.
+          Choose the areas of your life to include. You can change this any time
+          in settings.
         </p>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         {ALL_MODULES.map((mod) => {
-          const Icon = mod.icon;
           const enabled = data.enabled_modules.includes(mod.id);
+          const Icon = mod.icon;
 
           return (
-            <button key={mod.id} type="button" onClick={() => toggle(mod.id)}
+            <button
+              key={mod.id}
+              type="button"
+              onClick={() => toggle(mod.id)}
               className={cn(
                 "relative rounded-xl border p-4 text-left transition-all",
                 enabled
@@ -203,19 +215,23 @@ function Step2Modules({ data, onChange }: { data: OnboardingData; onChange: (p: 
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50">
                 <Icon className="h-5 w-5 text-muted-foreground" />
               </div>
-              
+
               <div className="text-sm font-semibold">{mod.label}</div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground leading-snug">{mod.description}</div>
+              <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                {mod.description}
+              </div>
             </button>
           );
         })}
       </div>
-      <p className="text-xs text-muted-foreground text-center">
+
+      <p className="text-center text-xs text-muted-foreground">
         {data.enabled_modules.length} of {ALL_MODULES.length} modules selected
       </p>
     </div>
   );
 }
+
 
 function Step3Macros({ data, onChange }: { data: OnboardingData; onChange: (p: Partial<OnboardingData>) => void }) {
   const hasBodyData = data.weight_kg && data.height_cm && data.age;

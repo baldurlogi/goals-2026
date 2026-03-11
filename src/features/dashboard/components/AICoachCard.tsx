@@ -4,7 +4,7 @@ import { Sparkles, RefreshCw, ArrowRight, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
-import { buildAIContext } from "@/features/ai/aiUserProfile";
+import { buildAIContext } from "@/features/ai/buildAIContext";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 
 // ── Types ────────────────────────────────────────────────────────────────────

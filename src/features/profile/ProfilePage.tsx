@@ -164,6 +164,7 @@ function ModulesEditor({
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50">
                 <Icon className="h-5 w-5 text-muted-foreground" />
               </div>
+
               <div className="text-sm font-semibold">{mod.label}</div>
               <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
                 {mod.description}
@@ -179,6 +180,7 @@ function ModulesEditor({
     </div>
   );
 }
+
 
 type Form = {
   display_name: string;
