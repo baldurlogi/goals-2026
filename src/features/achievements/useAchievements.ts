@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ACHIEVEMENTS,
   type AchievementCheckData,
@@ -34,6 +34,7 @@ type LegacyFitnessLift = {
 
 type LegacyFitnessStore = {
   lifts: Record<string, LegacyFitnessLift>;
+  skills: Record<string, { history: PREntry[]; category?: string }>;
 };
 
 function toLegacyFitness(prGoals: PRGoal[]): LegacyFitnessStore {
@@ -49,72 +50,59 @@ function toLegacyFitness(prGoals: PRGoal[]): LegacyFitnessStore {
         },
       ]),
     ),
+    skills: {},
   };
 }
 
 async function buildCheckData(): Promise<AchievementCheckData> {
-  const [goals, prGoals, nutritionLog, reading, todos, profile] =
-    await Promise.all([
-      loadUserGoals().catch(() => []),
-      loadPRGoals().catch(() => []),
-      loadNutritionLog().catch(() => null),
-      loadReadingInputs().catch(() => null),
-      listTodos().catch(() => []),
-      loadProfile().catch(() => null),
-    ]);
+  const [
+    authResult,
+    goals,
+    prGoals,
+    nutritionLog,
+    reading,
+    todos,
+    profile,
+    readingStreakState,
+  ] = await Promise.all([
+    supabase.auth.getUser().catch(() => ({ data: { user: null } })),
+    loadUserGoals().catch(() => []),
+    loadPRGoals().catch(() => []),
+    loadNutritionLog().catch(() => null),
+    loadReadingInputs().catch(() => null),
+    listTodos().catch(() => []),
+    loadProfile().catch(() => null),
+    loadModuleState<{ streak: number }>('reading', 'reading_streak', {
+      streak: 0,
+    }).catch(() => ({ streak: 0 })),
+  ]);
 
-  let readingStreak = 0;
-  try {
-    const s = await loadModuleState<{ streak: number }>(
-      'reading',
-      'reading_streak',
-      { streak: 0 },
-    );
-    readingStreak = s?.streak ?? 0;
-  } catch {
-    // ignore
-  }
-
+  const user = authResult?.data?.user ?? null;
+  const readingStreak = readingStreakState?.streak ?? 0;
   const readingBooksCompleted = (reading?.completed ?? []).length;
-
-  let nutritionLogsThisWeek = 0;
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const { data } = await supabase
-        .from('nutrition_logs')
-        .select('log_date')
-        .eq('user_id', user.id);
-
-      nutritionLogsThisWeek = (data ?? []).length;
-    }
-  } catch {
-    // ignore
-  }
-
   const todosCompletedTotal = todos.filter((t) => t.done).length;
 
   const enabledModules =
     (profile as unknown as { enabled_modules?: string[] })?.enabled_modules ??
     [];
 
-  let accountAgeDays = 0;
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  let nutritionLogsThisWeek = 0;
+  if (user) {
+    try {
+      const { data } = await supabase
+        .from('nutrition_logs')
+        .select('log_date')
+        .eq('user_id', user.id);
 
-    if (user?.created_at) {
-      accountAgeDays = Math.floor(
-        (Date.now() - new Date(user.created_at).getTime()) / 86400000,
-      );
+      nutritionLogsThisWeek = (data ?? []).length;
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
+
+  const accountAgeDays = user?.created_at
+    ? Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000)
+    : 0;
 
   return {
     goals,
@@ -138,73 +126,153 @@ export type UseAchievementsResult = {
   loading: boolean;
 };
 
-export function useAchievements(): UseAchievementsResult {
-  const [unlocked, setUnlocked] =
-    useState<UnlockedAchievement[]>(seedAchievements);
-  const [newlyUnlocked, setNewlyUnlocked] = useState<UnlockedAchievement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const checkingRef = useRef(false);
+type Listener = () => void;
 
-  const check = useCallback(async () => {
-    if (checkingRef.current) return;
-    checkingRef.current = true;
+const CHECK_COOLDOWN_MS = 5000;
+const initialUnlocked = seedAchievements();
 
-    try {
-      const [existing, checkData] = await Promise.all([
-        loadUnlockedAchievements(),
-        buildCheckData(),
-      ]);
+const store = {
+  unlocked: initialUnlocked as UnlockedAchievement[],
+  newlyUnlocked: [] as UnlockedAchievement[],
+  loading: initialUnlocked.length === 0,
+  checking: false,
+  initialized: false,
+  lastCheckAt: 0,
+  listeners: new Set<Listener>(),
+  eventsBound: false,
+};
 
-      const existingIds = new Set(existing.map((a) => a.id));
-      const newlyEarned: UnlockedAchievement[] = [];
+function emitChange() {
+  store.listeners.forEach((listener) => listener());
+}
 
-      for (const def of ACHIEVEMENTS) {
-        if (existingIds.has(def.id)) continue;
+function subscribe(listener: Listener) {
+  store.listeners.add(listener);
 
-        try {
-          if (def.check(checkData)) {
-            const isNew = await unlockAchievement(def.id);
-            if (isNew) {
-              newlyEarned.push({ id: def.id, unlockedAt: getLocalDateKey() });
-            }
+  return () => {
+    store.listeners.delete(listener);
+  };
+}
+
+function dismissNew() {
+  if (store.newlyUnlocked.length === 0) return;
+  store.newlyUnlocked = store.newlyUnlocked.slice(1);
+  emitChange();
+}
+
+async function runCheck(force = false) {
+  const now = Date.now();
+
+  if (store.checking) return;
+  if (
+    !force &&
+    store.initialized &&
+    now - store.lastCheckAt < CHECK_COOLDOWN_MS
+  ) {
+    return;
+  }
+
+  store.checking = true;
+  store.lastCheckAt = now;
+
+  if (!store.initialized && store.unlocked.length === 0) {
+    store.loading = true;
+    emitChange();
+  }
+
+  try {
+    const existing = await loadUnlockedAchievements().catch(
+      () => store.unlocked,
+    );
+
+    store.unlocked = existing;
+    store.loading = false;
+    emitChange();
+
+    const checkData = await buildCheckData();
+    const existingIds = new Set(existing.map((a) => a.id));
+    const newlyEarned: UnlockedAchievement[] = [];
+
+    for (const def of ACHIEVEMENTS) {
+      if (existingIds.has(def.id)) continue;
+
+      try {
+        if (def.check(checkData)) {
+          const isNew = await unlockAchievement(def.id);
+          if (isNew) {
+            newlyEarned.push({ id: def.id, unlockedAt: getLocalDateKey() });
           }
-        } catch {
-          // ignore individual check failure
+        }
+      } catch {
+        // ignore individual check failure
+      }
+    }
+
+    const updated = await loadUnlockedAchievements().catch(() => {
+      if (newlyEarned.length === 0) return store.unlocked;
+
+      const merged = [...store.unlocked];
+      for (const achievement of newlyEarned) {
+        if (!merged.some((item) => item.id === achievement.id)) {
+          merged.push(achievement);
         }
       }
+      return merged;
+    });
 
-      const updated = await loadUnlockedAchievements();
-      setUnlocked(updated);
+    store.unlocked = updated;
 
-      if (newlyEarned.length > 0) {
-        setNewlyUnlocked((prev) => [...prev, ...newlyEarned]);
-      }
-    } finally {
-      checkingRef.current = false;
-      setLoading(false);
+    if (newlyEarned.length > 0) {
+      store.newlyUnlocked = [...store.newlyUnlocked, ...newlyEarned];
     }
-  }, []);
+  } finally {
+    store.checking = false;
+    store.loading = false;
+    store.initialized = true;
+    emitChange();
+  }
+}
+
+function bindEventsOnce() {
+  if (store.eventsBound || typeof window === 'undefined') return;
+  store.eventsBound = true;
+
+  const handleActivity = () => {
+    void runCheck();
+  };
+
+  [
+    'fitness:changed',
+    'nutrition:changed',
+    'todos:changed',
+    'schedule:changed',
+    'daily-life:reading:changed',
+    'goal_module:changed',
+    ACHIEVEMENTS_CHANGED_EVENT,
+  ].forEach((eventName) => {
+    window.addEventListener(eventName, handleActivity);
+  });
+}
+
+export function useAchievements(): UseAchievementsResult {
+  const [, setVersion] = useState(0);
 
   useEffect(() => {
-    void check();
+    bindEventsOnce();
 
-    const events = [
-      'fitness:changed',
-      'nutrition:changed',
-      'todos:changed',
-      'schedule:changed',
-      'daily-life:reading:changed',
-      'goal_module:changed',
-      ACHIEVEMENTS_CHANGED_EVENT,
-    ];
+    const unsubscribe = subscribe(() => {
+      setVersion((v) => v + 1);
+    });
 
-    events.forEach((e) => window.addEventListener(e, check));
-    return () => events.forEach((e) => window.removeEventListener(e, check));
-  }, [check]);
+    void runCheck();
 
-  const dismissNew = useCallback(() => {
-    setNewlyUnlocked((prev) => prev.slice(1));
+    return unsubscribe;
   }, []);
 
-  return { unlocked, newlyUnlocked, dismissNew, loading };
+  return {
+    unlocked: store.unlocked,
+    newlyUnlocked: store.newlyUnlocked,
+    dismissNew,
+    loading: store.loading,
+  };
 }

@@ -1,23 +1,14 @@
-/**
- * useWeeklyReport.ts
- *
- * Manages the AI Weekly Life Report:
- * - Loads the latest report from Supabase
- * - Builds weeklyData payload from all module stores
- * - Calls hyper-responder with action: "weekly-report"
- * - Stores result back to Supabase
- */
-
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { getAISystemContext } from '@/features/ai/buildAIContext';
 import { loadUserGoals } from '@/features/goals/userGoalStorage';
 import { readProfileCache } from '@/features/onboarding/profileStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+
 const SUPABASE_FN =
   'https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder';
 
-// ── Report shape (mirrors edge function output) ───────────────────────────────
+const WEEKLY_REPORT_CACHE_KEY = 'cache:weekly-report:latest:v1';
 
 export type ModuleScore = {
   module: string;
@@ -55,7 +46,31 @@ export type WeeklyReportRecord = {
   createdAt: string;
 };
 
-// ── Week helpers ──────────────────────────────────────────────────────────────
+function readLatestReportCache(): WeeklyReportRecord | null {
+  try {
+    const raw = localStorage.getItem(WEEKLY_REPORT_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as WeeklyReportRecord | null;
+    if (!parsed?.id || !parsed?.weekStart || !parsed?.report) return null;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeLatestReportCache(report: WeeklyReportRecord | null) {
+  try {
+    if (!report) {
+      localStorage.removeItem(WEEKLY_REPORT_CACHE_KEY);
+      return;
+    }
+    localStorage.setItem(WEEKLY_REPORT_CACHE_KEY, JSON.stringify(report));
+  } catch {
+    // ignore
+  }
+}
 
 /** Returns the ISO Monday of the given date */
 function getMondayOf(date: Date): Date {
@@ -82,24 +97,24 @@ export function getCurrentWeekEnd(): string {
   return toDateStr(sunday);
 }
 
-/** Returns true if today is Sunday (day 0) */
 export function isSunday(): boolean {
   return new Date().getDay() === 0;
 }
 
-// ── Data collectors (reads from localStorage caches) ─────────────────────────
-
 function collectGoalsData(modules: Set<string>) {
   if (!modules.has('goals')) return undefined;
+
   try {
     const raw = localStorage.getItem('cache:user_goals:v1');
     if (!raw) return undefined;
+
     const goals = JSON.parse(raw) as Array<{
       id: string;
       title: string;
       priority: string;
       steps: Array<{ id: string }>;
     }>;
+
     const doneRaw = localStorage.getItem('goals:done:v1');
     const doneMap: Record<string, Record<string, boolean>> = doneRaw
       ? JSON.parse(doneRaw)
@@ -117,10 +132,10 @@ function collectGoalsData(modules: Set<string>) {
         g.steps.length === 0
           ? 0
           : Math.round((doneCount / g.steps.length) * 100);
+
       return { title: g.title, priority: g.priority, pct };
     });
 
-    // Count done steps from localStorage event history if available
     const historyRaw = localStorage.getItem('goals:step-history:v1');
     if (historyRaw) {
       const history: Array<{ date: string }> = JSON.parse(historyRaw);
@@ -142,9 +157,11 @@ function collectGoalsData(modules: Set<string>) {
 
 function collectFitnessData(modules: Set<string>) {
   if (!modules.has('fitness')) return undefined;
+
   try {
     const raw = localStorage.getItem('cache:fitness:v1');
     if (!raw) return undefined;
+
     const data = JSON.parse(raw);
     return {
       workoutsThisWeek: data.workoutsThisWeek ?? 0,
@@ -159,6 +176,7 @@ function collectFitnessData(modules: Set<string>) {
 
 function collectNutritionData(modules: Set<string>) {
   if (!modules.has('nutrition')) return undefined;
+
   try {
     const logRaw = localStorage.getItem('cache:nutrition_log:v1');
     const phaseRaw = localStorage.getItem('cache:nutrition_phase:v1');
@@ -177,6 +195,7 @@ function collectNutritionData(modules: Set<string>) {
             weekEntries.reduce((s, e) => s + (e.calories ?? 0), 0) / daysLogged,
           )
         : 0;
+
     const avgProtein =
       daysLogged > 0
         ? Math.round(
@@ -198,10 +217,11 @@ function collectNutritionData(modules: Set<string>) {
 
 function collectReadingData(modules: Set<string>) {
   if (!modules.has('reading')) return undefined;
+
   try {
     const raw = localStorage.getItem('daily-life:reading:v2');
     if (!raw) return undefined;
-    // ReadingInputs shape: { current, upNext, completed, dailyGoalPages, streak, lastReadDate }
+
     const data = JSON.parse(raw) as {
       current?: { title?: string; currentPage?: string; totalPages?: string };
       dailyGoalPages?: string;
@@ -209,8 +229,8 @@ function collectReadingData(modules: Set<string>) {
       lastReadDate?: string | null;
       completed?: Array<unknown>;
     };
-    const profile = readProfileCache();
 
+    const profile = readProfileCache();
     const currentPage = Number(data.current?.currentPage ?? 0);
     const totalPages = Math.max(1, Number(data.current?.totalPages ?? 1));
     const pct = Math.round((currentPage / totalPages) * 100);
@@ -222,7 +242,9 @@ function collectReadingData(modules: Set<string>) {
       pct,
       streak: data.streak ?? 0,
       lastReadDate: data.lastReadDate ?? null,
-      dailyGoalPages: Number(data.dailyGoalPages ?? profile?.daily_reading_goal ?? 20),
+      dailyGoalPages: Number(
+        data.dailyGoalPages ?? profile?.daily_reading_goal ?? 20,
+      ),
       booksCompletedTotal: (data.completed ?? []).length,
     };
   } catch {
@@ -232,18 +254,23 @@ function collectReadingData(modules: Set<string>) {
 
 function collectTodosData(modules: Set<string>) {
   if (!modules.has('todos')) return undefined;
+
   try {
     const raw = localStorage.getItem('cache:todos:v1');
     if (!raw) return undefined;
+
     const todos: Array<{ completedAt?: string; createdAt?: string }> =
       JSON.parse(raw);
     const weekStart = getCurrentWeekStart();
+
     const completedThisWeek = todos.filter(
       (t) => t.completedAt && t.completedAt >= weekStart,
     ).length;
+
     const totalCreatedThisWeek = todos.filter(
       (t) => t.createdAt && t.createdAt >= weekStart,
     ).length;
+
     return { completedThisWeek, totalCreatedThisWeek };
   } catch {
     return undefined;
@@ -252,9 +279,11 @@ function collectTodosData(modules: Set<string>) {
 
 function collectScheduleData(modules: Set<string>) {
   if (!modules.has('schedule')) return undefined;
+
   try {
     const raw = localStorage.getItem('cache:schedule:templates:v1');
     if (!raw) return undefined;
+
     const data = JSON.parse(raw);
     return {
       blocksCompletedThisWeek: data.blocksCompletedThisWeek ?? 0,
@@ -265,13 +294,15 @@ function collectScheduleData(modules: Set<string>) {
   }
 }
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
-
 type Status = 'idle' | 'loading' | 'generating' | 'error';
 
 export function useWeeklyReport(modules: Set<string>) {
-  const [report, setReport] = useState<WeeklyReportRecord | null>(null);
-  const [status, setStatus] = useState<Status>('idle');
+  const [report, setReport] = useState<WeeklyReportRecord | null>(() =>
+    readLatestReportCache(),
+  );
+  const [status, setStatus] = useState<Status>(() =>
+    readLatestReportCache() ? 'idle' : 'loading',
+  );
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<{
     prompts_used: number;
@@ -281,18 +312,21 @@ export function useWeeklyReport(modules: Set<string>) {
 
   const weekStart = getCurrentWeekStart();
 
-  // Load latest report from Supabase on mount
   useEffect(() => {
     let cancelled = false;
-    setStatus('loading');
 
     async function load() {
+      if (!readLatestReportCache()) {
+        setStatus('loading');
+      }
+
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
+
         if (!user) {
-          setStatus('idle');
+          if (!cancelled) setStatus('idle');
           return;
         }
 
@@ -304,25 +338,30 @@ export function useWeeklyReport(modules: Set<string>) {
           .limit(1)
           .maybeSingle();
 
+        if (cancelled) return;
+
         if (dbErr || !data) {
           setStatus('idle');
           return;
         }
-        if (cancelled) return;
 
-        setReport({
+        const latest: WeeklyReportRecord = {
           id: data.id,
           weekStart: data.week_start,
           report: data.report as WeeklyReport,
           createdAt: data.created_at,
-        });
+        };
+
+        setReport(latest);
+        writeLatestReportCache(latest);
         setStatus('idle');
       } catch {
         if (!cancelled) setStatus('idle');
       }
     }
 
-    load();
+    void load();
+
     return () => {
       cancelled = true;
     };
@@ -336,9 +375,11 @@ export function useWeeklyReport(modules: Set<string>) {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Not signed in');
 
-      // Load goals from Supabase directly for accuracy
+      if (!session?.access_token) {
+        throw new Error('Not signed in');
+      }
+
       const goals = await loadUserGoals();
       const profile = readProfileCache();
 
@@ -346,10 +387,9 @@ export function useWeeklyReport(modules: Set<string>) {
       try {
         userContext = await getAISystemContext();
       } catch {
-        /* non-fatal */
+        // non-fatal
       }
 
-      // Get enabled modules list
       const enabledModulesRaw = localStorage.getItem(
         'cache:enabled_modules:v1',
       );
@@ -357,7 +397,8 @@ export function useWeeklyReport(modules: Set<string>) {
         ? new Set(JSON.parse(enabledModulesRaw))
         : modules;
 
-      // Build weeklyData from local caches
+      const goalsSummary = collectGoalsData(enabledModules);
+
       const weeklyData = {
         weekStart,
         weekEnd: getCurrentWeekEnd(),
@@ -369,19 +410,9 @@ export function useWeeklyReport(modules: Set<string>) {
         },
         goals: {
           total: goals.length,
-          stepsCompletedThisWeek:
-            collectGoalsData(enabledModules)?.stepsCompletedThisWeek ?? 0,
-          overdueSteps: collectGoalsData(enabledModules)?.overdueSteps ?? 0,
-          topGoals: goals.slice(0, 5).map((g) => ({
-            title: g.title,
-            priority: g.priority,
-            pct:
-              g.steps.length === 0
-                ? 0
-                : Math.round(
-                    (g.steps.filter(() => false).length / g.steps.length) * 100,
-                  ),
-          })),
+          stepsCompletedThisWeek: goalsSummary?.stepsCompletedThisWeek ?? 0,
+          overdueSteps: goalsSummary?.overdueSteps ?? 0,
+          topGoals: goalsSummary?.topGoals ?? [],
         },
         fitness: collectFitnessData(enabledModules),
         nutrition: collectNutritionData(enabledModules),
@@ -409,25 +440,33 @@ export function useWeeklyReport(modules: Set<string>) {
           d.message ?? 'Upgrade to Pro to generate weekly reports.',
         );
       }
+
       if (res.status === 429) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.message ?? 'Monthly AI limit reached.');
       }
+
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error ?? 'Failed to generate report');
       }
 
       const data = await res.json();
+
       const newRecord: WeeklyReportRecord = {
         id: crypto.randomUUID(),
         weekStart,
         report: data.report as WeeklyReport,
-        createdAt: getLocalDateKey(),
+        createdAt: new Date().toISOString(),
       };
 
       setReport(newRecord);
-      if (data.usage) setUsage(data.usage);
+      writeLatestReportCache(newRecord);
+
+      if (data.usage) {
+        setUsage(data.usage);
+      }
+
       setStatus('idle');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong');

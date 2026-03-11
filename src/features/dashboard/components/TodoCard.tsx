@@ -23,10 +23,10 @@ function TodoCardInner() {
     inputRef.current?.focus();
   }
 
-  if (loading) return <TodoCardSkeleton />;
+  if (loading && total === 0) return <TodoCardSkeleton />;
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-3">
+    <Card className="relative overflow-hidden lg:col-span-3 min-h-[260px]">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-sky-500 via-blue-400 to-indigo-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -46,7 +46,6 @@ function TodoCardInner() {
       </CardHeader>
 
       <CardContent className="space-y-1 pb-4">
-        {/* Item list */}
         {preview.length === 0 ? (
           <p className="py-2 text-center text-xs text-muted-foreground">
             Nothing here — add something below.
@@ -88,7 +87,6 @@ function TodoCardInner() {
           </>
         )}
 
-        {/* Quick-add */}
         <div className="flex items-center gap-1.5 pt-2">
           <input
             ref={inputRef}
@@ -109,7 +107,6 @@ function TodoCardInner() {
           </Button>
         </div>
 
-        {/* Footer link */}
         <div className="flex justify-end pt-1">
           <Button
             asChild
