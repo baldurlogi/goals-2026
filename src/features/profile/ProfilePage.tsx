@@ -141,6 +141,7 @@ function ModulesEditor({
       <div className="grid gap-3 sm:grid-cols-2">
         {ALL_MODULES.map((mod) => {
           const enabled = value.includes(mod.id);
+          const Icon = mod.icon;
 
           return (
             <button
@@ -160,7 +161,9 @@ function ModulesEditor({
                 </div>
               )}
 
-              <div className="mb-2 text-2xl">{mod.emoji}</div>
+              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50">
+                <Icon className="h-5 w-5 text-muted-foreground" />
+              </div>
               <div className="text-sm font-semibold">{mod.label}</div>
               <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
                 {mod.description}
@@ -829,6 +832,7 @@ export function ProfilePage() {
             <div className="flex flex-wrap gap-2">
               {ALL_MODULES.map(m => {
                 const active = aiFocusAreas.includes(m.id);
+                const Icon = m.icon;
                 return (
                   <button
                     key={m.id}
@@ -843,7 +847,11 @@ export function ProfilePage() {
                         : "border-border bg-muted/30 text-muted-foreground hover:border-violet-500/30 hover:text-foreground",
                     )}
                   >
-                    <span>{m.emoji}</span>
+                    <span>
+                      <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50">
+                        <Icon className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    </span>
                     {m.label}
                   </button>
                 );

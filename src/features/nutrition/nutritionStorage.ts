@@ -47,6 +47,29 @@ function emptyLog(date = todayKey()): NutritionLog {
   return { date, eaten: {}, customEntries: [] };
 }
 
+// ── Log cache ──────────────────────────────────────────────────────────────
+const LOG_CACHE_KEY = 'cache:nutrition_log:v1';
+
+function readLogCache(): NutritionLog | null {
+  try {
+    const raw = localStorage.getItem(LOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as NutritionLog;
+    // Only use cache if it's for today
+    if (parsed.date !== todayKey()) return null;
+    return parsed;
+  } catch { return null; }
+}
+
+function writeLogCache(log: NutritionLog): void {
+  try { localStorage.setItem(LOG_CACHE_KEY, JSON.stringify(log)); } catch { /* ignore */ }
+}
+
+/** Synchronous seed — returns today's log from cache, or empty. Zero network. */
+export function seedNutritionLog(): NutritionLog {
+  return readLogCache() ?? emptyLog();
+}
+
 // ── Phase ──────────────────────────────────────────────────────────────────
 export async function loadPhase(): Promise<NutritionPhase> {
   const {
@@ -99,6 +122,12 @@ export async function loadNutritionLog(
   } = await supabase.auth.getUser();
   if (!user) return emptyLog(date);
 
+  // Return cache immediately for today — avoids Supabase round trip on fast reads
+  if (date === todayKey()) {
+    const cached = readLogCache();
+    if (cached) return cached;
+  }
+
   const { data, error } = await supabase
     .from('nutrition_logs')
     .select('log_date, eaten, custom_entries')
@@ -123,11 +152,13 @@ export async function loadNutritionLog(
     return emptyLog(date);
   }
 
-  return {
+  const log: NutritionLog = {
     date: data.log_date,
     eaten: (data.eaten ?? {}) as NutritionLog['eaten'],
     customEntries: (data.custom_entries ?? []) as NutritionLog['customEntries'],
   };
+  if (date === todayKey()) writeLogCache(log);
+  return log;
 }
 
 async function saveLog(log: NutritionLog): Promise<void> {
@@ -135,6 +166,9 @@ async function saveLog(log: NutritionLog): Promise<void> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return;
+
+  // Write to cache immediately so next seed/load is instant
+  if (log.date === todayKey()) writeLogCache(log);
 
   await supabase.from('nutrition_logs').upsert(
     {

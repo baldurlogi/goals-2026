@@ -182,7 +182,9 @@ function Step2Modules({ data, onChange }: { data: OnboardingData; onChange: (p: 
       </div>
       <div className="grid grid-cols-2 gap-3">
         {ALL_MODULES.map((mod) => {
+          const Icon = mod.icon;
           const enabled = data.enabled_modules.includes(mod.id);
+
           return (
             <button key={mod.id} type="button" onClick={() => toggle(mod.id)}
               className={cn(
@@ -190,13 +192,18 @@ function Step2Modules({ data, onChange }: { data: OnboardingData; onChange: (p: 
                 enabled
                   ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                   : "border-border bg-muted/20 hover:border-primary/40",
-              )}>
+              )}
+            >
               {enabled && (
                 <div className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary">
                   <Check className="h-3 w-3 text-primary-foreground" />
                 </div>
               )}
-              <div className="text-2xl mb-2">{mod.emoji}</div>
+
+              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50">
+                <Icon className="h-5 w-5 text-muted-foreground" />
+              </div>
+              
               <div className="text-sm font-semibold">{mod.label}</div>
               <div className="mt-0.5 text-[11px] text-muted-foreground leading-snug">{mod.description}</div>
             </button>
@@ -228,7 +235,7 @@ function Step3Macros({ data, onChange }: { data: OnboardingData; onChange: (p: P
       {maintain && cut ? (
         <div className="space-y-4">
           <MacroCard label="Maintain" targets={maintain} color="text-primary" />
-          <MacroCard label="Cut (−400 kcal)" targets={cut} color="text-amber-500" />
+          <MacroCard label="Cut (-400 kcal)" targets={cut} color="text-amber-500" />
           <details className="group">
             <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground select-none list-none flex items-center gap-1">
               <span className="group-open:hidden">▶</span><span className="hidden group-open:inline">▼</span> Edit manually

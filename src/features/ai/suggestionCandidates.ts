@@ -1,3 +1,18 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Target,
+  Clock3,
+  Rocket,
+  BookOpen,
+  Library,
+  Salad,
+  Utensils,
+  Dumbbell,
+  Activity,
+  CheckSquare,
+  CalendarDays,
+  Lightbulb,
+} from "lucide-react";
 import type { ModuleId } from "@/features/modules/modules";
 import type { AISignals } from "@/features/ai/aiSignals";
 
@@ -12,16 +27,14 @@ export type SuggestionCandidate = {
   action: string;
   reason: string;
   href: string;
-  emoji: string;
+  icon: LucideIcon;
 };
 
 function hasModule(signals: AISignals, module: ModuleId): boolean {
   return signals.modules.includes(module);
 }
 
-function dedupeByModule(
-  items: SuggestionCandidate[],
-): SuggestionCandidate[] {
+function dedupeByModule(items: SuggestionCandidate[]): SuggestionCandidate[] {
   const seen = new Set<string>();
   const output: SuggestionCandidate[] = [];
 
@@ -47,7 +60,7 @@ export function buildSuggestionCandidates(
         action: "Create your first goal",
         reason: "A clear goal gives the rest of your dashboard direction.",
         href: "/app/goals",
-        emoji: "🎯",
+        icon: Target,
       });
     }
 
@@ -60,7 +73,7 @@ export function buildSuggestionCandidates(
         }`,
         reason: "Clearing overdue steps reduces friction and gets momentum back.",
         href: "/app/upcoming",
-        emoji: "⏰",
+        icon: Clock3,
       });
     }
 
@@ -71,26 +84,20 @@ export function buildSuggestionCandidates(
         action: `Do: ${signals.goals.nextStepLabel}`,
         reason: `It moves "${signals.goals.highestPriorityTitle}" forward today.`,
         href: "/app/goals",
-        emoji: "🚀",
+        icon: Rocket,
       });
     }
   }
 
   if (hasModule(signals, "reading")) {
-    if (
-      signals.reading.currentBookTitle &&
-      signals.reading.minutesToday === 0
-    ) {
+    if (signals.reading.currentBookTitle && signals.reading.minutesToday === 0) {
       items.push({
         module: "reading",
         priority: 78,
-        action: `Read for ${Math.min(
-          signals.reading.targetMinutes || 20,
-          20,
-        )} minutes`,
+        action: `Read for ${Math.min(signals.reading.targetMinutes || 20, 20)} minutes`,
         reason: `Keep "${signals.reading.currentBookTitle}" moving and protect your streak.`,
         href: "/app/reading",
-        emoji: "📖",
+        icon: BookOpen,
       });
     } else if (!signals.reading.currentBookTitle) {
       items.push({
@@ -99,7 +106,7 @@ export function buildSuggestionCandidates(
         action: "Choose your next book",
         reason: "Setting a current book makes reading easier to start.",
         href: "/app/reading",
-        emoji: "📚",
+        icon: Library,
       });
     }
   }
@@ -112,7 +119,7 @@ export function buildSuggestionCandidates(
         action: "Log your first meal",
         reason: "A quick nutrition check-in makes the rest of the day easier to steer.",
         href: "/app/nutrition",
-        emoji: "🥗",
+        icon: Salad,
       });
     } else if (signals.nutrition.mealsLoggedToday < 3) {
       items.push({
@@ -123,7 +130,7 @@ export function buildSuggestionCandidates(
           signals.nutrition.mealsLoggedToday === 1 ? "" : "s"
         } logged so far today.`,
         href: "/app/nutrition",
-        emoji: "🍽️",
+        icon: Utensils,
       });
     }
   }
@@ -139,7 +146,7 @@ export function buildSuggestionCandidates(
         action: "Plan your next workout",
         reason: `It has been ${signals.fitness.daysSinceWorkout} days since your last logged session.`,
         href: "/app/fitness",
-        emoji: "🏋️",
+        icon: Dumbbell,
       });
     } else if (signals.fitness.weakestLift) {
       items.push({
@@ -148,7 +155,7 @@ export function buildSuggestionCandidates(
         action: `Review your ${signals.fitness.weakestLift} progress`,
         reason: "Your weakest area is often the best place to unlock progress.",
         href: "/app/fitness",
-        emoji: "💪",
+        icon: Activity,
       });
     }
   }
@@ -161,7 +168,7 @@ export function buildSuggestionCandidates(
         action: "Finish one quick to-do",
         reason: "A small completed task can unlock momentum fast.",
         href: "/app/todos",
-        emoji: "✅",
+        icon: CheckSquare,
       });
     }
   }
@@ -177,7 +184,7 @@ export function buildSuggestionCandidates(
         action: "Review your next schedule block",
         reason: "Seeing the next block clearly lowers startup friction.",
         href: "/app/schedule",
-        emoji: "📅",
+        icon: CalendarDays,
       });
     }
   }
@@ -192,7 +199,7 @@ export function buildSuggestionCandidates(
         action: "Review your upcoming tasks",
         reason: "A quick scan helps you choose the next meaningful step.",
         href: "/app/upcoming",
-        emoji: "💡",
+        icon: Lightbulb,
       },
     ];
   }

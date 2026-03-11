@@ -5,7 +5,6 @@ import {
   type AIUserProfile,
   type PreferredTone,
 } from '@/features/ai/aiUserProfile';
-import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 const SNAPSHOT_TTL_MS = 30 * 60 * 1000;
 
@@ -49,6 +48,10 @@ function buildSystemPrompt(
       }. Today: ${signals.reading.minutesToday}/${signals.reading.targetMinutes} minutes. Streak: ${signals.reading.streak} day(s).`
     : `No current book set. Today: ${signals.reading.minutesToday}/${signals.reading.targetMinutes} minutes. Streak: ${signals.reading.streak} day(s).`;
 
+  const extraNotes = [aiProfile?.personality_notes, aiProfile?.lifestyle_notes]
+    .filter(Boolean)
+    .join('\n');
+
   return `You are a personal life coach AI embedded inside the user's Life OS app.
 
 ## User summary
@@ -84,15 +87,16 @@ Strongest lift: ${signals.fitness.strongestLift ?? 'Unknown'}
 Weakest lift: ${signals.fitness.weakestLift ?? 'Unknown'}
 
 ## Coaching style
-${aiProfile?.personality_notes ?? 'The user benefits from concrete, small, low-friction next steps.'}
-${aiProfile?.lifestyle_notes ?? ''}
+${extraNotes || 'The user benefits from concrete, small, low-friction next steps.'}
 ${toneInstructions[tone]}
 
 Keep responses specific, actionable, and tied to the user's real data.
 Never repeat long summaries back to the user.`;
 }
 
-export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
+export async function buildAIContext(
+  forceRefresh = false,
+): Promise<AIContext> {
   const aiProfile = await loadAIProfile();
 
   if (
@@ -105,6 +109,7 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
 
     if (age < SNAPSHOT_TTL_MS) {
       const cachedSignals = aiProfile.last_context_snapshot as AISignals;
+
       return {
         systemContext: buildSystemPrompt(cachedSignals, aiProfile),
         signals: cachedSignals,
@@ -114,10 +119,11 @@ export async function buildAIContext(forceRefresh = false): Promise<AIContext> {
   }
 
   const signals = await buildAISignals(forceRefresh);
+  const builtAt = new Date().toISOString();
 
   await saveAIProfile({
     last_context_snapshot: signals as unknown as Record<string, unknown>,
-    last_context_built_at: getLocalDateKey(),
+    last_context_built_at: builtAt,
     active_modules: signals.modules,
     preferred_step_count: aiProfile?.preferred_step_count ?? 5,
     preferred_tone: aiProfile?.preferred_tone ?? 'direct',

@@ -122,3 +122,12 @@ export async function resetReadingInputs(): Promise<ReadingInputs> {
   await saveReadingInputs(DEFAULT_READING_INPUTS);
   return DEFAULT_READING_INPUTS;
 }
+
+/** Synchronous seed — reads from localStorage mirror. Zero network. */
+export function seedReadingInputs(): ReadingInputs {
+  try {
+    const raw = localStorage.getItem("daily-life:reading:v2");
+    if (raw) return normalizeReadingInputs(JSON.parse(raw));
+  } catch { /* ignore */ }
+  return DEFAULT_READING_INPUTS;
+}

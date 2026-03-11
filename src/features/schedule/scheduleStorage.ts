@@ -25,6 +25,29 @@ export const DEFAULT_SCHEDULE_LOG: ScheduleLog = {
   completed: [],
 };
 
+// ── Schedule log cache ────────────────────────────────────────────────────
+const LOG_CACHE_KEY = 'cache:schedule_log:v1';
+
+function readLogCache(): ScheduleLog | null {
+  try {
+    const raw = localStorage.getItem(LOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ScheduleLog;
+    // Only valid for today
+    if (parsed.date !== getLocalDateKey()) return null;
+    return parsed;
+  } catch { return null; }
+}
+
+function writeLogCache(log: ScheduleLog): void {
+  try { localStorage.setItem(LOG_CACHE_KEY, JSON.stringify(log)); } catch { /* ignore */ }
+}
+
+/** Synchronous seed — returns today's schedule log from cache. Zero network. */
+export function seedScheduleLog(): ScheduleLog {
+  return readLogCache() ?? { ...DEFAULT_SCHEDULE_LOG, date: getLocalDateKey() };
+}
+
 export type ScheduleLog = {
   date: string;
   view: ScheduleView;
@@ -38,6 +61,10 @@ export async function loadScheduleLog(): Promise<ScheduleLog> {
   const date = todayKey();
   const empty: ScheduleLog = { ...DEFAULT_SCHEDULE_LOG, date };
   if (!user) return empty;
+
+  // Return cache immediately for today
+  const cached = readLogCache();
+  if (cached) return cached;
 
   const { data, error } = await supabase
     .from('schedule_logs')
@@ -69,14 +96,17 @@ export async function loadScheduleLog(): Promise<ScheduleLog> {
     return { ...empty, view: defaultView };
   }
 
-  return {
+  const result: ScheduleLog = {
     date: data.log_date,
     view: (data.view as ScheduleView) ?? 'wfh',
     completed: data.completed ?? [],
   };
+  writeLogCache(result);
+  return result;
 }
 
 async function saveLog(log: ScheduleLog): Promise<void> {
+  writeLogCache(log);
   const {
     data: { user },
   } = await supabase.auth.getUser();
