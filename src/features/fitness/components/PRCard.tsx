@@ -1,156 +1,211 @@
 import { useState } from "react";
 import {
-  LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
-import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, TrendingUp, MoreHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import {
-  currentBest,
-  progressPct,
-  fmtValue,
-  CATEGORY_LABELS,
-  type PRGoal,
-  type PREntry,
-} from "@/features/fitness/fitnessStorage";
-
-// ── Sparkline tooltip ─────────────────────────────────────────────────────────
+  ChevronDown,
+  ChevronUp,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { CATEGORY_LABELS } from "../constants";
+import { currentBest, fmtValue, progressPct } from "../selectors";
+import { type PREntry, type PRGoal } from "../types";
 
 function SparkTooltip({
-  active, payload, unit,
+  active,
+  payload,
+  unit,
 }: {
   active?: boolean;
   payload?: Array<{ value: number; payload: { date: string } }>;
   unit: PRGoal["unit"];
 }) {
   if (!active || !payload?.length) return null;
-  const p = payload[0];
+
+  const point = payload[0];
+
   return (
-    <div className="rounded-lg border bg-popover px-2.5 py-1.5 shadow-md text-xs">
-      <div className="font-semibold">{fmtValue(p.value, unit)}</div>
-      <div className="text-muted-foreground">{p.payload.date}</div>
+    <div className="rounded-lg border bg-popover px-2.5 py-1.5 text-xs shadow-md">
+      <div className="font-semibold">{fmtValue(point.value, unit)}</div>
+      <div className="text-muted-foreground">{point.payload.date}</div>
     </div>
   );
 }
 
-// ── Log form ──────────────────────────────────────────────────────────────────
-
 function LogForm({
-  unit, onSubmit, onCancel,
+  unit,
+  onSubmit,
+  onCancel,
 }: {
   unit: PRGoal["unit"];
   onSubmit: (value: number, notes: string) => void;
   onCancel: () => void;
 }) {
-  const [val,   setVal]   = useState("");
+  const [val, setVal] = useState("");
   const [notes, setNotes] = useState("");
-  const placeholder = unit === "seconds"
-    ? "Seconds (e.g. 75 for 1:15)"
-    : `Value in ${unit}`;
+
+  const placeholder =
+    unit === "seconds" ? "Seconds (e.g. 75 for 1:15)" : `Value in ${unit}`;
 
   return (
     <div className="mt-2 space-y-2 rounded-xl border bg-muted/20 p-3">
       <div className="flex gap-2">
         <input
-          type="number" min={0} placeholder={placeholder} value={val}
+          type="number"
+          min={0}
+          placeholder={placeholder}
+          value={val}
           onChange={(e) => setVal(e.target.value)}
           className="w-28 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         />
         <input
-          type="text" placeholder="Notes (optional)" value={notes}
+          type="text"
+          placeholder="Notes (optional)"
+          value={notes}
           onChange={(e) => setNotes(e.target.value)}
           className="flex-1 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
+
       <div className="flex gap-2">
-        <Button size="sm" disabled={!val || Number(val) <= 0}
-          onClick={() => onSubmit(Number(val), notes)}>
+        <Button
+          size="sm"
+          disabled={!val || Number(val) <= 0}
+          onClick={() => onSubmit(Number(val), notes)}
+        >
           Save PR
         </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
       </div>
     </div>
   );
 }
 
-// ── Goal editor ───────────────────────────────────────────────────────────────
-
 function GoalEditor({
-  current, unit, onSave, onCancel,
+  current,
+  unit,
+  onSave,
+  onCancel,
 }: {
-  current: number; unit: string;
-  onSave: (val: number) => void; onCancel: () => void;
+  current: number;
+  unit: string;
+  onSave: (val: number) => void;
+  onCancel: () => void;
 }) {
   const [val, setVal] = useState(String(current));
+
   return (
     <span className="inline-flex items-center gap-1">
       <input
-        type="number" value={val} min={0}
+        type="number"
+        value={val}
+        min={0}
         onChange={(e) => setVal(e.target.value)}
         className="w-20 rounded border bg-background px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       />
       <span className="text-xs text-muted-foreground">{unit}</span>
-      <button type="button"
+      <button
+        type="button"
         onClick={() => Number(val) > 0 && onSave(Number(val))}
-        className="text-[10px] font-semibold text-emerald-500 hover:text-emerald-400">
+        className="text-[10px] font-semibold text-emerald-500 hover:text-emerald-400"
+      >
         Save
       </button>
-      <button type="button" onClick={onCancel}
-        className="text-[10px] text-muted-foreground hover:text-foreground">✕</button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-[10px] text-muted-foreground hover:text-foreground"
+      >
+        ✕
+      </button>
     </span>
   );
 }
 
-// ── History row ───────────────────────────────────────────────────────────────
-
 function HistoryRow({
-  entry, index, unit, onDelete,
+  entry,
+  index,
+  unit,
+  onDelete,
 }: {
-  entry: PREntry; index: number; unit: PRGoal["unit"];
+  entry: PREntry;
+  index: number;
+  unit: PRGoal["unit"];
   onDelete: (i: number) => void;
 }) {
   return (
     <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/30">
-      <span className="w-24 shrink-0 text-xs text-muted-foreground">{entry.date}</span>
+      <span className="w-24 shrink-0 text-xs text-muted-foreground">
+        {entry.date}
+      </span>
       <span className="flex-1 text-sm font-semibold tabular-nums">
         {fmtValue(entry.value, unit)}
       </span>
       {entry.notes && (
-        <span className="text-xs text-muted-foreground italic truncate max-w-[120px]">{entry.notes}</span>
+        <span className="max-w-[120px] truncate text-xs italic text-muted-foreground">
+          {entry.notes}
+        </span>
       )}
-      <button type="button" onClick={() => onDelete(index)}
-        className="invisible ml-auto shrink-0 text-muted-foreground/40 hover:text-destructive group-hover:visible">
+      <button
+        type="button"
+        onClick={() => onDelete(index)}
+        className="invisible ml-auto shrink-0 text-muted-foreground/40 hover:text-destructive group-hover:visible"
+      >
         <Trash2 className="h-3 w-3" />
       </button>
     </div>
   );
 }
 
-// ── Main PRCard ───────────────────────────────────────────────────────────────
-
 interface PRCardProps {
   goal: PRGoal;
-  onLog:        (id: string, value: number, notes?: string) => void;
+  onLog: (id: string, value: number, notes?: string) => void;
   onGoalUpdate: (id: string, goal: number) => void;
-  onDelete:     (id: string, index: number) => void;
-  onRemove:     (id: string) => void;
+  onDelete: (id: string, index: number) => void;
+  onRemove: (id: string) => void;
 }
 
-export function PRCard({ goal, onLog, onGoalUpdate, onDelete, onRemove }: PRCardProps) {
-  const [showLog,     setShowLog]     = useState(false);
+export function PRCard({
+  goal,
+  onLog,
+  onGoalUpdate,
+  onDelete,
+  onRemove,
+}: PRCardProps) {
+  const [showLog, setShowLog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showChart,   setShowChart]   = useState(false);
-  const [editGoal,    setEditGoal]    = useState(false);
-  const [showMenu,    setShowMenu]    = useState(false);
+  const [showChart, setShowChart] = useState(false);
+  const [editGoal, setEditGoal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   const best = currentBest(goal.history);
-  const pct  = progressPct(best, goal.goal);
+  const pct = progressPct(best, goal.goal);
 
   const chartData = [...goal.history]
     .slice(0, 20)
     .reverse()
-    .map((e) => ({ date: e.date, value: e.value }));
+    .map((entry) => ({ date: entry.date, value: entry.value }));
 
   const trend =
     goal.history.length >= 2
@@ -159,29 +214,36 @@ export function PRCard({ goal, onLog, onGoalUpdate, onDelete, onRemove }: PRCard
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="pb-2 pt-4 px-4">
+      <CardHeader className="px-4 pb-2 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <CardTitle className="text-sm truncate">{goal.label}</CardTitle>
+              <CardTitle className="truncate text-sm">{goal.label}</CardTitle>
               <span className="shrink-0 text-[10px] text-muted-foreground/60">
                 {CATEGORY_LABELS[goal.category].split(" ")[0]}
               </span>
             </div>
-            <CardDescription className="text-xs mt-0.5">
+
+            <CardDescription className="mt-0.5 text-xs">
               Goal:{" "}
               {editGoal ? (
                 <GoalEditor
                   current={goal.goal}
                   unit={goal.unit}
-                  onSave={(v) => { onGoalUpdate(goal.id, v); setEditGoal(false); }}
+                  onSave={(value) => {
+                    onGoalUpdate(goal.id, value);
+                    setEditGoal(false);
+                  }}
                   onCancel={() => setEditGoal(false)}
                 />
               ) : (
                 <span>
                   {goal.goalLabel}{" "}
-                  <button type="button" onClick={() => setEditGoal(true)}
-                    className="inline-flex text-muted-foreground/50 hover:text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={() => setEditGoal(true)}
+                    className="inline-flex text-muted-foreground/50 hover:text-muted-foreground"
+                  >
                     <Pencil className="h-2.5 w-2.5" />
                   </button>
                 </span>
@@ -189,48 +251,64 @@ export function PRCard({ goal, onLog, onGoalUpdate, onDelete, onRemove }: PRCard
             </CardDescription>
           </div>
 
-          <div className="flex items-start gap-2 shrink-0">
+          <div className="flex shrink-0 items-start gap-2">
             <div className="text-right">
               {best !== null ? (
                 <>
-                  <div className="text-xl font-bold tabular-nums leading-none">
+                  <div className="text-xl font-bold leading-none tabular-nums">
                     {fmtValue(best, goal.unit)}
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center justify-end gap-1">
+
+                  <div className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
                     {trend !== null && trend !== 0 && (
-                      <span className={trend > 0 ? "text-emerald-500" : "text-rose-500"}>
-                        <TrendingUp className={[
-                          "h-2.5 w-2.5 inline",
-                          trend < 0 ? "rotate-180" : "",
-                        ].join(" ")} />
-                        {" "}{trend > 0 ? "+" : ""}{fmtValue(Math.abs(trend), goal.unit)}
+                      <span
+                        className={
+                          trend > 0 ? "text-emerald-500" : "text-rose-500"
+                        }
+                      >
+                        <TrendingUp
+                          className={[
+                            "inline h-2.5 w-2.5",
+                            trend < 0 ? "rotate-180" : "",
+                          ].join(" ")}
+                        />{" "}
+                        {trend > 0 ? "+" : ""}
+                        {fmtValue(Math.abs(trend), goal.unit)}
                       </span>
                     )}
                     <span>PR</span>
                   </div>
                 </>
               ) : (
-                <div className="text-xs italic text-muted-foreground mt-1">No PR yet</div>
+                <div className="mt-1 text-xs italic text-muted-foreground">
+                  No PR yet
+                </div>
               )}
             </div>
 
-            {/* Overflow menu */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setShowMenu((s) => !s)}
-                className="p-1 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors"
+                onClick={() => setShowMenu((open) => !open)}
+                className="rounded-md p-1 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground"
               >
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
+
               {showMenu && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 top-6 z-20 rounded-xl border bg-popover shadow-lg py-1 min-w-[140px]">
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowMenu(false)}
+                  />
+                  <div className="absolute right-0 top-6 z-20 min-w-[140px] rounded-xl border bg-popover py-1 shadow-lg">
                     <button
                       type="button"
-                      onClick={() => { setShowMenu(false); onRemove(goal.id); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors"
+                      onClick={() => {
+                        setShowMenu(false);
+                        onRemove(goal.id);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-destructive hover:bg-muted"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Remove goal
@@ -241,89 +319,55 @@ export function PRCard({ goal, onLog, onGoalUpdate, onDelete, onRemove }: PRCard
             </div>
           </div>
         </div>
-
-        {/* Progress bar */}
-        <div className="mt-3 space-y-1">
-          <Progress value={pct} className="h-1.5" />
-          <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
-            <span>{pct}% to goal</span>
-            {best !== null && best >= goal.goal && (
-              <span className="text-emerald-500 font-semibold">🎯 Goal reached!</span>
-            )}
-          </div>
-        </div>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 space-y-2">
-        {/* Chart toggle */}
-        {chartData.length >= 2 && (
-          <button
-            type="button"
-            onClick={() => setShowChart((s) => !s)}
-            className="w-full text-left"
-          >
-            {showChart ? (
-              <div className="mt-1 rounded-xl border bg-muted/20 p-3">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                    Progress chart
-                  </span>
-                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
-                </div>
-                <ResponsiveContainer width="100%" height={100}>
-                  <LineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <XAxis dataKey="date" hide />
-                    <YAxis
-                      domain={["auto", "auto"]}
-                      tickFormatter={(v) => fmtValue(v, goal.unit)}
-                      tick={{ fontSize: 9 }}
-                      width={42}
-                    />
-                    <ReferenceLine
-                      y={goal.goal}
-                      strokeDasharray="4 2"
-                      strokeOpacity={0.4}
-                    />
-                    <Tooltip content={<SparkTooltip unit={goal.unit} />} />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke="hsl(var(--foreground))"
-                      strokeWidth={2}
-                      dot={{ r: 3, fill: "hsl(var(--foreground))", strokeWidth: 0 }}
-                      activeDot={{ r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                <TrendingUp className="h-3 w-3" />
-                <span>Show chart ({chartData.length} entries)</span>
-                <ChevronDown className="h-3 w-3 ml-auto" />
-              </div>
-            )}
-          </button>
-        )}
+      <CardContent className="space-y-3 px-4 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Progress</span>
+            <span className="tabular-nums">{pct}%</span>
+          </div>
+          <Progress value={pct} className="h-2" />
+        </div>
 
-        {/* Action row */}
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex flex-wrap gap-2">
           <Button
-            size="sm" variant={showLog ? "default" : "outline"}
-            className="h-7 gap-1 text-xs"
-            onClick={() => { setShowLog((s) => !s); setShowHistory(false); }}
+            size="sm"
+            variant={showLog ? "secondary" : "default"}
+            onClick={() => setShowLog((v) => !v)}
+            className="h-8 gap-1.5 text-xs"
           >
-            <Plus className="h-3 w-3" /> Log PR
+            <Plus className="h-3.5 w-3.5" />
+            Log PR
           </Button>
 
-          {goal.history.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowHistory((v) => !v)}
+            className="h-8 gap-1.5 text-xs"
+          >
+            {showHistory ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+            History
+          </Button>
+
+          {goal.history.length >= 2 && (
             <Button
-              size="sm" variant="ghost"
-              className="h-7 gap-1 text-xs text-muted-foreground"
-              onClick={() => { setShowHistory((s) => !s); setShowLog(false); }}
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowChart((v) => !v)}
+              className="h-8 gap-1.5 text-xs"
             >
-              {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              History ({goal.history.length})
+              {showChart ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+              Trend
             </Button>
           )}
         </div>
@@ -331,20 +375,62 @@ export function PRCard({ goal, onLog, onGoalUpdate, onDelete, onRemove }: PRCard
         {showLog && (
           <LogForm
             unit={goal.unit}
-            onSubmit={(v, n) => { onLog(goal.id, v, n); setShowLog(false); }}
+            onSubmit={(value, notes) => {
+              onLog(goal.id, value, notes);
+              setShowLog(false);
+            }}
             onCancel={() => setShowLog(false)}
           />
         )}
 
+        {showChart && chartData.length > 1 && (
+          <div className="rounded-xl border bg-muted/10 p-3">
+            <div className="mb-2 text-xs font-medium text-muted-foreground">
+              PR trend
+            </div>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <XAxis dataKey="date" hide />
+                  <YAxis hide domain={["dataMin - 5", "dataMax + 5"]} />
+                  <Tooltip content={<SparkTooltip unit={goal.unit} />} />
+                  <ReferenceLine
+                    y={goal.goal}
+                    stroke="currentColor"
+                    strokeDasharray="4 4"
+                    opacity={0.25}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         {showHistory && (
-          <div className="mt-1 space-y-0.5 max-h-48 overflow-auto rounded-xl border p-2">
-            {goal.history.map((entry, i) => (
-              <HistoryRow
-                key={`${entry.date}-${i}`}
-                entry={entry} index={i} unit={goal.unit}
-                onDelete={(idx) => onDelete(goal.id, idx)}
-              />
-            ))}
+          <div className="space-y-1 rounded-xl border bg-muted/10 p-2">
+            {goal.history.length === 0 ? (
+              <div className="px-2 py-2 text-xs text-muted-foreground">
+                No entries yet
+              </div>
+            ) : (
+              goal.history.map((entry, index) => (
+                <HistoryRow
+                  key={`${entry.date}-${entry.value}-${index}`}
+                  entry={entry}
+                  index={index}
+                  unit={goal.unit}
+                  onDelete={(i) => onDelete(goal.id, i)}
+                />
+              ))
+            )}
           </div>
         )}
       </CardContent>

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, Dumbbell } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { fmtValue } from '@/features/fitness/fitnessStorage';
 import { useFitnessDashboard } from '../hooks/useFitnessDashboard';
 import { FitnessCardSkeleton } from '@/features/dashboard/skeletons';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
@@ -55,48 +56,41 @@ function FitnessCardInner() {
             </p>
           </div>
         ) : (
-          <>
-            {/* Lifts */}
-            <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Lifts
-              </p>
-              {topLifts.map((lift) => (
-                <div key={lift.id} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">{lift.label}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {lift.best !== null ? (
-                        <>
-                          <span className="font-semibold text-foreground">
-                            {lift.best}kg
-                          </span>{' '}
-                          / {lift.goal}kg
-                        </>
-                      ) : (
-                        <span className="italic">— / {lift.goal}kg</span>
-                      )}
-                    </span>
-                  </div>
-                  <MiniBar pct={lift.pct} color="bg-violet-500" />
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Lifts
+            </p>
+
+            {topLifts.map((lift) => (
+              <div key={lift.id} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">{lift.label}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {lift.best !== null ? (
+                      <>
+                        <span className="font-semibold text-foreground">
+                          {fmtValue(lift.best, lift.unit)}
+                        </span>{" "}
+                        / {fmtValue(lift.goal, lift.unit)}
+                      </>
+                    ) : (
+                      <span className="italic">— / {fmtValue(lift.goal, lift.unit)}</span>
+                    )}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </>
+
+                <MiniBar pct={lift.pct} color="bg-violet-500" />
+              </div>
+            ))}
+          </div>
         )}
 
-        <div className="flex justify-end pt-1">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 text-xs"
-          >
-            <Link to="/app/fitness">
-              All PRs <ChevronRight className="h-3 w-3" />
-            </Link>
-          </Button>
-        </div>
+        <Button asChild variant="ghost" className="w-full justify-between px-0 text-sm">
+          <Link to="/app/fitness">
+            Open Fitness
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );

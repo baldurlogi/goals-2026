@@ -1,101 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  loadPRGoals,
-  readPRCache,
+  DASHBOARD_TOP_LIFTS,
   FITNESS_CHANGED_EVENT,
   currentBest,
+  findGoalByAliases,
+  loadPRGoals,
   progressPct,
-  type PRGoal,
-  type PREntry,
+  readPRCache,
   type MetricType,
+  type PRGoal,
 } from "@/features/fitness/fitnessStorage";
 
-type FitnessDashboardLift = {
+type DashboardTopLift = {
+  id: string;
   label: string;
-  goal: number;
   unit: MetricType;
-  history: PREntry[];
+  best: number | null;
+  goal: number;
+  pct: number;
 };
-
-type FitnessDashboardStore = {
-  lifts: Record<string, FitnessDashboardLift>;
-};
-
-const EMPTY_STORE: FitnessDashboardStore = { lifts: {} };
-
-function toStore(prGoals: PRGoal[]): FitnessDashboardStore {
-  return {
-    lifts: Object.fromEntries(
-      prGoals.map((goal) => [
-        goal.id,
-        {
-          label: goal.label,
-          goal: goal.goal,
-          unit: goal.unit,
-          history: Array.isArray(goal.history) ? goal.history : [],
-        },
-      ]),
-    ),
-  };
-}
-
-function readCache(): FitnessDashboardStore {
-  try {
-    return toStore(readPRCache());
-  } catch {
-    return EMPTY_STORE;
-  }
-}
-
-function findLift(
-  store: FitnessDashboardStore,
-  ids: string[],
-  fallbackLabel: string,
-) {
-  for (const id of ids) {
-    const lift = store.lifts[id];
-    if (lift) {
-      const best = currentBest(lift.history);
-      return {
-        id,
-        label: lift.label,
-        best,
-        goal: lift.goal,
-        pct: progressPct(best, lift.goal),
-      };
-    }
-  }
-
-  return {
-    id: ids[0],
-    label: fallbackLabel,
-    best: null,
-    goal: 0,
-    pct: 0,
-  };
-}
 
 export function useFitnessDashboard() {
-  const [store, setStore] = useState<FitnessDashboardStore>(readCache);
+  const [goals, setGoals] = useState<PRGoal[]>(() => readPRCache());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchData() {
-      const prGoals = await loadPRGoals();
-      const fresh = toStore(prGoals);
-
+    async function refresh() {
+      const fresh = await loadPRGoals();
       if (!cancelled) {
-        setStore(fresh);
+        setGoals(fresh);
         setLoading(false);
       }
     }
 
-    void fetchData();
+    void refresh();
 
     const sync = () => {
-      void fetchData();
+      void refresh();
     };
 
     window.addEventListener(FITNESS_CHANGED_EVENT, sync);
@@ -108,11 +51,39 @@ export function useFitnessDashboard() {
     };
   }, []);
 
-  const topLifts = [
-    findLift(store, ["bench_press", "bench"], "Bench Press"),
-    findLift(store, ["back_squat", "squat"], "Back Squat"),
-    findLift(store, ["ohp", "overhead_press"], "Overhead Press"),
-  ];
+  const topLifts = useMemo<DashboardTopLift[]>(
+    () =>
+      DASHBOARD_TOP_LIFTS.map((entry) => {
+        const goal = findGoalByAliases(goals, entry.aliases);
 
-  return { store, topLifts, loading };
+        if (!goal) {
+          return {
+            id: entry.id,
+            label: entry.label,
+            unit: "kg" as const,
+            best: null,
+            goal: 0,
+            pct: 0,
+          };
+        }
+
+        const best = currentBest(goal.history);
+
+        return {
+          id: goal.id,
+          label: goal.label,
+          unit: goal.unit,
+          best,
+          goal: goal.goal,
+          pct: progressPct(best, goal.goal),
+        };
+      }),
+    [goals],
+  );
+
+  return {
+    goals,
+    topLifts,
+    loading,
+  };
 }

@@ -23,14 +23,11 @@
 │   │   ├── .DS_Store
 │   │   ├── App.tsx
 │   │   ├── AppLayout.tsx
-│   │   ├── daily-plan
-│   │   │   └── DailyPlanHeader.tsx
 │   │   ├── pieShape.tsx
-│   │   ├── providers
-│   │   │   ├── AuthProvider.tsx
-│   │   │   ├── ThemeProvider.tsx
-│   │   │   └── theme-context.ts
-│   │   └── router
+│   │   └── providers
+│   │       ├── AuthProvider.tsx
+│   │       ├── ThemeProvider.tsx
+│   │       └── theme-context.ts
 │   ├── components
 │   │   ├── .DS_Store
 │   │   ├── BackToDashboard.tsx
@@ -108,6 +105,10 @@
 │   │   │   └── skeletons.tsx
 │   │   ├── fitness
 │   │   │   ├── FitnessPage.tsx
+│   │   │   ├── components
+│   │   │   │   ├── AddPRGoalModal.tsx
+│   │   │   │   ├── PRCard.tsx
+│   │   │   │   └── WeeklySplitCard.tsx
 │   │   │   └── fitnessStorage.ts
 │   │   ├── goals
 │   │   │   ├── .DS_Store
@@ -132,13 +133,6 @@
 │   │   │   │   │   │   ├── SavingsCard.tsx
 │   │   │   │   │   │   └── SpendingDonutCard.tsx
 │   │   │   │   │   └── financeStorage.ts
-│   │   │   │   ├── fitness
-│   │   │   │   │   ├── .DS_Store
-│   │   │   │   │   ├── FitnessGoalPage.tsx
-│   │   │   │   │   └── components
-│   │   │   │   │       ├── MacroTargetsCard.tsx
-│   │   │   │   │       ├── WeeklySplitCard.tsx
-│   │   │   │   │       └── WorkoutStreakCard.tsx
 │   │   │   │   ├── freelance
 │   │   │   │   │   ├── FreelanceGoalPage.tsx
 │   │   │   │   │   ├── components
@@ -162,6 +156,7 @@
 │   │   │   │   │   │   └── WeeklyMileageCard.tsx
 │   │   │   │   │   └── marathonStorage.ts
 │   │   │   │   ├── reading
+│   │   │   │   │   ├── .DS_Store
 │   │   │   │   │   ├── ReadingGoalPage.tsx
 │   │   │   │   │   ├── components
 │   │   │   │   │   │   ├── BookProgressCard.tsx
@@ -241,8 +236,7 @@
 │   │   │   ├── .DS_Store
 │   │   │   ├── NutritionPage.tsx
 │   │   │   ├── components
-│   │   │   │   ├── MacroRow.tsx
-│   │   │   │   └── MealCard.tsx
+│   │   │   │   └── MacroRow.tsx
 │   │   │   ├── nutritionData.ts
 │   │   │   ├── nutritionStorage.ts
 │   │   │   ├── nutritionTypes.ts
@@ -255,6 +249,7 @@
 │   │   ├── profile
 │   │   │   └── ProfilePage.tsx
 │   │   ├── reading
+│   │   │   ├── .DS_Store
 │   │   │   ├── ReadingPage.tsx
 │   │   │   ├── components
 │   │   │   │   ├── ReadingInputsCard.tsx
@@ -299,4 +294,4 @@
 ├── tsconfig.node.json
 └── vite.config.ts
 
-64 directories, 236 files
+61 directories, 234 files
