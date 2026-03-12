@@ -19,26 +19,7 @@ import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
-import { loadUserGoals } from "@/features/goals/userGoalStorage";
-
-const DASHBOARD_START_CARD_DISMISSED_KEY =
-  "dashboard:start-card:dismissed:v1";
-
-function readStartCardDismissed() {
-  try {
-    return localStorage.getItem(DASHBOARD_START_CARD_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function writeStartCardDismissed() {
-  try {
-    localStorage.setItem(DASHBOARD_START_CARD_DISMISSED_KEY, "1");
-  } catch {
-    return;
-  }
-}
+import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
 
 function QuickAction({
   icon,
@@ -90,30 +71,20 @@ export default function DashboardPage() {
   const isPro = tierMeets(tier, "pro");
   const has = (id: string) => modules.has(id as never);
 
-  const [goalCount, setGoalCount] = useState<number | null>(null);
-  const [startCardDismissed, setStartCardDismissed] = useState(
-    readStartCardDismissed,
+  const [goalCount, setGoalCount] = useState<number | null>(
+    () => seedUserGoals().length
   );
 
   useEffect(() => {
     let cancelled = false;
-
     loadUserGoals().then((fresh) => {
       if (cancelled) return;
       setGoalCount(fresh.length);
     });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  const showStartHere = goalCount === 0 && !startCardDismissed;
-
-  function dismissStartHere() {
-    setStartCardDismissed(true);
-    writeStartCardDismissed();
-  }
+  const showEmptyState = goalCount === 0;
 
   const quickActions = [
     has("nutrition") && {
@@ -167,6 +138,12 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+        {showEmptyState && (
+          <div className="md:col-span-2 lg:col-span-12">
+            <DashboardStartHereCard onDismiss={() => {}} />
+          </div>
+        )}
+
         {isPro && <AICoachCard />}
         <LifeProgressCard />
         {isPro && <WeeklyReportCard />}
@@ -187,12 +164,6 @@ export default function DashboardPage() {
                 <QuickAction key={qa.href} {...qa} />
               ))}
             </div>
-          </div>
-        )}
-
-        {showStartHere && (
-          <div className="md:col-span-2 lg:col-span-12">
-            <DashboardStartHereCard onDismiss={dismissStartHere} />
           </div>
         )}
       </div>
