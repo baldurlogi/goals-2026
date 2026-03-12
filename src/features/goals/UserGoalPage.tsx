@@ -15,10 +15,24 @@ import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 const AI_SIGNALS_CACHE_KEY = 'cache:ai-signals:v1';
+const LAST_SESSION_KEY = 'cache:ai-coach:last-session:v1';
 
 function clearAISignalsCache() {
   try {
     localStorage.removeItem(AI_SIGNALS_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function writeLastSession(goalId: string, goalTitle: string, stepLabel: string) {
+  try {
+    localStorage.setItem(LAST_SESSION_KEY, JSON.stringify({
+      date: getLocalDateKey(),
+      goalId,
+      goalTitle,
+      stepLabel,
+    }));
   } catch {
     // ignore
   }
@@ -100,6 +114,8 @@ export function UserGoalPage() {
 
     if (!wasDone) {
       const nextDoneCount = doneCount + 1;
+      const step = activeGoal.steps.find((s) => s.id === stepId);
+      if (step) writeLastSession(activeGoal.id, activeGoal.title, step.label);
 
       toast.success(`1 step closer to ${activeGoal.title} 🎯`, {
         description: `${nextDoneCount}/${total} steps complete`,

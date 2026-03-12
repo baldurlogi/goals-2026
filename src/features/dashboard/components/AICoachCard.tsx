@@ -34,6 +34,7 @@ class AIUsageLimitError extends Error {
 
 const CACHE_KEY          = "cache:ai-coach:v1";
 const LAST_MODULE_KEY    = "cache:ai-coach:last-module";
+const LAST_SESSION_KEY   = "cache:ai-coach:last-session:v1";
 const CACHE_TTL          = 60 * 60 * 1000; // 1 hour
 const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
 
@@ -65,6 +66,16 @@ function clearCache() {
 
 function readLastModule(): string | null {
   try { return localStorage.getItem(LAST_MODULE_KEY); } catch { return null; }
+}
+
+type LastSession = { date: string; goalId: string; goalTitle: string; stepLabel: string };
+
+function readLastSession(): LastSession | null {
+  try {
+    const raw = localStorage.getItem(LAST_SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as LastSession;
+  } catch { return null; }
 }
 
 // ── Fetch from edge function ──────────────────────────────────────────────────
@@ -226,9 +237,23 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
     schedule: "📅",
   };
 
+  // Check for yesterday's session — if found, prepend continuity to the reason
+  const yesterday = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+
+  const session = readLastSession();
+  const hasYesterdaySession = session?.date === yesterday;
+
+  const reason = hasYesterdaySession && top.module === "goals" && session.goalId
+    ? `You were working on "${session.goalTitle}" yesterday — keep the momentum going.`
+    : top.reason;
+
   return {
     action: top.action,
-    reason: top.reason,
+    reason,
     href: top.href,
     emoji: EMOJI[top.module] ?? "💡",
     module: top.module,
