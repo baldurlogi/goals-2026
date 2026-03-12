@@ -5,6 +5,16 @@ import { supabase } from "@/lib/supabaseClient";
 // Local key only used for optional legacy fallback + migration safety
 const STORAGE_KEY = "daily-life:reading:v2";
 
+const AI_SIGNALS_CACHE_KEY = "cache:ai-signals:v1";
+
+function clearAISignalsCache() {
+  try {
+    localStorage.removeItem(AI_SIGNALS_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export const READING_CHANGED_EVENT = "daily-life:reading:changed";
 function emitReadingChanged() {
   if (typeof window !== "undefined") {
@@ -86,7 +96,6 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
  * Also mirrors to localStorage for offline-ish resilience.
  */
 export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
-  // Mirror locally (optional but nice)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
   } catch {
@@ -96,8 +105,8 @@ export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth?.user;
 
-  // If not logged in, just keep local
   if (!user) {
+    clearAISignalsCache();
     emitReadingChanged();
     return;
   }
@@ -115,8 +124,10 @@ export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
 
   if (error) throw error;
 
+  clearAISignalsCache();
   emitReadingChanged();
 }
+
 
 export async function resetReadingInputs(): Promise<ReadingInputs> {
   await saveReadingInputs(DEFAULT_READING_INPUTS);

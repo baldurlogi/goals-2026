@@ -144,7 +144,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {isPro && <AICoachCard />}
+        <AICoachCard />
         <LifeProgressCard />
         {isPro && <WeeklyReportCard />}
         {has("reading") && <ReadingCard />}

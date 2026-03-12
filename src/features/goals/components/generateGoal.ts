@@ -12,6 +12,13 @@ export type AIUsage = {
   tier: string;
 };
 
+export type ClarifyingQuestion = {
+  id: string;
+  question: string;
+  hint?: string;
+  placeholder?: string;
+};
+
 type AILimitPayload = {
   error: 'monthly_limit_reached';
   message: string;
@@ -48,19 +55,62 @@ export const PROMPT_EXAMPLES = [
   'Build a consistent skincare routine',
 ];
 
-export const STEP_COUNT_OPTIONS = [5, 6, 8, 10, 12];
-
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function isPriority(value: unknown): value is UserGoal['priority'] {
   return value === 'high' || value === 'medium' || value === 'low';
 }
 
-// ── Main function ─────────────────────────────────────────────────────────
+async function getSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token)
+    throw new Error('You must be signed in.');
+  return session;
+}
+
+// ── Clarifying questions ──────────────────────────────────────────────────
+
+export async function getClarifyingQuestions(
+  prompt: string,
+): Promise<ClarifyingQuestion[]> {
+  if (USE_MOCK_AI) {
+    return [
+      {
+        id: 'q1',
+        question: 'What is your current level?',
+        hint: 'This helps Claude calibrate the difficulty of your steps.',
+        placeholder: 'e.g. complete beginner, some experience…',
+      },
+      {
+        id: 'q2',
+        question: 'Do you have a specific deadline or target date?',
+        placeholder: 'e.g. end of October, no deadline…',
+      },
+    ];
+  }
+
+  const session = await getSession();
+
+  const res = await fetch(EDGE_FN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ action: 'clarify', prompt }),
+  });
+
+  if (!res.ok) throw new Error('Clarification failed');
+
+  const data = await res.json() as { questions?: ClarifyingQuestion[] };
+  return Array.isArray(data.questions) ? data.questions : [];
+}
+
+// ── Goal generation ───────────────────────────────────────────────────────
 
 export async function generateGoalFromPrompt(
   prompt: string,
-  stepCount: number,
+  answers: Record<string, string> = {},
 ): Promise<{ goal: UserGoal; usage: AIUsage }> {
   if (USE_MOCK_AI) {
     const blank = createBlankGoal();
@@ -71,39 +121,46 @@ export async function generateGoalFromPrompt(
         subtitle: 'Build up endurance and complete a marathon by your target month.',
         emoji: '🏃',
         priority: 'high',
-        steps: Array.from({ length: stepCount }, (_, i) => ({
+        steps: Array.from({ length: 10 }, (_, i) => ({
           ...createBlankStep(i),
           label: ([
-            'Choose a marathon race',
-            'Set a weekly running schedule',
-            'Build base mileage',
-            'Add a long run each week',
+            'Choose a marathon race and register',
+            'Assess current fitness baseline',
+            'Build base mileage to 30km/week',
+            'Add weekly long run',
             'Improve pacing and recovery',
             'Practice fueling strategy',
             'Run a half-marathon benchmark',
+            'Peak training block',
             'Start taper plan',
-            'Finalize race logistics',
             'Run the marathon',
           ][i] ?? `Complete milestone ${i + 1}`),
-          notes: 'AI mock step for UI testing.',
+          notes: 'Done when: this step is fully completed as described.',
           idealFinish: null,
-          estimatedTime: i === stepCount - 1 ? 'ongoing' : '1-2 hours',
+          estimatedTime: '1-2 hours',
         })),
       },
       usage: { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: 'free' },
     };
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token)
-    throw new Error('You must be signed in to generate AI goals.');
+  const session = await getSession();
 
   let userContext = '';
   try {
     userContext = await getAISystemContext();
   } catch {
-    /* non-fatal — falls back to no context */
+    /* non-fatal */
   }
+
+  // Build answers block — only include non-empty answers
+  const answersBlock = Object.values(answers).some((v) => v.trim())
+    ? '\n\nUser context from follow-up questions:\n' +
+      Object.entries(answers)
+        .filter(([, v]) => v.trim())
+        .map(([, v]) => `- ${v.trim()}`)
+        .join('\n')
+    : '';
 
   const response = await fetch(EDGE_FN_URL, {
     method: 'POST',
@@ -111,7 +168,11 @@ export async function generateGoalFromPrompt(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ prompt, stepCount, userContext }),
+    body: JSON.stringify({
+      action: 'goal',
+      prompt: prompt + answersBlock,
+      userContext,
+    }),
   });
 
   const raw = await response.text();
@@ -172,7 +233,6 @@ export async function generateGoalFromPrompt(
               typeof s?.label === 'string' &&
               (s.label as string).trim().length > 0,
           )
-          .slice(0, stepCount)
           .map((s, i) => ({
             ...createBlankStep(i),
             label: typeof s.label === 'string' ? s.label : '',

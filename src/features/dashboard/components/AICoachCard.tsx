@@ -9,6 +9,8 @@ import { buildAISignals } from "@/features/ai/aiSignals";
 import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
+import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
+
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -317,7 +319,20 @@ function AICoachCardInner() {
   }, []);
 
   // Load static on mount
-  useEffect(() => { void loadStatic(); }, [loadStatic]);
+  useEffect(() => {
+    void loadStatic();
+
+    function handleReadingChanged() {
+      clearCache();
+      void loadStatic();
+    }
+
+    window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+
+    return () => {
+      window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+    };
+  }, [loadStatic]);
 
   function handleRefresh() {
     clearCache();
