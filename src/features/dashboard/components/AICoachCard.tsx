@@ -116,16 +116,114 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
 
 // ── Card inner ────────────────────────────────────────────────────────────────
 
+function buildStarterSuggestion(
+  signals: Awaited<ReturnType<typeof buildAISignals>>,
+): CoachSuggestion | null {
+  if (signals.modules.includes("goals") && signals.goals.count === 0) {
+    return {
+      action: "Create your first goal",
+      reason: "Start with one meaningful goal so your coach can guide your next steps.",
+      href: "/app/goals",
+      emoji: "🎯",
+      module: "goals",
+    };
+  }
+
+  if (
+    signals.modules.includes("reading") &&
+    !signals.reading.currentBookTitle
+  ) {
+    return {
+      action: "Add your current book",
+      reason: "Once a book is set, your coach can help you keep reading momentum.",
+      href: "/app/reading",
+      emoji: "📖",
+      module: "reading",
+    };
+  }
+
+  if (
+    signals.modules.includes("fitness") &&
+    signals.fitness.daysSinceWorkout === null &&
+    !signals.fitness.strongestLift &&
+    !signals.fitness.weakestLift
+  ) {
+    return {
+      action: "Add your first PR goal",
+      reason: "Track one lift or skill so the coach can help you push progress.",
+      href: "/app/fitness",
+      emoji: "💪",
+      module: "fitness",
+    };
+  }
+
+  if (
+    signals.modules.includes("nutrition") &&
+    signals.nutrition.mealsLoggedToday === 0
+  ) {
+    return {
+      action: "Log your first meal",
+      reason: "A quick nutrition check-in gives the coach something real to work with.",
+      href: "/app/nutrition",
+      emoji: "🥗",
+      module: "nutrition",
+    };
+  }
+
+  if (signals.modules.includes("todos") && signals.todos?.totalToday === 0) {
+    return {
+      action: "Add one small to-do",
+      reason: "Even one task gives your coach a concrete place to start.",
+      href: "/app/todos",
+      emoji: "✅",
+      module: "todos",
+    };
+  }
+
+  if (
+    signals.modules.includes("schedule") &&
+    signals.schedule?.totalBlocks === 0
+  ) {
+    return {
+      action: "Set up today’s schedule",
+      reason: "A simple plan makes your next move much easier to choose.",
+      href: "/app/schedule",
+      emoji: "📅",
+      module: "schedule",
+    };
+  }
+
+  return null;
+}
+
+
 // Build a static suggestion from priority logic (no AI, no network)
 async function buildStaticSuggestion(): Promise<CoachSuggestion> {
   const signals = await buildAISignals();
+
+  const starter = buildStarterSuggestion(signals);
+  if (starter) return starter;
+
   const candidates = buildSuggestionCandidates(signals);
   const top = candidates[0];
-  if (!top) throw new Error("No candidates");
+
+  if (!top) {
+    return {
+      action: "Review your goals",
+      reason: "Start with one goal so your coach can suggest the best next move.",
+      href: "/app/goals",
+      emoji: "🎯",
+      module: "goals",
+    };
+  }
 
   const EMOJI: Record<string, string> = {
-    goals: "🎯", reading: "📖", nutrition: "🥗",
-    fitness: "💪", todos: "✅", schedule: "📅",
+    goals: "🎯",
+    reading: "📖",
+    nutrition: "🥗",
+    fitness: "💪",
+    todos: "✅",
+    schedule: "📅",
   };
 
   return {
@@ -136,6 +234,9 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
     module: top.module,
   };
 }
+
+
+
 
 function AICoachCardInner() {
   const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(null);
@@ -247,11 +348,27 @@ function AICoachCardInner() {
 
         {/* Error state */}
         {error && !suggestion && (
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">Couldn't load suggestion right now.</p>
-            <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-7 shrink-0 text-xs">
-              Try again
-            </Button>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Couldn't load your next suggestion right now.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                className="h-8 text-xs"
+              >
+                Try again
+              </Button>
+
+              <Button asChild size="sm" className="gap-1.5">
+                <Link to="/app/goals">
+                  Start with goals <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
           </div>
         )}
 
