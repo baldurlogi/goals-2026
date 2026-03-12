@@ -114,15 +114,27 @@ export function buildSuggestionCandidates(
 
         // Overdue step — most urgent
         if (goal.overdueStepLabel) {
-          const score = p === 'high' ? 98 : p === 'medium' ? 92 : 78;
+          const baseScore = p === 'high' ? 98 : p === 'medium' ? 92 : 78;
+          const overdueBonus = Math.min(goal.overdueCount ?? 0, 9) / 10;
+          const score = baseScore + overdueBonus;
+
           const daysOverdue = goal.overdueStepDate
-            ? Math.floor((new Date(today).getTime() - new Date(goal.overdueStepDate).getTime()) / 86400000)
+            ? Math.floor(
+                (new Date(today).getTime() -
+                  new Date(goal.overdueStepDate).getTime()) /
+                  86400000,
+              )
             : null;
+
           items.push({
             module: "goals",
             priority: score,
             action: goal.overdueStepLabel,
-            reason: `Overdue step for "${goal.title}"${daysOverdue ? ` · ${daysOverdue}d overdue` : ''}.`,
+            reason: `Overdue step for "${goal.title}" · ${
+              goal.overdueCount ?? 1
+            } overdue step${(goal.overdueCount ?? 1) === 1 ? '' : 's'}${
+              daysOverdue ? ` · ${daysOverdue}d overdue` : ''
+            }.`,
             href: "/app/goals",
             icon: Clock3,
           });

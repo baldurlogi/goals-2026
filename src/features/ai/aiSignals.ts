@@ -57,6 +57,7 @@ export type AISignals = {
       id: string;
       title: string;
       priority: string | null;
+      overdueCount: number;
       overdueStepLabel: string | null;
       overdueStepDate: string | null;
       nextStepLabel: string | null;
@@ -226,6 +227,7 @@ function getStepInfo(
   doneMap: GoalDoneMap,
   today: string,
 ): {
+  overdueCount: number;
   overdueStepLabel: string | null;
   overdueStepDate: string | null;
   nextStepLabel: string | null;
@@ -260,6 +262,7 @@ function getStepInfo(
   const nextStep = upcomingSteps[0] ?? null;
 
   return {
+    overdueCount: overdueSteps.length,
     overdueStepLabel:
       typeof overdueStep?.label === 'string' && overdueStep.label.trim().length > 0
         ? overdueStep.label
@@ -272,6 +275,7 @@ function getStepInfo(
     nextStepDate: nextStep?.idealFinish ?? null,
   };
 }
+
 
 function countOverdueIncompleteSteps(
   goals: GoalLike[],
