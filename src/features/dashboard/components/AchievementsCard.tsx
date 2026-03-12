@@ -1,10 +1,8 @@
 import { Link } from "react-router-dom";
 import { Trophy, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-  ACHIEVEMENTS,
-  RARITY_CONFIG,
-} from "@/features/achievements/achievementDefinitions";
+import { ACHIEVEMENTS } from "@/features/achievements/achievementList";
+import { RARITY_CONFIG } from "@/features/achievements/achievementConfig";
 import { useAchievements } from "@/features/achievements/useAchievements";
 
 export function AchievementsCard() {
@@ -20,7 +18,7 @@ export function AchievementsCard() {
     .slice(0, 3);
 
   return (
-    <Card className="lg:col-span-4 overflow-hidden min-h-[170px]">
+    <Card className="min-h-[170px] overflow-hidden lg:col-span-4">
       <CardHeader className="pb-2 pt-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -80,7 +78,7 @@ export function AchievementsCard() {
 
               <div className="flex gap-2">
                 {recent.map((u) => {
-                  const def = ACHIEVEMENTS.find((a) => a.id === u.id);
+                  const def = ACHIEVEMENTS.find((achievement) => achievement.id === u.id);
                   if (!def) return null;
 
                   const rarity = RARITY_CONFIG[def.rarity];
