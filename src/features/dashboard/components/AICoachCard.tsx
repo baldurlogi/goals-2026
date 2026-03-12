@@ -1,10 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, RefreshCw, ArrowRight, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { buildAIContext } from "@/features/ai/buildAIContext";
+import { buildAISignals } from "@/features/ai/aiSignals";
+import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -109,19 +111,60 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
 
 // ── Card inner ────────────────────────────────────────────────────────────────
 
-function AICoachCardInner() {
-  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(() => readCache());
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState<string | null>(null);
+// Build a static suggestion from priority logic (no AI, no network)
+async function buildStaticSuggestion(): Promise<CoachSuggestion> {
+  const signals = await buildAISignals();
+  const candidates = buildSuggestionCandidates(signals);
+  const top = candidates[0];
+  if (!top) throw new Error("No candidates");
 
-  const load = useCallback(async () => {
+  const EMOJI: Record<string, string> = {
+    goals: "🎯", reading: "📖", nutrition: "🥗",
+    fitness: "💪", todos: "✅", schedule: "📅",
+  };
+
+  return {
+    action: top.action,
+    reason: top.reason,
+    href: top.href,
+    emoji: EMOJI[top.module] ?? "💡",
+    module: top.module,
+  };
+}
+
+function AICoachCardInner() {
+  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(null);
+  const [loading, setLoading]       = useState(true); // true on mount — loads static immediately
+  const [error, setError]           = useState<string | null>(null);
+  const [isAI, setIsAI]             = useState(false);
+
+  // On mount: always show static priority-based suggestion, ignore stale AI cache
+  const loadStatic = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setIsAI(false);
+    try {
+      const s = await buildStaticSuggestion();
+      setSuggestion(s);
+    } catch (e) {
+      // Fall back to AI cache if static fails
+      const cached = readCache();
+      if (cached) { setSuggestion(cached); }
+      else { setError(e instanceof Error ? e.message : "Something went wrong"); }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  // On refresh button: fetch AI suggestion
+  const loadAI = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const s = await fetchCoachSuggestion();
       writeCache(s);
       setSuggestion(s);
+      setIsAI(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -129,9 +172,18 @@ function AICoachCardInner() {
     }
   }, []);
 
+  // Load static on mount
+  useEffect(() => { void loadStatic(); }, [loadStatic]);
+
   function handleRefresh() {
     clearCache();
-    load();
+    if (isAI) {
+      // Already showing AI — get a new static suggestion first, then AI
+      void loadStatic();
+    } else {
+      // Upgrade to AI suggestion
+      void loadAI();
+    }
   }
 
   return (
@@ -223,7 +275,7 @@ function AICoachCardInner() {
         {/* Powered by badge */}
         <div className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground/40">
           <Zap className="h-2.5 w-2.5" />
-          <span>AI-powered · updates hourly · uses your goals, fitness, reading & nutrition data</span>
+          <span>{isAI ? "AI-powered suggestion" : "Smart suggestion · hit ↻ for AI"} · uses your goals, fitness, reading & nutrition data</span>
         </div>
       </CardContent>
     </Card>

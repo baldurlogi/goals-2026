@@ -6,14 +6,17 @@ import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 export const NUTRITION_CHANGED_EVENT = 'nutrition:changed';
 
+const LOG_CACHE_KEY = 'cache:nutrition_log:v1';
+const PHASE_CACHE_KEY = 'cache:nutrition_phase:v1';
+
 function emit() {
   window.dispatchEvent(new Event(NUTRITION_CHANGED_EVENT));
 }
+
 function todayKey() {
   return getLocalDateKey();
 }
 
-// ── Types ──────────────────────────────────────────────────────────────────
 export type MealKey =
   | 'breakfast1'
   | 'breakfast2'
@@ -47,34 +50,57 @@ function emptyLog(date = todayKey()): NutritionLog {
   return { date, eaten: {}, customEntries: [] };
 }
 
-// ── Log cache ──────────────────────────────────────────────────────────────
-const LOG_CACHE_KEY = 'cache:nutrition_log:v1';
-
 function readLogCache(): NutritionLog | null {
   try {
     const raw = localStorage.getItem(LOG_CACHE_KEY);
     if (!raw) return null;
+
     const parsed = JSON.parse(raw) as NutritionLog;
-    // Only use cache if it's for today
     if (parsed.date !== todayKey()) return null;
+
     return parsed;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function writeLogCache(log: NutritionLog): void {
-  try { localStorage.setItem(LOG_CACHE_KEY, JSON.stringify(log)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(LOG_CACHE_KEY, JSON.stringify(log));
+  } catch {
+    // ignore
+  }
 }
 
-/** Synchronous seed — returns today's log from cache, or empty. Zero network. */
+function readPhaseCache(): NutritionPhase | null {
+  try {
+    const raw = localStorage.getItem(PHASE_CACHE_KEY);
+    return raw === 'cut' || raw === 'maintain' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePhaseCache(phase: NutritionPhase): void {
+  try {
+    localStorage.setItem(PHASE_CACHE_KEY, phase);
+  } catch {
+    // ignore
+  }
+}
+
 export function seedNutritionLog(): NutritionLog {
   return readLogCache() ?? emptyLog();
 }
 
-// ── Phase ──────────────────────────────────────────────────────────────────
 export async function loadPhase(): Promise<NutritionPhase> {
+  const cached = readPhaseCache();
+  if (cached) return cached;
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   if (!user) return 'maintain';
 
   const { data, error } = await supabase
@@ -83,28 +109,36 @@ export async function loadPhase(): Promise<NutritionPhase> {
     .eq('user_id', user.id)
     .maybeSingle();
 
-  // If anything truly unexpected happens, fall back safely
   if (error) {
     console.warn('loadPhase error:', error);
     return 'maintain';
   }
 
-  // First-time user: create default row
   if (!data) {
     await supabase
       .from('nutrition_phase')
       .insert({ user_id: user.id, phase: 'maintain' });
+
+    writePhaseCache('maintain');
     return 'maintain';
   }
 
-  return (data.phase as NutritionPhase) ?? 'maintain';
+  const phase = (data.phase as NutritionPhase) ?? 'maintain';
+  writePhaseCache(phase);
+  return phase;
 }
 
 export async function savePhase(phase: NutritionPhase): Promise<void> {
+  writePhaseCache(phase);
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+
+  if (!user) {
+    emit();
+    return;
+  }
 
   await supabase
     .from('nutrition_phase')
@@ -113,20 +147,19 @@ export async function savePhase(phase: NutritionPhase): Promise<void> {
   emit();
 }
 
-// ── Daily log ──────────────────────────────────────────────────────────────
 export async function loadNutritionLog(
   date = todayKey(),
 ): Promise<NutritionLog> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return emptyLog(date);
-
-  // Return cache immediately for today — avoids Supabase round trip on fast reads
   if (date === todayKey()) {
     const cached = readLogCache();
     if (cached) return cached;
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return emptyLog(date);
 
   const { data, error } = await supabase
     .from('nutrition_logs')
@@ -140,7 +173,6 @@ export async function loadNutritionLog(
     return emptyLog(date);
   }
 
-  // First-time user for this date: create default row so future reads are clean
   if (!data) {
     const created = {
       user_id: user.id,
@@ -157,6 +189,7 @@ export async function loadNutritionLog(
     eaten: (data.eaten ?? {}) as NutritionLog['eaten'],
     customEntries: (data.custom_entries ?? []) as NutritionLog['customEntries'],
   };
+
   if (date === todayKey()) writeLogCache(log);
   return log;
 }
@@ -165,9 +198,9 @@ async function saveLog(log: NutritionLog): Promise<void> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   if (!user) return;
 
-  // Write to cache immediately so next seed/load is instant
   if (log.date === todayKey()) writeLogCache(log);
 
   await supabase.from('nutrition_logs').upsert(
@@ -211,7 +244,6 @@ export async function removeCustomEntry(id: string): Promise<void> {
   await saveLog(log);
 }
 
-// ── Saved meals ────────────────────────────────────────────────────────────
 export async function loadSavedMeals(): Promise<SavedMeal[]> {
   const {
     data: { user },
@@ -240,6 +272,7 @@ export async function saveNewMeal(
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   const meal: SavedMeal = {
     id: crypto.randomUUID(),
     name: name.trim(),
@@ -248,7 +281,6 @@ export async function saveNewMeal(
   };
 
   if (user) {
-    // Let DB generate id; but keeping your UUID is also fine if you store it in "id"
     await supabase.from('saved_meals').insert({ ...meal, user_id: user.id });
     emit();
   }
@@ -265,7 +297,6 @@ export async function logSavedMeal(meal: SavedMeal): Promise<void> {
   await addCustomEntry(meal.name, meal.macros);
 }
 
-// ── Macro aggregation ──────────────────────────────────────────────────────
 const MEAL_MACROS: Record<MealKey, Macros> = {
   breakfast1: meals.breakfast.option1.macros,
   breakfast2: meals.breakfast.option2.macros,
@@ -304,7 +335,6 @@ export function getLoggedMacros(log: NutritionLog | null | undefined): Macros {
     };
   }, zero);
 
-  // ✅ THIS was missing in your file
   return {
     cal: fromMeals.cal + fromCustom.cal,
     protein: fromMeals.protein + fromCustom.protein,

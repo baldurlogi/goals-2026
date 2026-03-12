@@ -6,6 +6,8 @@ import {
   type PreferredTone,
 } from '@/features/ai/aiUserProfile';
 
+const SNAPSHOT_TTL_MS = 30 * 60 * 1000;
+
 export type AIContext = {
   systemContext: string;
   signals: AISignals;
@@ -43,7 +45,11 @@ function buildSystemPrompt(
   const readingLine = signals.reading.currentBookTitle
     ? `Current book: ${signals.reading.currentBookTitle}${
         signals.reading.author ? ` by ${signals.reading.author}` : ''
-      }. Target: ${signals.reading.targetPages} pages/day. Streak: ${signals.reading.streak} day(s).`
+      }. Target: ${signals.reading.targetPages} pages/day. Current progress: ${
+        signals.reading.currentPage ?? 'unknown'
+      }/${signals.reading.totalPages ?? 'unknown'} pages. Streak: ${
+        signals.reading.streak
+      } day(s).`
     : `No current book set. Target: ${signals.reading.targetPages} pages/day. Streak: ${signals.reading.streak} day(s).`;
 
   const extraNotes = [aiProfile?.personality_notes, aiProfile?.lifestyle_notes]
@@ -97,15 +103,29 @@ export async function buildAIContext(
 ): Promise<AIContext> {
   const aiProfile = await loadAIProfile();
 
-  // Always rebuild signals fresh — the 5-min cache in buildAISignals is sufficient.
-  // We never serve the 30-min Supabase snapshot here because nutrition, todos, and
-  // schedule change throughout the day and must always reflect current state.
+  if (
+    !forceRefresh &&
+    aiProfile?.last_context_snapshot &&
+    aiProfile.last_context_built_at
+  ) {
+    const age =
+      Date.now() - new Date(aiProfile.last_context_built_at).getTime();
+
+    if (age < SNAPSHOT_TTL_MS) {
+      const cachedSignals = aiProfile.last_context_snapshot as AISignals;
+      return {
+        systemContext: buildSystemPrompt(cachedSignals, aiProfile),
+        signals: cachedSignals,
+        aiProfile,
+      };
+    }
+  }
+
   const signals = await buildAISignals(forceRefresh);
-  const builtAt = new Date().toISOString();
 
   await saveAIProfile({
     last_context_snapshot: signals as unknown as Record<string, unknown>,
-    last_context_built_at: builtAt,
+    last_context_built_at: new Date().toISOString(),
     active_modules: signals.modules,
     preferred_step_count: aiProfile?.preferred_step_count ?? 5,
     preferred_tone: aiProfile?.preferred_tone ?? 'direct',
