@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Loader2, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { Link } from "react-router-dom";
 import type { UserGoal } from '../goalTypes';
+import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
+import type { Tier } from "@/features/subscription/useTier";
 import {
   generateGoalFromPrompt,
   AILimitError,
@@ -56,34 +59,18 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
   // ── Limit reached ──────────────────────────────────────────────────────
   if (limitHit) {
     return (
-      <div className="flex flex-col flex-1 items-center justify-center px-5 py-10 text-center space-y-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
-          <Zap className="h-5 w-5 text-amber-500" />
-        </div>
-        <div>
-          <p className="text-base font-semibold">Monthly AI limit reached</p>
-          <p className="mt-1 text-sm text-muted-foreground max-w-xs">
-            {limitTier === 'free'
-              ? "You've used all 10 free AI prompts this month. Upgrade to Pro for 200 prompts/month."
-              : limitTier === 'pro'
-                ? "You've used all 200 Pro prompts this month. Upgrade to Pro Max for 1,000 prompts/month."
-                : "You've used all 1,000 prompts this month. Your limit resets on the 1st."}
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" size="sm" onClick={onBack}>
-            Create manually
-          </Button>
-          {limitTier !== 'pro_max' && (
-            <Button size="sm" className="gap-1.5">
-              <Zap className="h-3.5 w-3.5" />
-              {limitTier === 'free' ? 'Upgrade to Pro' : 'Upgrade to Pro Max'}
-            </Button>
-          )}
-        </div>
+      <div className="flex flex-1 items-center justify-center px-5 py-10">
+        <AIUsageLimitNotice
+          tier={limitTier as Tier}
+          feature="AI goal creation"
+          className="w-full max-w-md"
+          secondaryActionLabel="Create manually"
+          onSecondaryAction={onBack}
+        />
       </div>
     );
   }
+
 
   return (
     <div className="flex flex-col flex-1 overflow-y-auto px-5 py-5 space-y-5">
@@ -141,19 +128,23 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
         <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <Sparkles className="h-3 w-3 shrink-0 text-primary" />
           <span>
-            <span className="font-semibold text-foreground">{usage.remaining}</span>{' '}
+            <span className="font-semibold text-foreground">{usage.remaining}</span>{" "}
             AI prompts remaining this month
-            {usage.tier !== 'pro_max' && (
+            {usage.tier !== "pro_max" && (
               <>
-                {' '}·{' '}
-                <button type="button" className="underline hover:text-foreground">
+                {" "}·{" "}
+                <Link
+                  to="/app/upgrade"
+                  className="underline hover:text-foreground"
+                >
                   Upgrade for more
-                </button>
+                </Link>
               </>
             )}
           </span>
         </div>
       )}
+
 
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">Try an example</p>

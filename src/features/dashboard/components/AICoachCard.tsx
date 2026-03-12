@@ -8,6 +8,7 @@ import { buildAIContext } from "@/features/ai/buildAIContext";
 import { buildAISignals } from "@/features/ai/aiSignals";
 import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
+import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,13 @@ type CacheEntry = {
   suggestion: CoachSuggestion;
   builtAt: number;
 };
+
+class AIUsageLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AIUsageLimitError";
+  }
+}
 
 const CACHE_KEY          = "cache:ai-coach:v1";
 const LAST_MODULE_KEY    = "cache:ai-coach:last-module";
@@ -83,17 +91,14 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
 
   if (res.status === 429) {
     const data = await res.json().catch(() => ({}));
-    // Distinguish per-minute rate limit from monthly quota
+
     if (data.error === "rate_limit_exceeded") {
       throw new Error(data.message ?? "Too many requests. Please wait a moment.");
     }
-    // Monthly quota hit — return graceful fallback
-    return {
-      emoji: "💡",
-      action: "Review your upcoming goals for today.",
-      reason: "You've hit your monthly AI limit — upgrade for more suggestions.",
-      href: "/app/upcoming",
-    };
+
+    throw new AIUsageLimitError(
+      data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions.",
+    );
   }
 
   if (!res.ok) {
@@ -137,12 +142,17 @@ function AICoachCardInner() {
   const [loading, setLoading]       = useState(true); // true on mount — loads static immediately
   const [error, setError]           = useState<string | null>(null);
   const [isAI, setIsAI]             = useState(false);
+  const [limitHit, setLimitHit] = useState(false);
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
+
 
   // On mount: always show static priority-based suggestion, ignore stale AI cache
   const loadStatic = useCallback(async () => {
     setLoading(true);
     setError(null);
     setIsAI(false);
+    setLimitHit(false);
+    setLimitMessage(null);
     try {
       const s = await buildStaticSuggestion();
       setSuggestion(s);
@@ -160,13 +170,21 @@ function AICoachCardInner() {
   const loadAI = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setLimitHit(false);
+    setLimitMessage(null);
     try {
       const s = await fetchCoachSuggestion();
       writeCache(s);
       setSuggestion(s);
       setIsAI(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      if (e instanceof AIUsageLimitError) {
+        setLimitHit(true);
+        setLimitMessage(e.message);
+        setError(null);
+      } else {
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
@@ -235,6 +253,15 @@ function AICoachCardInner() {
               Try again
             </Button>
           </div>
+        )}
+
+        {/* Limit hit */}
+        {limitHit && (
+          <AIUsageLimitNotice
+            feature="AI coach refresh"
+            message={limitMessage ?? undefined}
+            className="mb-4"
+          />
         )}
 
         {/* Suggestion */}

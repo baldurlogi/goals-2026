@@ -297,6 +297,7 @@ function collectScheduleData(modules: Set<string>) {
 type Status = 'idle' | 'loading' | 'generating' | 'error';
 
 export function useWeeklyReport(modules: Set<string>) {
+  const [limitHit, setLimitHit] = useState(false);
   const [report, setReport] = useState<WeeklyReportRecord | null>(() =>
     readLatestReportCache(),
   );
@@ -370,6 +371,7 @@ export function useWeeklyReport(modules: Set<string>) {
   const generate = useCallback(async () => {
     setStatus('generating');
     setError(null);
+    setLimitHit(false);
 
     try {
       const {
@@ -443,7 +445,10 @@ export function useWeeklyReport(modules: Set<string>) {
 
       if (res.status === 429) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d.message ?? 'Monthly AI limit reached.');
+        setLimitHit(true);
+        setError(d.message ?? 'Monthly AI limit reached.');
+        setStatus('idle');
+        return;
       }
 
       if (!res.ok) {
@@ -478,6 +483,7 @@ export function useWeeklyReport(modules: Set<string>) {
     report,
     status,
     error,
+    limitHit,
     usage,
     generate,
     weekStart,

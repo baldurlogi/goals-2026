@@ -10,11 +10,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useWeeklyReport, isSunday } from "../hooks/useWeeklyReport";
+import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
+import { UpgradeBanner } from "@/features/subscription/UpgradeBanner";
+
 
 export function WeeklyReportCard() {
   const { modules } = useEnabledModules();
-  const { report, status, generate, weekStart, isThisWeek } =
+  const { report, status, error, limitHit, generate, weekStart, isThisWeek } =
     useWeeklyReport(modules);
+
 
   const isGenerating = status === "generating";
   const isLoading = status === "loading";
@@ -27,6 +31,16 @@ export function WeeklyReportCard() {
 
   const todayIsSunday = isSunday();
   const hasThisWeekReport = Boolean(report && isThisWeek);
+
+  const showUpgradeLock =
+    !limitHit &&
+    !!error &&
+    error.toLowerCase().includes("upgrade to pro");
+
+  const showGenericError =
+    !limitHit &&
+    !showUpgradeLock &&
+    !!error;
 
   return (
     <div className="lg:col-span-6 rounded-2xl border bg-card p-5 space-y-4 min-h-[220px]">
@@ -78,24 +92,64 @@ export function WeeklyReportCard() {
               : "No report for this week yet. Generate one any time."}
           </p>
 
-          <Button
-            onClick={generate}
-            disabled={isGenerating}
-            size="sm"
-            className="w-full gap-2"
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                Generating…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                {todayIsSunday ? "Generate Sunday Report" : "Generate Report"}
-              </>
-            )}
-          </Button>
+          {limitHit ? (
+            <AIUsageLimitNotice
+              feature="AI weekly report"
+              message={error ?? undefined}
+            />
+          ) : showUpgradeLock ? (
+            <UpgradeBanner
+              feature="AI Weekly Life Report"
+              requiredTier="pro"
+            />
+          ) : showGenericError ? (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3">
+              <p className="text-sm font-medium text-foreground">
+                Couldn't generate your weekly report
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {error}
+              </p>
+              <Button
+                onClick={generate}
+                disabled={isGenerating}
+                size="sm"
+                variant="outline"
+                className="mt-3 gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Try again
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={generate}
+              disabled={isGenerating}
+              size="sm"
+              className="w-full gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {todayIsSunday ? "Generate Sunday Report" : "Generate Report"}
+                </>
+              )}
+            </Button>
+          )}
         </div>
       )}
 
