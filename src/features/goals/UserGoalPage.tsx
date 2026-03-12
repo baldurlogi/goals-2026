@@ -14,6 +14,15 @@ import { loadUserGoals, saveUserGoal } from '@/features/goals/userGoalStorage';
 import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 
+const AI_SIGNALS_CACHE_KEY = 'cache:ai-signals:v1';
+
+function clearAISignalsCache() {
+  try {
+    localStorage.removeItem(AI_SIGNALS_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 // Convert UserGoalStep → GoalStep shape that StepsCard expects
 function toGoalStep(s: UserGoalStep) {
@@ -60,7 +69,7 @@ export function UserGoalPage() {
 
   if (!goal) {
     return (
-      <div className="space-y-4 text-center py-16">
+      <div className="space-y-4 py-16 text-center">
         <div className="text-4xl">🔍</div>
         <div className="font-semibold">Goal not found</div>
         <Button asChild variant="secondary">
@@ -70,9 +79,11 @@ export function UserGoalPage() {
     );
   }
 
-  const doneMap = state.done[goal.id] ?? {};
-  const total = goal.steps.length;
-  const doneCount = goal.steps.filter((s) => doneMap[s.id]).length;
+  const activeGoal = goal;
+
+  const doneMap = state.done[activeGoal.id] ?? {};
+  const total = activeGoal.steps.length;
+  const doneCount = activeGoal.steps.filter((s) => doneMap[s.id]).length;
   const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
 
   const PRIORITY_COLOR: Record<string, string> = {
@@ -80,6 +91,22 @@ export function UserGoalPage() {
     medium: 'text-amber-400',
     low: 'text-emerald-400',
   };
+
+  function handleToggleStep(stepId: string) {
+    const wasDone = !!doneMap[stepId];
+
+    dispatch({ type: 'toggleStep', goalId: activeGoal.id, stepId });
+    clearAISignalsCache();
+
+    if (!wasDone) {
+      const nextDoneCount = doneCount + 1;
+
+      toast.success(`1 step closer to ${activeGoal.title} 🎯`, {
+        description: `${nextDoneCount}/${total} steps complete`,
+      });
+    }
+  }
+
 
   return (
     <div className="space-y-6">
@@ -90,20 +117,20 @@ export function UserGoalPage() {
             <Link to="/app/goals" className="underline">
               Goals
             </Link>{' '}
-            / {goal.title}
+            / {activeGoal.title}
           </div>
           <h1 className="text-2xl font-semibold">
-            {goal.emoji} {goal.title}
+            {activeGoal.emoji} {activeGoal.title}
           </h1>
-          {goal.subtitle && (
-            <p className="text-muted-foreground">{goal.subtitle}</p>
+          {activeGoal.subtitle && (
+            <p className="text-muted-foreground">{activeGoal.subtitle}</p>
           )}
           <div className="text-sm text-muted-foreground">
             {doneCount}/{total} steps · Priority:{' '}
             <span
-              className={`capitalize font-medium ${PRIORITY_COLOR[goal.priority]}`}
+              className={`capitalize font-medium ${PRIORITY_COLOR[activeGoal.priority]}`}
             >
-              {goal.priority}
+              {activeGoal.priority}
             </span>
           </div>
           <div className="mt-3 max-w-xl">
@@ -117,7 +144,7 @@ export function UserGoalPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 items-end shrink-0">
+        <div className="shrink-0 items-end flex flex-col gap-2">
           <div className="flex gap-2">
             {isPro && (
               <Button
@@ -141,25 +168,26 @@ export function UserGoalPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => dispatch({ type: 'resetGoal', goalId: goal.id })}
+            onClick={() => {
+              dispatch({ type: 'resetGoal', goalId: activeGoal.id });
+              clearAISignalsCache();
+            }}
           >
             Reset steps
           </Button>
         </div>
       </div>
 
-      {/* Upgrade banner — shown only for free tier */}
       {!isPro && (
         <UpgradeBanner feature="AI goal optimization" requiredTier="pro" />
       )}
 
-      {/* Steps */}
-      {goal.steps.length === 0 ? (
-        <div className="rounded-2xl border border-dashed p-10 text-center space-y-3">
+      {activeGoal.steps.length === 0 ? (
+        <div className="space-y-3 rounded-2xl border border-dashed p-10 text-center">
           <div className="text-3xl">📋</div>
           <div>
             <div className="font-medium">No steps yet</div>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="mt-1 text-sm text-muted-foreground">
               Edit this goal to add steps and track your progress.
             </p>
           </div>
@@ -169,24 +197,22 @@ export function UserGoalPage() {
         </div>
       ) : (
         <StepsCard
-          goalId={goal.id}
-          goalTitle={goal.title}
-          steps={goal.steps.map(toGoalStep)}
+          goalId={activeGoal.id}
+          goalTitle={activeGoal.title}
+          steps={activeGoal.steps.map(toGoalStep)}
           doneMap={doneMap}
-          onToggle={(stepId) =>
-            dispatch({ type: 'toggleStep', goalId: goal.id, stepId })
-          }
+          onToggle={handleToggleStep}
           heightClassName="h-[600px]"
         />
       )}
 
-      {/* Edit modal */}
       {editing && (
         <AddEditGoalModal
-          initial={goal}
+          initial={activeGoal}
           onSave={(updated) => {
             setGoal(updated);
             saveUserGoal(updated);
+            clearAISignalsCache();
             setEditing(false);
             toast.success('Goal updated');
           }}
@@ -194,18 +220,18 @@ export function UserGoalPage() {
         />
       )}
 
-      {/* Improve modal */}
       {improving && (
         <ImproveGoalModal
-          goal={goal}
+          goal={activeGoal}
           onApply={(newSteps) => {
             const updated: UserGoal = {
-              ...goal,
+              ...activeGoal,
               steps: newSteps,
               updatedAt: getLocalDateKey(),
             };
             setGoal(updated);
             saveUserGoal(updated);
+            clearAISignalsCache();
             setImproving(false);
             toast.success('Goal steps improved ✨');
           }}
