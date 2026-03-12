@@ -5,7 +5,7 @@ import {
   unlockAchievement,
   ACHIEVEMENTS_CHANGED_EVENT,
 } from './achievementStorage';
-import { buildAchievementCheckData } from './AchievementAdapters';
+import { buildAchievementCheckData } from "./achievementAdapters";
 import type { UnlockedAchievement } from './achievementTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 

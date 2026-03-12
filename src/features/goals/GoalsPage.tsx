@@ -17,7 +17,6 @@ import {
 } from './userGoalStorage';
 import type { UserGoal } from './goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
-getLocalDateKey
 
 type SortMode = 'priority' | 'overdue';
 type ModalState = UserGoal | 'new' | 'ai' | null;
