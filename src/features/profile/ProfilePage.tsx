@@ -263,6 +263,7 @@ export function ProfilePage() {
 
   // AI profile state
   const [aiSaving, setAiSaving] = useState(false);
+  const [aiAboutMe, setAiAboutMe] = useState("");
   const [aiTone, setAiTone] = useState<PreferredTone>("direct");
   const [aiGoalsSummary, setAiGoalsSummary] = useState("");
   const [aiLifestyleNotes, setAiLifestyleNotes] = useState("");
@@ -289,6 +290,7 @@ export function ProfilePage() {
   useEffect(() => {
     loadAIProfile().then((ai) => {
       if (!ai) return;
+      setAiAboutMe(ai.about_me ?? "");
       setAiTone(ai.preferred_tone ?? "direct");
       setAiGoalsSummary(ai.goals_summary ?? "");
       setAiLifestyleNotes(ai.lifestyle_notes ?? "");
@@ -375,6 +377,7 @@ export function ProfilePage() {
     try {
       await saveAIProfile({
         preferred_tone: aiTone,
+        about_me: aiAboutMe.trim() || null,
         goals_summary: aiGoalsSummary.trim() || null,
         lifestyle_notes: aiLifestyleNotes.trim() || null,
         active_modules: aiFocusAreas.length > 0 ? aiFocusAreas : null,
@@ -734,6 +737,31 @@ export function ProfilePage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+
+          {/* About you */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">About you</label>
+            <p className="text-xs text-muted-foreground">
+              Write a few sentences about yourself — your situation, what drives you, what you struggle with. The more context you give, the more personal your AI coach becomes.
+            </p>
+            <textarea
+              value={aiAboutMe}
+              onChange={e => setAiAboutMe(e.target.value)}
+              placeholder={'e.g. "I\'m a 26 year old student in Copenhagen. I tend to start strong and fall off after 2 weeks. I work from home so I have flexible time but get distracted easily. My main motivation is looking good and feeling more confident."'}
+              rows={4}
+              maxLength={600}
+              className={cn(
+                "w-full resize-none rounded-xl border bg-muted/30 px-3 py-2.5 text-sm",
+                "placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-violet-500/50",
+                "transition-colors"
+              )}
+            />
+            <p className="text-right text-[10px] text-muted-foreground">
+              {aiAboutMe.length}/600
+            </p>
+          </div>
+
+          <Separator />
 
           {/* Preferred tone */}
           <div className="space-y-3">

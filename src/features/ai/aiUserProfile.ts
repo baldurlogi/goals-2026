@@ -8,6 +8,7 @@ export type PreferredTone =
 
 export type AIUserProfile = {
   user_id: string;
+  about_me: string | null;
   goals_summary: string | null;
   lifestyle_notes: string | null;
   personality_notes: string | null;

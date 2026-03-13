@@ -17,6 +17,33 @@ import {
 } from './userGoalStorage';
 import type { UserGoal } from './goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { AIContextNudge } from './components/AIContextNudge';
+import type { ReactNode } from 'react';
+
+function SortButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+        active
+          ? 'bg-foreground text-background'
+          : 'text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 
 type SortMode = 'priority' | 'overdue';
 type ModalState = UserGoal | 'new' | 'ai' | null;
@@ -167,6 +194,8 @@ export function GoalsPage() {
         </div>
       </div>
 
+      <AIContextNudge />
+
       {!loading && goals.length === 0 && (
         <div className="space-y-6 rounded-2xl border border-dashed p-12 text-center">
           <div className="text-4xl">🎯</div>
@@ -239,30 +268,5 @@ export function GoalsPage() {
         />
       )}
     </div>
-  );
-}
-
-function SortButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-        active
-          ? 'bg-foreground text-background'
-          : 'text-muted-foreground hover:text-foreground',
-      ].join(' ')}
-    >
-      {children}
-    </button>
   );
 }

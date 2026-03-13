@@ -9,8 +9,7 @@ import { createBlankGoal, createBlankStep, saveUserGoal } from '../userGoalStora
 import type { UserGoal, UserGoalStep } from '../goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { AIPromptScreen } from './AIPromptScreen';
-
-// ── Constants ─────────────────────────────────────────────────────────────
+import { queueAIContextNudge } from './AIContextNudge';
 
 const PRIORITY_OPTIONS: UserGoal['priority'][] = ['high', 'medium', 'low'];
 
@@ -33,8 +32,6 @@ type Props = {
   onClose: () => void;
   startWithAI?: boolean;
 };
-
-// ── Component ─────────────────────────────────────────────────────────────
 
 export function AddEditGoalModal({
   initial,
@@ -109,6 +106,11 @@ export function AddEditGoalModal({
     setSaving(true);
     try {
       await saveUserGoal(trimmedGoal);
+
+      if (!isEdit) {
+        queueAIContextNudge();
+      }
+
       toast.success(isEdit ? 'Goal updated' : 'Goal created ✨');
       onSave(trimmedGoal);
     } catch {
@@ -122,79 +124,85 @@ export function AddEditGoalModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center px-0 sm:px-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-end justify-center px-0 sm:items-center sm:px-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="relative w-full sm:max-w-2xl max-h-[92dvh] flex flex-col rounded-t-2xl sm:rounded-2xl border bg-card shadow-2xl overflow-hidden"
+        className="relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border bg-card shadow-2xl sm:max-w-2xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
-          <div className="flex items-center gap-3">
-            <h2 className="text-base font-semibold">
-              {isEdit ? 'Edit goal' : mode === 'ai' ? 'AI goal planner' : 'New goal'}
-            </h2>
-            {mode === 'manual' && goal.title && !isEdit && goal.steps.length > 0 && (
-              <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                <Sparkles className="h-2.5 w-2.5" /> AI generated · review & edit
-              </span>
-            )}
-          </div>
+        <div className="shrink-0 border-b px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-semibold">
+                {isEdit ? 'Edit goal' : mode === 'ai' ? 'AI goal planner' : 'New goal'}
+              </h2>
+              {mode === 'manual' && goal.title && !isEdit && goal.steps.length > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  <Sparkles className="h-2.5 w-2.5" /> AI generated · review & edit
+                </span>
+              )}
+            </div>
 
-          <div className="flex items-center gap-2">
-            {!isEdit && (
+            <div className="flex items-center gap-2">
+              {!isEdit && (
+                <button
+                  type="button"
+                  onClick={() => setMode((m) => (m === 'ai' ? 'manual' : 'ai'))}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    mode === 'ai'
+                      ? 'border-primary/40 bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {mode === 'ai' ? 'AI mode' : 'Use AI'}
+                </button>
+              )}
               <button
-                type="button"
-                onClick={() => setMode((m) => (m === 'ai' ? 'manual' : 'ai'))}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  mode === 'ai'
-                    ? 'border-primary/40 bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:text-foreground',
-                )}
+                onClick={onClose}
+                className="text-xl leading-none text-muted-foreground hover:text-foreground"
               >
-                <Sparkles className="h-3 w-3" />
-                {mode === 'ai' ? 'AI mode' : 'Use AI'}
+                ×
               </button>
-            )}
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground text-xl leading-none"
-            >
-              ×
-            </button>
+            </div>
           </div>
         </div>
 
-        {/* AI screen */}
         {mode === 'ai' && (
-          <AIPromptScreen onGenerated={handleAIGenerated} onBack={() => setMode('manual')} />
+          <AIPromptScreen
+            onGenerated={handleAIGenerated}
+            onBack={() => setMode('manual')}
+          />
         )}
 
-        {/* Manual / review form */}
         {mode === 'manual' && (
           <>
-            <div className="overflow-y-auto flex-1 px-5 py-5 space-y-5">
-
-              {/* Emoji + Title */}
+            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
               <div className="flex items-start gap-3">
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setEmojiPickerOpen((o) => !o)}
-                    className="text-3xl w-12 h-12 flex items-center justify-center rounded-xl border hover:bg-muted transition-colors"
+                    className="flex h-12 w-12 items-center justify-center rounded-xl border text-3xl transition-colors hover:bg-muted"
                   >
                     {goal.emoji}
                   </button>
+
                   {emojiPickerOpen && (
-                    <div className="absolute top-14 left-0 z-10 flex flex-wrap gap-1.5 p-3 rounded-xl border bg-popover shadow-xl w-56">
+                    <div className="absolute left-0 top-14 z-10 flex w-56 flex-wrap gap-1.5 rounded-xl border bg-popover p-3 shadow-xl">
                       {EMOJI_SUGGESTIONS.map((e) => (
                         <button
                           key={e}
                           type="button"
-                          onClick={() => { updateGoal({ emoji: e }); setEmojiPickerOpen(false); }}
-                          className="text-xl w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted"
+                          onClick={() => {
+                            updateGoal({ emoji: e });
+                            setEmojiPickerOpen(false);
+                          }}
+                          className="rounded-md p-1.5 text-lg hover:bg-muted"
                         >
                           {e}
                         </button>
@@ -202,119 +210,109 @@ export function AddEditGoalModal({
                     </div>
                   )}
                 </div>
-                <div className="flex-1 space-y-2">
+
+                <div className="min-w-0 flex-1 space-y-3">
                   <Input
                     ref={titleRef}
-                    placeholder="Goal title *"
                     value={goal.title}
                     onChange={(e) => updateGoal({ title: e.target.value })}
-                    className="text-base font-medium"
+                    placeholder="Goal title"
+                    className="text-base"
                   />
-                  <Input
-                    placeholder="Short description (optional)"
+                  <Textarea
                     value={goal.subtitle}
                     onChange={(e) => updateGoal({ subtitle: e.target.value })}
+                    placeholder="Optional subtitle"
+                    rows={2}
+                    className="resize-none"
                   />
                 </div>
               </div>
 
-              {/* Priority */}
-              <div className="space-y-1.5">
-                <div className="text-xs text-muted-foreground font-medium">Priority</div>
-                <div className="flex gap-2">
-                  {PRIORITY_OPTIONS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => updateGoal({ priority: p })}
-                      className={cn(
-                        'rounded-full border px-4 py-1.5 text-xs font-semibold capitalize transition-all',
-                        goal.priority === p
-                          ? PRIORITY_COLOR[p]
-                          : 'border-border text-muted-foreground hover:border-primary/40',
-                      )}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {PRIORITY_OPTIONS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => updateGoal({ priority: p })}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors',
+                      goal.priority === p
+                        ? PRIORITY_COLOR[p]
+                        : 'border-border text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
               </div>
 
-              {/* Steps */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-xs text-muted-foreground font-medium">
-                    Steps ({goal.steps.length})
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={addStep} className="gap-1 h-7 text-xs">
-                    <Plus className="h-3 w-3" /> Add step
+                  <div className="text-sm font-medium">Steps</div>
+                  <Button type="button" size="sm" variant="outline" onClick={addStep}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Add step
                   </Button>
                 </div>
-
-                {goal.steps.length === 0 && (
-                  <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    No steps yet — add some to track progress
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   {goal.steps.map((step, idx) => {
                     const isOpen = openStepId === step.id;
                     return (
-                      <div key={step.id} className="rounded-xl border bg-muted/20">
-                        <div className="flex items-center gap-2 px-3 py-2.5">
-                          <div className="flex flex-col gap-0.5 shrink-0">
+                      <div key={step.id} className="overflow-hidden rounded-xl border">
+                        <div className="flex items-center gap-3 px-3 py-3">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                            {idx + 1}
+                          </div>
+
+                          <Input
+                            value={step.label}
+                            onChange={(e) => updateStep(step.id, { label: e.target.value })}
+                            placeholder="Step label"
+                            className="h-9 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                          />
+
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => moveStep(step.id, -1)}
-                              disabled={idx === 0}
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 leading-none text-xs"
+                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                             >
                               ▲
                             </button>
                             <button
                               type="button"
                               onClick={() => moveStep(step.id, 1)}
-                              disabled={idx === goal.steps.length - 1}
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 leading-none text-xs"
+                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                             >
                               ▼
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => removeStep(step.id)}
+                              className="shrink-0 text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setOpenStepId(isOpen ? null : step.id)}
+                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
+                              {isOpen ? '−' : '+'}
+                            </button>
                           </div>
-                          <span className="text-xs text-muted-foreground w-5 text-center shrink-0">
-                            {idx + 1}
-                          </span>
-                          <Input
-                            placeholder="Step label *"
-                            value={step.label}
-                            onChange={(e) => updateStep(step.id, { label: e.target.value })}
-                            className="flex-1 h-8 text-sm"
-                            onClick={() => setOpenStepId(isOpen ? null : step.id)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setOpenStepId(isOpen ? null : step.id)}
-                            className="text-xs text-muted-foreground hover:text-foreground shrink-0"
-                          >
-                            {isOpen ? '▲' : '▼'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeStep(step.id)}
-                            className="text-muted-foreground hover:text-destructive shrink-0"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
                         </div>
 
                         {isOpen && (
-                          <div className="px-3 pb-3 space-y-2 border-t pt-3">
+                          <div className="space-y-2 border-t px-3 pb-3 pt-3">
                             <Textarea
                               placeholder="Notes (optional)"
                               value={step.notes}
                               onChange={(e) => updateStep(step.id, { notes: e.target.value })}
                               rows={2}
-                              className="text-sm resize-none"
+                              className="resize-none text-sm"
                             />
                             <div className="grid grid-cols-2 gap-2">
                               <div className="space-y-1">
@@ -323,7 +321,9 @@ export function AddEditGoalModal({
                                   type="date"
                                   value={step.idealFinish ?? ''}
                                   onChange={(e) =>
-                                    updateStep(step.id, { idealFinish: e.target.value || null })
+                                    updateStep(step.id, {
+                                      idealFinish: e.target.value || null,
+                                    })
                                   }
                                   className="h-8 text-sm"
                                 />
@@ -334,7 +334,9 @@ export function AddEditGoalModal({
                                   placeholder="e.g. 30 min"
                                   value={step.estimatedTime}
                                   onChange={(e) =>
-                                    updateStep(step.id, { estimatedTime: e.target.value })
+                                    updateStep(step.id, {
+                                      estimatedTime: e.target.value,
+                                    })
                                   }
                                   className="h-8 text-sm"
                                 />
@@ -349,12 +351,19 @@ export function AddEditGoalModal({
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between gap-3 px-5 py-4 border-t shrink-0">
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleSave} disabled={!isValid || saving} className="min-w-28">
-                {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create goal'}
-              </Button>
+            <div className="shrink-0 border-t px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <Button variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={!isValid || saving}
+                  className="min-w-28"
+                >
+                  {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create goal'}
+                </Button>
+              </div>
             </div>
           </>
         )}
