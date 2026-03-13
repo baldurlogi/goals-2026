@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { Trophy, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ACHIEVEMENTS, RARITY_CONFIG } from "@/features/achievements/achievementDefinitions";
+import { ACHIEVEMENTS } from "@/features/achievements/achievementList";
+import { RARITY_CONFIG } from "@/features/achievements/achievementConfig";
 import { useAchievements } from "@/features/achievements/useAchievements";
 
 export function AchievementsCard() {
@@ -10,13 +11,14 @@ export function AchievementsCard() {
   const totalCount = ACHIEVEMENTS.length;
   const unlockedCount = unlocked.length;
   const pct = Math.round((unlockedCount / totalCount) * 100);
+  const showLoadingState = loading && unlockedCount === 0;
 
   const recent = [...unlocked]
     .sort((a, b) => b.unlockedAt.localeCompare(a.unlockedAt))
     .slice(0, 3);
 
   return (
-    <Card className="lg:col-span-4 overflow-hidden">
+    <Card className="min-h-[170px] overflow-hidden lg:col-span-4">
       <CardHeader className="pb-2 pt-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -38,19 +40,26 @@ export function AchievementsCard() {
       </CardHeader>
 
       <CardContent className="space-y-4 pb-5">
-        {loading ? (
+        {showLoadingState ? (
           <div className="flex gap-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-11 w-11 animate-pulse rounded-xl bg-muted" />
+              <div
+                key={i}
+                className="h-11 w-11 animate-pulse rounded-xl bg-muted"
+              />
             ))}
           </div>
         ) : unlockedCount === 0 ? (
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">No badges yet — keep going 🚀</p>
+            <p className="text-sm text-muted-foreground">
+              No badges yet — keep going 🚀
+            </p>
             <div className="h-2 overflow-hidden rounded-full bg-muted">
               <div className="h-full w-0 rounded-full bg-amber-500" />
             </div>
-            <p className="text-[11px] text-muted-foreground">0 / {totalCount} unlocked</p>
+            <p className="text-[11px] text-muted-foreground">
+              0 / {totalCount} unlocked
+            </p>
           </div>
         ) : (
           <>
@@ -58,15 +67,20 @@ export function AchievementsCard() {
               <div>
                 <div className="text-lg font-bold tabular-nums text-amber-500">
                   {unlockedCount}
-                  <span className="text-sm font-normal text-muted-foreground">/{totalCount}</span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    /{totalCount}
+                  </span>
                 </div>
-                <div className="text-[10px] text-muted-foreground">{pct}% complete</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {pct}% complete
+                </div>
               </div>
 
               <div className="flex gap-2">
                 {recent.map((u) => {
-                  const def = ACHIEVEMENTS.find((a) => a.id === u.id);
+                  const def = ACHIEVEMENTS.find((achievement) => achievement.id === u.id);
                   if (!def) return null;
+
                   const rarity = RARITY_CONFIG[def.rarity];
 
                   return (

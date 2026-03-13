@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { getAISystemContext } from "@/features/ai/buildAIContext";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
+import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
+
 
 const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
 
@@ -34,6 +36,13 @@ type ImproveResult = {
   steps: ImprovedStep[];
   summary: string;
 };
+
+class AIUsageLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AIUsageLimitError";
+  }
+}
 
 // ── API call ──────────────────────────────────────────────────────────────────
 
@@ -71,8 +80,11 @@ async function fetchImprovedSteps(goal: UserGoal): Promise<ImproveResult> {
 
   if (res.status === 429) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.message ?? "Monthly AI limit reached. Upgrade to Pro for more.");
+    throw new AIUsageLimitError(
+      data.message ?? "Monthly AI limit reached. Upgrade for more AI improvements.",
+    );
   }
+
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -167,7 +179,8 @@ type Props = {
 };
 
 export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
-    const [phase, setPhase] = useState<"loading" | "review" | "error">("loading");
+    const [phase, setPhase] = useState<"loading" | "review" | "error" | "limit">("loading");
+    const [limitMessage, setLimitMessage] = useState<string | null>(null);
     const [result, setResult] = useState<ImproveResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [accepted, setAccepted] = useState<Record<string, StepStatus>>({});
@@ -181,6 +194,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
         setError(null);
         setResult(null);
         setAccepted({});
+        setLimitMessage(null);
     }
 
     try {
@@ -196,8 +210,13 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
         setError(null);
         setPhase("review");
     } catch (e) {
+      if (e instanceof AIUsageLimitError) {
+        setLimitMessage(e.message);
+        setPhase("limit");
+      } else {
         setError(e instanceof Error ? e.message : "Something went wrong");
         setPhase("error");
+      }
     }
     }, [goal]);
 
@@ -294,6 +313,18 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
                 ))}
               </div>
               <p className="text-sm text-muted-foreground">Analysing your goal and building improvements…</p>
+            </div>
+          )}
+
+          {/* Limit */}
+          {phase === "limit" && (
+            <div className="px-6 py-20">
+              <AIUsageLimitNotice
+                feature="AI goal optimization"
+                message={limitMessage ?? undefined}
+                secondaryActionLabel="Back"
+                onSecondaryAction={onClose}
+              />
             </div>
           )}
 

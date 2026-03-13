@@ -11,6 +11,8 @@ import { Check, Sparkles, Zap, Crown, ArrowLeft, Lock, Loader2, ExternalLink } f
 import { useTier, TIER_BADGE, type Tier } from "@/features/subscription/useTier";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from "@supabase/supabase-js";
+
 
 const STRIPE_DISABLED = false;
 
@@ -136,8 +138,27 @@ async function redirectToCheckout(priceKey: PriceKey) {
   });
 
   if (error) {
-    console.error("create-checkout-session error:", error);
-    toast.error(error.message || "Could not start checkout");
+    if (error instanceof FunctionsHttpError) {
+      const errorBody = await error.context.json();
+      console.error("create-checkout-session HTTP error body:", errorBody);
+      toast.error(errorBody?.error ?? "Checkout failed");
+      return;
+    }
+
+    if (error instanceof FunctionsRelayError) {
+      console.error("create-checkout-session relay error:", error.message);
+      toast.error(error.message || "Relay error");
+      return;
+    }
+
+    if (error instanceof FunctionsFetchError) {
+      console.error("create-checkout-session fetch error:", error.message);
+      toast.error(error.message || "Network error");
+      return;
+    }
+
+    console.error("create-checkout-session unknown error:", error);
+    toast.error("Could not start checkout");
     return;
   }
 
@@ -146,7 +167,7 @@ async function redirectToCheckout(priceKey: PriceKey) {
     return;
   }
 
-  toast.error(data?.error || "Could not start checkout");
+  toast.error(data?.error ?? "Could not start checkout");
 }
 
 async function redirectToPortal() {

@@ -1,6 +1,7 @@
-import { supabase } from "@/lib/supabaseClient";
+import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { supabase } from '@/lib/supabaseClient';
 
-export const WATER_CHANGED_EVENT = "water:changed";
+export const WATER_CHANGED_EVENT = 'water:changed';
 
 export type WaterLog = {
   date: string;
@@ -13,7 +14,7 @@ function emit() {
 }
 
 export function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateKey();
 }
 
 export function defaultWaterLog(date = todayKey()): WaterLog {
@@ -35,7 +36,10 @@ function normalizeWaterLog(
   return {
     date: input?.date ?? date,
     ml: Math.max(0, Math.round(Number(input?.ml ?? 0) || 0)),
-    targetMl: Math.max(250, Math.round(Number(input?.targetMl ?? 2500) || 2500)),
+    targetMl: Math.max(
+      250,
+      Math.round(Number(input?.targetMl ?? 2500) || 2500),
+    ),
   };
 }
 
@@ -60,20 +64,22 @@ function writeWaterCache(log: WaterLog): void {
 export async function loadWaterLog(date = todayKey()): Promise<WaterLog> {
   const cached = readWaterCache(date);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     return cached ?? defaultWaterLog(date);
   }
 
   const { data, error } = await supabase
-    .from("water_logs")
-    .select("log_date, ml, target_ml")
-    .eq("user_id", user.id)
-    .eq("log_date", date)
+    .from('water_logs')
+    .select('log_date, ml, target_ml')
+    .eq('user_id', user.id)
+    .eq('log_date', date)
     .maybeSingle();
 
   if (error) {
-    console.warn("loadWaterLog error:", error);
+    console.warn('loadWaterLog error:', error);
     return cached ?? defaultWaterLog(date);
   }
 
@@ -98,32 +104,35 @@ export async function saveWaterLog(log: WaterLog): Promise<void> {
   const normalized = normalizeWaterLog(log, log.date);
   writeWaterCache(normalized);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     emit();
     return;
   }
 
-  const { error } = await supabase
-    .from("water_logs")
-    .upsert(
-      {
-        user_id: user.id,
-        log_date: normalized.date,
-        ml: normalized.ml,
-        target_ml: normalized.targetMl,
-      },
-      { onConflict: "user_id,log_date" },
-    );
+  const { error } = await supabase.from('water_logs').upsert(
+    {
+      user_id: user.id,
+      log_date: normalized.date,
+      ml: normalized.ml,
+      target_ml: normalized.targetMl,
+    },
+    { onConflict: 'user_id,log_date' },
+  );
 
   if (error) {
-    console.warn("saveWaterLog error:", error);
+    console.warn('saveWaterLog error:', error);
   }
 
   emit();
 }
 
-export async function addWater(amountMl: number, date = todayKey()): Promise<void> {
+export async function addWater(
+  amountMl: number,
+  date = todayKey(),
+): Promise<void> {
   const current = await loadWaterLog(date);
   await saveWaterLog({
     ...current,
@@ -139,7 +148,10 @@ export async function resetWaterLog(date = todayKey()): Promise<void> {
   });
 }
 
-export async function setWaterTarget(targetMl: number, date = todayKey()): Promise<void> {
+export async function setWaterTarget(
+  targetMl: number,
+  date = todayKey(),
+): Promise<void> {
   const current = await loadWaterLog(date);
   await saveWaterLog({
     ...current,

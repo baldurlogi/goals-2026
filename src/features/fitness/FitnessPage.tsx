@@ -1,398 +1,259 @@
-import { useEffect, useState } from "react";
-import { Dumbbell, Plus, Trash2, ChevronDown, ChevronUp, Pencil } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Dumbbell, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { AddPRGoalModal } from "@/features/fitness/components/AddPRGoalModal";
+import { PRCard } from "@/features/fitness/components/PRCard";
+import { WeeklySplitCard } from "@/features/fitness/components/WeeklySplitCard";
+import { CATEGORY_LABELS, FITNESS_CHANGED_EVENT } from "./constants";
 import {
-  loadFitness,
-  logPR,
-  updateGoal,
-  deleteEntry,
-  currentBest,
-  progressPct,
-  FITNESS_CHANGED_EVENT,
-  DEFAULT_STORE,
-  type FitnessStore,
-  type LiftId,
-  type SkillId,
-  type LiftRecord,
-  type SkillRecord,
-  type PREntry,
-} from "@/features/fitness/fitnessStorage";
+  addPRGoal,
+  deletePREntry,
+  deletePRGoal,
+  loadPRGoals,
+  logPREntry,
+  readPRCache,
+  updatePRGoal,
+} from "./prGoalStorage";
+import { type PRCategory, type PRGoal } from "./types";
 
-// ── Tabs ─────────────────────────────────────────────────────────────────────
-type Tab = "lifts" | "crossfit" | "swimming";
+const CATEGORIES = Object.keys(CATEGORY_LABELS) as PRCategory[];
 
-// ── Log PR modal (inline form) ───────────────────────────────────────────────
-function LogForm({
-  unit,
-  metricType,
-  onSubmit,
-  onCancel,
-}: {
-  unit: string;
-  metricType: string;
-  onSubmit: (value: number, notes: string) => void;
-  onCancel: () => void;
-}) {
-  const [val, setVal]     = useState("");
-  const [notes, setNotes] = useState("");
-
-  const placeholder =
-    metricType === "seconds" ? "Time in seconds (e.g. 78)" :
-    `Value in ${unit}`;
-
+function PRCardPlaceholder() {
   return (
-    <div className="mt-3 space-y-2 rounded-xl border bg-muted/30 p-3">
-      <div className="flex gap-2">
-        <input
-          type="number"
-          min={0}
-          placeholder={placeholder}
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          className="w-28 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        />
-        <input
-          type="text"
-          placeholder="Notes (optional)"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="flex-1 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        />
-      </div>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          disabled={!val || Number(val) <= 0}
-          onClick={() => onSubmit(Number(val), notes)}
-        >
-          Log PR
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
-      </div>
-    </div>
-  );
-}
-
-// ── Goal editor ───────────────────────────────────────────────────────────────
-function GoalEditor({
-  current,
-  unit,
-  onSave,
-  onCancel,
-}: {
-  current: number;
-  unit: string;
-  onSave: (val: number) => void;
-  onCancel: () => void;
-}) {
-  const [val, setVal] = useState(String(current));
-  return (
-    <span className="inline-flex items-center gap-1">
-      <input
-        type="number"
-        value={val}
-        min={0}
-        onChange={(e) => setVal(e.target.value)}
-        className="w-20 rounded border bg-background px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-      />
-      <span className="text-xs text-muted-foreground">{unit}</span>
-      <button
-        type="button"
-        onClick={() => Number(val) > 0 && onSave(Number(val))}
-        className="text-[10px] font-semibold text-emerald-500 hover:text-emerald-400"
-      >Save</button>
-      <button type="button" onClick={onCancel} className="text-[10px] text-muted-foreground hover:text-foreground">✕</button>
-    </span>
-  );
-}
-
-// ── History row ───────────────────────────────────────────────────────────────
-function HistoryRow({
-  entry, index, unit, metricType, onDelete,
-}: {
-  entry: PREntry; index: number; unit: string; metricType: string;
-  onDelete: (i: number) => void;
-}) {
-  const displayVal =
-    metricType === "seconds"
-      ? `${Math.floor(entry.value / 60)}:${String(entry.value % 60).padStart(2, "0")}`
-      : `${entry.value} ${unit}`;
-
-  return (
-    <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/30">
-      <span className="w-24 shrink-0 text-xs text-muted-foreground">{entry.date}</span>
-      <span className="flex-1 text-sm font-semibold tabular-nums">{displayVal}</span>
-      {entry.notes && <span className="text-xs text-muted-foreground italic truncate max-w-[120px]">{entry.notes}</span>}
-      <button
-        type="button"
-        onClick={() => onDelete(index)}
-        className="invisible ml-auto shrink-0 text-muted-foreground/40 hover:text-destructive group-hover:visible"
-      >
-        <Trash2 className="h-3 w-3" />
-      </button>
-    </div>
-  );
-}
-
-// ── Single PR card ────────────────────────────────────────────────────────────
-function PRCard({
-  kind,
-  record,
-  onLog,
-  onGoalSave,
-  onDelete,
-}: {
-  kind: "lift" | "skill";
-  record: LiftRecord | SkillRecord;
-  onLog: (kind: "lift" | "skill", id: string, value: number, notes?: string) => void;
-  onGoalSave: (kind: "lift" | "skill", id: string, goal: number) => void;
-  onDelete: (kind: "lift" | "skill", id: string, index: number) => void;
-}) {
-  const [showLog,     setShowLog]     = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [editGoal,    setEditGoal]    = useState(false);
-
-  const unit       = record.unit;
-  const metricType = kind === "skill" ? (record as SkillRecord).metricType : "number";
-  const best       = currentBest(record.history);
-  const pct        = progressPct(best, record.goal);
-  const goalLabel  = kind === "skill" ? ((record as SkillRecord).goalLabel ?? `${record.goal} ${unit}`) : `${record.goal} ${unit}`;
-
-  const displayBest =
-    metricType === "seconds" && best !== null
-      ? `${Math.floor(best / 60)}:${String(best % 60).padStart(2, "0")}`
-      : best !== null
-      ? `${best} ${unit}`
-      : null;
-
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-2 pt-4 px-4">
+    <div className="min-h-[260px] animate-pulse rounded-2xl border bg-card p-4">
+      <div className="space-y-3">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-sm">{record.label}</CardTitle>
-            <CardDescription className="text-xs mt-0.5">
-              Goal:{" "}
-              {editGoal ? (
-                <GoalEditor
-                  current={record.goal}
-                  unit={unit}
-                  onSave={(v) => { onGoalSave(kind, record.id, v); setEditGoal(false); }}
-                  onCancel={() => setEditGoal(false)}
-                />
-              ) : (
-                <span>
-                  {goalLabel}{" "}
-                  <button type="button" onClick={() => setEditGoal(true)} className="inline-flex text-muted-foreground/60 hover:text-muted-foreground">
-                    <Pencil className="h-2.5 w-2.5" />
-                  </button>
-                </span>
-              )}
-            </CardDescription>
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-32 rounded bg-muted" />
+            <div className="h-3 w-24 rounded bg-muted" />
           </div>
-
-          <div className="text-right shrink-0">
-            {displayBest ? (
-              <>
-                <div className="text-lg font-bold tabular-nums leading-none">{displayBest}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">current PR</div>
-              </>
-            ) : (
-              <div className="text-xs italic text-muted-foreground">No PR yet</div>
-            )}
-          </div>
+          <div className="h-8 w-8 rounded bg-muted" />
         </div>
 
-        {/* Progress toward goal */}
-        <div className="mt-3 space-y-1">
-          <Progress value={pct} className="h-1.5" />
-          <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
-            <span>{pct}% to goal</span>
-            {best !== null && best >= record.goal && (
-              <span className="text-emerald-500 font-semibold">🎯 Goal hit!</span>
-            )}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-14 rounded bg-muted" />
+            <div className="h-3 w-10 rounded bg-muted" />
           </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="px-4 pb-4 space-y-1">
-        {/* Log + History toggles */}
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant={showLog ? "default" : "outline"}
-            className="h-7 gap-1 text-xs"
-            onClick={() => { setShowLog((s) => !s); setShowHistory(false); }}
-          >
-            <Plus className="h-3 w-3" /> Log PR
-          </Button>
-
-          {record.history.length > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 gap-1 text-xs text-muted-foreground"
-              onClick={() => { setShowHistory((s) => !s); setShowLog(false); }}
-            >
-              {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              History ({record.history.length})
-            </Button>
-          )}
+          <div className="h-2 w-full rounded-full bg-muted" />
         </div>
 
-        {showLog && (
-          <LogForm
-            unit={unit}
-            metricType={metricType}
-            onSubmit={(v, n) => { onLog(kind, record.id, v, n); setShowLog(false); }}
-            onCancel={() => setShowLog(false)}
-          />
-        )}
+        <div className="flex flex-wrap gap-2">
+          <div className="h-8 w-20 rounded bg-muted" />
+          <div className="h-8 w-20 rounded bg-muted" />
+        </div>
 
-        {showHistory && (
-          <div className="mt-2 space-y-0.5 max-h-48 overflow-auto">
-            {record.history.map((entry, i) => (
-              <HistoryRow
-                key={`${entry.date}-${i}`}
-                entry={entry}
-                index={i}
-                unit={unit}
-                metricType={metricType}
-                onDelete={(idx) => onDelete(kind, record.id, idx)}
-              />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        <div className="h-24 rounded-xl bg-muted/60" />
+      </div>
+    </div>
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 export function FitnessPage() {
-  const [store, setStore] = useState<FitnessStore>(() => structuredClone(DEFAULT_STORE));
-  const [tab,   setTab]   = useState<Tab>("lifts");
+  const [goals, setGoals] = useState<PRGoal[]>(() => readPRCache());
+  const [initialSyncDone, setInitialSyncDone] = useState(
+    () => readPRCache().length > 0,
+  );
+  const [showAdd, setShowAdd] = useState(false);
+  const [filterCat, setFilterCat] = useState<PRCategory | "all">("all");
 
   useEffect(() => {
-    const sync = async () => setStore(await loadFitness());
-    sync(); // initial load
-    window.addEventListener(FITNESS_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
+    let cancelled = false;
+
+    async function sync() {
+      try {
+        const fresh = await loadPRGoals();
+        if (!cancelled) setGoals(fresh);
+      } finally {
+        if (!cancelled) setInitialSyncDone(true);
+      }
+    }
+
+    void sync();
+
+    const handleSync = () => {
+      void sync();
+    };
+
+    window.addEventListener(FITNESS_CHANGED_EVENT, handleSync);
+
     return () => {
-      window.removeEventListener(FITNESS_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      cancelled = true;
+      window.removeEventListener(FITNESS_CHANGED_EVENT, handleSync);
     };
   }, []);
 
-  const handleLog = async (kind: "lift" | "skill", id: string, value: number, notes?: string) => {
-    await logPR(kind, id as LiftId & SkillId, value, notes);
-    setStore(await loadFitness());
-    toast.success("PR logged");
-  };
+  async function refreshGoals() {
+    setGoals(await loadPRGoals());
+  }
 
-  const handleGoalSave = async (kind: "lift" | "skill", id: string, goal: number) => {
-    await updateGoal(kind, id as LiftId & SkillId, goal);
-    setStore(await loadFitness());
+  async function handleAdd(goal: Omit<PRGoal, "history" | "createdAt">) {
+    await addPRGoal(goal);
+    await refreshGoals();
+    setShowAdd(false);
+    toast.success(`${goal.label} added!`);
+  }
+
+  async function handleLog(id: string, value: number, notes?: string) {
+    await logPREntry(id, value, notes);
+    await refreshGoals();
+    toast.success("PR logged! 💪");
+  }
+
+  async function handleGoalUpdate(id: string, goal: number) {
+    const existing = goals.find((item) => item.id === id);
+
+    await updatePRGoal(id, {
+      goal,
+      goalLabel: existing ? `${goal} ${existing.unit}` : String(goal),
+    });
+
+    await refreshGoals();
     toast.success("Goal updated");
-  };
+  }
 
-  const handleDelete = async (kind: "lift" | "skill", id: string, index: number) => {
-    await deleteEntry(kind, id as LiftId & SkillId, index);
-    setStore(await loadFitness());
+  async function handleDeleteEntry(id: string, index: number) {
+    await deletePREntry(id, index);
+    await refreshGoals();
     toast.success("Entry deleted");
-  };
+  }
 
-  const liftOrder: LiftId[]       = ["bench", "squat", "ohp", "clean", "snatch"];
-  const crossfitOrder: SkillId[]  = ["butterfly_pullups", "muscle_ups", "strict_hspu", "freestanding_hspu", "hsw"];
-  const swimmingOrder: SkillId[]  = ["swim_100m", "swim_200m"];
+  async function handleRemoveGoal(id: string) {
+    await deletePRGoal(id);
+    await refreshGoals();
+    toast.success("PR goal removed");
+  }
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: "lifts",    label: "🏋️ Lifts" },
-    { id: "crossfit", label: "🤸 CrossFit" },
-    { id: "swimming", label: "🏊 Swimming" },
-  ];
+  const existingIds = useMemo(() => new Set(goals.map((g) => g.id)), [goals]);
+
+  const visibleGoals = useMemo(
+    () =>
+      filterCat === "all"
+        ? goals
+        : goals.filter((goal) => goal.category === filterCat),
+    [filterCat, goals],
+  );
+
+  const usedCategories = useMemo(
+    () =>
+      CATEGORIES.filter((cat) =>
+        goals.some((goal) => goal.category === cat),
+      ),
+    [goals],
+  );
+
+  const showInitialPlaceholder = !initialSyncDone && goals.length === 0;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <Dumbbell className="h-5 w-5 text-violet-500" />
         <div>
-          <h1 className="text-xl font-semibold">PRs & Fitness</h1>
+          <h1 className="text-xl font-semibold">Fitness</h1>
           <p className="text-sm text-muted-foreground">
-            Track personal records, goals and history across lifts and skills.
+            Weekly plan, workout streak, and personal records.
           </p>
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 rounded-xl border bg-card p-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={[
-              "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              tab === t.id
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:text-foreground",
-            ].join(" ")}
+      <WeeklySplitCard />
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Personal Records
+          </h2>
+
+          <Button
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setShowAdd(true)}
           >
-            {t.label}
-          </button>
-        ))}
+            <Plus className="h-3.5 w-3.5" />
+            Add PR Goal
+          </Button>
+        </div>
+
+        {usedCategories.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setFilterCat("all")}
+              className={[
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                filterCat === "all"
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              ].join(" ")}
+            >
+              All ({goals.length})
+            </button>
+
+            {usedCategories.map((cat) => {
+              const count = goals.filter((goal) => goal.category === cat).length;
+
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setFilterCat(cat)}
+                  className={[
+                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                    filterCat === cat
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border text-muted-foreground hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {CATEGORY_LABELS[cat]} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {showInitialPlaceholder ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <PRCardPlaceholder key={i} />
+            ))}
+          </div>
+        ) : goals.length === 0 ? (
+          <div className="rounded-2xl border border-dashed p-10 text-center">
+            <Dumbbell className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
+            <p className="text-sm font-medium text-muted-foreground">
+              No PR goals yet
+            </p>
+            <p className="mb-4 mt-1 text-xs text-muted-foreground/60">
+              Add your first goal — pick from suggestions or create your own.
+            </p>
+            <Button size="sm" onClick={() => setShowAdd(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Add PR Goal
+            </Button>
+          </div>
+        ) : visibleGoals.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleGoals.map((goal) => (
+              <PRCard
+                key={goal.id}
+                goal={goal}
+                onLog={handleLog}
+                onGoalUpdate={handleGoalUpdate}
+                onDelete={handleDeleteEntry}
+                onRemove={handleRemoveGoal}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      {/* Lifts tab */}
-      {tab === "lifts" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {liftOrder.map((id) => (
-            <PRCard
-              key={id}
-              kind="lift"
-              record={store.lifts[id]}
-              onLog={handleLog}
-              onGoalSave={handleGoalSave}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* CrossFit tab */}
-      {tab === "crossfit" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {crossfitOrder.map((id) => (
-            <PRCard
-              key={id}
-              kind="skill"
-              record={store.skills[id]}
-              onLog={handleLog}
-              onGoalSave={handleGoalSave}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Swimming tab */}
-      {tab === "swimming" && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {swimmingOrder.map((id) => (
-            <PRCard
-              key={id}
-              kind="skill"
-              record={store.skills[id]}
-              onLog={handleLog}
-              onGoalSave={handleGoalSave}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
+      {showAdd && (
+        <AddPRGoalModal
+          existingIds={existingIds}
+          onAdd={handleAdd}
+          onClose={() => setShowAdd(false)}
+        />
       )}
     </div>
   );

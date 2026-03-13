@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReadingFieldPath, ReadingInputs } from "./readingTypes";
-import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan } from "./readingUtils";
+import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan, updateReadingStreak } from "./readingUtils";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { Flame } from "lucide-react";
 import { ReadingInputsCard } from "./components/ReadingInputsCard";
 import { Button } from "@/components/ui/button";
 import { ReadingNowCard } from "./components/ReadingNowCard";
@@ -19,8 +21,6 @@ import { Separator } from "@/components/ui/separator";
 export function ReadingPage() {
   // ✅ always start with safe defaults
   const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
-  const [currentDraft, setCurrentDraft] = useState(() => DEFAULT_READING_INPUTS.current);
-
 
   // Draft inputs for adding to queue
   const [draft, setDraft] = useState({ title: "", author: "", totalPages: "" });
@@ -31,45 +31,18 @@ export function ReadingPage() {
 
     const sync = async () => {
       const next = await Promise.resolve(loadReadingInputs());
-      if (!cancelled) {
-        setInputs(next);
-        setCurrentDraft(next.current); // <- move it here (event callback)
-      }
+      if (!cancelled) setInputs(next);
     };
 
     sync();
 
-    window.addEventListener(READING_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
+    window.addEventListener(READING_CHANGED_EVENT, sync as any);
+    window.addEventListener("storage", sync as any);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(READING_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const sync = async () => {
-      const next = await Promise.resolve(loadReadingInputs());
-      if (!cancelled) setInputs(next);
-    };
-
-    const onEvent: EventListener = () => {
-      void sync();
-    };
-
-    void sync();
-
-    window.addEventListener(READING_CHANGED_EVENT, onEvent);
-    window.addEventListener("storage", onEvent);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener(READING_CHANGED_EVENT, onEvent);
-      window.removeEventListener("storage", onEvent);
+      window.removeEventListener(READING_CHANGED_EVENT, sync as any);
+      window.removeEventListener("storage", sync as any);
     };
   }, []);
 
@@ -99,7 +72,15 @@ export function ReadingPage() {
     setAndPersist((prev) => {
       if (path === "current.title") return { ...prev, current: { ...prev.current, title: value } };
       if (path === "current.author") return { ...prev, current: { ...prev.current, author: value } };
-      if (path === "current.currentPage") return { ...prev, current: { ...prev.current, currentPage: value } };
+      if (path === "current.currentPage") {
+        const updated = { ...prev, current: { ...prev.current, currentPage: value } };
+        // Update streak whenever pages are logged
+        if (value.trim() && Number(value) > 0) {
+          const streakUpdate = updateReadingStreak(prev, getLocalDateKey());
+          return { ...updated, ...streakUpdate };
+        }
+        return updated;
+      }
       if (path === "current.totalPages") return { ...prev, current: { ...prev.current, totalPages: value } };
       if (path === "dailyGoalPages") return { ...prev, dailyGoalPages: value };
       return prev;
@@ -165,35 +146,9 @@ export function ReadingPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-4">
-        <ReadingInputsCard
-          value={{ ...inputs, current: currentDraft }}
-          onChange={(path, v) => {
-            if (path === "current.currentPage") {
-              setCurrentDraft((p) => ({ ...p, currentPage: v }));
-              updateField("current.currentPage", v); // ✅ updates inputs + NowReading live
-              return;
-            }
-
-            if (path === "current.totalPages") {
-              setCurrentDraft((p) => ({ ...p, totalPages: v }));
-              updateField("current.totalPages", v); // optional: keep stats live too
-              return;
-            }
-
-            // keep these local-only (no lag)
-            if (path === "current.title") setCurrentDraft((p) => ({ ...p, title: v }));
-            if (path === "current.author") setCurrentDraft((p) => ({ ...p, author: v }));
-          }}
-        />
+        <ReadingInputsCard value={inputs} onChange={updateField} />
 
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => {
-              setAndPersist((prev) => ({ ...prev, current: currentDraft }));
-            }}
-          >
-            Save current book
-          </Button>
           <Button variant="outline" onClick={resetAll}>
             Reset
           </Button>
@@ -247,11 +202,41 @@ export function ReadingPage() {
       <div className="space-y-4">
         <ReadingNowCard stats={stats} />
 
+        {/* Streak card */}
+        <Card>
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className={[
+              "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl",
+              (inputs.streak ?? 0) > 0 ? "bg-orange-500/15" : "bg-muted",
+            ].join(" ")}>
+              <Flame className={[
+                "h-6 w-6",
+                (inputs.streak ?? 0) > 0 ? "text-orange-500" : "text-muted-foreground",
+              ].join(" ")} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">
+                {inputs.streak ?? 0}
+                <span className="ml-1 text-sm font-normal text-muted-foreground">
+                  day streak
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {(inputs.streak ?? 0) === 0
+                  ? "Update your page count to start a streak"
+                  : inputs.lastReadDate === getLocalDateKey()
+                    ? "You read today — keep it up! 🔥"
+                    : "Update today's pages to keep your streak"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <ReadingNextCard queue={inputs.upNext} onRemove={removeFromQueue} />
 
-        <Card className="border-amber-500">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-md text-amber-400">Completed this year</CardTitle>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Completed this year</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {inputs.completed.length === 0 ? (

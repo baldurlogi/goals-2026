@@ -1,3 +1,18 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Target,
+  Clock3,
+  Rocket,
+  BookOpen,
+  Library,
+  Salad,
+  Utensils,
+  Dumbbell,
+  Activity,
+  CheckSquare,
+  CalendarDays,
+  Lightbulb,
+} from "lucide-react";
 import type { ModuleId } from "@/features/modules/modules";
 import type { AISignals } from "@/features/ai/aiSignals";
 
@@ -12,16 +27,49 @@ export type SuggestionCandidate = {
   action: string;
   reason: string;
   href: string;
-  emoji: string;
+  icon: LucideIcon;
 };
 
 function hasModule(signals: AISignals, module: ModuleId): boolean {
   return signals.modules.includes(module);
 }
 
-function dedupeByModule(
-  items: SuggestionCandidate[],
-): SuggestionCandidate[] {
+function getNutritionSuggestion(
+  signals: AISignals,
+): SuggestionCandidate | null {
+  const meals = signals.nutrition.mealsLoggedToday;
+  if (meals >= 4) return null; // all meals logged, never suggest
+
+  const hour = new Date().getHours(); // local time
+
+  // Determine if the next meal is actually due yet
+  // Breakfast: due from 6am, Lunch: due from 1pm, Snack: due from 5pm, Dinner: due from 9pm
+  const mealWindows = [
+    { label: "breakfast", dueFrom: 6,  action: "Log breakfast" },
+    { label: "lunch",     dueFrom: 13, action: "Log lunch" },
+    { label: "snack",     dueFrom: 17, action: "Log your afternoon snack" },
+    { label: "dinner",    dueFrom: 21, action: "Log dinner" },
+  ];
+
+  const nextMeal = mealWindows[meals]; // meals logged = index of next meal
+  if (!nextMeal) return null;
+
+  // Not due yet — don't suggest it
+  if (hour < nextMeal.dueFrom) return null;
+
+  return {
+    module: "nutrition",
+    // Priority 62 — always below overdue steps (96) and next goal step (84)
+    // but above fitness/todos/schedule when a meal is actually due
+    priority: 62,
+    action: nextMeal.action,
+    reason: `${meals} of 4 meals logged today.`,
+    href: "/app/nutrition",
+    icon: meals === 0 ? Salad : Utensils,
+  };
+}
+
+function dedupeByModule(items: SuggestionCandidate[]): SuggestionCandidate[] {
   const seen = new Set<string>();
   const output: SuggestionCandidate[] = [];
 
@@ -47,85 +95,108 @@ export function buildSuggestionCandidates(
         action: "Create your first goal",
         reason: "A clear goal gives the rest of your dashboard direction.",
         href: "/app/goals",
-        emoji: "🎯",
+        icon: Target,
       });
-    }
+    } else {
+      // Build one specific suggestion per goal, scored by priority ladder:
+      // 98 = high + overdue, 92 = medium + overdue, 86 = high + upcoming (≤3 days),
+      // 78 = low + overdue, 72 = medium + upcoming, 64 = low + upcoming
+      const THREE_DAYS_FROM_NOW = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 3);
+        return d.toISOString().slice(0, 10);
+      })();
 
-    if (signals.goals.overdueSteps > 0) {
-      items.push({
-        module: "goals",
-        priority: 96,
-        action: `Review ${signals.goals.overdueSteps} overdue goal step${
-          signals.goals.overdueSteps === 1 ? "" : "s"
-        }`,
-        reason: "Clearing overdue steps reduces friction and gets momentum back.",
-        href: "/app/upcoming",
-        emoji: "⏰",
-      });
-    }
+      const today = new Date().toISOString().slice(0, 10);
 
-    if (signals.goals.highestPriorityTitle && signals.goals.nextStepLabel) {
-      items.push({
-        module: "goals",
-        priority: 84,
-        action: `Do: ${signals.goals.nextStepLabel}`,
-        reason: `It moves "${signals.goals.highestPriorityTitle}" forward today.`,
-        href: "/app/goals",
-        emoji: "🚀",
-      });
+      for (const goal of signals.goals.topGoals) {
+        const p = goal.priority;
+
+        // Overdue step — most urgent
+        if (goal.overdueStepLabel) {
+          const baseScore = p === 'high' ? 98 : p === 'medium' ? 92 : 78;
+          const overdueBonus = Math.min(goal.overdueCount ?? 0, 9) / 10;
+          const score = baseScore + overdueBonus;
+
+          const daysOverdue = goal.overdueStepDate
+            ? Math.floor(
+                (new Date(today).getTime() -
+                  new Date(goal.overdueStepDate).getTime()) /
+                  86400000,
+              )
+            : null;
+
+          items.push({
+            module: "goals",
+            priority: score,
+            action: goal.overdueStepLabel,
+            reason: `Overdue step for "${goal.title}" · ${
+              goal.overdueCount ?? 1
+            } overdue step${(goal.overdueCount ?? 1) === 1 ? '' : 's'}${
+              daysOverdue ? ` · ${daysOverdue}d overdue` : ''
+            }.`,
+            href: "/app/goals",
+            icon: Clock3,
+          });
+        }
+
+        // Upcoming step within 3 days
+        if (goal.nextStepLabel && goal.nextStepDate && goal.nextStepDate <= THREE_DAYS_FROM_NOW) {
+          const score = p === 'high' ? 86 : p === 'medium' ? 72 : 64;
+          const daysUntil = Math.floor((new Date(goal.nextStepDate).getTime() - new Date(today).getTime()) / 86400000);
+          items.push({
+            module: "goals",
+            priority: score,
+            action: goal.nextStepLabel,
+            reason: `Next step for "${goal.title}"${daysUntil === 0 ? ' · due today' : ` · due in ${daysUntil}d`}.`,
+            href: "/app/goals",
+            icon: Rocket,
+          });
+        }
+
+        // Upcoming step with no date — lower priority nudge
+        if (goal.nextStepLabel && !goal.nextStepDate && !goal.overdueStepLabel) {
+          const score = p === 'high' ? 80 : p === 'medium' ? 66 : 56;
+          items.push({
+            module: "goals",
+            priority: score,
+            action: goal.nextStepLabel,
+            reason: `Move "${goal.title}" forward today.`,
+            href: "/app/goals",
+            icon: Rocket,
+          });
+        }
+      }
     }
   }
 
   if (hasModule(signals, "reading")) {
-    if (
-      signals.reading.currentBookTitle &&
-      signals.reading.minutesToday === 0
-    ) {
+    if (signals.reading.currentBookTitle) {
       items.push({
         module: "reading",
-        priority: 78,
-        action: `Read for ${Math.min(
-          signals.reading.targetMinutes || 20,
-          20,
-        )} minutes`,
-        reason: `Keep "${signals.reading.currentBookTitle}" moving and protect your streak.`,
+        priority: 72, // below overdue steps (96) and next goal step (84), above nutrition (62)
+        action: `Read ${signals.reading.targetPages} pages of ${signals.reading.currentBookTitle}`,
+        reason: signals.reading.streak > 0
+          ? `Keep your ${signals.reading.streak}-day streak alive.`
+          : "Start a reading streak today.",
         href: "/app/reading",
-        emoji: "📖",
+        icon: BookOpen,
       });
-    } else if (!signals.reading.currentBookTitle) {
+    } else {
       items.push({
         module: "reading",
-        priority: 52,
+        priority: 48,
         action: "Choose your next book",
         reason: "Setting a current book makes reading easier to start.",
         href: "/app/reading",
-        emoji: "📚",
+        icon: Library,
       });
     }
   }
 
   if (hasModule(signals, "nutrition")) {
-    if (signals.nutrition.mealsLoggedToday === 0) {
-      items.push({
-        module: "nutrition",
-        priority: 74,
-        action: "Log your first meal",
-        reason: "A quick nutrition check-in makes the rest of the day easier to steer.",
-        href: "/app/nutrition",
-        emoji: "🥗",
-      });
-    } else if (signals.nutrition.mealsLoggedToday < 3) {
-      items.push({
-        module: "nutrition",
-        priority: 58,
-        action: "Update your nutrition log",
-        reason: `You have ${signals.nutrition.mealsLoggedToday} meal${
-          signals.nutrition.mealsLoggedToday === 1 ? "" : "s"
-        } logged so far today.`,
-        href: "/app/nutrition",
-        emoji: "🍽️",
-      });
-    }
+    const nutritionSuggestion = getNutritionSuggestion(signals);
+    if (nutritionSuggestion) items.push(nutritionSuggestion);
   }
 
   if (hasModule(signals, "fitness")) {
@@ -139,7 +210,7 @@ export function buildSuggestionCandidates(
         action: "Plan your next workout",
         reason: `It has been ${signals.fitness.daysSinceWorkout} days since your last logged session.`,
         href: "/app/fitness",
-        emoji: "🏋️",
+        icon: Dumbbell,
       });
     } else if (signals.fitness.weakestLift) {
       items.push({
@@ -148,7 +219,7 @@ export function buildSuggestionCandidates(
         action: `Review your ${signals.fitness.weakestLift} progress`,
         reason: "Your weakest area is often the best place to unlock progress.",
         href: "/app/fitness",
-        emoji: "💪",
+        icon: Activity,
       });
     }
   }
@@ -161,7 +232,7 @@ export function buildSuggestionCandidates(
         action: "Finish one quick to-do",
         reason: "A small completed task can unlock momentum fast.",
         href: "/app/todos",
-        emoji: "✅",
+        icon: CheckSquare,
       });
     }
   }
@@ -177,7 +248,7 @@ export function buildSuggestionCandidates(
         action: "Review your next schedule block",
         reason: "Seeing the next block clearly lowers startup friction.",
         href: "/app/schedule",
-        emoji: "📅",
+        icon: CalendarDays,
       });
     }
   }
@@ -192,7 +263,7 @@ export function buildSuggestionCandidates(
         action: "Review your upcoming tasks",
         reason: "A quick scan helps you choose the next meaningful step.",
         href: "/app/upcoming",
-        emoji: "💡",
+        icon: Lightbulb,
       },
     ];
   }

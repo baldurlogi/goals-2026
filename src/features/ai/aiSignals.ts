@@ -1,13 +1,18 @@
-import { loadProfile } from "@/features/onboarding/profileStorage";
-import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
-import { loadUserGoals } from "@/features/goals/userGoalStorage";
-import { loadFitness } from "@/features/fitness/fitnessStorage";
+import { loadProfile } from '@/features/onboarding/profileStorage';
+import { DEFAULT_MODULES, type ModuleId } from '@/features/modules/modules';
+import { loadUserGoals } from '@/features/goals/userGoalStorage';
+import {
+  getDaysSinceWorkout,
+  getStrongestLiftLabel,
+  getWeakestLiftLabel,
+  loadPRGoals,
+} from '@/features/fitness/fitnessStorage';
 import {
   loadNutritionLog,
   loadPhase,
-} from "@/features/nutrition/nutritionStorage";
+} from '@/features/nutrition/nutritionStorage';
 
-const CACHE_KEY = "cache:ai-signals:v1";
+const CACHE_KEY = 'cache:ai-signals:v1';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 type GoalLike = {
@@ -21,21 +26,7 @@ type GoalLike = {
   }>;
 };
 
-type FitnessHistoryEntryLike = {
-  value?: number;
-  date?: string;
-};
-
-type FitnessLiftLike = {
-  label?: string;
-  goal?: number;
-  unit?: string;
-  history?: FitnessHistoryEntryLike[];
-};
-
-type FitnessStoreLike = {
-  lifts?: Record<string, FitnessLiftLike>;
-};
+type GoalDoneMap = Record<string, Record<string, boolean>>;
 
 type ReadingState = {
   currentBookTitle: string | null;
@@ -43,8 +34,7 @@ type ReadingState = {
   currentPage: number | null;
   totalPages: number | null;
   streak: number;
-  minutesToday: number;
-  targetMinutes: number;
+  targetPages: number;
 };
 
 export type AISignals = {
@@ -55,7 +45,7 @@ export type AISignals = {
     activityLevel: string | null;
     preferredScheduleView: string | null;
     dailyReadingGoal: number | null;
-    tier: "free" | "pro" | "pro_max" | null;
+    tier: 'free' | 'pro' | 'pro_max' | null;
   };
   goals: {
     count: number;
@@ -64,14 +54,19 @@ export type AISignals = {
     overdueSteps: number;
     nextStepLabel: string | null;
     topGoals: Array<{
+      id: string;
       title: string;
       priority: string | null;
+      overdueCount: number;
+      overdueStepLabel: string | null;
+      overdueStepDate: string | null;
       nextStepLabel: string | null;
+      nextStepDate: string | null;
       stepCount: number;
     }>;
   };
   nutrition: {
-    phase: "maintain" | "cut";
+    phase: 'maintain' | 'cut';
     mealsLoggedToday: number;
     calorieTarget: number | null;
     proteinTarget: number | null;
@@ -120,9 +115,195 @@ function normalizeModules(modules: ModuleId[] | null | undefined): ModuleId[] {
     : [...DEFAULT_MODULES];
 }
 
+function priorityRank(priority: string | undefined): number {
+  if (priority === 'high') return 0;
+  if (priority === 'medium') return 1;
+  if (priority === 'low') return 2;
+  return 99;
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isBooleanRecord(value: unknown): value is Record<string, boolean> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.values(value).every((v) => typeof v === 'boolean');
+}
+
+function isGoalDoneMap(value: unknown): value is GoalDoneMap {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.values(value).every((v) => isBooleanRecord(v));
+}
+
+function extractDoneMap(payload: unknown): GoalDoneMap | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+
+  if (isGoalDoneMap(record)) return record;
+  if (isGoalDoneMap(record.done)) return record.done;
+
+  if (
+    record.state &&
+    typeof record.state === 'object' &&
+    !Array.isArray(record.state)
+  ) {
+    const stateRecord = record.state as Record<string, unknown>;
+    if (isGoalDoneMap(stateRecord.done)) return stateRecord.done;
+  }
+
+  if (
+    record.data &&
+    typeof record.data === 'object' &&
+    !Array.isArray(record.data)
+  ) {
+    const dataRecord = record.data as Record<string, unknown>;
+    if (isGoalDoneMap(dataRecord.done)) return dataRecord.done;
+  }
+
+  return null;
+}
+
+function readGoalDoneMap(): GoalDoneMap {
+  const likelyKeys = [
+    'goal-store',
+    'goal_store',
+    'goals-store',
+    'goals_store',
+    'goalStore',
+    'goalsStore',
+    'cache:goal_store:v1',
+    'cache:goals_store:v1',
+    'daily-life:goal-store:v1',
+    'daily-life:goals-store:v1',
+  ];
+
+  for (const key of likelyKeys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+
+      const parsed = JSON.parse(raw);
+      const doneMap = extractDoneMap(parsed);
+      if (doneMap) return doneMap;
+    } catch {
+      // ignore
+    }
+  }
+
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+
+      const parsed = JSON.parse(raw);
+      const doneMap = extractDoneMap(parsed);
+      if (doneMap) return doneMap;
+    } catch {
+      // ignore
+    }
+  }
+
+  return {};
+}
+
+function isStepDone(
+  goalId: string | undefined,
+  stepId: string | undefined,
+  doneMap: GoalDoneMap,
+): boolean {
+  if (!goalId || !stepId) return false;
+  return Boolean(doneMap[goalId]?.[stepId]);
+}
+
+function getStepInfo(
+  goal: GoalLike,
+  doneMap: GoalDoneMap,
+  today: string,
+): {
+  overdueCount: number;
+  overdueStepLabel: string | null;
+  overdueStepDate: string | null;
+  nextStepLabel: string | null;
+  nextStepDate: string | null;
+} {
+  const steps = Array.isArray(goal.steps) ? goal.steps : [];
+  const incompleteSteps = steps.filter((step) => {
+    if (!step?.id) return true;
+    return !isStepDone(goal.id, step.id, doneMap);
+  });
+
+  const overdueSteps = incompleteSteps
+    .filter(
+      (step) =>
+        typeof step.idealFinish === 'string' &&
+        step.idealFinish.length > 0 &&
+        step.idealFinish < today,
+    )
+    .sort((a, b) => (a.idealFinish ?? '').localeCompare(b.idealFinish ?? ''));
+
+  const overdueStep = overdueSteps[0] ?? null;
+
+  const upcomingSteps = incompleteSteps
+    .filter((step) => !step.idealFinish || step.idealFinish >= today)
+    .sort((a, b) => {
+      if (!a.idealFinish && !b.idealFinish) return 0;
+      if (!a.idealFinish) return 1;
+      if (!b.idealFinish) return -1;
+      return a.idealFinish.localeCompare(b.idealFinish);
+    });
+
+  const nextStep = upcomingSteps[0] ?? null;
+
+  return {
+    overdueCount: overdueSteps.length,
+    overdueStepLabel:
+      typeof overdueStep?.label === 'string' && overdueStep.label.trim().length > 0
+        ? overdueStep.label
+        : null,
+    overdueStepDate: overdueStep?.idealFinish ?? null,
+    nextStepLabel:
+      typeof nextStep?.label === 'string' && nextStep.label.trim().length > 0
+        ? nextStep.label
+        : null,
+    nextStepDate: nextStep?.idealFinish ?? null,
+  };
+}
+
+
+function countOverdueIncompleteSteps(
+  goals: GoalLike[],
+  doneMap: GoalDoneMap,
+  today: string,
+): number {
+  return goals.reduce((count, goal) => {
+    if (!goal.id || !Array.isArray(goal.steps)) return count;
+
+    return (
+      count +
+      goal.steps.filter((step) => {
+        if (!step?.id) return false;
+        if (isStepDone(goal.id, step.id, doneMap)) return false;
+
+        return (
+          typeof step.idealFinish === 'string' &&
+          step.idealFinish.length > 0 &&
+          step.idealFinish < today
+        );
+      }).length
+    );
+  }, 0);
+}
+
 function readReadingState(): ReadingState {
   try {
-    const raw = localStorage.getItem("daily-life:reading:v2");
+    const raw = localStorage.getItem('daily-life:reading:v2');
     if (!raw) {
       return {
         currentBookTitle: null,
@@ -130,8 +311,7 @@ function readReadingState(): ReadingState {
         currentPage: null,
         totalPages: null,
         streak: 0,
-        minutesToday: 0,
-        targetMinutes: 30,
+        targetPages: 20,
       };
     }
 
@@ -139,35 +319,39 @@ function readReadingState(): ReadingState {
       current?: {
         title?: string;
         author?: string;
-        currentPage?: number;
-        totalPages?: number;
+        currentPage?: string | number;
+        totalPages?: string | number;
       };
-      book?: {
-        title?: string;
-        author?: string;
-        currentPage?: number;
-        totalPages?: number;
-      };
-      streak?: { streak?: number };
-      minutes?: { minutes?: number; target?: number };
+      streak?: number;
+      dailyGoalPages?: string | number;
     };
 
-    const book = parsed.current ?? parsed.book;
+    const book = parsed.current;
 
     return {
       currentBookTitle:
-        typeof book?.title === "string" && book.title !== "Current book"
+        typeof book?.title === 'string' &&
+        book.title.trim().length > 0 &&
+        book.title !== 'Current book'
           ? book.title
           : null,
-      author: typeof book?.author === "string" ? book.author : null,
+      author:
+        typeof book?.author === 'string' && book.author.trim().length > 0
+          ? book.author
+          : null,
       currentPage:
-        typeof book?.currentPage === "number" ? book.currentPage : null,
-      totalPages: typeof book?.totalPages === "number" ? book.totalPages : null,
-      streak: typeof parsed.streak?.streak === "number" ? parsed.streak.streak : 0,
-      minutesToday:
-        typeof parsed.minutes?.minutes === "number" ? parsed.minutes.minutes : 0,
-      targetMinutes:
-        typeof parsed.minutes?.target === "number" ? parsed.minutes.target : 30,
+        book?.currentPage != null
+          ? parseInt(String(book.currentPage), 10) || null
+          : null,
+      totalPages:
+        book?.totalPages != null
+          ? parseInt(String(book.totalPages), 10) || null
+          : null,
+      streak: typeof parsed.streak === 'number' ? parsed.streak : 0,
+      targetPages:
+        parsed.dailyGoalPages != null
+          ? parseInt(String(parsed.dailyGoalPages), 10) || 20
+          : 20,
     };
   } catch {
     return {
@@ -176,15 +360,14 @@ function readReadingState(): ReadingState {
       currentPage: null,
       totalPages: null,
       streak: 0,
-      minutesToday: 0,
-      targetMinutes: 30,
+      targetPages: 20,
     };
   }
 }
 
-function readTodosSignal(): AISignals["todos"] {
+function readTodosSignal(): AISignals['todos'] {
   try {
-    const raw = localStorage.getItem("todos_v1");
+    const raw = localStorage.getItem('todos_v1');
     if (!raw) return null;
 
     const todos = JSON.parse(raw) as Array<{
@@ -194,58 +377,75 @@ function readTodosSignal(): AISignals["todos"] {
 
     if (!Array.isArray(todos)) return null;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const todayTodos = todos.filter(
-      (t) => typeof t.created_at === "string" && t.created_at.slice(0, 10) === today,
+      (todo) =>
+        typeof todo.created_at === 'string' &&
+        todo.created_at.slice(0, 10) === today,
     );
 
     return {
       totalToday: todayTodos.length,
-      doneToday: todayTodos.filter((t) => Boolean(t.done)).length,
+      doneToday: todayTodos.filter((todo) => Boolean(todo.done)).length,
     };
   } catch {
     return null;
   }
 }
 
-function readScheduleSignal(): AISignals["schedule"] {
+function readScheduleSignal(): AISignals['schedule'] {
   return null;
 }
 
-function priorityRank(priority: string | undefined): number {
-  if (priority === "high") return 0;
-  if (priority === "medium") return 1;
-  if (priority === "low") return 2;
-  return 99;
-}
+function countMealsLogged(log: unknown): number {
+  if (!log || typeof log !== 'object') return 0;
 
-function daysSince(isoDate: string | null): number | null {
-  if (!isoDate) return null;
-  const t = new Date(isoDate).getTime();
-  if (Number.isNaN(t)) return null;
-  return Math.floor((Date.now() - t) / 86_400_000);
+  const nutrition = log as {
+    eaten?: Record<string, boolean>;
+    customEntries?: unknown[];
+  };
+
+  const preset = Object.values(nutrition.eaten ?? {}).filter(Boolean).length;
+  const custom = Array.isArray(nutrition.customEntries)
+    ? nutrition.customEntries.length
+    : 0;
+
+  return preset + custom;
 }
 
 export async function buildAISignals(
   forceRefresh = false,
 ): Promise<AISignals> {
-  if (!forceRefresh) {
-    const cached = readCache();
-    if (cached) return cached;
+  const cached = !forceRefresh ? readCache() : null;
+
+  const nutritionLog = await Promise.resolve(loadNutritionLog()).catch(() => null);
+  const mealsLoggedToday = countMealsLogged(nutritionLog);
+
+  if (cached) {
+    const updated: AISignals = {
+      ...cached,
+      builtAt: new Date().toISOString(),
+      nutrition: {
+        ...cached.nutrition,
+        mealsLoggedToday,
+      },
+    };
+
+    writeCache(updated);
+    return updated;
   }
 
-  const [profile, goals, fitnessStore, nutritionLog, nutritionPhase] =
-    await Promise.all([
-      Promise.resolve(loadProfile()).catch(() => null),
-      Promise.resolve(loadUserGoals()).catch(() => []),
-      Promise.resolve(loadFitness()).catch(() => null),
-      Promise.resolve(loadNutritionLog()).catch(() => null),
-      Promise.resolve(loadPhase()).catch(() => "maintain" as const),
-    ]);
+  const [profile, goals, prGoals, nutritionPhase] = await Promise.all([
+    Promise.resolve(loadProfile()).catch(() => null),
+    Promise.resolve(loadUserGoals()).catch(() => []),
+    Promise.resolve(loadPRGoals()).catch(() => []),
+    Promise.resolve(loadPhase()).catch(() => 'maintain' as const),
+  ]);
 
   const reading = readReadingState();
   const todos = readTodosSignal();
   const schedule = readScheduleSignal();
+  const doneMap = readGoalDoneMap();
 
   const modules = normalizeModules(profile?.enabled_modules);
 
@@ -253,76 +453,17 @@ export async function buildAISignals(
   const sortedGoals = [...goalList].sort(
     (a, b) => priorityRank(a.priority) - priorityRank(b.priority),
   );
+
+  const today = todayISO();
   const highestPriorityGoal = sortedGoals[0] ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const highestPriorityStepInfo = highestPriorityGoal
+    ? getStepInfo(highestPriorityGoal, doneMap, today)
+    : null;
 
-  const overdueSteps = goalList.reduce((count, goal) => {
-    const steps = Array.isArray(goal.steps) ? goal.steps : [];
-    return (
-      count +
-      steps.filter(
-        (s) =>
-          typeof s.idealFinish === "string" &&
-          s.idealFinish.length > 0 &&
-          s.idealFinish < today,
-      ).length
-    );
-  }, 0);
-
-  const fitness = (fitnessStore ?? null) as FitnessStoreLike | null;
-  const lifts = fitness?.lifts ? Object.values(fitness.lifts) : [];
-
-  const allWorkoutDates = lifts.flatMap((lift) =>
-    Array.isArray(lift.history)
-      ? lift.history
-          .map((entry) => (typeof entry.date === "string" ? entry.date : null))
-          .filter(Boolean) as string[]
-      : [],
-  );
-
-  const latestWorkoutDate =
-    [...allWorkoutDates].sort().at(-1) ?? null;
-
-  const liftProgress = lifts
-    .map((lift) => {
-      const history = Array.isArray(lift.history) ? lift.history : [];
-      const best = history.reduce<number | null>((acc, entry) => {
-        if (typeof entry.value !== "number") return acc;
-        if (acc === null || entry.value > acc) return entry.value;
-        return acc;
-      }, null);
-
-      const goal = typeof lift.goal === "number" ? lift.goal : null;
-      const pct =
-        best !== null && goal && goal > 0 ? Math.round((best / goal) * 100) : null;
-
-      return {
-        label: lift.label ?? null,
-        pct,
-      };
-    })
-    .filter((lift) => typeof lift.label === "string");
-
-  const strongestLift =
-    [...liftProgress]
-      .filter((l) => typeof l.pct === "number")
-      .sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))[0]?.label ?? null;
-
-  const weakestLift =
-    [...liftProgress]
-      .filter((l) => typeof l.pct === "number")
-      .sort((a, b) => (a.pct ?? 0) - (b.pct ?? 0))[0]?.label ?? null;
+  const overdueSteps = countOverdueIncompleteSteps(goalList, doneMap, today);
 
   const profileMacros =
-    nutritionPhase === "cut"
-      ? profile?.macro_cut
-      : profile?.macro_maintain;
-
-  const mealsLoggedToday =
-    nutritionLog && typeof nutritionLog === "object"
-      ? Object.values((nutritionLog as { eaten?: Record<string, boolean> }).eaten ?? {})
-          .filter(Boolean).length
-      : 0;
+    nutritionPhase === 'cut' ? profile?.macro_cut : profile?.macro_maintain;
 
   const signals: AISignals = {
     builtAt: new Date().toISOString(),
@@ -340,31 +481,32 @@ export async function buildAISignals(
       highestPriority: highestPriorityGoal?.priority ?? null,
       overdueSteps,
       nextStepLabel:
-        Array.isArray(highestPriorityGoal?.steps) &&
-        typeof highestPriorityGoal?.steps[0]?.label === "string"
-          ? highestPriorityGoal.steps[0].label ?? null
-          : null,
-      topGoals: sortedGoals.slice(0, 5).map((goal) => ({
-        title: goal.title ?? "Untitled goal",
-        priority: goal.priority ?? null,
-        nextStepLabel:
-          Array.isArray(goal.steps) && typeof goal.steps[0]?.label === "string"
-            ? goal.steps[0].label ?? null
-            : null,
-        stepCount: Array.isArray(goal.steps) ? goal.steps.length : 0,
-      })),
+        highestPriorityStepInfo?.overdueStepLabel ??
+        highestPriorityStepInfo?.nextStepLabel ??
+        null,
+      topGoals: sortedGoals.slice(0, 10).map((goal) => {
+        const stepInfo = getStepInfo(goal, doneMap, today);
+
+        return {
+          id: goal.id ?? '',
+          title: goal.title ?? 'Untitled goal',
+          priority: goal.priority ?? null,
+          ...stepInfo,
+          stepCount: Array.isArray(goal.steps) ? goal.steps.length : 0,
+        };
+      }),
     },
     nutrition: {
-      phase: nutritionPhase === "cut" ? "cut" : "maintain",
+      phase: nutritionPhase === 'cut' ? 'cut' : 'maintain',
       mealsLoggedToday,
       calorieTarget: profileMacros?.cal ?? null,
       proteinTarget: profileMacros?.protein ?? null,
     },
     reading,
     fitness: {
-      daysSinceWorkout: daysSince(latestWorkoutDate),
-      strongestLift,
-      weakestLift,
+      daysSinceWorkout: getDaysSinceWorkout(prGoals),
+      strongestLift: getStrongestLiftLabel(prGoals),
+      weakestLift: getWeakestLiftLabel(prGoals),
     },
     todos,
     schedule,

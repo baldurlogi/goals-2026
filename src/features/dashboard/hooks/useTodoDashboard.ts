@@ -5,42 +5,56 @@ import {
   type TodoItem,
 } from "@/features/todos/todoStorage";
 
-const CACHE_KEY    = "cache:todos:v1";
+const CACHE_KEY = "cache:todos:v1";
 const PREVIEW_LIMIT = 5;
 
 function readCache(): TodoItem[] {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 export function useTodoDashboard() {
-  const [todos,   setTodos]   = useState<TodoItem[]>(readCache);
-  const [loading, setLoading] = useState(true);
+  const [todos, setTodos] = useState<TodoItem[]>(() => readCache());
+  const [loading, setLoading] = useState(() => readCache().length === 0);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetch() {
-      const fresh = await loadTodos();
-      if (!cancelled) {
-        setTodos(fresh);
-        setLoading(false);
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
-        } catch(e) {
-          console.warn("read cache failed", e);
-          return {};
+      try {
+        const fresh = await loadTodos();
+
+        if (!cancelled) {
+          setTodos(fresh);
+          setLoading(false);
+
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+          } catch (e) {
+            console.warn("todo cache write failed", e);
+          }
         }
+      } catch (e) {
+        if (!cancelled) {
+          setLoading(false);
+        }
+        console.warn("todo dashboard load failed", e);
       }
     }
 
-    fetch();
+    void fetch();
 
-    const sync = () => fetch();
+    const sync = () => {
+      void fetch();
+    };
+
     window.addEventListener(TODO_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
+
     return () => {
       cancelled = true;
       window.removeEventListener(TODO_CHANGED_EVENT, sync);
@@ -49,10 +63,18 @@ export function useTodoDashboard() {
   }, []);
 
   const incomplete = todos.filter((t) => !t.done);
-  const preview    = incomplete.slice(0, PREVIEW_LIMIT);
-  const hasMore    = incomplete.length > PREVIEW_LIMIT;
-  const extraCount = incomplete.length - PREVIEW_LIMIT;
-  const doneCount  = todos.filter((t) => t.done).length;
+  const preview = incomplete.slice(0, PREVIEW_LIMIT);
+  const hasMore = incomplete.length > PREVIEW_LIMIT;
+  const extraCount = Math.max(0, incomplete.length - PREVIEW_LIMIT);
+  const doneCount = todos.filter((t) => t.done).length;
 
-  return { preview, incomplete, hasMore, extraCount, doneCount, total: todos.length, loading };
+  return {
+    preview,
+    incomplete,
+    hasMore,
+    extraCount,
+    doneCount,
+    total: todos.length,
+    loading,
+  };
 }

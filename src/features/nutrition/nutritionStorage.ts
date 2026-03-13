@@ -1,25 +1,43 @@
-import { supabase } from "@/lib/supabaseClient";
-import type { NutritionPhase } from "@/features/nutrition/nutritionData";
-import type { Macros } from "@/features/nutrition/nutritionTypes";
-import { meals } from "@/features/nutrition/nutritionData";
+import { supabase } from '@/lib/supabaseClient';
+import type { NutritionPhase } from '@/features/nutrition/nutritionData';
+import type { Macros } from '@/features/nutrition/nutritionTypes';
+import { meals } from '@/features/nutrition/nutritionData';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
 
-export const NUTRITION_CHANGED_EVENT = "nutrition:changed";
+export const NUTRITION_CHANGED_EVENT = 'nutrition:changed';
 
-function emit() { window.dispatchEvent(new Event(NUTRITION_CHANGED_EVENT)); }
-function todayKey() { return new Date().toISOString().slice(0, 10); }
+const LOG_CACHE_KEY = 'cache:nutrition_log:v1';
+const PHASE_CACHE_KEY = 'cache:nutrition_phase:v1';
 
-// ── Types ──────────────────────────────────────────────────────────────────
+function emit() {
+  window.dispatchEvent(new Event(NUTRITION_CHANGED_EVENT));
+}
+
+function todayKey() {
+  return getLocalDateKey();
+}
+
 export type MealKey =
-  | "breakfast1" | "breakfast2"
-  | "lunchWfh"   | "lunchOffice"
-  | "afternoonSnack" | "postWorkout" | "dinner";
+  | 'breakfast1'
+  | 'breakfast2'
+  | 'lunchWfh'
+  | 'lunchOffice'
+  | 'afternoonSnack'
+  | 'postWorkout'
+  | 'dinner';
 
 export type CustomEntry = {
-  id: string; name: string; macros: Macros; loggedAt: number;
+  id: string;
+  name: string;
+  macros: Macros;
+  loggedAt: number;
 };
 
 export type SavedMeal = {
-  id: string; name: string; macros: Macros; emoji: string;
+  id: string;
+  name: string;
+  macros: Macros;
+  emoji: string;
 };
 
 export type NutritionLog = {
@@ -32,61 +50,129 @@ function emptyLog(date = todayKey()): NutritionLog {
   return { date, eaten: {}, customEntries: [] };
 }
 
-// ── Phase ──────────────────────────────────────────────────────────────────
+function readLogCache(): NutritionLog | null {
+  try {
+    const raw = localStorage.getItem(LOG_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as NutritionLog;
+    if (parsed.date !== todayKey()) return null;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeLogCache(log: NutritionLog): void {
+  try {
+    localStorage.setItem(LOG_CACHE_KEY, JSON.stringify(log));
+  } catch {
+    // ignore
+  }
+}
+
+function readPhaseCache(): NutritionPhase | null {
+  try {
+    const raw = localStorage.getItem(PHASE_CACHE_KEY);
+    return raw === 'cut' || raw === 'maintain' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePhaseCache(phase: NutritionPhase): void {
+  try {
+    localStorage.setItem(PHASE_CACHE_KEY, phase);
+  } catch {
+    // ignore
+  }
+}
+
+export function seedNutritionLog(): NutritionLog {
+  return readLogCache() ?? emptyLog();
+}
+
 export async function loadPhase(): Promise<NutritionPhase> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return "maintain";
+  const cached = readPhaseCache();
+  if (cached) return cached;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return 'maintain';
 
   const { data, error } = await supabase
-    .from("nutrition_phase")
-    .select("phase")
-    .eq("user_id", user.id)
+    .from('nutrition_phase')
+    .select('phase')
+    .eq('user_id', user.id)
     .maybeSingle();
 
-  // If anything truly unexpected happens, fall back safely
   if (error) {
-    console.warn("loadPhase error:", error);
-    return "maintain";
+    console.warn('loadPhase error:', error);
+    return 'maintain';
   }
 
-  // First-time user: create default row
   if (!data) {
-    await supabase.from("nutrition_phase").insert({ user_id: user.id, phase: "maintain" });
-    return "maintain";
+    await supabase
+      .from('nutrition_phase')
+      .insert({ user_id: user.id, phase: 'maintain' });
+
+    writePhaseCache('maintain');
+    return 'maintain';
   }
 
-  return (data.phase as NutritionPhase) ?? "maintain";
+  const phase = (data.phase as NutritionPhase) ?? 'maintain';
+  writePhaseCache(phase);
+  return phase;
 }
 
 export async function savePhase(phase: NutritionPhase): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  writePhaseCache(phase);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    emit();
+    return;
+  }
 
   await supabase
-    .from("nutrition_phase")
-    .upsert({ user_id: user.id, phase }, { onConflict: "user_id" });
+    .from('nutrition_phase')
+    .upsert({ user_id: user.id, phase }, { onConflict: 'user_id' });
 
   emit();
 }
 
-// ── Daily log ──────────────────────────────────────────────────────────────
-export async function loadNutritionLog(date = todayKey()): Promise<NutritionLog> {
-  const { data: { user } } = await supabase.auth.getUser();
+export async function loadNutritionLog(
+  date = todayKey(),
+): Promise<NutritionLog> {
+  if (date === todayKey()) {
+    const cached = readLogCache();
+    if (cached) return cached;
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) return emptyLog(date);
 
   const { data, error } = await supabase
-    .from("nutrition_logs")
-    .select("log_date, eaten, custom_entries")
-    .eq("user_id", user.id)
-    .eq("log_date", date)
+    .from('nutrition_logs')
+    .select('log_date, eaten, custom_entries')
+    .eq('user_id', user.id)
+    .eq('log_date', date)
     .maybeSingle();
 
   if (error) {
-    console.warn("loadNutritionLog error:", error);
+    console.warn('loadNutritionLog error:', error);
     return emptyLog(date);
   }
 
-  // First-time user for this date: create default row so future reads are clean
   if (!data) {
     const created = {
       user_id: user.id,
@@ -94,29 +180,38 @@ export async function loadNutritionLog(date = todayKey()): Promise<NutritionLog>
       eaten: {},
       custom_entries: [],
     };
-    await supabase.from("nutrition_logs").insert(created);
+    await supabase.from('nutrition_logs').insert(created);
     return emptyLog(date);
   }
 
-  return {
+  const log: NutritionLog = {
     date: data.log_date,
-    eaten: (data.eaten ?? {}) as NutritionLog["eaten"],
-    customEntries: (data.custom_entries ?? []) as NutritionLog["customEntries"],
+    eaten: (data.eaten ?? {}) as NutritionLog['eaten'],
+    customEntries: (data.custom_entries ?? []) as NutritionLog['customEntries'],
   };
+
+  if (date === todayKey()) writeLogCache(log);
+  return log;
 }
 
 async function saveLog(log: NutritionLog): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) return;
 
-  await supabase
-    .from("nutrition_logs")
-    .upsert({
+  if (log.date === todayKey()) writeLogCache(log);
+
+  await supabase.from('nutrition_logs').upsert(
+    {
       user_id: user.id,
       log_date: log.date,
       eaten: log.eaten ?? {},
       custom_entries: log.customEntries ?? [],
-    }, { onConflict: "user_id,log_date" });
+    },
+    { onConflict: 'user_id,log_date' },
+  );
 
   emit();
 }
@@ -128,12 +223,15 @@ export async function toggleMeal(key: MealKey, eaten: boolean): Promise<void> {
   await saveLog(log);
 }
 
-export async function addCustomEntry(name: string, macros: Macros): Promise<void> {
+export async function addCustomEntry(
+  name: string,
+  macros: Macros,
+): Promise<void> {
   const log = await loadNutritionLog();
   log.customEntries = log.customEntries ?? [];
   log.customEntries.push({
     id: crypto.randomUUID(),
-    name: name.trim() || "Custom meal",
+    name: name.trim() || 'Custom meal',
     macros,
     loggedAt: Date.now(),
   });
@@ -146,32 +244,44 @@ export async function removeCustomEntry(id: string): Promise<void> {
   await saveLog(log);
 }
 
-// ── Saved meals ────────────────────────────────────────────────────────────
 export async function loadSavedMeals(): Promise<SavedMeal[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return [];
 
   const { data, error } = await supabase
-    .from("saved_meals")
-    .select("id, name, emoji, macros")
-    .eq("user_id", user.id)
-    .order("created_at");
+    .from('saved_meals')
+    .select('id, name, emoji, macros')
+    .eq('user_id', user.id)
+    .order('created_at');
 
   if (error) {
-    console.warn("loadSavedMeals error:", error);
+    console.warn('loadSavedMeals error:', error);
     return [];
   }
 
   return (data ?? []) as SavedMeal[];
 }
 
-export async function saveNewMeal(name: string, macros: Macros, emoji = "🍽️"): Promise<SavedMeal> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const meal: SavedMeal = { id: crypto.randomUUID(), name: name.trim(), macros, emoji };
+export async function saveNewMeal(
+  name: string,
+  macros: Macros,
+  emoji = '🍽️',
+): Promise<SavedMeal> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const meal: SavedMeal = {
+    id: crypto.randomUUID(),
+    name: name.trim(),
+    macros,
+    emoji,
+  };
 
   if (user) {
-    // Let DB generate id; but keeping your UUID is also fine if you store it in "id"
-    await supabase.from("saved_meals").insert({ ...meal, user_id: user.id });
+    await supabase.from('saved_meals').insert({ ...meal, user_id: user.id });
     emit();
   }
 
@@ -179,7 +289,7 @@ export async function saveNewMeal(name: string, macros: Macros, emoji = "🍽️
 }
 
 export async function deleteSavedMeal(id: string): Promise<void> {
-  await supabase.from("saved_meals").delete().eq("id", id);
+  await supabase.from('saved_meals').delete().eq('id', id);
   emit();
 }
 
@@ -187,15 +297,14 @@ export async function logSavedMeal(meal: SavedMeal): Promise<void> {
   await addCustomEntry(meal.name, meal.macros);
 }
 
-// ── Macro aggregation ──────────────────────────────────────────────────────
 const MEAL_MACROS: Record<MealKey, Macros> = {
-  breakfast1:     meals.breakfast.option1.macros,
-  breakfast2:     meals.breakfast.option2.macros,
-  lunchWfh:       meals.lunch.wfh.macros,
-  lunchOffice:    meals.lunch.office.macros,
+  breakfast1: meals.breakfast.option1.macros,
+  breakfast2: meals.breakfast.option2.macros,
+  lunchWfh: meals.lunch.wfh.macros,
+  lunchOffice: meals.lunch.office.macros,
   afternoonSnack: meals.afternoonSnack.macros,
-  postWorkout:    meals.postWorkout.macros,
-  dinner:         meals.dinner.macros,
+  postWorkout: meals.postWorkout.macros,
+  dinner: meals.dinner.macros,
 };
 
 export function getLoggedMacros(log: NutritionLog | null | undefined): Macros {
@@ -226,7 +335,6 @@ export function getLoggedMacros(log: NutritionLog | null | undefined): Macros {
     };
   }, zero);
 
-  // ✅ THIS was missing in your file
   return {
     cal: fromMeals.cal + fromCustom.cal,
     protein: fromMeals.protein + fromCustom.protein,

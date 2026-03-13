@@ -5,6 +5,16 @@ import { supabase } from "@/lib/supabaseClient";
 // Local key only used for optional legacy fallback + migration safety
 const STORAGE_KEY = "daily-life:reading:v2";
 
+const AI_SIGNALS_CACHE_KEY = "cache:ai-signals:v1";
+
+function clearAISignalsCache() {
+  try {
+    localStorage.removeItem(AI_SIGNALS_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export const READING_CHANGED_EVENT = "daily-life:reading:changed";
 function emitReadingChanged() {
   if (typeof window !== "undefined") {
@@ -17,6 +27,8 @@ export const DEFAULT_READING_INPUTS: ReadingInputs = {
   upNext: [],
   completed: [],
   dailyGoalPages: "20",
+  lastReadDate: null,
+  streak: 0,
 };
 
 // helper: merge partial into defaults safely
@@ -32,6 +44,8 @@ function normalizeReadingInputs(parsed: Partial<ReadingInputs> | null | undefine
     upNext: Array.isArray(p.upNext) ? p.upNext : [],
     completed: Array.isArray(p.completed) ? p.completed : [],
     dailyGoalPages,
+    lastReadDate: typeof p.lastReadDate === "string" ? p.lastReadDate : null,
+    streak: typeof p.streak === "number" ? p.streak : 0,
   };
 }
 
@@ -82,7 +96,6 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
  * Also mirrors to localStorage for offline-ish resilience.
  */
 export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
-  // Mirror locally (optional but nice)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
   } catch {
@@ -92,8 +105,8 @@ export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth?.user;
 
-  // If not logged in, just keep local
   if (!user) {
+    clearAISignalsCache();
     emitReadingChanged();
     return;
   }
@@ -111,10 +124,21 @@ export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
 
   if (error) throw error;
 
+  clearAISignalsCache();
   emitReadingChanged();
 }
 
+
 export async function resetReadingInputs(): Promise<ReadingInputs> {
   await saveReadingInputs(DEFAULT_READING_INPUTS);
+  return DEFAULT_READING_INPUTS;
+}
+
+/** Synchronous seed — reads from localStorage mirror. Zero network. */
+export function seedReadingInputs(): ReadingInputs {
+  try {
+    const raw = localStorage.getItem("daily-life:reading:v2");
+    if (raw) return normalizeReadingInputs(JSON.parse(raw));
+  } catch { /* ignore */ }
   return DEFAULT_READING_INPUTS;
 }

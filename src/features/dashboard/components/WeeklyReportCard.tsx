@@ -1,30 +1,28 @@
-/**
- * WeeklyReportCard.tsx
- *
- * Dashboard bento card for the AI Weekly Report.
- * - Pro+ only — hidden for free tier
- * - Shows latest report summary if available
- * - Shows "Generate" CTA on Sundays when no report exists for this week
- * - Shows "View report" link otherwise
- *
- * Place in DashboardPage grid: lg:col-span-6
- */
-
 import { Link } from "react-router-dom";
 import {
-  Sparkles, Trophy, Target, ChevronRight,
-  RefreshCw, Calendar,
+  Sparkles,
+  Trophy,
+  Target,
+  ChevronRight,
+  RefreshCw,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useWeeklyReport, isSunday } from "../hooks/useWeeklyReport";
+import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
+import { UpgradeBanner } from "@/features/subscription/UpgradeBanner";
+
 
 export function WeeklyReportCard() {
   const { modules } = useEnabledModules();
-  const { report, status, generate, weekStart, isThisWeek } = useWeeklyReport(modules);
+  const { report, status, error, limitHit, generate, weekStart, isThisWeek } =
+    useWeeklyReport(modules);
+
 
   const isGenerating = status === "generating";
   const isLoading = status === "loading";
+  const showLoadingState = isLoading && !report;
 
   const weekLabel = (() => {
     const d = new Date(weekStart + "T00:00:00");
@@ -32,11 +30,20 @@ export function WeeklyReportCard() {
   })();
 
   const todayIsSunday = isSunday();
-  const hasThisWeekReport = report && isThisWeek;
+  const hasThisWeekReport = Boolean(report && isThisWeek);
+
+  const showUpgradeLock =
+    !limitHit &&
+    !!error &&
+    error.toLowerCase().includes("upgrade to pro");
+
+  const showGenericError =
+    !limitHit &&
+    !showUpgradeLock &&
+    !!error;
 
   return (
-    <div className="lg:col-span-6 rounded-2xl border bg-card p-5 space-y-4">
-      {/* Header */}
+    <div className="lg:col-span-6 rounded-2xl border bg-card p-5 space-y-4 min-h-[220px]">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/15">
@@ -60,60 +67,98 @@ export function WeeklyReportCard() {
             </p>
           </div>
         </div>
-        {hasThisWeekReport && (
+
+        {hasThisWeekReport && report && (
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-500/20">
             <span className="text-lg font-bold text-violet-300">
-              {report!.report.overallScore}
+              {report.report.overallScore}
             </span>
           </div>
         )}
       </div>
 
-      {/* Loading */}
-      {isLoading && (
+      {showLoadingState && (
         <div className="space-y-2">
           <div className="h-3 w-3/4 rounded bg-muted/40 animate-pulse" />
           <div className="h-3 w-1/2 rounded bg-muted/40 animate-pulse" />
         </div>
       )}
 
-      {/* No report yet — Sunday CTA */}
-      {!isLoading && !hasThisWeekReport && (
+      {!showLoadingState && !hasThisWeekReport && (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed">
             {todayIsSunday
               ? "It's Sunday — your weekly review is ready to generate."
               : "No report for this week yet. Generate one any time."}
           </p>
-          <Button
-            onClick={generate}
-            disabled={isGenerating}
-            size="sm"
-            className="w-full gap-2"
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                Generating…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                {todayIsSunday ? "Generate Sunday Report" : "Generate Report"}
-              </>
-            )}
-          </Button>
+
+          {limitHit ? (
+            <AIUsageLimitNotice
+              feature="AI weekly report"
+              message={error ?? undefined}
+            />
+          ) : showUpgradeLock ? (
+            <UpgradeBanner
+              feature="AI Weekly Life Report"
+              requiredTier="pro"
+            />
+          ) : showGenericError ? (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3">
+              <p className="text-sm font-medium text-foreground">
+                Couldn't generate your weekly report
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {error}
+              </p>
+              <Button
+                onClick={generate}
+                disabled={isGenerating}
+                size="sm"
+                variant="outline"
+                className="mt-3 gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Try again
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={generate}
+              disabled={isGenerating}
+              size="sm"
+              className="w-full gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {todayIsSunday ? "Generate Sunday Report" : "Generate Report"}
+                </>
+              )}
+            </Button>
+          )}
         </div>
       )}
 
-      {/* Has report — show headline + top win + top focus */}
-      {!isLoading && hasThisWeekReport && report && (
+      {!showLoadingState && hasThisWeekReport && report && (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
             {report.report.headline}
           </p>
 
-          {/* Top win */}
           {report.report.wins?.[0] && (
             <div className="flex items-start gap-2 rounded-lg bg-emerald-500/8 border border-emerald-500/15 px-3 py-2">
               <Trophy className="h-3.5 w-3.5 shrink-0 text-emerald-400 mt-0.5" />
@@ -123,7 +168,6 @@ export function WeeklyReportCard() {
             </div>
           )}
 
-          {/* Top focus */}
           {report.report.nextWeekFocus?.[0] && (
             <div className="flex items-start gap-2 rounded-lg bg-primary/8 border border-primary/15 px-3 py-2">
               <Target className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />

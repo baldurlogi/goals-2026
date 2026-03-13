@@ -1,0 +1,95 @@
+import { Link } from "react-router-dom";
+import { Sparkles, ArrowRight, Zap } from "lucide-react";
+import {
+  TIER_LABELS,
+  useTier,
+  type Tier,
+} from "@/features/subscription/useTier";
+import { Button } from "@/components/ui/button";
+
+type Props = {
+  tier?: Tier;
+  feature?: string;
+  message?: string;
+  className?: string;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
+};
+
+const NEXT_TIER: Record<Tier, Tier | null> = {
+  free: "pro",
+  pro: "pro_max",
+  pro_max: null,
+};
+
+function defaultMessageForTier(tier: Tier) {
+  if (tier === "free") {
+    return "You've used all 10 free AI prompts this month. Upgrade to Pro for 200 prompts/month.";
+  }
+
+  if (tier === "pro") {
+    return "You've used all 200 Pro prompts this month. Upgrade to Pro Max for 1,000 prompts/month.";
+  }
+
+  return "You've used all 1,000 AI prompts this month. Your limit resets on the 1st.";
+}
+
+export function AIUsageLimitNotice({
+  tier,
+  feature = "This AI feature",
+  message,
+  className = "",
+  secondaryActionLabel,
+  onSecondaryAction,
+}: Props) {
+  const liveTier = useTier();
+  const activeTier = tier ?? liveTier;
+  const nextTier = NEXT_TIER[activeTier];
+  const nextTierLabel = nextTier ? TIER_LABELS[nextTier] : null;
+
+  return (
+    <div
+      className={`rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-4 ${className}`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
+          <Zap className="h-4 w-4 text-amber-500" />
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-sm font-semibold text-foreground">
+            Monthly AI limit reached
+          </p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            <span className="font-medium text-foreground">{feature}</span>{" "}
+            can’t generate more AI output right now.{" "}
+            {message ?? defaultMessageForTier(activeTier)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {secondaryActionLabel && onSecondaryAction && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onSecondaryAction}
+          >
+            {secondaryActionLabel}
+          </Button>
+        )}
+
+        {nextTier && nextTierLabel && (
+          <Button asChild size="sm" className="gap-1.5">
+            <Link to="/app/upgrade">
+              <Sparkles className="h-3.5 w-3.5" />
+              Upgrade to {nextTierLabel}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

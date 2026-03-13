@@ -1,48 +1,49 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  loadFitness,
+  DASHBOARD_TOP_LIFTS,
   FITNESS_CHANGED_EVENT,
   currentBest,
+  findGoalByAliases,
+  loadPRGoals,
   progressPct,
-  DEFAULT_STORE,
-  type FitnessStore,
+  readPRCache,
+  type MetricType,
+  type PRGoal,
 } from "@/features/fitness/fitnessStorage";
 
-const CACHE_KEY = "cache:fitness:v1";
-
-function readCache(): FitnessStore {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : DEFAULT_STORE;
-  } catch { return DEFAULT_STORE; }
-}
+type DashboardTopLift = {
+  id: string;
+  label: string;
+  unit: MetricType;
+  best: number | null;
+  goal: number;
+  pct: number;
+};
 
 export function useFitnessDashboard() {
-  const [store,   setStore]   = useState<FitnessStore>(readCache);
+  const [goals, setGoals] = useState<PRGoal[]>(() => readPRCache());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetch() {
-      const fresh = await loadFitness();
+    async function refresh() {
+      const fresh = await loadPRGoals();
       if (!cancelled) {
-        setStore(fresh);
+        setGoals(fresh);
         setLoading(false);
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
-        } catch(e) {
-          console.warn("read cache failed", e);
-          return {};
-        }
       }
     }
 
-    fetch();
+    void refresh();
 
-    const sync = () => fetch();
+    const sync = () => {
+      void refresh();
+    };
+
     window.addEventListener(FITNESS_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
+
     return () => {
       cancelled = true;
       window.removeEventListener(FITNESS_CHANGED_EVENT, sync);
@@ -50,11 +51,39 @@ export function useFitnessDashboard() {
     };
   }, []);
 
-  const topLifts = (["bench", "squat", "ohp"] as const).map((id) => {
-    const r    = store.lifts[id];
-    const best = currentBest(r.history);
-    return { id, label: r.label, best, goal: r.goal, pct: progressPct(best, r.goal) };
-  });
+  const topLifts = useMemo<DashboardTopLift[]>(
+    () =>
+      DASHBOARD_TOP_LIFTS.map((entry) => {
+        const goal = findGoalByAliases(goals, entry.aliases);
 
-  return { store, topLifts, loading };
+        if (!goal) {
+          return {
+            id: entry.id,
+            label: entry.label,
+            unit: "kg" as const,
+            best: null,
+            goal: 0,
+            pct: 0,
+          };
+        }
+
+        const best = currentBest(goal.history);
+
+        return {
+          id: goal.id,
+          label: goal.label,
+          unit: goal.unit,
+          best,
+          goal: goal.goal,
+          pct: progressPct(best, goal.goal),
+        };
+      }),
+    [goals],
+  );
+
+  return {
+    goals,
+    topLifts,
+    loading,
+  };
 }

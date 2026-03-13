@@ -1,25 +1,53 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Plus, Sparkles } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { useGoalsStore } from "@/features/goals/goalStoreContext";
-import { GoalCard } from "./components/GoalCard";
-import { AddEditGoalModal } from "./components/AddEditGoalModal";
-import { ImproveGoalModal } from "./components/ImproveGoalModal";
-import { GoalsPageSkeleton } from "@/features/dashboard/skeletons";
-import { useTier, tierMeets } from "@/features/subscription/useTier";
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Plus, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { useGoalsStore } from '@/features/goals/goalStoreContext';
+import { GoalCard } from './components/GoalCard';
+import { AddEditGoalModal } from './components/AddEditGoalModal';
+import { ImproveGoalModal } from './components/ImproveGoalModal';
+import { GoalsPageSkeleton } from '@/features/dashboard/skeletons';
+import { useTier, tierMeets } from '@/features/subscription/useTier';
 import {
   loadUserGoals,
   seedUserGoals,
   deleteUserGoal,
   saveUserGoal,
-} from "./userGoalStorage";
-import type { UserGoal } from "./goalTypes";
+} from './userGoalStorage';
+import type { UserGoal } from './goalTypes';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { AIContextNudge } from './components/AIContextNudge';
+import type { ReactNode } from 'react';
 
-type SortMode = "priority" | "overdue";
-type ModalState = UserGoal | "new" | "ai" | null;
-type GoalRouteState = { openGoalModal?: "new" | "ai" } | null;
+function SortButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+        active
+          ? 'bg-foreground text-background'
+          : 'text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+
+type SortMode = 'priority' | 'overdue';
+type ModalState = UserGoal | 'new' | 'ai' | null;
+type GoalRouteState = { openGoalModal?: 'new' | 'ai' } | null;
 
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
@@ -27,17 +55,17 @@ export function GoalsPage() {
   const { state } = useGoalsStore();
   const [goals, setGoals] = useState<UserGoal[]>(() => seedUserGoals());
   const [loading, setLoading] = useState(goals.length === 0);
-  const [sort, setSort] = useState<SortMode>("priority");
+  const [sort, setSort] = useState<SortMode>('priority');
   const [localModal, setLocalModal] = useState<ModalState>(null);
   const [improvingGoal, setImprovingGoal] = useState<UserGoal | null>(null);
   const tier = useTier();
-  const isPro = tierMeets(tier, "pro");
+  const isPro = tierMeets(tier, 'pro');
   const location = useLocation();
   const navigate = useNavigate();
 
   const routeModal = (() => {
     const requested = (location.state as GoalRouteState | null)?.openGoalModal;
-    return requested === "new" || requested === "ai" ? requested : null;
+    return requested === 'new' || requested === 'ai' ? requested : null;
   })();
 
   const modal = localModal ?? routeModal;
@@ -63,7 +91,7 @@ export function GoalsPage() {
     };
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
 
   const overdueCountByGoal = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -80,17 +108,20 @@ export function GoalsPage() {
 
   const sorted = useMemo(() => {
     return [...goals].sort((a, b) => {
-      if (sort === "priority") {
+      if (sort === 'priority') {
         const r =
-          (PRIORITY_RANK[a.priority] ?? 99) -
-          (PRIORITY_RANK[b.priority] ?? 99);
+          (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
         if (r !== 0) return r;
-        return (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
+        return (
+          (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0)
+        );
       }
       const od =
         (overdueCountByGoal[b.id] ?? 0) - (overdueCountByGoal[a.id] ?? 0);
       if (od !== 0) return od;
-      return (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
+      return (
+        (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99)
+      );
     });
   }, [goals, sort, overdueCountByGoal]);
 
@@ -123,8 +154,8 @@ export function GoalsPage() {
           <h2 className="text-lg font-semibold">Goals</h2>
           <p className="text-sm text-muted-foreground">
             {goals.length === 0
-              ? "Add your first goal to get started."
-              : "Check off steps to update progress automatically."}
+              ? 'Add your first goal to get started.'
+              : 'Check off steps to update progress automatically.'}
           </p>
         </div>
 
@@ -132,14 +163,14 @@ export function GoalsPage() {
           {goals.length > 0 && (
             <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
               <SortButton
-                active={sort === "priority"}
-                onClick={() => setSort("priority")}
+                active={sort === 'priority'}
+                onClick={() => setSort('priority')}
               >
                 Priority
               </SortButton>
               <SortButton
-                active={sort === "overdue"}
-                onClick={() => setSort("overdue")}
+                active={sort === 'overdue'}
+                onClick={() => setSort('overdue')}
               >
                 Most overdue
               </SortButton>
@@ -148,20 +179,22 @@ export function GoalsPage() {
 
           <Button
             variant="outline"
-            onClick={() => setLocalModal("ai")}
+            onClick={() => setLocalModal('ai')}
             className="gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
           >
             <Sparkles className="h-4 w-4" /> Generate with AI
           </Button>
 
           <Button
-            onClick={() => setLocalModal("new")}
+            onClick={() => setLocalModal('new')}
             className="gap-2 hover:border-primary/30 hover:text-white bg-primary/5 text-primary"
           >
             <Plus className="h-4 w-4" /> Add goal
           </Button>
         </div>
       </div>
+
+      <AIContextNudge />
 
       {!loading && goals.length === 0 && (
         <div className="space-y-6 rounded-2xl border border-dashed p-12 text-center">
@@ -176,13 +209,13 @@ export function GoalsPage() {
           <div className="flex justify-center gap-3">
             <Button
               variant="outline"
-              onClick={() => setLocalModal("ai")}
+              onClick={() => setLocalModal('ai')}
               className="gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
             >
               <Sparkles className="h-4 w-4" /> Generate with AI
             </Button>
             <Button
-              onClick={() => setLocalModal("new")}
+              onClick={() => setLocalModal('new')}
               variant="ghost"
               className="gap-2"
             >
@@ -210,8 +243,8 @@ export function GoalsPage() {
 
       {modal !== null && (
         <AddEditGoalModal
-          initial={modal === "new" || modal === "ai" ? undefined : modal}
-          startWithAI={modal === "ai"}
+          initial={modal === 'new' || modal === 'ai' ? undefined : modal}
+          startWithAI={modal === 'ai'}
           onSave={handleSaved}
           onClose={closeModal}
         />
@@ -224,41 +257,16 @@ export function GoalsPage() {
             const updated: UserGoal = {
               ...improvingGoal,
               steps: newSteps,
-              updatedAt: new Date().toISOString(),
+              updatedAt: getLocalDateKey(),
             };
             handleSaved(updated);
             saveUserGoal(updated);
             setImprovingGoal(null);
-            toast.success("Goal steps improved ✨");
+            toast.success('Goal steps improved ✨');
           }}
           onClose={() => setImprovingGoal(null)}
         />
       )}
     </div>
-  );
-}
-
-function SortButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-        active
-          ? "bg-foreground text-background"
-          : "text-muted-foreground hover:text-foreground",
-      ].join(" ")}
-    >
-      {children}
-    </button>
   );
 }

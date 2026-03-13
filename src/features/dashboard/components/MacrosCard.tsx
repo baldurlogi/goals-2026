@@ -67,14 +67,13 @@ function MacrosCardInner() {
     target,
     phase,
     calPct,
-    mealsEaten,
-    totalMeals,
+    itemsLogged,
     caloriesRemaining,
     proteinRemaining,
     loading,
   } = useNutritionDashboard();
 
-  const cacheEmpty = logged.cal === 0 && mealsEaten === 0;
+  const cacheEmpty = logged.cal === 0 && itemsLogged === 0;
   if (loading && cacheEmpty) return <MacrosCardSkeleton />;
 
   return (
@@ -100,7 +99,7 @@ function MacrosCardInner() {
             </span>
           </div>
           <span className="text-[10px] text-muted-foreground">
-            {mealsEaten}/{totalMeals} meals
+            {itemsLogged} item{itemsLogged !== 1 ? 's' : ''} logged
           </span>
         </div>
 
@@ -155,8 +154,7 @@ function MacrosCardInner() {
           <p className="text-[11px] text-muted-foreground">
             {logged.cal === 0 ? (
               <>
-                No meals logged yet — head to <strong>Nutrition</strong> to
-                check off meals.
+                No meals logged yet — head to <strong>Nutrition</strong> to log your first meal.
               </>
             ) : caloriesRemaining > 0 ? (
               <>

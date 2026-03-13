@@ -3,16 +3,20 @@
  * Import and run from the browser console:
  *   import("/src/auth/migrateToSupabase.ts").then(m => m.migrateLocalStorageToSupabase())
  */
-import { supabase } from "@/lib/supabaseClient";
+import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { supabase } from '@/lib/supabaseClient';
 
 export async function migrateLocalStorageToSupabase() {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError) {
-    console.error("Auth error:", authError);
+    console.error('Auth error:', authError);
     return;
   }
   if (!user) {
-    console.error("Not logged in");
+    console.error('Not logged in');
     return;
   }
 
@@ -20,79 +24,88 @@ export async function migrateLocalStorageToSupabase() {
   const errors: string[] = [];
 
   async function upsert(table: string, data: object, conflict: string) {
-    const { error } = await supabase.from(table).upsert(data, { onConflict: conflict });
+    const { error } = await supabase
+      .from(table)
+      .upsert(data, { onConflict: conflict });
     if (error) errors.push(`${table}: ${error.message}`);
   }
 
   // Nutrition phase
-  const phase = localStorage.getItem("nutrition_phase_v1");
-  if (phase) await upsert("nutrition_phase", { user_id: uid, phase }, "user_id");
+  const phase = localStorage.getItem('nutrition_phase_v1');
+  if (phase)
+    await upsert('nutrition_phase', { user_id: uid, phase }, 'user_id');
 
   // Nutrition log
-  const log = localStorage.getItem("nutrition_log_v1");
+  const log = localStorage.getItem('nutrition_log_v1');
   if (log) {
     const p = JSON.parse(log);
     await upsert(
-      "nutrition_logs",
+      'nutrition_logs',
       {
         user_id: uid,
         log_date: p.date,
         eaten: p.eaten ?? {},
         custom_entries: p.customEntries ?? [],
       },
-      "user_id,log_date"
+      'user_id,log_date',
     );
   }
 
   // Saved meals
-  const saved = localStorage.getItem("nutrition_saved_meals_v1");
+  const saved = localStorage.getItem('nutrition_saved_meals_v1');
   if (saved) {
     for (const m of JSON.parse(saved)) {
       await upsert(
-        "saved_meals",
-        { id: m.id, user_id: uid, name: m.name, macros: m.macros, emoji: m.emoji },
-        "id"
+        'saved_meals',
+        {
+          id: m.id,
+          user_id: uid,
+          name: m.name,
+          macros: m.macros,
+          emoji: m.emoji,
+        },
+        'id',
       );
     }
   }
 
   // Schedule log
-  const sched = localStorage.getItem("schedule_log_v1");
+  const sched = localStorage.getItem('schedule_log_v1');
   if (sched) {
     const p = JSON.parse(sched);
     await upsert(
-      "schedule_logs",
+      'schedule_logs',
       {
         user_id: uid,
         log_date: p.date,
-        view: p.view ?? "wfh",
+        view: p.view ?? 'wfh',
         completed: p.completed ?? [],
       },
-      "user_id,log_date"
+      'user_id,log_date',
     );
   }
 
   // ✅ Reading state (daily-life:reading:v2 / legacy v1) -> reading_state
   const reading =
-    localStorage.getItem("daily-life:reading:v2") ??
-    localStorage.getItem("daily-life:reading:v1");
+    localStorage.getItem('daily-life:reading:v2') ??
+    localStorage.getItem('daily-life:reading:v1');
   if (reading) {
     const state = JSON.parse(reading);
     await upsert(
-      "reading_state",
-      { user_id: uid, state, updated_at: new Date().toISOString() },
-      "user_id"
+      'reading_state',
+      { user_id: uid, state, updated_at: getLocalDateKey() },
+      'user_id',
     );
   } else {
-    console.warn("No local reading found (daily-life:reading:v2/v1)");
+    console.warn('No local reading found (daily-life:reading:v2/v1)');
   }
 
   // Todos
-  const todos = localStorage.getItem("todos_v1");
+  const todos = localStorage.getItem('todos_v1');
   if (todos) {
     for (const t of JSON.parse(todos)) {
       await upsert(
-        "todos",
+        'todos',
         {
           id: t.id,
           user_id: uid,
@@ -100,29 +113,29 @@ export async function migrateLocalStorageToSupabase() {
           done: t.done,
           created_at: new Date(t.createdAt).toISOString(),
         },
-        "id"
+        'id',
       );
     }
   } else {
-    console.warn("No local todos found (todos_v1)");
+    console.warn('No local todos found (todos_v1)');
   }
 
   // Fitness PRs
-  const fitness = localStorage.getItem("fitness_prs_v1");
+  const fitness = localStorage.getItem('fitness_prs_v1');
   if (fitness) {
     const p = JSON.parse(fitness);
     for (const [liftId, r] of Object.entries(p.lifts ?? {})) {
       const rec = r as { goal: number; history: object[] };
       await upsert(
-        "fitness_lifts",
+        'fitness_lifts',
         { user_id: uid, lift_id: liftId, goal: rec.goal, history: rec.history },
-        "user_id,lift_id"
+        'user_id,lift_id',
       );
     }
     for (const [skillId, r] of Object.entries(p.skills ?? {})) {
       const rec = r as { goal: number; goal_label?: string; history: object[] };
       await upsert(
-        "fitness_skills",
+        'fitness_skills',
         {
           user_id: uid,
           skill_id: skillId,
@@ -130,48 +143,48 @@ export async function migrateLocalStorageToSupabase() {
           goal_label: rec.goal_label,
           history: rec.history,
         },
-        "user_id,skill_id"
+        'user_id,skill_id',
       );
     }
   } else {
-    console.warn("No local fitness PRs found (fitness_prs_v1)");
+    console.warn('No local fitness PRs found (fitness_prs_v1)');
   }
 
-  const FINANCE_GOAL_ID = "finance";
-  const financeKeys = Object.keys(localStorage).filter(
-    (k) => k.startsWith(`daily-life:finance:${FINANCE_GOAL_ID}:`)
+  const FINANCE_GOAL_ID = 'finance';
+  const financeKeys = Object.keys(localStorage).filter((k) =>
+    k.startsWith(`daily-life:finance:${FINANCE_GOAL_ID}:`),
   );
   for (const key of financeKeys) {
     const raw = localStorage.getItem(key);
     if (!raw) continue;
     const state = JSON.parse(raw) as { month: string };
-    const month = state.month ?? key.split(":").pop();
+    const month = state.month ?? key.split(':').pop();
     if (!month) continue;
     await upsert(
-      "finance_months",
+      'finance_months',
       { user_id: uid, goal_id: FINANCE_GOAL_ID, month, state },
-      "user_id,goal_id,month"
+      'user_id,goal_id,month',
     );
   }
 
   // ✅ Goal progress (daily-life:goals:v1)
-  const goals = localStorage.getItem("daily-life:goals:v1");
+  const goals = localStorage.getItem('daily-life:goals:v1');
   if (goals) {
     const p = JSON.parse(goals);
     for (const [goalId, done] of Object.entries(p.done ?? {})) {
       await upsert(
-        "goal_progress",
+        'goal_progress',
         { user_id: uid, goal_id: goalId, done },
-        "user_id,goal_id"
+        'user_id,goal_id',
       );
     }
   } else {
-    console.warn("No local goals found (daily-life:goals:v1)");
+    console.warn('No local goals found (daily-life:goals:v1)');
   }
 
   if (errors.length) {
-    console.error("Migration errors:", errors);
+    console.error('Migration errors:', errors);
   } else {
-    console.log("✅ Migration complete — moved localStorage data to Supabase");
+    console.log('✅ Migration complete — moved localStorage data to Supabase');
   }
 }
