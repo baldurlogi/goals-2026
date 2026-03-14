@@ -40,7 +40,7 @@ export const DEFAULT_OFFICE_BLOCKS: TimelineItem[] = [
 export const DEFAULT_WEEKEND_BLOCKS: TimelineItem[] = [
   block("wkd-1",  "8:00",       "Wake up",           "Slightly later — you've earned it.",       "⏰"),
   block("wkd-2",  "8:15",       "Breakfast",         "Take your time. Enjoy the morning.",       "🥣"),
-  block("wkd-3",  "9:00",       "Workout / sport",   "Run, swim, gym — whatever you enjoy.",     "🏃"),
+  block("wkd-3",  "9:00",       "Workout",           "Run, swim, gym — whatever you enjoy.",     "🏃"),
   block("wkd-4",  "11:00",      "Errands or chores", "Batch them so the week stays clean.",      "🏠"),
   block("wkd-5",  "13:00",      "Lunch",             "Flexible — eat with family or friends.",   "🥗"),
   block("wkd-6",  "14:00",      "Deep focus (1 hr)", "Side project, learning, or planning.",     "🧠"),
