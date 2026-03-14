@@ -55,8 +55,12 @@
 │   │   ├── achievements
 │   │   │   ├── AchievementModal.tsx
 │   │   │   ├── AchievementPage.tsx
-│   │   │   ├── achievementDefinitions.ts
+│   │   │   ├── achievementAdapters.ts
+│   │   │   ├── achievementConfig.ts
+│   │   │   ├── achievementEngine.ts
+│   │   │   ├── achievementList.ts
 │   │   │   ├── achievementStorage.ts
+│   │   │   ├── achievementTypes.ts
 │   │   │   └── useAchievements.ts
 │   │   ├── ai
 │   │   │   ├── aiSignals.ts
@@ -104,22 +108,32 @@
 │   │   │   │   └── useWeeklyReport.ts
 │   │   │   └── skeletons.tsx
 │   │   ├── fitness
+│   │   │   ├── .DS_Store
 │   │   │   ├── FitnessPage.tsx
 │   │   │   ├── components
 │   │   │   │   ├── AddPRGoalModal.tsx
 │   │   │   │   ├── PRCard.tsx
 │   │   │   │   └── WeeklySplitCard.tsx
-│   │   │   └── fitnessStorage.ts
+│   │   │   ├── constants.ts
+│   │   │   ├── date.ts
+│   │   │   ├── fitnessStorage.ts
+│   │   │   ├── prGoalStorage.ts
+│   │   │   ├── selectors.ts
+│   │   │   ├── types.ts
+│   │   │   └── weeklySplitStorage.ts
 │   │   ├── goals
 │   │   │   ├── .DS_Store
 │   │   │   ├── GoalsPage.tsx
 │   │   │   ├── UpcomingTasksPage.tsx
 │   │   │   ├── UserGoalPage.tsx
 │   │   │   ├── components
+│   │   │   │   ├── AIContextNudge.tsx
+│   │   │   │   ├── AIPromptScreen.tsx
 │   │   │   │   ├── AddEditGoalModal.tsx
 │   │   │   │   ├── GoalCard.tsx
 │   │   │   │   ├── ImproveGoalModal.tsx
-│   │   │   │   └── StepsCard.tsx
+│   │   │   │   ├── StepsCard.tsx
+│   │   │   │   └── generateGoal.ts
 │   │   │   ├── goalStore.tsx
 │   │   │   ├── goalStoreContext.ts
 │   │   │   ├── goalTypes.ts
@@ -257,7 +271,8 @@
 │   │   │   │   └── ReadingNowCard.tsx
 │   │   │   ├── readingStorage.ts
 │   │   │   ├── readingTypes.ts
-│   │   │   └── readingUtils.ts
+│   │   │   ├── readingUtils.ts
+│   │   │   └── useBookLookup.ts
 │   │   ├── schedule
 │   │   │   ├── .DS_Store
 │   │   │   ├── SchedulePage.tsx
@@ -268,6 +283,7 @@
 │   │   │   ├── scheduleStorage.ts
 │   │   │   └── scheduleTypes.ts
 │   │   ├── subscription
+│   │   │   ├── AIUsageLimitNotice.tsx
 │   │   │   ├── UpgradeBanner.tsx
 │   │   │   ├── UpgradePage.tsx
 │   │   │   └── useTier.ts
@@ -294,4 +310,4 @@
 ├── tsconfig.node.json
 └── vite.config.ts
 
-61 directories, 234 files
+61 directories, 250 files

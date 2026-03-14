@@ -175,32 +175,54 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   {
     id: "nutrition_full_day",
     title: "Clean Plate",
-    description: "Logged all 7 meals in a single day.",
+    description: "Logged breakfast, lunch, and dinner in a single day.",
     emoji: "🥇",
     category: "nutrition",
     rarity: "rare",
     check: ({ nutritionLog }) => {
       if (!nutritionLog) return false;
-      return Object.values(nutritionLog.eaten ?? {}).filter(Boolean).length >= 7;
+      const eaten = nutritionLog.eaten ?? {};
+      const hasBreakfast = !!(eaten.breakfast1 || eaten.breakfast2);
+      const hasLunch = !!(eaten.lunchWfh || eaten.lunchOffice);
+      const hasDinner = !!eaten.dinner;
+      return hasBreakfast && hasLunch && hasDinner;
     },
   },
   {
-    id: "nutrition_week_streak",
+    id: "nutrition_logged_7_days",
     title: "Consistent Fueler",
     description: "Logged meals on 7 different days.",
-    emoji: "📅",
+    emoji: "⛽️",
     category: "nutrition",
-    rarity: "epic",
+    rarity: "rare",
     check: ({ nutritionLogsThisWeek }) => nutritionLogsThisWeek >= 7,
   },
   {
+    id: "nutrition_logged_30_days",
+    title: "Nutrition Nerd",
+    description: "Logged meals on 30 different days.",
+    emoji: "📊",
+    category: "nutrition",
+    rarity: "epic",
+    check: ({ nutritionLogsThisWeek }) => nutritionLogsThisWeek >= 30,
+  },
+  {
     id: "nutrition_custom",
-    title: "Chef's Special",
-    description: "Added a custom meal entry.",
-    emoji: "👨‍🍳",
+    title: "Off Menu",
+    description: "Added your first custom meal entry.",
+    emoji: "🍳",
     category: "nutrition",
     rarity: "common",
     check: ({ nutritionLog }) => (nutritionLog?.customEntries ?? []).length > 0,
+  },
+  {
+    id: "nutrition_five_custom",
+    title: "Chef's Special",
+    description: "Added 5 custom meal entries.",
+    emoji: "👨‍🍳",
+    category: "nutrition",
+    rarity: "rare",
+    check: ({ nutritionLog }) => (nutritionLog?.customEntries ?? []).length >= 5,
   },
 
   {

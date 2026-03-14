@@ -1,24 +1,39 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Target, Dumbbell, Apple, BookOpen, CheckSquare, CalendarDays,
+  Target,
+  Dumbbell,
+  Apple,
+  BookOpen,
+  CheckSquare,
+  CalendarDays,
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-  readPRCache,
-  loadPRGoals,
-  currentBest,
-  progressPct,
-  fmtValue,
-} from "@/features/fitness/fitnessStorage";
-import { loadNutritionLog } from "@/features/nutrition/nutritionStorage";
+import { loadNutritionLog, seedNutritionLog } from "@/features/nutrition/nutritionStorage";
 import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
-import { loadReadingInputs, seedReadingInputs, READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
+import {
+  loadReadingInputs,
+  seedReadingInputs,
+  READING_CHANGED_EVENT,
+  getTodayReadingProgress,
+} from "@/features/reading/readingStorage";
 import { listTodos, seedTodos } from "@/features/todos/todoStorage";
-import { loadScheduleLog, loadScheduleTemplates, seedScheduleLog, seedScheduleTemplates } from "@/features/schedule/scheduleStorage";
-import { seedNutritionLog } from "@/features/nutrition/nutritionStorage";
+import {
+  loadScheduleLog,
+  loadScheduleTemplates,
+  seedScheduleLog,
+  seedScheduleTemplates,
+} from "@/features/schedule/scheduleStorage";
+import {
+  loadWeeklySplit,
+  readSplitCache,
+  todayDayKey,
+  todayISO,
+  REST_LABELS,
+} from "@/features/fitness/fitnessStorage";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 
 type ModuleProgress = {
   id: string;
@@ -33,61 +48,143 @@ type ModuleProgress = {
   accentClass: string;
 };
 
-// ── Per-module builders (accept data, no fetching) ────────────────────────────
+type GoalDoneCache = Record<string, boolean | Record<string, boolean>>;
+
+const GOAL_DONE_CACHE_KEYS = ["cache:goals:v1", "cache:goal_steps_done:v1"] as const;
+const MODULE_ORDER = ["goals", "fitness", "nutrition", "reading", "todos", "schedule"];
+
+function clampPct(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(Math.round(value), 0), 100);
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function readDoneCache(): GoalDoneCache {
+  try {
+    for (const key of GOAL_DONE_CACHE_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as GoalDoneCache;
+      }
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+function isStepDone(doneCache: GoalDoneCache, goalId: string, stepId: string): boolean {
+  const byGoal = doneCache[goalId];
+  if (byGoal && typeof byGoal === "object" && !Array.isArray(byGoal)) {
+    return Boolean((byGoal as Record<string, boolean>)[stepId]);
+  }
+  return Boolean(doneCache[stepId]);
+}
+
+function isStepOverdue(idealFinish: string | null | undefined, todayKey: string): boolean {
+  if (!idealFinish) return false;
+  const trimmed = idealFinish.trim();
+  if (!trimmed) return false;
+  return trimmed < todayKey;
+}
 
 function buildGoalsProgress(goals: Awaited<ReturnType<typeof loadUserGoals>>): ModuleProgress {
   if (goals.length === 0) {
     return {
-      id: "goals", label: "Goals", href: "/app/goals",
+      id: "goals",
+      label: "Goals",
+      href: "/app/goals",
       icon: <Target className="h-3.5 w-3.5" />,
-      pct: 0, primaryStat: "No goals yet",
-      color: "rose", accentClass: "bg-rose-500",
+      pct: 0,
+      primaryStat: "No goals yet",
+      color: "rose",
+      accentClass: "bg-rose-500",
     };
   }
-  const totalSteps = goals.reduce((s, g) => s + g.steps.length, 0);
-  const pct = totalSteps === 0 ? 0 : Math.min(
-    Math.round((goals.filter((g) => g.steps.length > 0).length / goals.length) * 100), 100,
-  );
+
+  const doneCache = readDoneCache();
+  const todayKey = getLocalDateKey();
+
+  let overdueTotal = 0;
+  let overdueDone = 0;
+
+  for (const goal of goals) {
+    for (const step of goal.steps) {
+      if (!isStepOverdue(step.idealFinish, todayKey)) continue;
+      overdueTotal += 1;
+      if (isStepDone(doneCache, goal.id, step.id)) {
+        overdueDone += 1;
+      }
+    }
+  }
+
+  if (overdueTotal === 0) {
+    return {
+      id: "goals",
+      label: "Goals",
+      href: "/app/goals",
+      icon: <Target className="h-3.5 w-3.5" />,
+      pct: 100,
+      primaryStat: "Up to date",
+      secondaryStat: "No overdue steps",
+      color: "rose",
+      accentClass: "bg-rose-500",
+    };
+  }
+
+  const overdueRemaining = overdueTotal - overdueDone;
+  const pct = clampPct((overdueDone / overdueTotal) * 100);
+
   return {
-    id: "goals", label: "Goals", href: "/app/goals",
+    id: "goals",
+    label: "Goals",
+    href: "/app/goals",
     icon: <Target className="h-3.5 w-3.5" />,
     pct,
-    primaryStat: `${goals.length} active goal${goals.length !== 1 ? "s" : ""}`,
-    secondaryStat: `${totalSteps} total steps`,
-    color: "rose", accentClass: "bg-rose-500",
+    primaryStat: `${pluralize(overdueRemaining, "overdue step")} left`,
+    secondaryStat: `${overdueDone}/${overdueTotal} overdue cleared`,
+    color: "rose",
+    accentClass: "bg-rose-500",
   };
 }
 
-function buildFitnessProgress(prGoals: ReturnType<typeof readPRCache>): ModuleProgress {
-  const hasData = prGoals.some((g) => g.history.length > 0);
-  if (!hasData) {
-    return {
-      id: "fitness", label: "Fitness", href: "/app/fitness",
-      icon: <Dumbbell className="h-3.5 w-3.5" />,
-      pct: 0, primaryStat: "No PRs yet",
-      color: "violet", accentClass: "bg-violet-500",
-    };
-  }
-  const liftsWithData = prGoals.filter((g) => g.history.length > 0);
-  const avgPct = Math.round(
-    liftsWithData.reduce((sum, g) => sum + progressPct(currentBest(g.history), g.goal), 0) /
-    liftsWithData.length,
-  );
-  const weekAgoISO = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-  const recentPRs = prGoals.reduce(
-    (count, g) => count + g.history.filter((e) => e.date >= weekAgoISO).length, 0,
-  );
-  const topLift = liftsWithData.reduce((top, g) =>
-    progressPct(currentBest(g.history), g.goal) > progressPct(currentBest(top.history), top.goal) ? g : top,
-  );
-  const topBest = currentBest(topLift.history);
+function buildFitnessProgress(
+  split: Awaited<ReturnType<typeof loadWeeklySplit>>,
+): ModuleProgress {
+  const dayKey = todayDayKey();
+  const today = todayISO();
+  const day = split.days[dayKey];
+  const label = day?.label?.trim() || "Workout";
+  const normalized = label.toLowerCase();
+  const isRestDay = REST_LABELS.has(normalized);
+  const isDoneToday = day?.completedDate === today;
+
+  const pct = isRestDay ? 100 : isDoneToday ? 100 : 0;
+
   return {
-    id: "fitness", label: "Fitness", href: "/app/fitness",
+    id: "fitness",
+    label: "Fitness",
+    href: "/app/fitness",
     icon: <Dumbbell className="h-3.5 w-3.5" />,
-    pct: avgPct,
-    primaryStat: `${recentPRs} PR${recentPRs !== 1 ? "s" : ""} this week`,
-    secondaryStat: topBest !== null ? `Best: ${topLift.label} ${fmtValue(topBest, topLift.unit)}` : undefined,
-    color: "violet", accentClass: "bg-violet-500",
+    pct,
+    streak: split.streak ?? 0,
+    primaryStat: isRestDay
+      ? "Rest / recovery day"
+      : isDoneToday
+        ? `${label} done`
+        : `${label} not done yet`,
+    secondaryStat: isRestDay
+      ? "No workout due today"
+      : isDoneToday
+        ? "Marked complete in Fitness"
+        : "Mark today complete in Fitness",
+    color: "violet",
+    accentClass: "bg-violet-500",
   };
 }
 
@@ -95,48 +192,70 @@ function buildNutritionProgress(log: Awaited<ReturnType<typeof loadNutritionLog>
   const mealsLogged = Object.values(log.eaten ?? {}).filter(Boolean).length;
   const customCount = (log.customEntries ?? []).length;
   const itemsLogged = mealsLogged + customCount;
-  const pct = Math.min(Math.round((itemsLogged / 4) * 100), 100);
+  const pct = clampPct((itemsLogged / 4) * 100);
+
   return {
-    id: "nutrition", label: "Nutrition", href: "/app/nutrition",
+    id: "nutrition",
+    label: "Nutrition",
+    href: "/app/nutrition",
     icon: <Apple className="h-3.5 w-3.5" />,
     pct,
-    primaryStat: `${itemsLogged} item${itemsLogged !== 1 ? "s" : ""} logged`,
-    secondaryStat: customCount > 0 ? `${customCount} custom` : undefined,
-    color: "orange", accentClass: "bg-orange-500",
+    primaryStat: `${pluralize(itemsLogged, "meal", "meals")} logged`,
+    secondaryStat:
+      customCount > 0
+        ? `${pluralize(customCount, "custom entry", "custom entries")}`
+        : undefined,
+    color: "orange",
+    accentClass: "bg-orange-500",
   };
 }
 
 function buildReadingProgress(inputs: Awaited<ReturnType<typeof loadReadingInputs>>): ModuleProgress {
-  const current = inputs.current;
-  const totalPages = parseInt(String(current.totalPages)) || 0;
-  const currentPage = parseInt(String(current.currentPage)) || 0;
-  const pct = totalPages > 0 ? Math.min(Math.round((currentPage / totalPages) * 100), 100) : 0;
-  const hasBook = current.title.trim().length > 0;
-  const pagesLeft = totalPages - currentPage;
-  // streak is stored directly on ReadingInputs — no second Supabase call needed
-  const streak = (inputs as { streak?: number }).streak ?? 0;
+  const hasBook = inputs.current.title.trim().length > 0;
+  const streak = inputs.streak ?? 0;
+  const daily = getTodayReadingProgress(inputs);
+
   return {
-    id: "reading", label: "Reading", href: "/app/reading",
+    id: "reading",
+    label: "Reading",
+    href: "/app/reading",
     icon: <BookOpen className="h-3.5 w-3.5" />,
-    pct,
-    primaryStat: hasBook ? `p.${currentPage}/${totalPages}` : "No book set",
-    secondaryStat: hasBook && pagesLeft > 0 ? `${pagesLeft} pages left` : hasBook ? "Finished! 🎉" : undefined,
+    pct: daily.pct,
+    primaryStat: hasBook
+      ? daily.goalPages > 0
+        ? `${daily.pagesRead}/${daily.goalPages} pages today`
+        : `${daily.pagesRead} pages today`
+      : "No book set",
+    secondaryStat: hasBook
+      ? daily.goalPages > 0
+        ? daily.pct >= 100
+          ? "Daily goal hit ✅"
+          : `${Math.max(daily.goalPages - daily.pagesRead, 0)} to goal`
+        : daily.pagesRead > 0
+          ? "Reading logged today"
+          : "Start today's reading"
+      : undefined,
     streak,
-    color: "emerald", accentClass: "bg-emerald-500",
+    color: "emerald",
+    accentClass: "bg-emerald-500",
   };
 }
 
 function buildTodosProgress(todos: Awaited<ReturnType<typeof listTodos>>): ModuleProgress {
   const done = todos.filter((t) => t.done).length;
   const total = todos.length;
-  const pct = total === 0 ? 0 : Math.min(Math.round((done / total) * 100), 100);
+  const pct = total === 0 ? 100 : clampPct((done / total) * 100);
+
   return {
-    id: "todos", label: "To-do", href: "/app/todos",
+    id: "todos",
+    label: "To-do",
+    href: "/app/todos",
     icon: <CheckSquare className="h-3.5 w-3.5" />,
     pct,
     primaryStat: total === 0 ? "All clear!" : `${done}/${total} done`,
     secondaryStat: total > 0 && done === total ? "All complete 🎉" : undefined,
-    color: "sky", accentClass: "bg-sky-500",
+    color: "sky",
+    accentClass: "bg-sky-500",
   };
 }
 
@@ -147,54 +266,61 @@ function buildScheduleProgress(
   const blocks = templates[log.view] ?? [];
   const total = blocks.length;
   const done = log.completed.length;
-  const pct = total === 0 ? 0 : Math.min(Math.round((done / total) * 100), 100);
+  const pct = total === 0 ? 100 : clampPct((done / total) * 100);
+
   return {
-    id: "schedule", label: "Schedule", href: "/app/schedule",
+    id: "schedule",
+    label: "Schedule",
+    href: "/app/schedule",
     icon: <CalendarDays className="h-3.5 w-3.5" />,
     pct,
     primaryStat: total === 0 ? "No blocks today" : `${done}/${total} blocks`,
-    secondaryStat: log.view === "wfh" ? "WFH day" : log.view === "office" ? "Office day" : "Weekend",
-    color: "amber", accentClass: "bg-amber-500",
+    secondaryStat:
+      log.view === "wfh" ? "WFH day" : log.view === "office" ? "Office day" : "Weekend",
+    color: "amber",
+    accentClass: "bg-amber-500",
   };
 }
 
-// ── Seed: read all caches synchronously — zero network, instant paint ─────────
+function sortModules(results: ModuleProgress[]): ModuleProgress[] {
+  return results.sort((a, b) => MODULE_ORDER.indexOf(a.id) - MODULE_ORDER.indexOf(b.id));
+}
 
 function seedProgress(enabledModules: Set<string>): ModuleProgress[] {
   const results: ModuleProgress[] = [];
+
   try {
     if (enabledModules.has("goals")) {
-      const goals = seedUserGoals();
-      if (goals.length > 0) results.push(buildGoalsProgress(goals));
+      results.push(buildGoalsProgress(seedUserGoals()));
     }
+
     if (enabledModules.has("fitness")) {
-      const prGoals = readPRCache();
-      if (prGoals.length > 0) results.push(buildFitnessProgress(prGoals));
+      results.push(buildFitnessProgress(readSplitCache()));
     }
+
     if (enabledModules.has("nutrition")) {
-      const log = seedNutritionLog?.();
-      if (log) results.push(buildNutritionProgress(log));
+      results.push(buildNutritionProgress(seedNutritionLog()));
     }
+
     if (enabledModules.has("reading")) {
-      const inputs = seedReadingInputs?.();
-      if (inputs) results.push(buildReadingProgress(inputs));
+      results.push(buildReadingProgress(seedReadingInputs()));
     }
+
     if (enabledModules.has("todos")) {
-      const todos = seedTodos?.();
-      if (todos) results.push(buildTodosProgress(todos));
+      results.push(buildTodosProgress(seedTodos()));
     }
+
     if (enabledModules.has("schedule")) {
-      const log = seedScheduleLog?.();
-      const templates = seedScheduleTemplates?.();
-      if (log && templates) results.push(buildScheduleProgress(log, templates));
+      const log = seedScheduleLog();
+      const templates = seedScheduleTemplates();
+      results.push(buildScheduleProgress(log, templates));
     }
-  } catch { /* ignore — seed is best-effort */ }
+  } catch {
+    // seed is best-effort only
+  }
 
-  const ORDER = ["goals", "fitness", "nutrition", "reading", "todos", "schedule"];
-  return results.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
+  return sortModules(results);
 }
-
-// ── Async fetch: hits Supabase, updates silently in background ────────────────
 
 async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgress[]> {
   if (enabledModules.size === 0) return [];
@@ -208,7 +334,7 @@ async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgres
     })(),
     (async () => {
       if (!enabledModules.has("fitness")) return;
-      results.push(buildFitnessProgress(await loadPRGoals()));
+      results.push(buildFitnessProgress(await loadWeeklySplit()));
     })(),
     (async () => {
       if (!enabledModules.has("nutrition")) return;
@@ -216,7 +342,6 @@ async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgres
     })(),
     (async () => {
       if (!enabledModules.has("reading")) return;
-      // Single fetch — streak is on ReadingInputs directly, no second call needed
       results.push(buildReadingProgress(await loadReadingInputs()));
     })(),
     (async () => {
@@ -230,11 +355,8 @@ async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgres
     })(),
   ]);
 
-  const ORDER = ["goals", "fitness", "nutrition", "reading", "todos", "schedule"];
-  return results.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
+  return sortModules(results);
 }
-
-// ── UI components ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ pct, accentClass }: { pct: number; accentClass: string }) {
   return (
@@ -269,7 +391,9 @@ function ModuleTile({ item }: { item: ModuleProgress }) {
           </span>
         </div>
       </div>
+
       <ProgressBar pct={item.pct} accentClass={item.accentClass} />
+
       <div className="flex flex-col gap-0.5">
         <span className="text-[11px] font-medium text-foreground leading-tight">
           {item.primaryStat}
@@ -297,136 +421,10 @@ function SkeletonTile() {
   );
 }
 
-type StarterAction = {
-  id: string;
-  label: string;
-  sub: string;
-  href: string;
-  icon: React.ReactNode;
-  accentClass: string;
-};
-
-function getStarterActions(enabledModules: Set<string>): StarterAction[] {
-  const actions: StarterAction[] = [];
-
-  if (enabledModules.has("goals")) {
-    actions.push({
-      id: "goals",
-      label: "Create your first goal",
-      sub: "Break a big goal into steps",
-      href: "/app/goals",
-      icon: <Target className="h-4 w-4" />,
-      accentClass: "bg-rose-500/10 text-rose-500",
-    });
-  }
-
-  if (enabledModules.has("nutrition")) {
-    actions.push({
-      id: "nutrition",
-      label: "Log your first meal",
-      sub: "Start your daily nutrition streak",
-      href: "/app/nutrition",
-      icon: <Apple className="h-4 w-4" />,
-      accentClass: "bg-orange-500/10 text-orange-500",
-    });
-  }
-
-  if (enabledModules.has("reading")) {
-    actions.push({
-      id: "reading",
-      label: "Add your current book",
-      sub: "Track pages and build momentum",
-      href: "/app/reading",
-      icon: <BookOpen className="h-4 w-4" />,
-      accentClass: "bg-emerald-500/10 text-emerald-500",
-    });
-  }
-
-  if (enabledModules.has("fitness")) {
-    actions.push({
-      id: "fitness",
-      label: "Add a PR goal",
-      sub: "Track your first lift or skill",
-      href: "/app/fitness",
-      icon: <Dumbbell className="h-4 w-4" />,
-      accentClass: "bg-violet-500/10 text-violet-500",
-    });
-  }
-
-  if (enabledModules.has("todos")) {
-    actions.push({
-      id: "todos",
-      label: "Add a to-do",
-      sub: "Capture one thing to get done",
-      href: "/app/todos",
-      icon: <CheckSquare className="h-4 w-4" />,
-      accentClass: "bg-sky-500/10 text-sky-500",
-    });
-  }
-
-  if (enabledModules.has("schedule")) {
-    actions.push({
-      id: "schedule",
-      label: "Set today’s schedule",
-      sub: "Create structure for the day",
-      href: "/app/schedule",
-      icon: <CalendarDays className="h-4 w-4" />,
-      accentClass: "bg-amber-500/10 text-amber-500",
-    });
-  }
-
-  return actions.slice(0, 3);
-}
-
-function EmptyProgressState({
-  enabledModules,
-}: {
-  enabledModules: Set<string>;
-}) {
-  const actions = getStarterActions(enabledModules);
-
-  return (
-    <div className="space-y-4 rounded-xl border border-dashed bg-card/30 p-4">
-      <div>
-        <p className="text-sm font-semibold">Start filling your dashboard</p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          As you log meals, goals, reading, workouts, and tasks, your daily
-          progress will appear here.
-        </p>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {actions.map((action) => (
-          <Link
-            key={action.id}
-            to={action.href}
-            className="group flex items-center gap-3 rounded-xl border bg-card px-3 py-3 transition-all hover:shadow-sm hover:ring-1 hover:ring-border"
-          >
-            <span
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${action.accentClass}`}
-            >
-              {action.icon}
-            </span>
-
-            <div className="min-w-0">
-              <div className="text-sm font-semibold leading-tight">
-                {action.label}
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                {action.sub}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
 function OverallRing({ modules }: { modules: ModuleProgress[] }) {
   if (modules.length === 0) return null;
-  const avg = Math.round(modules.reduce((s, m) => s + m.pct, 0) / modules.length);
+
+  const avg = clampPct(modules.reduce((sum, module) => sum + module.pct, 0) / modules.length);
   const circumference = 2 * Math.PI * 18;
   const offset = circumference - (avg / 100) * circumference;
   const label =
@@ -435,15 +433,22 @@ function OverallRing({ modules }: { modules: ModuleProgress[] }) {
     avg >= 40 ? "Building up" :
     avg >= 20 ? "Getting started" :
     "Let's go!";
+
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="relative h-14 w-14">
         <svg className="h-14 w-14 -rotate-90" viewBox="0 0 40 40">
           <circle cx="20" cy="20" r="18" fill="none" strokeWidth="3" className="stroke-muted" />
           <circle
-            cx="20" cy="20" r="18" fill="none" strokeWidth="3"
-            strokeDasharray={circumference} strokeDashoffset={offset}
-            strokeLinecap="round" className="stroke-violet-500 transition-all duration-700"
+            cx="20"
+            cy="20"
+            r="18"
+            fill="none"
+            strokeWidth="3"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="stroke-violet-500 transition-all duration-700"
           />
         </svg>
         <span className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums">
@@ -457,16 +462,10 @@ function OverallRing({ modules }: { modules: ModuleProgress[] }) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 function LifeProgressCardInner() {
   const { modules: enabledModules } = useEnabledModules();
 
-  // Seed synchronously from localStorage — card paints instantly with cached data
-  const [progress, setProgress] = useState<ModuleProgress[]>(() =>
-    seedProgress(enabledModules)
-  );
-  // Only show skeletons on very first load when cache is empty
+  const [progress, setProgress] = useState<ModuleProgress[]>(() => seedProgress(enabledModules));
   const [loading, setLoading] = useState(() => seedProgress(enabledModules).length === 0);
 
   useEffect(() => {
@@ -481,11 +480,11 @@ function LifeProgressCardInner() {
       setLoading(false);
     }
 
-    // Initial fetch — runs in background, never blanks existing content
     void refresh();
 
-    // On module data changes: update silently (no loading flash)
-    const handleChange = () => { void refresh(); };
+    const handleChange = () => {
+      void refresh();
+    };
 
     const events = [
       "fitness:changed",
@@ -496,11 +495,12 @@ function LifeProgressCardInner() {
       "goal_module:changed",
       "goals:changed",
     ];
-    events.forEach((e) => window.addEventListener(e, handleChange));
+
+    events.forEach((eventName) => window.addEventListener(eventName, handleChange));
 
     return () => {
       cancelled = true;
-      events.forEach((e) => window.removeEventListener(e, handleChange));
+      events.forEach((eventName) => window.removeEventListener(eventName, handleChange));
     };
   }, [enabledModules]);
 
@@ -515,39 +515,35 @@ function LifeProgressCardInner() {
               <Target className="h-3.5 w-3.5 text-violet-400" />
             </div>
             <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Today's progress
+              Today&apos;s progress
             </span>
           </div>
           <span className="text-[10px] text-muted-foreground/50">
             {new Date().toLocaleDateString("en-GB", {
-              weekday: "long", day: "numeric", month: "short",
+              weekday: "long",
+              day: "numeric",
+              month: "short",
             })}
           </span>
         </div>
       </CardHeader>
 
       <CardContent className="pb-5">
-        {loading ? (
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-            {Array.from({ length: skeletonCount }).map((_, i) => (
-              <SkeletonTile key={i} />
-            ))}
-          </div>
-        ) : progress.length > 0 ? (
-          <div className="flex items-start gap-5">
+        <div className="flex items-start gap-5">
+          {progress.length > 0 && (
             <div className="hidden shrink-0 sm:flex">
               <OverallRing modules={progress} />
             </div>
+          )}
 
-            <div className="grid min-w-0 flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-              {progress.map((item) => (
-                <ModuleTile key={item.id} item={item} />
-              ))}
-            </div>
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+            {loading
+              ? Array.from({ length: skeletonCount }).map((_, index) => (
+                  <SkeletonTile key={index} />
+                ))
+              : progress.map((item) => <ModuleTile key={item.id} item={item} />)}
           </div>
-        ) : (
-          <EmptyProgressState enabledModules={enabledModules} />
-        )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -558,7 +554,12 @@ export function LifeProgressCard() {
     <ErrorBoundary
       variant="card"
       fallback={(error, reset) => (
-        <CardErrorFallback error={error} onRetry={reset} label="Life Progress" colSpan="lg:col-span-12" />
+        <CardErrorFallback
+          error={error}
+          onRetry={reset}
+          label="Life Progress"
+          colSpan="lg:col-span-12"
+        />
       )}
     >
       <LifeProgressCardInner />
