@@ -2,30 +2,86 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReadingFieldPath, ReadingInputs } from "./readingTypes";
 import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan, updateReadingStreak } from "./readingUtils";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
-import { Flame } from "lucide-react";
-import { ReadingInputsCard } from "./components/ReadingInputsCard";
-import { Button } from "@/components/ui/button";
+import { Flame, BookOpen } from "lucide-react";
 import { ReadingNowCard } from "./components/ReadingNowCard";
 import { ReadingNextCard } from "./components/ReadingNextCard";
+import { ReadingInputsCard } from "./components/ReadingInputsCard";
 import {
   loadReadingInputs,
   saveReadingInputs,
   DEFAULT_READING_INPUTS,
   READING_CHANGED_EVENT,
 } from "./readingStorage";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
+import type { CompletedBook } from "./readingTypes";
+
+function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
+  if (books.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/15">
+          <BookOpen className="h-3.5 w-3.5 text-amber-500" />
+        </div>
+        <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Books finished
+        </span>
+        <span className="ml-auto text-[11px] font-bold text-amber-500">
+          {books.length} {books.length === 1 ? "book" : "books"}
+        </span>
+      </div>
+
+      {/* Book cards */}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        {books.map((b, idx) => {
+          const date = new Date(b.finishedAt);
+          const monthYear = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+          // Pick a medal for the most recent books
+          const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "📖";
+
+          return (
+            <div
+              key={`${b.finishedAt}-${idx}`}
+              className="group relative overflow-hidden rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-3 transition-colors hover:bg-amber-500/10"
+            >
+              {/* Subtle glow on the most recent */}
+              {idx === 0 && (
+                <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-amber-500/20" />
+              )}
+
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 text-xl leading-none">{medal}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold leading-tight">
+                    {b.title || "Untitled"}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {b.author || "Unknown author"}
+                  </p>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground/60">
+                      {b.totalPages} pages
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/40">·</span>
+                    <span className="text-[10px] font-medium text-amber-500/80">
+                      {monthYear}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function ReadingPage() {
-  // ✅ always start with safe defaults
   const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
 
-  // Draft inputs for adding to queue
-  const [draft, setDraft] = useState({ title: "", author: "", totalPages: "" });
-
-  // ✅ hydrate from storage (works for sync or async storage)
   useEffect(() => {
     let cancelled = false;
 
@@ -51,11 +107,9 @@ export function ReadingPage() {
     return getReadingStats(plan);
   }, [inputs]);
 
-  // ✅ helper: compute next state AND persist it immediately
   function setAndPersist(updater: (prev: ReadingInputs) => ReadingInputs) {
     setInputs((prev) => {
       const next = updater(prev);
-      // save can be sync or async — we don’t block UI
       void Promise.resolve(saveReadingInputs(next));
       return next;
     });
@@ -70,32 +124,24 @@ export function ReadingPage() {
     if (digitOnlyPaths.includes(path) && !canAcceptDigitsOrBlank(value)) return;
 
     setAndPersist((prev) => {
-      if (path === "current.title") return { ...prev, current: { ...prev.current, title: value } };
-      if (path === "current.author") return { ...prev, current: { ...prev.current, author: value } };
+      if (path === "current.title")       return { ...prev, current: { ...prev.current, title: value } };
+      if (path === "current.author")      return { ...prev, current: { ...prev.current, author: value } };
       if (path === "current.currentPage") {
         const updated = { ...prev, current: { ...prev.current, currentPage: value } };
-        // Update streak whenever pages are logged
         if (value.trim() && Number(value) > 0) {
           const streakUpdate = updateReadingStreak(prev, getLocalDateKey());
           return { ...updated, ...streakUpdate };
         }
         return updated;
       }
-      if (path === "current.totalPages") return { ...prev, current: { ...prev.current, totalPages: value } };
-      if (path === "dailyGoalPages") return { ...prev, dailyGoalPages: value };
+      if (path === "current.totalPages")  return { ...prev, current: { ...prev.current, totalPages: value } };
+      if (path === "dailyGoalPages")      return { ...prev, dailyGoalPages: value };
       return prev;
     });
   }
 
-  function addToQueue() {
-    if (!draft.title.trim() && !draft.author.trim()) return;
-
-    setAndPersist((prev) => ({
-      ...prev,
-      upNext: [...prev.upNext, { ...draft }],
-    }));
-
-    setDraft({ title: "", author: "", totalPages: "" });
+  function addToQueue(book: { title: string; author: string; totalPages: string }) {
+    setAndPersist((prev) => ({ ...prev, upNext: [...prev.upNext, book] }));
   }
 
   function removeFromQueue(index: number) {
@@ -105,10 +151,13 @@ export function ReadingPage() {
     }));
   }
 
+  function reorderQueue(newQueue: ReadingInputs["upNext"]) {
+    setAndPersist((prev) => ({ ...prev, upNext: newQueue }));
+  }
+
   function markCurrentCompleted() {
     setAndPersist((prev) => {
       const finishedAt = new Date().toISOString();
-
       const totalPagesNum = Math.max(1, parseInt(prev.current.totalPages || "0", 10) || 0);
 
       const completedBook = {
@@ -119,14 +168,8 @@ export function ReadingPage() {
       };
 
       const [next, ...rest] = prev.upNext;
-
       const nextCurrent = next
-        ? {
-            title: next.title,
-            author: next.author,
-            currentPage: "0",
-            totalPages: next.totalPages,
-          }
+        ? { title: next.title, author: next.author, currentPage: "0", totalPages: next.totalPages }
         : { title: "", author: "", currentPage: "", totalPages: "" };
 
       return {
@@ -145,68 +188,15 @@ export function ReadingPage() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      {/* ── Left column: inputs + streak ── */}
       <div className="space-y-4">
         <ReadingInputsCard value={inputs} onChange={updateField} />
-
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={resetAll}>
-            Reset
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={markCurrentCompleted}
-            disabled={!inputs.current.title.trim() && !inputs.current.author.trim()}
-          >
-            Mark current as completed
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Add to Up Next</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Title</Label>
-                <Input value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Author</Label>
-                <Input value={draft.author} onChange={(e) => setDraft((p) => ({ ...p, author: e.target.value }))} />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Total pages</Label>
-                <Input
-                  value={draft.totalPages}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (!canAcceptDigitsOrBlank(v)) return;
-                    setDraft((p) => ({ ...p, totalPages: v }));
-                  }}
-                  placeholder="e.g. 320"
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            <Button onClick={addToQueue} disabled={!draft.title.trim() && !draft.author.trim()}>
-              Add to queue
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="space-y-4">
-        <ReadingNowCard stats={stats} />
 
         {/* Streak card */}
         <Card>
           <CardContent className="flex items-center gap-4 py-4">
             <div className={[
-              "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl",
+              "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
               (inputs.streak ?? 0) > 0 ? "bg-orange-500/15" : "bg-muted",
             ].join(" ")}>
               <Flame className={[
@@ -217,9 +207,7 @@ export function ReadingPage() {
             <div>
               <p className="text-2xl font-bold tabular-nums">
                 {inputs.streak ?? 0}
-                <span className="ml-1 text-sm font-normal text-muted-foreground">
-                  day streak
-                </span>
+                <span className="ml-1 text-sm font-normal text-muted-foreground">day streak</span>
               </p>
               <p className="text-xs text-muted-foreground">
                 {(inputs.streak ?? 0) === 0
@@ -232,30 +220,31 @@ export function ReadingPage() {
           </CardContent>
         </Card>
 
-        <ReadingNextCard queue={inputs.upNext} onRemove={removeFromQueue} />
+        {/* Completed books — visible on mobile here, hidden on desktop */}
+        <div className="lg:hidden">
+          <CompletedBooksSection books={inputs.completed} />
+        </div>
+      </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Completed this year</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {inputs.completed.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No completed books yet.</div>
-            ) : (
-              <div className="space-y-3">
-                {inputs.completed.map((b, idx) => (
-                  <div key={`${b.finishedAt}-${idx}`} className="text-sm">
-                    <div className="font-medium">{b.title || "Untitled"}</div>
-                    <div className="text-muted-foreground">
-                      {b.author || "Unknown author"} · {b.totalPages} pages ·{" "}
-                      {new Date(b.finishedAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* ── Right column: now reading + completed + queue ── */}
+      <div className="space-y-4">
+        <ReadingNowCard
+          stats={stats}
+          onMarkCompleted={markCurrentCompleted}
+          onReset={resetAll}
+        />
+
+        {/* Completed books — visible on desktop here */}
+        <div className="hidden lg:block">
+          <CompletedBooksSection books={inputs.completed} />
+        </div>
+
+        <ReadingNextCard
+          queue={inputs.upNext}
+          onRemove={removeFromQueue}
+          onReorder={reorderQueue}
+          onAdd={addToQueue}
+        />
       </div>
     </div>
   );

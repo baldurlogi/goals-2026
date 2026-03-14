@@ -35,6 +35,15 @@ type ModuleProgress = {
 
 // ── Per-module builders (accept data, no fetching) ────────────────────────────
 
+function readDoneCache(): Record<string, Record<string, boolean>> {
+  try {
+    const raw = localStorage.getItem("cache:goals:v1");
+    return raw ? (JSON.parse(raw) as Record<string, Record<string, boolean>>) : {};
+  } catch {
+    return {};
+  }
+}
+
 function buildGoalsProgress(goals: Awaited<ReturnType<typeof loadUserGoals>>): ModuleProgress {
   if (goals.length === 0) {
     return {
@@ -44,16 +53,19 @@ function buildGoalsProgress(goals: Awaited<ReturnType<typeof loadUserGoals>>): M
       color: "rose", accentClass: "bg-rose-500",
     };
   }
+  const doneCache = readDoneCache();
   const totalSteps = goals.reduce((s, g) => s + g.steps.length, 0);
-  const pct = totalSteps === 0 ? 0 : Math.min(
-    Math.round((goals.filter((g) => g.steps.length > 0).length / goals.length) * 100), 100,
-  );
+  const doneSteps = goals.reduce((s, g) => {
+    const doneMap = doneCache[g.id] ?? {};
+    return s + g.steps.filter((step) => !!doneMap[step.id]).length;
+  }, 0);
+  const pct = totalSteps === 0 ? 0 : Math.min(Math.round((doneSteps / totalSteps) * 100), 100);
   return {
     id: "goals", label: "Goals", href: "/app/goals",
     icon: <Target className="h-3.5 w-3.5" />,
     pct,
     primaryStat: `${goals.length} active goal${goals.length !== 1 ? "s" : ""}`,
-    secondaryStat: `${totalSteps} total steps`,
+    secondaryStat: `${doneSteps}/${totalSteps} steps done`,
     color: "rose", accentClass: "bg-rose-500",
   };
 }
@@ -297,133 +309,6 @@ function SkeletonTile() {
   );
 }
 
-type StarterAction = {
-  id: string;
-  label: string;
-  sub: string;
-  href: string;
-  icon: React.ReactNode;
-  accentClass: string;
-};
-
-function getStarterActions(enabledModules: Set<string>): StarterAction[] {
-  const actions: StarterAction[] = [];
-
-  if (enabledModules.has("goals")) {
-    actions.push({
-      id: "goals",
-      label: "Create your first goal",
-      sub: "Break a big goal into steps",
-      href: "/app/goals",
-      icon: <Target className="h-4 w-4" />,
-      accentClass: "bg-rose-500/10 text-rose-500",
-    });
-  }
-
-  if (enabledModules.has("nutrition")) {
-    actions.push({
-      id: "nutrition",
-      label: "Log your first meal",
-      sub: "Start your daily nutrition streak",
-      href: "/app/nutrition",
-      icon: <Apple className="h-4 w-4" />,
-      accentClass: "bg-orange-500/10 text-orange-500",
-    });
-  }
-
-  if (enabledModules.has("reading")) {
-    actions.push({
-      id: "reading",
-      label: "Add your current book",
-      sub: "Track pages and build momentum",
-      href: "/app/reading",
-      icon: <BookOpen className="h-4 w-4" />,
-      accentClass: "bg-emerald-500/10 text-emerald-500",
-    });
-  }
-
-  if (enabledModules.has("fitness")) {
-    actions.push({
-      id: "fitness",
-      label: "Add a PR goal",
-      sub: "Track your first lift or skill",
-      href: "/app/fitness",
-      icon: <Dumbbell className="h-4 w-4" />,
-      accentClass: "bg-violet-500/10 text-violet-500",
-    });
-  }
-
-  if (enabledModules.has("todos")) {
-    actions.push({
-      id: "todos",
-      label: "Add a to-do",
-      sub: "Capture one thing to get done",
-      href: "/app/todos",
-      icon: <CheckSquare className="h-4 w-4" />,
-      accentClass: "bg-sky-500/10 text-sky-500",
-    });
-  }
-
-  if (enabledModules.has("schedule")) {
-    actions.push({
-      id: "schedule",
-      label: "Set today’s schedule",
-      sub: "Create structure for the day",
-      href: "/app/schedule",
-      icon: <CalendarDays className="h-4 w-4" />,
-      accentClass: "bg-amber-500/10 text-amber-500",
-    });
-  }
-
-  return actions.slice(0, 3);
-}
-
-function EmptyProgressState({
-  enabledModules,
-}: {
-  enabledModules: Set<string>;
-}) {
-  const actions = getStarterActions(enabledModules);
-
-  return (
-    <div className="space-y-4 rounded-xl border border-dashed bg-card/30 p-4">
-      <div>
-        <p className="text-sm font-semibold">Start filling your dashboard</p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          As you log meals, goals, reading, workouts, and tasks, your daily
-          progress will appear here.
-        </p>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {actions.map((action) => (
-          <Link
-            key={action.id}
-            to={action.href}
-            className="group flex items-center gap-3 rounded-xl border bg-card px-3 py-3 transition-all hover:shadow-sm hover:ring-1 hover:ring-border"
-          >
-            <span
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${action.accentClass}`}
-            >
-              {action.icon}
-            </span>
-
-            <div className="min-w-0">
-              <div className="text-sm font-semibold leading-tight">
-                {action.label}
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                {action.sub}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
 function OverallRing({ modules }: { modules: ModuleProgress[] }) {
   if (modules.length === 0) return null;
   const avg = Math.round(modules.reduce((s, m) => s + m.pct, 0) / modules.length);
@@ -527,27 +412,19 @@ function LifeProgressCardInner() {
       </CardHeader>
 
       <CardContent className="pb-5">
-        {loading ? (
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-            {Array.from({ length: skeletonCount }).map((_, i) => (
-              <SkeletonTile key={i} />
-            ))}
-          </div>
-        ) : progress.length > 0 ? (
-          <div className="flex items-start gap-5">
-            <div className="hidden shrink-0 sm:flex">
+        <div className="flex items-start gap-5">
+          {progress.length > 0 && (
+            <div className="hidden sm:flex shrink-0">
               <OverallRing modules={progress} />
             </div>
-
-            <div className="grid min-w-0 flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-              {progress.map((item) => (
-                <ModuleTile key={item.id} item={item} />
-              ))}
-            </div>
+          )}
+          <div className="flex-1 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 min-w-0">
+            {loading
+              ? Array.from({ length: skeletonCount }).map((_, i) => <SkeletonTile key={i} />)
+              : progress.map((item) => <ModuleTile key={item.id} item={item} />)
+            }
           </div>
-        ) : (
-          <EmptyProgressState enabledModules={enabledModules} />
-        )}
+        </div>
       </CardContent>
     </Card>
   );
