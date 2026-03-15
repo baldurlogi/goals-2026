@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Apple, BookOpen, Dumbbell, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { WeeklyReportCard } from "./components/WeeklyReportCard";
 import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
+import { AIUsagePill } from "@/features/subscription/AIUsagePill";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
 
@@ -28,7 +29,7 @@ function QuickAction({
   href,
   color,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   sub: string;
   href: string;
@@ -81,7 +82,9 @@ export default function DashboardPage() {
       if (cancelled) return;
       setGoalCount(fresh.length);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const showEmptyState = goalCount === 0;
@@ -116,7 +119,7 @@ export default function DashboardPage() {
       color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
     },
   ].filter(Boolean) as {
-    icon: React.ReactNode;
+    icon: ReactNode;
     label: string;
     sub: string;
     href: string;
@@ -135,6 +138,8 @@ export default function DashboardPage() {
             {firstName ? ` ${firstName}` : ""} 👋
           </h1>
         </div>
+
+        <AIUsagePill />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
@@ -169,7 +174,7 @@ export default function DashboardPage() {
       </div>
 
       {modules.size === 0 && (
-        <div className="rounded-2xl border border-dashed p-12 text-center space-y-3">
+        <div className="space-y-3 rounded-2xl border border-dashed p-12 text-center">
           <p className="text-lg font-semibold">No modules enabled</p>
           <p className="text-sm text-muted-foreground">
             Go to Profile settings to choose what you want to track.

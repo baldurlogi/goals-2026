@@ -9,10 +9,13 @@ import { buildAISignals } from "@/features/ai/aiSignals";
 import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
+import { AIUsageInlineHint } from "@/features/subscription/AIUsageInlineHint";
+import type { Tier } from "@/features/subscription/useTier";
+import {
+  markAIUsageLimitReached,
+  writeAIUsageCache,
+} from "@/features/subscription/aiUsageCache";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
-
-
-// ── Types ────────────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
   action: string;
@@ -27,20 +30,41 @@ type CacheEntry = {
   builtAt: number;
 };
 
+type CoachUsagePayload = {
+  tier?: Tier;
+  monthly_limit?: number;
+  prompts_used?: number;
+  remaining?: number;
+};
+
+type CoachResponse = {
+  suggestion?: CoachSuggestion;
+  usage?: CoachUsagePayload;
+};
+
+type CoachLimitPayload = {
+  error?: string;
+  message?: string;
+  tier?: Tier;
+  monthly_limit?: number;
+  prompts_used?: number;
+};
+
 class AIUsageLimitError extends Error {
-  constructor(message: string) {
+  tier?: Tier;
+
+  constructor(message: string, tier?: Tier) {
     super(message);
     this.name = "AIUsageLimitError";
+    this.tier = tier;
   }
 }
 
-const CACHE_KEY          = "cache:ai-coach:v1";
-const LAST_MODULE_KEY    = "cache:ai-coach:last-module";
-const LAST_SESSION_KEY   = "cache:ai-coach:last-session:v1";
-const CACHE_TTL          = 60 * 60 * 1000; // 1 hour
+const CACHE_KEY = "cache:ai-coach:v1";
+const LAST_MODULE_KEY = "cache:ai-coach:last-module";
+const LAST_SESSION_KEY = "cache:ai-coach:last-session:v1";
+const CACHE_TTL = 60 * 60 * 1000;
 const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
-
-// ── Cache helpers ─────────────────────────────────────────────────────────────
 
 function readCache(): CoachSuggestion | null {
   try {
@@ -49,25 +73,36 @@ function readCache(): CoachSuggestion | null {
     const entry: CacheEntry = JSON.parse(raw);
     if (Date.now() - entry.builtAt > CACHE_TTL) return null;
     return entry.suggestion;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function writeCache(suggestion: CoachSuggestion) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ suggestion, builtAt: Date.now() }));
-    // Persist the module so next refresh avoids repeating it
     if (suggestion.module) {
       localStorage.setItem(LAST_MODULE_KEY, suggestion.module);
     }
-  } catch { /* storage full */ }
+  } catch {
+    // ignore storage failures
+  }
 }
 
 function clearCache() {
-  try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 function readLastModule(): string | null {
-  try { return localStorage.getItem(LAST_MODULE_KEY); } catch { return null; }
+  try {
+    return localStorage.getItem(LAST_MODULE_KEY);
+  } catch {
+    return null;
+  }
 }
 
 type LastSession = { date: string; goalId: string; goalTitle: string; stepLabel: string };
@@ -77,13 +112,15 @@ function readLastSession(): LastSession | null {
     const raw = localStorage.getItem(LAST_SESSION_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as LastSession;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-// ── Fetch from edge function ──────────────────────────────────────────────────
-
 async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("Not signed in");
 
   const { systemContext } = await buildAIContext();
@@ -93,7 +130,7 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({
       action: "coach",
@@ -103,14 +140,21 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   });
 
   if (res.status === 429) {
-    const data = await res.json().catch(() => ({}));
+    const data = (await res.json().catch(() => ({}))) as CoachLimitPayload;
 
     if (data.error === "rate_limit_exceeded") {
       throw new Error(data.message ?? "Too many requests. Please wait a moment.");
     }
 
+    markAIUsageLimitReached({
+      tier: data.tier,
+      monthly_limit: data.monthly_limit,
+      prompts_used: data.prompts_used,
+    });
+
     throw new AIUsageLimitError(
       data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions.",
+      data.tier,
     );
   }
 
@@ -119,15 +163,18 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
     throw new Error(err.error ?? "Failed to fetch suggestion");
   }
 
-  const data = await res.json();
-  const s = data.suggestion as CoachSuggestion;
+  const data = (await res.json()) as CoachResponse;
+  if (data.usage) {
+    writeAIUsageCache(data.usage);
+  }
 
-  // Validate shape
-  if (!s?.action || !s?.href) throw new Error("Invalid suggestion shape");
-  return s;
+  const suggestion = data.suggestion as CoachSuggestion;
+  if (!suggestion?.action || !suggestion?.href) {
+    throw new Error("Invalid suggestion shape");
+  }
+
+  return suggestion;
 }
-
-// ── Card inner ────────────────────────────────────────────────────────────────
 
 function buildStarterSuggestion(
   signals: Awaited<ReturnType<typeof buildAISignals>>,
@@ -142,10 +189,7 @@ function buildStarterSuggestion(
     };
   }
 
-  if (
-    signals.modules.includes("reading") &&
-    !signals.reading.currentBookTitle
-  ) {
+  if (signals.modules.includes("reading") && !signals.reading.currentBookTitle) {
     return {
       action: "Add your current book",
       reason: "Once a book is set, your coach can help you keep reading momentum.",
@@ -193,10 +237,7 @@ function buildStarterSuggestion(
     };
   }
 
-  if (
-    signals.modules.includes("schedule") &&
-    signals.schedule?.totalBlocks === 0
-  ) {
+  if (signals.modules.includes("schedule") && signals.schedule?.totalBlocks === 0) {
     return {
       action: "Set up today’s schedule",
       reason: "A simple plan makes your next move much easier to choose.",
@@ -209,8 +250,6 @@ function buildStarterSuggestion(
   return null;
 }
 
-
-// Build a static suggestion from priority logic (no AI, no network)
 async function buildStaticSuggestion(): Promise<CoachSuggestion> {
   const signals = await buildAISignals();
 
@@ -239,19 +278,21 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
     schedule: "📅",
   };
 
-  // Check for yesterday's session — if found, prepend continuity to the reason
   const yesterday = (() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
   })();
 
   const session = readLastSession();
   const hasYesterdaySession = session?.date === yesterday;
 
-  const reason = hasYesterdaySession && top.module === "goals" && session.goalId
-    ? `You were working on "${session.goalTitle}" yesterday — keep the momentum going.`
-    : top.reason;
+  const reason =
+    hasYesterdaySession && top.module === "goals" && session.goalId
+      ? `You were working on "${session.goalTitle}" yesterday — keep the momentum going.`
+      : top.reason;
 
   return {
     action: top.action,
@@ -262,53 +303,55 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
   };
 }
 
-
-
-
 function AICoachCardInner() {
   const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(null);
-  const [loading, setLoading]       = useState(true); // true on mount — loads static immediately
-  const [error, setError]           = useState<string | null>(null);
-  const [isAI, setIsAI]             = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isAI, setIsAI] = useState(false);
   const [limitHit, setLimitHit] = useState(false);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const [limitTier, setLimitTier] = useState<Tier | null>(null);
 
-
-  // On mount: always show static priority-based suggestion, ignore stale AI cache
   const loadStatic = useCallback(async () => {
     setLoading(true);
     setError(null);
     setIsAI(false);
     setLimitHit(false);
     setLimitMessage(null);
+    setLimitTier(null);
+
     try {
-      const s = await buildStaticSuggestion();
-      setSuggestion(s);
+      const next = await buildStaticSuggestion();
+      setSuggestion(next);
     } catch (e) {
-      // Fall back to AI cache if static fails
       const cached = readCache();
-      if (cached) { setSuggestion(cached); }
-      else { setError(e instanceof Error ? e.message : "Something went wrong"); }
+      if (cached) {
+        setSuggestion(cached);
+      } else {
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // On refresh button: fetch AI suggestion
   const loadAI = useCallback(async () => {
     setLoading(true);
     setError(null);
     setLimitHit(false);
     setLimitMessage(null);
+    setLimitTier(null);
+
     try {
-      const s = await fetchCoachSuggestion();
-      writeCache(s);
-      setSuggestion(s);
+      const next = await fetchCoachSuggestion();
+      writeCache(next);
+      setSuggestion(next);
       setIsAI(true);
     } catch (e) {
       if (e instanceof AIUsageLimitError) {
         setLimitHit(true);
         setLimitMessage(e.message);
+        setLimitTier(e.tier ?? null);
         setError(null);
       } else {
         setError(e instanceof Error ? e.message : "Something went wrong");
@@ -318,7 +361,6 @@ function AICoachCardInner() {
     }
   }, []);
 
-  // Load static on mount
   useEffect(() => {
     void loadStatic();
 
@@ -328,7 +370,6 @@ function AICoachCardInner() {
     }
 
     window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
-
     return () => {
       window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
     };
@@ -337,17 +378,14 @@ function AICoachCardInner() {
   function handleRefresh() {
     clearCache();
     if (isAI) {
-      // Already showing AI — get a new static suggestion first, then AI
       void loadStatic();
     } else {
-      // Upgrade to AI suggestion
       void loadAI();
     }
   }
 
   return (
     <Card className="relative overflow-hidden lg:col-span-12">
-      {/* Animated gradient top border */}
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-fuchsia-400 via-pink-400 to-orange-400" />
 
       <CardHeader className="pb-3 pt-5">
@@ -374,7 +412,6 @@ function AICoachCardInner() {
       </CardHeader>
 
       <CardContent className="pb-5">
-        {/* Loading state */}
         {loading && !suggestion && (
           <div className="flex items-center gap-3 py-1">
             <div className="flex gap-1">
@@ -386,11 +423,10 @@ function AICoachCardInner() {
           </div>
         )}
 
-        {/* Error state */}
         {error && !suggestion && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Couldn't load your next suggestion right now.
+              Couldn&apos;t load your next suggestion right now.
             </p>
 
             <div className="flex flex-wrap gap-2">
@@ -412,40 +448,32 @@ function AICoachCardInner() {
           </div>
         )}
 
-        {/* Limit hit */}
         {limitHit && (
           <AIUsageLimitNotice
+            tier={limitTier ?? undefined}
             feature="AI coach refresh"
             message={limitMessage ?? undefined}
             className="mb-4"
           />
         )}
 
-        {/* Suggestion */}
         {suggestion && (
           <div className="flex items-center gap-4">
-            {/* Emoji badge */}
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-2xl">
               {suggestion.emoji}
             </div>
 
-            {/* Text */}
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold leading-snug">
-                {loading ? (
-                  <span className="text-muted-foreground">Refreshing…</span>
-                ) : (
-                  suggestion.action
-                )}
+                {loading ? <span className="text-muted-foreground">Refreshing…</span> : suggestion.action}
               </p>
               {suggestion.reason && !loading && (
-                <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   {suggestion.reason}
                 </p>
               )}
             </div>
 
-            {/* CTA */}
             {!loading && (
               <Button asChild size="sm" className="shrink-0 gap-1.5">
                 <Link to={suggestion.href}>
@@ -456,17 +484,22 @@ function AICoachCardInner() {
           </div>
         )}
 
-        {/* Powered by badge */}
-        <div className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground/40">
-          <Zap className="h-2.5 w-2.5" />
-          <span>{isAI ? "AI-powered suggestion" : "Smart suggestion · hit ↻ for AI"} · uses your goals, fitness, reading & nutrition data</span>
+        <div className="mt-3 space-y-2">
+          {!limitHit && (
+            <AIUsageInlineHint actionLabel="Refreshing for an AI suggestion uses 1 AI prompt" />
+          )}
+
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground/40">
+            <Zap className="h-2.5 w-2.5" />
+            <span>
+              {isAI ? 'AI-powered suggestion' : 'Smart suggestion · hit ↻ for AI'} · uses your goals, fitness, reading & nutrition data
+            </span>
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
-
-// ── Export with error boundary ────────────────────────────────────────────────
 
 export function AICoachCard() {
   return (

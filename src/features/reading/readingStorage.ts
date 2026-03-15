@@ -8,6 +8,28 @@ const STORAGE_KEY = "daily-life:reading:v2";
 const READING_DAILY_PROGRESS_KEY = "cache:reading:today-progress:v1";
 const AI_SIGNALS_CACHE_KEY = "cache:ai-signals:v1";
 
+const READING_HISTORY_KEY = "cache:reading:history:v1";
+
+export type ReadingHistoryEntry = {
+  date: string;
+  bookKey: string;
+  title: string;
+  author: string;
+  totalPages: number;
+  goalPages: number;
+  baselinePage: number;
+  latestPage: number;
+  pagesRead: number;
+  updatedAt: string;
+};
+
+export type WeeklyReadingSummary = {
+  pagesRead: number;
+  goalPages: number;
+  daysRead: number;
+  dataCompleteness: "complete" | "partial" | "unknown";
+};
+
 type ReadingDailyProgressCache = {
   date: string;
   bookKey: string;
@@ -31,6 +53,7 @@ function clearAISignalsCache() {
 }
 
 export const READING_CHANGED_EVENT = "daily-life:reading:changed";
+
 
 function emitReadingChanged() {
   if (typeof window !== "undefined") {
@@ -98,6 +121,55 @@ function clearDailyProgressCache() {
   } catch {
     // ignore
   }
+}
+
+function readReadingHistoryCache(): ReadingHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(READING_HISTORY_KEY);
+    return raw ? (JSON.parse(raw) as ReadingHistoryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeReadingHistoryCache(entries: ReadingHistoryEntry[]) {
+  try {
+    localStorage.setItem(READING_HISTORY_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore
+  }
+}
+
+function upsertReadingHistoryEntry(
+  inputs: ReadingInputs,
+  cache: ReadingDailyProgressCache,
+  goalPages: number,
+) {
+  const title = inputs.current.title.trim();
+  const author = inputs.current.author.trim();
+  const totalPages = parsePage(inputs.current.totalPages);
+
+  if (!cache.bookKey.trim()) return;
+
+  const entry: ReadingHistoryEntry = {
+    date: cache.date,
+    bookKey: cache.bookKey,
+    title,
+    author,
+    totalPages,
+    goalPages,
+    baselinePage: cache.baselinePage,
+    latestPage: cache.latestPage,
+    pagesRead: Math.max(cache.latestPage - cache.baselinePage, 0),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const existing = readReadingHistoryCache().filter(
+    (item) => !(item.date === entry.date && item.bookKey === entry.bookKey),
+  );
+
+  existing.push(entry);
+  writeReadingHistoryCache(existing);
 }
 
 function createProgressSnapshot(
@@ -177,6 +249,7 @@ function syncTodayReadingProgress(
   }
 
   writeDailyProgressCache(nextCache);
+  upsertReadingHistoryEntry(nextInputs, nextCache, goalPages);
 
   const pagesRead = Math.max(nextCache.latestPage - nextCache.baselinePage, 0);
   const pct =
@@ -333,4 +406,33 @@ export function seedReadingInputs(): ReadingInputs {
     syncTodayReadingProgress(DEFAULT_READING_INPUTS);
     return DEFAULT_READING_INPUTS;
   }
+}
+
+export function getWeeklyReadingSummary(
+  inputs: ReadingInputs,
+  weekStart: string,
+  weekEnd: string,
+): WeeklyReadingSummary {
+  const history = readReadingHistoryCache()
+    .filter((entry) => entry.date >= weekStart && entry.date <= weekEnd)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const dedupedByDay = new Map<string, ReadingHistoryEntry>();
+  for (const entry of history) {
+    const existing = dedupedByDay.get(entry.date);
+    if (!existing || entry.updatedAt > existing.updatedAt) {
+      dedupedByDay.set(entry.date, entry);
+    }
+  }
+
+  const entries = Array.from(dedupedByDay.values());
+  const goalPages = parseGoalPages(inputs.dailyGoalPages);
+
+  return {
+    pagesRead: entries.reduce((sum, entry) => sum + Math.max(entry.pagesRead, 0), 0),
+    goalPages,
+    daysRead: entries.length,
+    dataCompleteness:
+      entries.length >= 5 ? "complete" : entries.length > 0 ? "partial" : "unknown",
+  };
 }

@@ -3,16 +3,15 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles, SkipForward } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Link } from "react-router-dom";
 import type { UserGoal } from '../goalTypes';
-import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
-import type { Tier } from "@/features/subscription/useTier";
+import { AIUsageLimitNotice } from '@/features/subscription/AIUsageLimitNotice';
+import { AIUsageInlineHint } from '@/features/subscription/AIUsageInlineHint';
+import type { Tier } from '@/features/subscription/useTier';
 import {
   generateGoalFromPrompt,
   getClarifyingQuestions,
   AILimitError,
   PROMPT_EXAMPLES,
-  type AIUsage,
   type ClarifyingQuestion,
 } from './generateGoal';
 
@@ -33,14 +32,12 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [limitHit, setLimitHit] = useState(false);
   const [limitTier, setLimitTier] = useState('free');
-  const [usage, setUsage] = useState<AIUsage | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (screen === 'prompt') textareaRef.current?.focus();
   }, [screen]);
 
-  // Step 1 — fetch clarifying questions
   async function handleNext() {
     if (!prompt.trim()) return;
     setLoadingQuestions(true);
@@ -52,14 +49,12 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
       setAnswers({});
       setScreen('clarifying');
     } catch {
-      // If clarification call fails, skip straight to generation
       await handleGenerate({});
     } finally {
       setLoadingQuestions(false);
     }
   }
 
-  // Step 2 — generate with answers (or skipped)
   async function handleGenerate(answersOverride?: Record<string, string>) {
     setLoadingGoal(true);
     setScreen('generating');
@@ -69,11 +64,7 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
     const finalAnswers = answersOverride ?? answers;
 
     try {
-      const { goal, usage: u } = await generateGoalFromPrompt(
-        prompt.trim(),
-        finalAnswers,
-      );
-      setUsage(u);
+      const { goal } = await generateGoalFromPrompt(prompt.trim(), finalAnswers);
       onGenerated(goal);
     } catch (e) {
       if (e instanceof AILimitError) {
@@ -89,7 +80,6 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
     }
   }
 
-  // ── Limit reached ──────────────────────────────────────────────────────
   if (limitHit) {
     return (
       <div className="flex flex-1 items-center justify-center px-5 py-10">
@@ -104,7 +94,6 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
     );
   }
 
-  // ── Generating screen ──────────────────────────────────────────────────
   if (screen === 'generating') {
     return (
       <div className="flex flex-1 items-center justify-center px-5 py-10">
@@ -125,7 +114,6 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
     );
   }
 
-  // ── Clarifying questions screen ────────────────────────────────────────
   if (screen === 'clarifying') {
     return (
       <div className="flex flex-col flex-1 overflow-y-auto px-5 py-5 space-y-5">
@@ -135,7 +123,7 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
             <span className="text-sm font-semibold">A few quick questions</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Answer these so Claude can make your plan specific to you. Skip any you're not sure about.
+            Answer these so Claude can make your plan specific to you. Skip any you&apos;re not sure about.
           </p>
         </div>
 
@@ -148,9 +136,7 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
           {questions.map((q) => (
             <div key={q.id} className="space-y-1.5">
               <label className="text-sm font-medium">{q.question}</label>
-              {q.hint && (
-                <p className="text-xs text-muted-foreground">{q.hint}</p>
-              )}
+              {q.hint && <p className="text-xs text-muted-foreground">{q.hint}</p>}
               <Input
                 placeholder={q.placeholder ?? 'Your answer…'}
                 value={answers[q.id] ?? ''}
@@ -170,6 +156,8 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
             {error}
           </div>
         )}
+
+        <AIUsageInlineHint actionLabel="Generating this plan uses 1 AI prompt" />
 
         <div className="flex items-center justify-between gap-3 pt-1">
           <Button
@@ -215,7 +203,6 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
     );
   }
 
-  // ── Prompt screen (default) ────────────────────────────────────────────
   return (
     <div className="flex flex-col flex-1 overflow-y-auto px-5 py-5 space-y-5">
       <div className="space-y-1">
@@ -247,23 +234,7 @@ export function AIPromptScreen({ onGenerated, onBack }: Props) {
         </div>
       )}
 
-      {usage && (
-        <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          <Sparkles className="h-3 w-3 shrink-0 text-primary" />
-          <span>
-            <span className="font-semibold text-foreground">{usage.remaining}</span>{' '}
-            AI prompts remaining this month
-            {usage.tier !== 'pro_max' && (
-              <>
-                {' '}·{' '}
-                <Link to="/app/upgrade" className="underline hover:text-foreground">
-                  Upgrade for more
-                </Link>
-              </>
-            )}
-          </span>
-        </div>
-      )}
+      <AIUsageInlineHint actionLabel="Generating a goal plan uses 1 AI prompt" />
 
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">Try an example</p>
