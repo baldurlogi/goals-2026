@@ -1,6 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
 import type { ModuleId } from "@/features/modules/modules";
-import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
 export type Sex = "male" | "female";
 export type ActivityLevel =
@@ -35,6 +34,12 @@ export type UserProfile = {
   tier: "free" | "pro" | "pro_max";
 };
 
+const LEGACY_CACHE_KEY = "cache:profile:v1";
+
+function profileCacheKey(userId: string) {
+  return `cache:profile:v2:${userId}`;
+}
+
 export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   sedentary: "Sedentary (desk job, little/no exercise)",
   light: "Light (1-3 workouts/week)",
@@ -56,7 +61,7 @@ export function calculateTDEE(
   height_cm: number,
   age: number,
   sex: Sex,
-  activity: ActivityLevel
+  activity: ActivityLevel,
 ): number {
   const bmr =
     sex === "male"
@@ -71,7 +76,7 @@ export function calculateMacros(
   height_cm: number,
   age: number,
   sex: Sex,
-  activity: ActivityLevel
+  activity: ActivityLevel,
 ): { maintain: MacroTargets; cut: MacroTargets } {
   const tdee = calculateTDEE(weight_kg, height_cm, age, sex, activity);
 
@@ -96,8 +101,6 @@ export function calculateMacros(
     },
   };
 }
-
-const CACHE_KEY = CACHE_KEYS.PROFILE;
 
 export const PROFILE_CHANGED_EVENT = "profile:changed";
 const emitProfileChanged = () =>
@@ -144,8 +147,11 @@ export function clearProfileState(): void {
 
 function writeProfileCache(profile: UserProfile) {
   try {
-    assertRegisteredCacheWrite(CACHE_KEY);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+    localStorage.setItem(
+      profileCacheKey(profile.id),
+      JSON.stringify(profile),
+    );
+    localStorage.removeItem(LEGACY_CACHE_KEY);
   } catch (e) {
     console.warn("write cache failed", e);
   }
@@ -161,13 +167,9 @@ export async function loadProfile(): Promise<UserProfile | null> {
     return null;
   }
 
-  const cached = readProfileCache();
-  if (cached && cached.id !== user.id) {
-    try {
-      localStorage.removeItem(CACHE_KEY);
-    } catch {
-      // Ignore cache storage failures.
-    }
+  const cached = readProfileCache(user.id);
+  if (cached) {
+    return cached;
   }
 
   const inFlight = inFlightProfileLoads.get(user.id);
@@ -199,7 +201,7 @@ export async function loadProfile(): Promise<UserProfile | null> {
 }
 
 export async function saveProfile(
-  patch: Partial<Omit<UserProfile, "id">>
+  patch: Partial<Omit<UserProfile, "id">>,
 ): Promise<void> {
   const {
     data: { user },
@@ -224,7 +226,7 @@ export async function saveProfile(
 }
 
 export async function completeOnboarding(
-  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">
+  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">,
 ): Promise<void> {
   const {
     data: { user },
@@ -239,7 +241,7 @@ export async function completeOnboarding(
           profile.height_cm,
           profile.age,
           profile.sex,
-          profile.activity_level
+          profile.activity_level,
         )
       : null;
 
