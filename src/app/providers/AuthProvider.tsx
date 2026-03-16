@@ -4,15 +4,36 @@ import { supabase } from "@/lib/supabaseClient";
 import { AuthContext } from "@/features/auth/authContext";
 import { clearUserCache } from "@/lib/clearUserCache";
 
-function getCachedProfileUserId(): string | null {
+function hasCachedProfileMismatch(nextUserId: string | null): boolean {
   try {
-    const raw = localStorage.getItem("cache:profile:v1");
-    if (!raw) return null;
+    const legacyRaw = localStorage.getItem("cache:profile:v1");
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw) as { id?: unknown };
+      const legacyId = typeof parsed.id === "string" ? parsed.id : null;
 
-    const parsed = JSON.parse(raw) as { id?: unknown };
-    return typeof parsed.id === "string" ? parsed.id : null;
+      if (
+        (nextUserId === null && legacyId !== null) ||
+        (nextUserId !== null && legacyId !== null && legacyId !== nextUserId)
+      ) {
+        return true;
+      }
+    }
+
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      if (key.startsWith("cache:profile:v2:")) {
+        const cachedUserId = key.replace("cache:profile:v2:", "");
+        if (nextUserId === null || cachedUserId !== nextUserId) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -31,14 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userChanged =
       previousUserId !== undefined && previousUserId !== nextUserId;
 
-    const cachedProfileUserId = checkCacheMismatch ? getCachedProfileUserId() : null;
-
-    const cachedMismatch =
-      checkCacheMismatch &&
-      ((nextUserId === null && cachedProfileUserId !== null) ||
-        (nextUserId !== null &&
-          cachedProfileUserId !== null &&
-          cachedProfileUserId !== nextUserId));
+    const cachedMismatch = checkCacheMismatch
+      ? hasCachedProfileMismatch(nextUserId)
+      : false;
 
     if (userChanged || cachedMismatch) {
       clearUserCache();

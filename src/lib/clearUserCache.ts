@@ -1,59 +1,28 @@
-/**
- * Clears all per-user localStorage caches.
- * Call this on sign-out and when a different user signs in.
- */
-export function clearUserCache(): void {
-  // Exact known keys
-  const exactKeys = [
-    "cache:ai-coach:v1",
-    "cache:achievements:v1",
-    "cache:user-tier:v1",
-    "cache:profile:v1",
-    "cache:user_goals:v1",
-    "cache:fitness:v1",
-    "cache:nutrition_log:v1",
-    "cache:nutrition_phase:v1",
-    "cache:schedule:templates:v1",
-    "cache:schedule_log:v1",
-    "cache:todos:v1",
-    "cache:goals:v1",
-    "daily-life:reading:v2",
-    "daily-life:fitness:streak:fitness-nutrition:v1",
-    "daily-life:goals:metric:finance:saved",
-    "daily-life:goals:v1",
-    "goals_v1",
-    "todos_v1",
-    "schedule_log_v1",
-    "nutrition_log_v1",
-    "nutrition_phase_v1",
-    "nutrition_saved_meals_v1",
-    "fitness_prs_v1",
-  ];
-
-  exactKeys.forEach((key) => {
-    try { localStorage.removeItem(key); } catch {
-      return;
-    }
-  });
-
-  // Prefix-based sweep — catches dynamic keys like:
-  // goals:frontend-roadmap:*, goals:reading-12-books:*, cache:finance:finance:*
-  const prefixes = [
-    "goals:",
-    "cache:finance:",
-    "daily-life:goals:",
-  ];
-
+export function clearUserCache() {
   try {
-    const allKeys = Object.keys(localStorage);
-    allKeys.forEach((key) => {
-      if (prefixes.some((p) => key.startsWith(p))) {
-        try { localStorage.removeItem(key); } catch {
-          return;
-        }
+    const keysToRemove: string[] = [];
+
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      if (
+        key === "cache:profile:v1" ||
+        key === "cache:ai-coach:v1" ||
+        key === "cache:ai-coach:last-module" ||
+        key === "cache:ai-coach:last-session:v1" ||
+        key === "cache:user-tier:v1" ||
+        key.startsWith("cache:profile:v2:") ||
+        key.startsWith("cache:ai-coach:v2:") ||
+        key.startsWith("cache:ai-coach:last-module:v2:") ||
+        key.startsWith("cache:ai-coach:last-session:v2:")
+      ) {
+        keysToRemove.push(key);
       }
-    });
+    }
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
   } catch {
-    return;
+    // ignore
   }
 }

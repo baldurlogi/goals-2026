@@ -96,7 +96,11 @@ export function calculateMacros(
   };
 }
 
-const CACHE_KEY = "cache:profile:v1";
+const LEGACY_CACHE_KEY = "cache:profile:v1";
+
+function profileCacheKey(userId: string) {
+  return `cache:profile:v2:${userId}`;
+}
 
 export const PROFILE_CHANGED_EVENT = "profile:changed";
 const emitProfileChanged = () =>
@@ -123,10 +127,15 @@ function defaultProfile(id: string): UserProfile {
   };
 }
 
-export function readProfileCache(): UserProfile | null {
+export function readProfileCache(userId?: string | null): UserProfile | null {
+  if (!userId) return null;
+
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as UserProfile) : null;
+    const raw = localStorage.getItem(profileCacheKey(userId));
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as UserProfile;
+    return parsed.id === userId ? parsed : null;
   } catch {
     return null;
   }
@@ -134,7 +143,8 @@ export function readProfileCache(): UserProfile | null {
 
 function writeProfileCache(profile: UserProfile) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+    localStorage.setItem(profileCacheKey(profile.id), JSON.stringify(profile));
+    localStorage.removeItem(LEGACY_CACHE_KEY);
   } catch (e) {
     console.warn("write cache failed", e);
   }
@@ -148,6 +158,11 @@ export async function loadProfile(): Promise<UserProfile | null> {
   if (!user) {
     inFlightProfileLoad = null;
     return null;
+  }
+
+  const cached = readProfileCache(user.id);
+  if (cached) {
+    return cached;
   }
 
   if (inFlightProfileLoad) {
@@ -190,7 +205,7 @@ export async function saveProfile(
 
   if (error) throw error;
 
-  const cached = readProfileCache();
+  const cached = readProfileCache(user.id);
   const next = cached
     ? ({ ...cached, ...patch } as UserProfile)
     : ({ ...defaultProfile(user.id), ...patch } as UserProfile);

@@ -16,7 +16,7 @@ import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
 import { AIUsagePill } from "@/features/subscription/AIUsagePill";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
-import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
+import { loadUserGoals } from "@/features/goals/userGoalStorage";
 
 const ReadingCard = lazy(async () => ({
   default: (await import("./components/ReadingCard")).ReadingCard,
@@ -172,9 +172,7 @@ export default function DashboardPage() {
   const isPro = tierMeets(tier, "pro");
   const has = (id: string) => modules.has(id as never);
 
-  const [goalCount, setGoalCount] = useState<number | null>(() =>
-    seedUserGoals().length
-  );
+  const [goalCount, setGoalCount] = useState<number | null>(null);
 
   const showStageOne = useDeferredMount(120);
   const showStageTwo = useDeferredMount(700);
