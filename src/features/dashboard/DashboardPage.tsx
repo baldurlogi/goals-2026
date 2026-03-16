@@ -157,7 +157,9 @@ export default function DashboardPage() {
   const isPro = tierMeets(tier, "pro");
   const has = (id: string) => modules.has(id as never);
 
-  const [goalCount, setGoalCount] = useState<number | null>(null);
+  const [goalCount, setGoalCount] = useState<number | null>(() => {
+    return seedUserGoals().length;
+  });
 
   const showTopEnhancements = useDeferredMount(120);
   const showStageOne = useDeferredMount(260);

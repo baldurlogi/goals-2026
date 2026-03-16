@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import type { User } from "@supabase/supabase-js";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/authContext";
 import {
   loadProfile,
@@ -8,35 +7,45 @@ import {
 } from "@/features/onboarding/profileStorage";
 import { OnboardingFlow } from "./OnboardingFlow";
 
-type Props = { children: React.ReactNode };
-
-type InnerProps = Props & {
-  user: User | null;
+type Props = {
+  children: React.ReactNode;
 };
 
-function RequireOnboardingForUser({ user, children }: InnerProps) {
-  const [profile, setProfile] = useState<UserProfile | null>(() => {
-    const cached = readProfileCache();
-    if (!user) return null;
-    if (cached?.id && cached.id !== user.id) return null;
-    return cached;
-  });
-  const [checking, setChecking] = useState(Boolean(user));
-  const userIdRef = useRef<string | null>(user?.id ?? null);
+export function RequireOnboarding({ children }: Props) {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const currentUserId = user?.id ?? null;
-    userIdRef.current = currentUserId;
+    let cancelled = false;
 
-    if (!user) return;
+    if (!userId) {
+      setProfile(null);
+      setChecking(false);
+      return;
+    }
 
-    void loadProfile().then((p) => {
-      if (userIdRef.current !== currentUserId) return;
-      if (p && p.id !== currentUserId) return;
+    const cached = readProfileCache(userId);
 
-      setProfile(p);
+    if (cached) {
+      setProfile(cached);
+      setChecking(false);
+    } else {
+      setChecking(true);
+    }
+
+    void loadProfile().then((fresh) => {
+      if (cancelled) return;
+      setProfile(fresh ?? cached ?? null);
       setChecking(false);
     });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   if (checking) return null;
 
@@ -44,13 +53,9 @@ function RequireOnboardingForUser({ user, children }: InnerProps) {
     return (
       <OnboardingFlow
         onComplete={() => {
-          const currentUserId = userIdRef.current;
-          if (!currentUserId) return;
-
-          void loadProfile().then((nextProfile) => {
-            if (userIdRef.current !== currentUserId) return;
-            if (nextProfile && nextProfile.id !== currentUserId) return;
-            setProfile(nextProfile);
+          void loadProfile().then((fresh) => {
+            setProfile(fresh);
+            setChecking(false);
           });
         }}
       />
@@ -58,14 +63,4 @@ function RequireOnboardingForUser({ user, children }: InnerProps) {
   }
 
   return <>{children}</>;
-}
-
-export function RequireOnboarding({ children }: Props) {
-  const { user } = useAuth();
-
-  return (
-    <RequireOnboardingForUser key={user?.id ?? "anonymous"} user={user}>
-      {children}
-    </RequireOnboardingForUser>
-  );
 }
