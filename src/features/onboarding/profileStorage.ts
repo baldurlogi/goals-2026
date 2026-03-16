@@ -102,7 +102,7 @@ export const PROFILE_CHANGED_EVENT = "profile:changed";
 const emitProfileChanged = () =>
   window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
 
-let inFlightProfileLoad: Promise<UserProfile | null> | null = null;
+const inFlightProfileLoads = new Map<string, Promise<UserProfile | null>>();
 
 function defaultProfile(id: string): UserProfile {
   return {
@@ -132,6 +132,10 @@ export function readProfileCache(): UserProfile | null {
   }
 }
 
+export function clearProfileState(): void {
+  inFlightProfileLoads.clear();
+}
+
 function writeProfileCache(profile: UserProfile) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
@@ -146,15 +150,25 @@ export async function loadProfile(): Promise<UserProfile | null> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    inFlightProfileLoad = null;
+    clearProfileState();
     return null;
   }
 
-  if (inFlightProfileLoad) {
-    return inFlightProfileLoad;
+  const cached = readProfileCache();
+  if (cached && cached.id !== user.id) {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch {
+      // Ignore cache storage failures.
+    }
   }
 
-  inFlightProfileLoad = (async () => {
+  const inFlight = inFlightProfileLoads.get(user.id);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const loadPromise = (async () => {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -168,10 +182,12 @@ export async function loadProfile(): Promise<UserProfile | null> {
     return profile;
   })();
 
+  inFlightProfileLoads.set(user.id, loadPromise);
+
   try {
-    return await inFlightProfileLoad;
+    return await loadPromise;
   } finally {
-    inFlightProfileLoad = null;
+    inFlightProfileLoads.delete(user.id);
   }
 }
 
@@ -196,7 +212,7 @@ export async function saveProfile(
     : ({ ...defaultProfile(user.id), ...patch } as UserProfile);
 
   writeProfileCache(next);
-  inFlightProfileLoad = null;
+  inFlightProfileLoads.delete(user.id);
   emitProfileChanged();
 }
 
