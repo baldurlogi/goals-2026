@@ -1,11 +1,12 @@
 import { supabase } from '@/lib/supabaseClient';
+import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
 import type { UnlockedAchievement } from './achievementTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 export const ACHIEVEMENTS_CHANGED_EVENT = 'achievements:changed';
 
 const emit = () => window.dispatchEvent(new Event(ACHIEVEMENTS_CHANGED_EVENT));
-const CACHE_KEY = 'cache:achievements:v1';
+const CACHE_KEY = CACHE_KEYS.ACHIEVEMENTS;
 
 function readCache(): UnlockedAchievement[] {
   try {
@@ -18,6 +19,7 @@ function readCache(): UnlockedAchievement[] {
 
 function writeCache(achievements: UnlockedAchievement[]) {
   try {
+    assertRegisteredCacheWrite(CACHE_KEY);
     localStorage.setItem(CACHE_KEY, JSON.stringify(achievements));
   } catch {
     // ignore

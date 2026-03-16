@@ -2,8 +2,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { FITNESS_CHANGED_EVENT } from "./constants";
 import { todayISO } from "./date";
 import type { MetricType, PREntry, PRCategory, PRGoal } from "./types";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
-const PR_CACHE_KEY = "cache:fitness_prs:v1";
+const PR_CACHE_KEY = CACHE_KEYS.FITNESS_PRS;
 
 function emit() {
   if (typeof window !== "undefined") {
@@ -44,6 +45,7 @@ export function readPRCache(): PRGoal[] {
 
 function writePRCache(goals: PRGoal[]): void {
   try {
+    assertRegisteredCacheWrite(PR_CACHE_KEY);
     localStorage.setItem(PR_CACHE_KEY, JSON.stringify(goals));
   } catch {
     // ignore

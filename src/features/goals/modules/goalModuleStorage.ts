@@ -1,17 +1,18 @@
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { storageError, storageOk, type StorageMutationResult } from '@/lib/storageResult';
+import { cacheKeyBuilders, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
 import { supabase } from '@/lib/supabaseClient';
 
 
 export const GOAL_MODULE_CHANGED_EVENT = 'goal_module:changed';
 const LOG_TAG = '[storage:goal-module]';
-const PENDING_SYNC_PREFIX = 'cache:gm:pending-sync:';
+
 function emit() {
   window.dispatchEvent(new Event(GOAL_MODULE_CHANGED_EVENT));
 }
 
 function cacheKey(goalId: string, moduleKey: string) {
-  return `cache:gm:${goalId}:${moduleKey}`;
+  return cacheKeyBuilders.goalModule(goalId, moduleKey);
 }
 
 function readCache<T>(goalId: string, moduleKey: string, fallback: T): T {
@@ -25,20 +26,24 @@ function readCache<T>(goalId: string, moduleKey: string, fallback: T): T {
 
 function writeCache<T>(goalId: string, moduleKey: string, value: T) {
   try {
-    localStorage.setItem(cacheKey(goalId, moduleKey), JSON.stringify(value));
+    const key = cacheKey(goalId, moduleKey);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     return;
   }
 }
 
 function pendingSyncKey(goalId: string, moduleKey: string) {
-  return `${PENDING_SYNC_PREFIX}${goalId}:${moduleKey}`;
+  return cacheKeyBuilders.goalModulePendingSync(goalId, moduleKey);
 }
 
 function markPendingSync<T>(goalId: string, moduleKey: string, state: T) {
   try {
+    const key = pendingSyncKey(goalId, moduleKey);
+    assertRegisteredCacheWrite(key);
     localStorage.setItem(
-      pendingSyncKey(goalId, moduleKey),
+      key,
       JSON.stringify({ state, updated_at: getLocalDateKey() }),
     );
   } catch {

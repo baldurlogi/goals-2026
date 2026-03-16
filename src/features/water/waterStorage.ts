@@ -1,5 +1,6 @@
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { supabase } from '@/lib/supabaseClient';
+import { cacheKeyBuilders, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
 
 export const WATER_CHANGED_EVENT = 'water:changed';
 
@@ -26,7 +27,7 @@ export function defaultWaterLog(date = todayKey()): WaterLog {
 }
 
 function cacheKey(date: string) {
-  return `cache:water:${date}`;
+  return cacheKeyBuilders.water(date);
 }
 
 function normalizeWaterLog(
@@ -55,7 +56,9 @@ export function readWaterCache(date = todayKey()): WaterLog | null {
 
 function writeWaterCache(log: WaterLog): void {
   try {
-    localStorage.setItem(cacheKey(log.date), JSON.stringify(log));
+    const key = cacheKey(log.date);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(log));
   } catch {
     return;
   }

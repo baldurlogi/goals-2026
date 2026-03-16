@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import type { ModuleId } from "@/features/modules/modules";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
 export type Sex = "male" | "female";
 export type ActivityLevel =
@@ -96,7 +97,7 @@ export function calculateMacros(
   };
 }
 
-const CACHE_KEY = "cache:profile:v1";
+const CACHE_KEY = CACHE_KEYS.PROFILE;
 
 export const PROFILE_CHANGED_EVENT = "profile:changed";
 const emitProfileChanged = () =>
@@ -138,6 +139,7 @@ export function clearProfileState(): void {
 
 function writeProfileCache(profile: UserProfile) {
   try {
+    assertRegisteredCacheWrite(CACHE_KEY);
     localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
   } catch (e) {
     console.warn("write cache failed", e);

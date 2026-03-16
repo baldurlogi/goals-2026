@@ -6,6 +6,7 @@ import type {
 } from '@/features/schedule/scheduleTypes';
 import { DEFAULT_USER_SCHEDULE } from '@/features/schedule/scheduleData';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
 
 export const SCHEDULE_CHANGED_EVENT = 'schedule:changed';
 export const SCHEDULE_TEMPLATE_EVENT = 'schedule:template:changed';
@@ -34,7 +35,7 @@ export const DEFAULT_SCHEDULE_LOG: ScheduleLog = {
 
 // ── Schedule log cache ────────────────────────────────────────────────────
 
-export const SCHEDULE_LOG_CACHE_KEY = 'cache:schedule_log:v1';
+export const SCHEDULE_LOG_CACHE_KEY = CACHE_KEYS.SCHEDULE_LOG;
 
 function readLogCache(): ScheduleLog | null {
   try {
@@ -51,6 +52,7 @@ function readLogCache(): ScheduleLog | null {
 
 function writeLogCache(log: ScheduleLog): void {
   try {
+    assertRegisteredCacheWrite(SCHEDULE_LOG_CACHE_KEY);
     localStorage.setItem(SCHEDULE_LOG_CACHE_KEY, JSON.stringify(log));
   } catch {
     // ignore
@@ -234,7 +236,7 @@ export function getScheduleSummary(log: ScheduleLog, total: number) {
 
 // ── User schedule templates (editable blocks) ────────────────────────────
 
-const TEMPLATE_CACHE_KEY = 'cache:schedule:templates:v1';
+const TEMPLATE_CACHE_KEY = CACHE_KEYS.SCHEDULE_TEMPLATES;
 
 function readTemplateCache(): UserScheduleTemplates | null {
   try {
@@ -247,6 +249,7 @@ function readTemplateCache(): UserScheduleTemplates | null {
 
 function writeTemplateCache(t: UserScheduleTemplates) {
   try {
+    assertRegisteredCacheWrite(TEMPLATE_CACHE_KEY);
     localStorage.setItem(TEMPLATE_CACHE_KEY, JSON.stringify(t));
   } catch {
     return;
