@@ -6,8 +6,8 @@ import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 export const NUTRITION_CHANGED_EVENT = 'nutrition:changed';
 
-const LOG_CACHE_KEY = 'cache:nutrition_log:v1';
-const PHASE_CACHE_KEY = 'cache:nutrition_phase:v1';
+export const NUTRITION_LOG_CACHE_KEY = 'cache:nutrition_log:v1';
+export const NUTRITION_PHASE_CACHE_KEY = 'cache:nutrition_phase:v1';
 
 function emit() {
   window.dispatchEvent(new Event(NUTRITION_CHANGED_EVENT));
@@ -52,7 +52,7 @@ function emptyLog(date = todayKey()): NutritionLog {
 
 function readLogCache(): NutritionLog | null {
   try {
-    const raw = localStorage.getItem(LOG_CACHE_KEY);
+    const raw = localStorage.getItem(NUTRITION_LOG_CACHE_KEY);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as NutritionLog;
@@ -66,7 +66,7 @@ function readLogCache(): NutritionLog | null {
 
 function writeLogCache(log: NutritionLog): void {
   try {
-    localStorage.setItem(LOG_CACHE_KEY, JSON.stringify(log));
+    localStorage.setItem(NUTRITION_LOG_CACHE_KEY, JSON.stringify(log));
   } catch {
     // ignore
   }
@@ -74,7 +74,7 @@ function writeLogCache(log: NutritionLog): void {
 
 function readPhaseCache(): NutritionPhase | null {
   try {
-    const raw = localStorage.getItem(PHASE_CACHE_KEY);
+    const raw = localStorage.getItem(NUTRITION_PHASE_CACHE_KEY);
     return raw === 'cut' || raw === 'maintain' ? raw : null;
   } catch {
     return null;
@@ -83,7 +83,7 @@ function readPhaseCache(): NutritionPhase | null {
 
 function writePhaseCache(phase: NutritionPhase): void {
   try {
-    localStorage.setItem(PHASE_CACHE_KEY, phase);
+    localStorage.setItem(NUTRITION_PHASE_CACHE_KEY, phase);
   } catch {
     // ignore
   }

@@ -34,11 +34,11 @@ export const DEFAULT_SCHEDULE_LOG: ScheduleLog = {
 
 // ── Schedule log cache ────────────────────────────────────────────────────
 
-const LOG_CACHE_KEY = 'cache:schedule_log:v1';
+export const SCHEDULE_LOG_CACHE_KEY = 'cache:schedule_log:v1';
 
 function readLogCache(): ScheduleLog | null {
   try {
-    const raw = localStorage.getItem(LOG_CACHE_KEY);
+    const raw = localStorage.getItem(SCHEDULE_LOG_CACHE_KEY);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as ScheduleLog;
@@ -51,7 +51,7 @@ function readLogCache(): ScheduleLog | null {
 
 function writeLogCache(log: ScheduleLog): void {
   try {
-    localStorage.setItem(LOG_CACHE_KEY, JSON.stringify(log));
+    localStorage.setItem(SCHEDULE_LOG_CACHE_KEY, JSON.stringify(log));
   } catch {
     // ignore
   }

@@ -18,8 +18,8 @@ export type TodoCompletionHistoryEntry = {
 };
 
 // ── Cache ──────────────────────────────────────────────────────────────────
-const TODO_CACHE_KEY = "cache:todos:v1";
-const TODO_COMPLETION_HISTORY_KEY = "cache:todos:completion-history:v1";
+export const TODO_CACHE_KEY = "cache:todos:v1";
+export const TODO_COMPLETION_HISTORY_KEY = "cache:todos:completion-history:v1";
 
 function readTodoCache(): Todo[] | null {
   try {

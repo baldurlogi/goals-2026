@@ -1,66 +1,39 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from 'react';
 import {
   loadTodos,
   TODO_CHANGED_EVENT,
+  TODO_CACHE_KEY,
   type TodoItem,
-} from "@/features/todos/todoStorage";
+} from '@/features/todos/todoStorage';
+import { readCache, writeCache, loadWithWriteThrough, hasCache } from '@/lib/cache';
+import { useDashboardLoadSubscription } from '@/features/dashboard/hooks/useDashboardLoadSubscription';
 
-const CACHE_KEY = "cache:todos:v1";
 const PREVIEW_LIMIT = 5;
-
-function readCache(): TodoItem[] {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
+const TODO_EVENTS = [TODO_CHANGED_EVENT] as const;
+const TODO_STORAGE_KEYS = [TODO_CACHE_KEY] as const;
 
 export function useTodoDashboard() {
-  const [todos, setTodos] = useState<TodoItem[]>(() => readCache());
-  const [loading, setLoading] = useState(() => readCache().length === 0);
+  const [todos, setTodos] = useState<TodoItem[]>(() => readCache(TODO_CACHE_KEY, []));
+  const [loading, setLoading] = useState(() => !hasCache(TODO_CACHE_KEY));
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetch() {
-      try {
-        const fresh = await loadTodos();
-
-        if (!cancelled) {
-          setTodos(fresh);
-          setLoading(false);
-
-          try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
-          } catch (e) {
-            console.warn("todo cache write failed", e);
-          }
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setLoading(false);
-        }
-        console.warn("todo dashboard load failed", e);
-      }
+  const load = useCallback(async () => {
+    try {
+      const fresh = await loadWithWriteThrough(loadTodos, (value) =>
+        writeCache(TODO_CACHE_KEY, value),
+      );
+      setTodos(fresh);
+    } catch (e) {
+      console.warn('todo dashboard load failed', e);
+    } finally {
+      setLoading(false);
     }
-
-    void fetch();
-
-    const sync = () => {
-      void fetch();
-    };
-
-    window.addEventListener(TODO_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener(TODO_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
   }, []);
+
+  useDashboardLoadSubscription({
+    load,
+    events: TODO_EVENTS,
+    storageKeys: TODO_STORAGE_KEYS,
+  });
 
   const incomplete = todos.filter((t) => !t.done);
   const preview = incomplete.slice(0, PREVIEW_LIMIT);
