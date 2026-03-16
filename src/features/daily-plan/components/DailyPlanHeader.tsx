@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   DropdownMenu,
@@ -26,7 +27,6 @@ import {
   ALWAYS_NAV_ITEMS,
   type ModuleDef,
 } from "@/features/modules/modules";
-import { useTier, TIER_LABELS, TIER_BADGE } from "@/features/subscription/useTier";
 
 function getInitials(
   user: {
@@ -80,63 +80,67 @@ export function DailyPlanHeader() {
   const { user, signOut } = useAuth();
   const { theme, toggle } = useTheme();
   const { modules } = useEnabledModules();
-  const tier = useTier();
 
-  const enabledDefs = ALL_MODULES.filter((m) => modules.has(m.id));
+  const sections: NavSection[] = useMemo(() => {
+    const enabledDefs = ALL_MODULES.filter((m) => modules.has(m.id));
 
-  const dailyItems: NavItem[] = enabledDefs
-    .filter((m) => m.section === "Daily Plan")
-    .map((m) => ({
-      label: m.navLabel,
-      href: m.href,
-      icon: m.icon,
-    }));
+    const dailyItems: NavItem[] = enabledDefs
+      .filter((m) => m.section === "Daily Plan")
+      .map((m) => ({
+        label: m.navLabel,
+        href: m.href,
+        icon: m.icon,
+      }));
 
-  const goalsItems: NavItem[] = modules.has("goals")
-    ? [
-        {
-          label: "All Goals",
-          href: "/app/goals",
-          icon: ALL_MODULES.find((m) => m.id === "goals")!.icon,
-        },
-        {
-          label: ALWAYS_NAV_ITEMS[0].label,
-          href: ALWAYS_NAV_ITEMS[0].href,
-          icon: ALWAYS_NAV_ITEMS[0].icon,
-        },
-      ]
-    : [];
+    const goalsItems: NavItem[] = modules.has("goals")
+      ? [
+          {
+            label: "All Goals",
+            href: "/app/goals",
+            icon: ALL_MODULES.find((m) => m.id === "goals")!.icon,
+          },
+          {
+            label: ALWAYS_NAV_ITEMS[0].label,
+            href: ALWAYS_NAV_ITEMS[0].href,
+            icon: ALWAYS_NAV_ITEMS[0].icon,
+          },
+        ]
+      : [];
 
-  const otherItems: NavItem[] = enabledDefs
-    .filter((m) => m.section === "Other")
-    .map((m) => ({
-      label: m.navLabel,
-      href: m.href,
-      icon: m.icon,
-    }));
+    const otherItems: NavItem[] = enabledDefs
+      .filter((m) => m.section === "Other")
+      .map((m) => ({
+        label: m.navLabel,
+        href: m.href,
+        icon: m.icon,
+      }));
 
-  const sections: NavSection[] = [
-    ...(dailyItems.length > 0
-      ? [{ label: "Daily Plan", items: dailyItems }]
-      : []),
-    ...(goalsItems.length > 0 ? [{ label: "Goals", items: goalsItems }] : []),
-    ...(otherItems.length > 0 ? [{ label: "Other", items: otherItems }] : []),
-  ];
+    return [
+      ...(dailyItems.length > 0
+        ? [{ label: "Daily Plan", items: dailyItems }]
+        : []),
+      ...(goalsItems.length > 0 ? [{ label: "Goals", items: goalsItems }] : []),
+      ...(otherItems.length > 0 ? [{ label: "Other", items: otherItems }] : []),
+    ];
+  }, [modules]);
 
-  const currentItem = sections
-    .flatMap((s) => s.items)
-    .find((i) => pathname.startsWith(i.href));
+  const currentItem = useMemo(
+    () =>
+      sections
+        .flatMap((s) => s.items)
+        .find((i) => pathname.startsWith(i.href)),
+    [sections, pathname],
+  );
 
   const initials = getInitials(user);
   const displayName = getDisplayName(user);
   const email = user?.email ?? "";
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
-
   const CurrentIcon = currentItem?.icon;
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-14 items-center gap-4 px-4 lg:px-10">
+    <header className="sticky top-0 z-40 border-b bg-background/95 md:backdrop-blur supports-[backdrop-filter]:md:bg-background/60">
+      <div className="flex h-14 items-center gap-3 px-4 lg:px-10">
         <Link
           to="/app"
           className={cn(
@@ -155,17 +159,17 @@ export function DailyPlanHeader() {
             <Button
               variant="ghost"
               size="sm"
-              className="flex items-center gap-1.5 px-2 text-sm font-medium"
+              className="flex min-w-0 items-center gap-1.5 px-2 text-sm font-medium"
             >
               {currentItem && CurrentIcon ? (
                 <>
-                  <CurrentIcon className="h-4 w-4 text-muted-foreground" />
-                  <span>{currentItem.label}</span>
+                  <CurrentIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{currentItem.label}</span>
                 </>
               ) : (
                 "Navigate"
               )}
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
 
@@ -237,12 +241,14 @@ export function DailyPlanHeader() {
                   alt={displayName}
                   className="h-8 w-8 rounded-full object-cover"
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                 />
               ) : (
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
                   {initials}
                 </div>
               )}
+
               <span className="hidden max-w-[140px] truncate text-sm font-medium md:block">
                 {displayName || email}
               </span>
@@ -273,11 +279,6 @@ export function DailyPlanHeader() {
               <Link to="/app/upgrade" className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-violet-400" />
                 <span>Upgrade plan</span>
-                <span
-                  className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold ${TIER_BADGE[tier]}`}
-                >
-                  {TIER_LABELS[tier]}
-                </span>
               </Link>
             </DropdownMenuItem>
 
