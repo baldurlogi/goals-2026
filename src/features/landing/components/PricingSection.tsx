@@ -72,14 +72,18 @@ export function PricingSection({
           theme={theme}
         />
 
-        {billing === "yearly" && (
-          <p
-            className="mx-auto mt-3 text-xs"
-            style={{ color: t.primary }}
-          >
-            Yearly is billed once upfront. The monthly number shown is the lower equivalent.
-          </p>
-        )}
+        <div
+          className="mx-auto mt-3 min-h-[20px] text-xs"
+          style={{ color: t.primary }}
+        >
+          {billing === "yearly" ? (
+            "Yearly is billed once upfront. The monthly number shown is the lower equivalent."
+          ) : (
+            <span style={{ visibility: "hidden" }}>
+              Yearly is billed once upfront. The monthly number shown is the lower equivalent.
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 md:grid-cols-2">

@@ -13,19 +13,20 @@ export function LandingShell({ theme, children }: LandingShellProps) {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100svh",
         background: t.bg,
         color: t.text,
         fontFamily: "'DM Sans', sans-serif",
-        overflowX: "hidden",
+        overflowX: "clip",
         transition: "background 0.25s ease, color 0.25s ease",
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap');
-
         * { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
+        html {
+          scroll-behavior: smooth;
+          scrollbar-gutter: stable both-edges;
+        }
         body { margin: 0; }
       `}</style>
 

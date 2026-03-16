@@ -11,15 +11,16 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
 
   return (
     <Card
-      className="overflow-hidden rounded-3xl"
+      className="h-full overflow-hidden rounded-3xl"
       style={{
         background: t.surface,
         border: `1px solid ${t.borderStrong}`,
         boxShadow: t.shadow,
+        minHeight: 640,
       }}
     >
-      <CardContent className="p-4 sm:p-5">
-        <div className="mb-4 flex items-center gap-2">
+      <CardContent className="flex h-full flex-col p-4 sm:p-5">
+        <div className="mb-4 flex h-6 items-center gap-2">
           <div
             className="h-2.5 w-2.5 rounded-full"
             style={{ background: t.rose, opacity: 0.7 }}
@@ -40,9 +41,9 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
+        <div className="grid flex-1 gap-4 xl:grid-cols-[1.25fr_0.95fr]">
           <div
-            className="rounded-3xl border p-4"
+            className="flex h-full min-h-[560px] flex-col rounded-3xl border p-4"
             style={{
               background: t.bgSoft,
               borderColor: t.border,
@@ -56,17 +57,18 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
             </div>
 
             <div
-              className="mb-3 rounded-2xl border px-3 py-3 text-sm"
+              className="mb-4 rounded-2xl border px-3 py-3 text-sm"
               style={{
                 background: t.surface,
                 borderColor: t.border,
                 color: t.text,
+                minHeight: 52,
               }}
             >
               I want to run a marathon by October
             </div>
 
-            <div className="mb-4 flex flex-wrap gap-2">
+            <div className="mb-4 flex min-h-[36px] flex-wrap gap-2">
               {[5, 8, 10].map((n, i) => (
                 <div
                   key={n}
@@ -83,13 +85,13 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
             </div>
 
             <div
-              className="rounded-2xl border p-4"
+              className="flex flex-1 flex-col rounded-2xl border p-4"
               style={{
                 background: t.surface,
                 borderColor: t.border,
               }}
             >
-              <div className="mb-3 flex items-center gap-3">
+              <div className="mb-3 flex min-h-[52px] items-center gap-3">
                 <div className="text-2xl">🏃</div>
                 <div>
                   <div
@@ -104,40 +106,42 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
                 </div>
               </div>
 
-              {[
-                "Choose your marathon race",
-                "Build base mileage",
-                "Add a weekly long run",
-                "Practice fueling and pacing",
-              ].map((item, i) => (
-                <div
-                  key={item}
-                  className="flex items-center gap-3 py-2.5"
-                  style={{
-                    borderTop: i === 0 ? "none" : `1px solid ${t.border}`,
-                  }}
-                >
+              <div className="grid gap-0">
+                {[
+                  "Choose your marathon race",
+                  "Build base mileage",
+                  "Add a weekly long run",
+                  "Practice fueling and pacing",
+                ].map((item, i) => (
                   <div
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px]"
+                    key={item}
+                    className="flex min-h-[48px] items-center gap-3 py-2.5"
                     style={{
-                      background: i === 0 ? t.primarySoft : t.surface3,
-                      borderColor: i === 0 ? t.primaryBorder : t.border,
-                      color: i === 0 ? t.primary : t.muted,
+                      borderTop: i === 0 ? "none" : `1px solid ${t.border}`,
                     }}
                   >
-                    {i + 1}
+                    <div
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px]"
+                      style={{
+                        background: i === 0 ? t.primarySoft : t.surface3,
+                        borderColor: i === 0 ? t.primaryBorder : t.border,
+                        color: i === 0 ? t.primary : t.muted,
+                      }}
+                    >
+                      {i + 1}
+                    </div>
+                    <div className="text-sm" style={{ color: t.textSoft }}>
+                      {item}
+                    </div>
                   </div>
-                  <div className="text-sm" style={{ color: t.textSoft }}>
-                    {item}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-4">
+          <div className="grid auto-rows-fr gap-4">
             <div
-              className="rounded-3xl border p-4"
+              className="flex min-h-[164px] flex-col rounded-3xl border p-4"
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -151,7 +155,7 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
               </div>
 
               <div
-                className="rounded-2xl border p-4"
+                className="flex flex-1 flex-col justify-center rounded-2xl border p-4"
                 style={{
                   background: t.surface,
                   borderColor: t.primaryBorder,
@@ -173,7 +177,7 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
             </div>
 
             <div
-              className="rounded-3xl border p-4"
+              className="flex min-h-[220px] flex-col rounded-3xl border p-4"
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -186,39 +190,41 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
                 LIFE PROGRESS
               </div>
 
-              {[
-                ["Goals", 72, t.primary],
-                ["Fitness", 81, t.blue],
-                ["Reading", 64, t.amber],
-                ["Consistency", 76, t.purple],
-              ].map(([label, pct, color]) => (
-                <div key={label as string} className="mb-3">
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span style={{ color: t.muted }}>{label}</span>
-                    <span style={{ color: t.textSoft }}>{pct}%</span>
-                  </div>
+              <div className="flex-1">
+                {[
+                  ["Goals", 72, t.primary],
+                  ["Fitness", 81, t.blue],
+                  ["Reading", 64, t.amber],
+                  ["Consistency", 76, t.purple],
+                ].map(([label, pct, color]) => (
+                  <div key={label as string} className="mb-3">
+                    <div className="mb-1 flex justify-between text-xs">
+                      <span style={{ color: t.muted }}>{label}</span>
+                      <span style={{ color: t.textSoft }}>{pct}%</span>
+                    </div>
 
-                  <div
-                    className="h-2 overflow-hidden rounded-full border"
-                    style={{
-                      background: t.surface,
-                      borderColor: t.border,
-                    }}
-                  >
                     <div
-                      className="h-full rounded-full"
+                      className="h-2 overflow-hidden rounded-full border"
                       style={{
-                        width: `${pct}%`,
-                        background: color as string,
+                        background: t.surface,
+                        borderColor: t.border,
                       }}
-                    />
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          background: color as string,
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
             <div
-              className="rounded-3xl border p-4"
+              className="flex min-h-[176px] flex-col rounded-3xl border p-4"
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -231,7 +237,7 @@ export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
                 WHY PEOPLE STAY
               </div>
 
-              <div className="grid gap-2">
+              <div className="grid flex-1 gap-2">
                 {[
                   "You know what to do next",
                   "You can see your momentum",

@@ -40,7 +40,7 @@ export function PricingCard({
         boxShadow: featured ? t.shadow : "none",
       }}
     >
-      <CardContent className="flex h-full flex-col p-6">
+      <CardContent className="flex h-full min-h-[560px] flex-col p-6">
         {featured && (
           <div
             className="absolute right-4 top-4 rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]"
@@ -58,62 +58,70 @@ export function PricingCard({
           {name}
         </div>
 
-        <div className="mb-5 text-sm leading-6" style={{ color: t.muted }}>
+        <div
+          className="mb-5 min-h-[48px] text-sm leading-6"
+          style={{ color: t.muted }}
+        >
           {sub}
         </div>
 
-        <div className="mb-2 flex items-end gap-1.5">
-          <div
-            className="text-[42px] leading-none"
-            style={{
-              color: t.text,
-              fontFamily: "'Instrument Serif', serif",
-            }}
-          >
-            ${displayPrice}
+        <div className="mb-4 min-h-[108px]">
+          <div className="mb-2 flex min-h-[52px] items-end gap-1.5">
+            <div
+              className="min-w-[110px] text-[42px] leading-none"
+              style={{
+                color: t.text,
+                fontFamily: "'Instrument Serif', serif",
+              }}
+            >
+              ${displayPrice}
+            </div>
+
+            {!isFree && (
+              <div className="mb-1 text-sm" style={{ color: t.faint }}>
+                /{isYearly ? "yr" : "mo"}
+              </div>
+            )}
           </div>
 
-          {!isFree && (
-            <div className="mb-1 text-sm" style={{ color: t.faint }}>
-              /{isYearly ? "yr" : "mo"}
-            </div>
-          )}
-        </div>
-
-        <div className="mb-5 min-h-[52px]">
-          {isFree ? (
-            <div className="text-xs" style={{ color: t.primary }}>
-              No credit card required
-            </div>
-          ) : isYearly ? (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-sm">
-                <span
-                  className="line-through"
-                  style={{ color: t.faint }}
-                >
-                  ${monthly}/mo
-                </span>
-                <span
-                  className="font-semibold"
-                  style={{ color: t.primary }}
-                >
-                  ${equivalentMonthly}/mo equivalent
-                </span>
-              </div>
-
+          <div className="min-h-[52px]">
+            {isFree ? (
               <div className="text-xs" style={{ color: t.primary }}>
-                Billed once yearly · save 17%
+                No credit card required
               </div>
-            </div>
-          ) : (
-            <div className="text-xs" style={{ color: t.primary }}>
-              or ${yearly}/year · billed once yearly · save 17%
-            </div>
-          )}
+            ) : isYearly ? (
+              <div className="space-y-1.5">
+                <div className="flex min-h-[20px] items-center gap-2 text-sm">
+                  <span className="line-through" style={{ color: t.faint }}>
+                    ${monthly}/mo
+                  </span>
+                  <span className="font-semibold" style={{ color: t.primary }}>
+                    ${equivalentMonthly}/mo equivalent
+                  </span>
+                </div>
+
+                <div className="text-xs" style={{ color: t.primary }}>
+                  Billed once yearly · save 17%
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div
+                  className="min-h-[20px] text-sm"
+                  style={{ visibility: "hidden" }}
+                >
+                  ${monthly}/mo equivalent
+                </div>
+
+                <div className="text-xs" style={{ color: t.primary }}>
+                  or ${yearly}/year · billed once yearly · save 17%
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="mb-6 grid gap-2.5">
+        <div className="mb-6 grid min-h-[190px] gap-2.5">
           {points.map((point) => (
             <div key={point} className="flex items-start gap-2.5">
               <span style={{ color: t.primary }}>●</span>

@@ -19,8 +19,8 @@ export function HeroSection({
 
   return (
     <section
-      className="relative flex min-h-screen items-center px-4 pb-20 pt-28 sm:px-6 lg:px-8"
-      style={{ background: t.bg }}
+      className="relative overflow-hidden px-4 pb-20 pt-28 sm:px-6 lg:px-8"
+      style={{ background: t.bg, minHeight: "100svh" }}
     >
       <div
         className="pointer-events-none absolute inset-0"
@@ -28,9 +28,9 @@ export function HeroSection({
       />
 
       <div className="relative mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-2 lg:items-center lg:gap-14">
-        <div>
+        <div className="flex min-h-[520px] flex-col justify-center">
           <div
-            className="mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-2"
+            className="mb-6 inline-flex min-h-[40px] items-center gap-2 rounded-full border px-4 py-2"
             style={{
               background: t.primarySoft,
               borderColor: t.primaryBorder,
@@ -66,18 +66,20 @@ export function HeroSection({
             style={{ color: t.muted }}
           >
             An AI-powered life system that turns one goal into a clear plan,
-            shows your next best action, and makes progress visible across your real life.
+            shows your next best action, and makes progress visible across your
+            real life.
           </p>
 
           <p
             className="mb-7 max-w-2xl text-sm leading-8 sm:text-[15px]"
             style={{ color: t.faint }}
           >
-            Replace overwhelm with one connected system for goals, habits, health,
-            learning, routines, and momentum — so you stop guessing and start moving.
+            Replace overwhelm with one connected system for goals, habits,
+            health, learning, routines, and momentum — so you stop guessing and
+            start moving.
           </p>
 
-          <div className="mb-6 flex flex-wrap gap-3">
+          <div className="mb-6 flex min-h-[64px] flex-wrap gap-3">
             <Button
               type="button"
               onClick={onGetStarted}
@@ -105,7 +107,7 @@ export function HeroSection({
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex min-h-[60px] flex-wrap gap-2.5">
             {PERSONA_PILLS.map((label) => (
               <div
                 key={label}
@@ -123,7 +125,9 @@ export function HeroSection({
         </div>
 
         <div className="lg:pl-4">
-          <HeroProductPreview theme={theme} />
+          <div className="mx-auto max-w-[640px] lg:max-w-none">
+            <HeroProductPreview theme={theme} />
+          </div>
         </div>
       </div>
     </section>
