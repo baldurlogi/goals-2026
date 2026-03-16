@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/features/auth/authContext";
 
 export type Tier = "free" | "pro" | "pro_max";
 
@@ -48,6 +49,7 @@ function writeTierCache(tier: Tier) {
 
 let currentTier: Tier = readTierCache();
 let inFlightTierLoad: Promise<Tier> | null = null;
+let inFlightUserId: string | null = null;
 const listeners = new Set<(tier: Tier) => void>();
 
 function publishTier(next: Tier) {
@@ -56,26 +58,18 @@ function publishTier(next: Tier) {
   listeners.forEach((listener) => listener(next));
 }
 
-async function fetchTier(force = false): Promise<Tier> {
-  if (!force && inFlightTierLoad) {
+async function fetchTier(userId: string, force = false): Promise<Tier> {
+  if (!force && inFlightTierLoad && inFlightUserId === userId) {
     return inFlightTierLoad;
   }
 
+  inFlightUserId = userId;
   inFlightTierLoad = (async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        publishTier("free");
-        return "free";
-      }
-
       const { data, error } = await supabase
         .from("profiles")
         .select("tier")
-        .eq("id", user.id)
+        .eq("id", userId)
         .single();
 
       if (error || !data) {
@@ -91,6 +85,7 @@ async function fetchTier(force = false): Promise<Tier> {
       return currentTier;
     } finally {
       inFlightTierLoad = null;
+      inFlightUserId = null;
     }
   })();
 
@@ -98,16 +93,22 @@ async function fetchTier(force = false): Promise<Tier> {
 }
 
 export function useTier(): Tier {
+  const { userId, authReady } = useAuth();
   const [tier, setTier] = useState<Tier>(currentTier);
 
   useEffect(() => {
     listeners.add(setTier);
-    void fetchTier();
+
+    if (!authReady || userId === null) {
+      publishTier("free");
+    } else {
+      void fetchTier(userId);
+    }
 
     return () => {
       listeners.delete(setTier);
     };
-  }, []);
+  }, [authReady, userId]);
 
   return tier;
 }
