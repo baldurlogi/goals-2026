@@ -11,12 +11,21 @@ import {
 const CACHE_KEY = "cache:goals:v1";
 const LEGACY_WEEKLY_DONE_KEY = "goals:done:v1";
 const STEP_HISTORY_KEY = "goals:step-history:v1";
+const PERSIST_DEBOUNCE_MS = 300;
+const RETRY_BASE_DELAY_MS = 1000;
+const RETRY_MAX_DELAY_MS = 5000;
 
 type StepHistoryEntry = {
   goalId: string;
   stepId: string;
   date: string;
 };
+
+function cloneDoneState(done: DoneState): DoneState {
+  return Object.fromEntries(
+    Object.entries(done).map(([goalId, steps]) => [goalId, { ...steps }]),
+  );
+}
 
 function readCache(): DoneState {
   try {
@@ -143,6 +152,82 @@ export function GoalStoreProvider({
     done: readCache(),
     loaded: false,
   });
+  const debounceTimerRef = React.useRef<number | null>(null);
+  const retryTimerRef = React.useRef<number | null>(null);
+  const persistInFlightRef = React.useRef(false);
+  const queuedDoneRef = React.useRef<DoneState | null>(null);
+  const latestDoneRef = React.useRef<DoneState>(state.done);
+  const retryAttemptRef = React.useRef(0);
+
+  React.useEffect(() => {
+    latestDoneRef.current = state.done;
+  }, [state.done]);
+
+  const persistDoneState = React.useCallback(async (done: DoneState) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      retryAttemptRef.current = 0;
+      return;
+    }
+
+    const payload = Object.entries(done).map(([goalId, goalDone]) => ({
+      user_id: user.id,
+      goal_id: goalId,
+      done: goalDone,
+    }));
+
+    if (payload.length > 0) {
+      const { error } = await supabase
+        .from("goal_progress")
+        .upsert(payload, { onConflict: "user_id,goal_id" });
+
+      if (error) {
+        throw error;
+      }
+    }
+
+    retryAttemptRef.current = 0;
+  }, []);
+
+  const flushPersistQueue = React.useCallback(async () => {
+    if (persistInFlightRef.current) return;
+
+    const next = queuedDoneRef.current;
+    if (!next) return;
+
+    queuedDoneRef.current = null;
+    persistInFlightRef.current = true;
+
+    try {
+      await persistDoneState(next);
+    } catch (error) {
+      queuedDoneRef.current = cloneDoneState(latestDoneRef.current);
+      const retryDelay = Math.min(
+        RETRY_BASE_DELAY_MS * 2 ** retryAttemptRef.current,
+        RETRY_MAX_DELAY_MS,
+      );
+      retryAttemptRef.current += 1;
+
+      if (retryTimerRef.current != null) {
+        window.clearTimeout(retryTimerRef.current);
+      }
+
+      retryTimerRef.current = window.setTimeout(() => {
+        void flushPersistQueue();
+      }, retryDelay);
+
+      console.error("Failed to persist goal progress. Retrying...", error);
+    } finally {
+      persistInFlightRef.current = false;
+
+      if (queuedDoneRef.current) {
+        void flushPersistQueue();
+      }
+    }
+  }, [persistDoneState]);
 
   React.useEffect(() => {
     async function load() {
@@ -199,25 +284,30 @@ export function GoalStoreProvider({
   React.useEffect(() => {
     if (!state.loaded) return;
 
-    async function persist() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    writeCache(state.done);
+    queuedDoneRef.current = cloneDoneState(state.done);
 
-      writeCache(state.done);
-
-      if (!user) return;
-
-      for (const [goalId, done] of Object.entries(state.done)) {
-        await supabase.from("goal_progress").upsert(
-          { user_id: user.id, goal_id: goalId, done },
-          { onConflict: "user_id,goal_id" },
-        );
-      }
+    if (debounceTimerRef.current != null) {
+      window.clearTimeout(debounceTimerRef.current);
     }
 
-    void persist();
-  }, [state.done, state.loaded]);
+    debounceTimerRef.current = window.setTimeout(() => {
+      void flushPersistQueue();
+    }, PERSIST_DEBOUNCE_MS);
+  }, [flushPersistQueue, state.done, state.loaded]);
+
+  React.useEffect(
+    () => () => {
+      if (debounceTimerRef.current != null) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+
+      if (retryTimerRef.current != null) {
+        window.clearTimeout(retryTimerRef.current);
+      }
+    },
+    [],
+  );
 
   return (
     <GoalsStoreContext.Provider value={{ state, dispatch }}>
