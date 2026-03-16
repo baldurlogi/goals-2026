@@ -1,8 +1,11 @@
+import { clearProfileState } from "@/features/onboarding/profileStorage";
+
 /**
  * Clears all per-user localStorage caches.
  * Call this on sign-out and when a different user signs in.
  */
 export function clearUserCache(): void {
+  clearProfileState();
   // Exact known keys
   const exactKeys = [
     "cache:ai-coach:v1",
