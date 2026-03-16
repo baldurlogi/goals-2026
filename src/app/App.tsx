@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Suspense } from "react";
+import { lazy, Suspense } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import { GoalStoreProvider } from "@/features/goals/goalStore";
@@ -9,25 +9,32 @@ import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
 import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
 import { AppLayout } from "@/app/AppLayout";
 
-import { NutritionPage } from "@/features/nutrition/NutritionPage";
-import { SchedulePage } from "@/features/schedule/SchedulePage";
-import { ReadingPage } from "@/features/reading/ReadingPage";
-import { GoalsPage } from "@/features/goals/GoalsPage";
-import { UpcomingTasksPage } from "@/features/goals/UpcomingTasksPage";
-import { UserGoalPage } from "@/features/goals/UserGoalPage";
-import { TodosPage } from "@/features/todos/TodosPage";
-import { FitnessPage } from "@/features/fitness/FitnessPage";
-import DashboardPage from "@/features/dashboard/DashboardPage";
-import { ProfilePage } from "@/features/profile/ProfilePage";
-import { AchievementsPage } from "@/features/achievements/AchievementPage";
-import { UpgradePage } from "@/features/subscription/UpgradePage";
-import { WeeklyReportPage } from "@/features/dashboard/WeeklyReportPage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { AuthCallbackPage } from "@/features/auth/AuthCallbackPage";
 import { PrivacyPage } from "@/features/legal/PrivacyPage";
 import { TermsPage } from "@/features/legal/TermsPage";
 
+const DashboardPage = lazy(() => import("@/features/dashboard/DashboardPage"));
+const NutritionPage = lazy(() => import("@/features/nutrition/NutritionPage").then((module) => ({ default: module.NutritionPage })));
+const SchedulePage = lazy(() => import("@/features/schedule/SchedulePage").then((module) => ({ default: module.SchedulePage })));
+const ReadingPage = lazy(() => import("@/features/reading/ReadingPage").then((module) => ({ default: module.ReadingPage })));
+const GoalsPage = lazy(() => import("@/features/goals/GoalsPage").then((module) => ({ default: module.GoalsPage })));
+const UserGoalPage = lazy(() => import("@/features/goals/UserGoalPage").then((module) => ({ default: module.UserGoalPage })));
+const UpcomingTasksPage = lazy(() => import("@/features/goals/UpcomingTasksPage").then((module) => ({ default: module.UpcomingTasksPage })));
+const TodosPage = lazy(() => import("@/features/todos/TodosPage").then((module) => ({ default: module.TodosPage })));
+const FitnessPage = lazy(() => import("@/features/fitness/FitnessPage").then((module) => ({ default: module.FitnessPage })));
+const ProfilePage = lazy(() => import("@/features/profile/ProfilePage").then((module) => ({ default: module.ProfilePage })));
+
+const AchievementsPage = lazy(() => import("@/features/achievements/AchievementPage").then((module) => ({ default: module.AchievementsPage })));
+const UpgradePage = lazy(() => import("@/features/subscription/UpgradePage").then((module) => ({ default: module.UpgradePage })));
+const WeeklyReportPage = lazy(() => import("@/features/dashboard/WeeklyReportPage").then((module) => ({ default: module.WeeklyReportPage })));
+
+const routeLoadingFallback = <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+
+const withRouteSuspense = (element: React.ReactNode) => (
+  <Suspense fallback={routeLoadingFallback}>{element}</Suspense>
+);
 
 export default function App() {
   return (
@@ -56,29 +63,22 @@ export default function App() {
               </RequireAuth>
             }
           >
-            <Route index element={<DashboardPage />} />
+            <Route index element={withRouteSuspense(<DashboardPage />)} />
 
-            <Route path="nutrition" element={<NutritionPage />} />
-            <Route path="schedule" element={<SchedulePage />} />
-            <Route path="reading" element={<ReadingPage />} />
+            <Route path="nutrition" element={withRouteSuspense(<NutritionPage />)} />
+            <Route path="schedule" element={withRouteSuspense(<SchedulePage />)} />
+            <Route path="reading" element={withRouteSuspense(<ReadingPage />)} />
 
-            <Route path="goals" element={<GoalsPage />} />
-            <Route
-              path="goals/:goalId"
-              element={
-                <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading…</div>}>
-                  <UserGoalPage />
-                </Suspense>
-              }
-            />
+            <Route path="goals" element={withRouteSuspense(<GoalsPage />)} />
+            <Route path="goals/:goalId" element={withRouteSuspense(<UserGoalPage />)} />
 
-            <Route path="upcoming" element={<UpcomingTasksPage />} />
-            <Route path="todos" element={<TodosPage />} />
-            <Route path="fitness" element={<FitnessPage />} />
-            <Route path="profile" element={<ProfilePage />} />
-            <Route path="achievements" element={<AchievementsPage />} />
-            <Route path="upgrade" element={<UpgradePage />} />
-            <Route path="weekly-report" element={<WeeklyReportPage />} />
+            <Route path="upcoming" element={withRouteSuspense(<UpcomingTasksPage />)} />
+            <Route path="todos" element={withRouteSuspense(<TodosPage />)} />
+            <Route path="fitness" element={withRouteSuspense(<FitnessPage />)} />
+            <Route path="profile" element={withRouteSuspense(<ProfilePage />)} />
+            <Route path="achievements" element={withRouteSuspense(<AchievementsPage />)} />
+            <Route path="upgrade" element={withRouteSuspense(<UpgradePage />)} />
+            <Route path="weekly-report" element={withRouteSuspense(<WeeklyReportPage />)} />
 
             <Route path="daily-plan" element={<Navigate to="/app" replace />} />
           </Route>
