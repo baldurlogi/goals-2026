@@ -1,37 +1,61 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/authContext";
-import { loadProfile, readProfileCache, type UserProfile } from "@/features/onboarding/profileStorage";
+import {
+  loadProfile,
+  readProfileCache,
+  type UserProfile,
+} from "@/features/onboarding/profileStorage";
 import { OnboardingFlow } from "./OnboardingFlow";
 
 type Props = { children: React.ReactNode };
 
 export function RequireOnboarding({ children }: Props) {
   const { user } = useAuth();
-  const [profile, setProfile]   = useState<UserProfile | null>(readProfileCache);
-  const [checking, setChecking] = useState(true);
+  const userId = user?.id ?? null;
+
+  const [profile, setProfile] = useState<UserProfile | null>(() =>
+    userId ? readProfileCache(userId) : null,
+  );
+  const [checking, setChecking] = useState(() => (userId ? !profile : false));
 
   useEffect(() => {
-    if (!user) {
-      Promise.resolve().then(() => setChecking(false));
+    let cancelled = false;
+
+    if (!userId) {
+      setProfile(null);
+      setChecking(false);
       return;
     }
 
-    loadProfile().then((p) => {
-      setProfile(p);
+    const cached = readProfileCache(userId);
+    if (cached) {
+      setProfile(cached);
+      setChecking(false);
+    } else {
+      setChecking(true);
+    }
+
+    loadProfile().then((fresh) => {
+      if (cancelled) return;
+      setProfile(fresh ?? cached ?? null);
       setChecking(false);
     });
-  }, [user]);
 
-  // Still checking — show nothing (parent RequireAuth already shows spinner)
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   if (checking) return null;
 
-  // Onboarding not done
   if (!profile?.onboarding_done) {
     return (
       <OnboardingFlow
         onComplete={() => {
-          // Reload profile from cache after save
-          loadProfile().then(setProfile);
+          void loadProfile().then((fresh) => {
+            setProfile(fresh);
+            setChecking(false);
+          });
         }}
       />
     );

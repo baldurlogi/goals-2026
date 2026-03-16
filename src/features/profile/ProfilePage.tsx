@@ -576,10 +576,10 @@ export function ProfilePage() {
               targets={
                 form.macro_maintain ??
                 calculated?.maintain ?? {
-                  cal: 2400,
-                  protein: 156,
-                  carbs: 260,
-                  fat: 68,
+                  cal: 2700,
+                  protein: 160,
+                  carbs: 340,
+                  fat: 75,
                 }
               }
               onChange={(t) => update({ macro_maintain: t })}

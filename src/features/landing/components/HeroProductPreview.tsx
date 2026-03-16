@@ -4,10 +4,135 @@ import type { ThemeMode } from "../types";
 
 type HeroProductPreviewProps = {
   theme: ThemeMode;
+  compact?: boolean;
 };
 
-export function HeroProductPreview({ theme }: HeroProductPreviewProps) {
+export function HeroProductPreview({
+  theme,
+  compact = false,
+}: HeroProductPreviewProps) {
   const t = TOKENS[theme];
+
+  if (compact) {
+    return (
+      <Card
+        className="overflow-hidden rounded-3xl"
+        style={{
+          background: t.surface,
+          border: `1px solid ${t.borderStrong}`,
+          boxShadow:
+            theme === "dark"
+              ? "0 18px 48px rgba(0,0,0,0.32)"
+              : "0 14px 36px rgba(15,23,42,0.08)",
+        }}
+      >
+        <CardContent className="p-4">
+          <div className="mb-4 flex h-6 items-center gap-2">
+            <div
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ background: t.rose, opacity: 0.7 }}
+            />
+            <div
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ background: t.amber, opacity: 0.7 }}
+            />
+            <div
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ background: t.primary, opacity: 0.8 }}
+            />
+            <div
+              className="flex-1 text-center font-mono text-[10px]"
+              style={{ color: t.faint }}
+            >
+              Daily Life Progress
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                background: t.bgSoft,
+                borderColor: t.border,
+              }}
+            >
+              <div
+                className="mb-2 font-mono text-[11px] tracking-[0.08em]"
+                style={{ color: t.faint }}
+              >
+                NEXT BEST ACTION
+              </div>
+
+              <div
+                className="rounded-2xl border p-4"
+                style={{
+                  background: t.surface,
+                  borderColor: t.primaryBorder,
+                }}
+              >
+                <div className="mb-1 text-xs font-bold" style={{ color: t.primary }}>
+                  Today
+                </div>
+                <div
+                  className="mb-1 text-[15px] font-bold tracking-[-0.02em]"
+                  style={{ color: t.text }}
+                >
+                  Run 4 km after work
+                </div>
+                <div className="text-xs" style={{ color: t.muted }}>
+                  30 minutes · keeps your marathon plan on track
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                background: t.bgSoft,
+                borderColor: t.border,
+              }}
+            >
+              <div
+                className="mb-3 font-mono text-[11px] tracking-[0.08em]"
+                style={{ color: t.faint }}
+              >
+                LIFE PROGRESS
+              </div>
+
+              {[
+                { label: "Goals", pct: 72, color: t.primary },
+                { label: "Fitness", pct: 81, color: t.blue },
+                { label: "Reading", pct: 64, color: t.amber },
+              ].map((item) => (
+                <div key={item.label} className="mb-3 last:mb-0">
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span style={{ color: t.muted }}>{item.label}</span>
+                    <span style={{ color: t.textSoft }}>{item.pct}%</span>
+                  </div>
+
+                  <div
+                    className="h-2 overflow-hidden rounded-full border"
+                    style={{
+                      background: t.surface,
+                      borderColor: t.border,
+                    }}
+                  >
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${item.pct}%`,
+                        background: item.color,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card

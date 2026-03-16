@@ -6,7 +6,7 @@ export type NutritionPhase = "maintain" | "cut";
 // Fallback hardcoded targets — used only if profile has no macros set yet
 const FALLBACK_TARGETS: Record<NutritionPhase, Macros & { note: string }> = {
   maintain: {
-    cal: 2400, protein: 156, carbs: 260, fat: 68,
+    cal: 2700, protein: 160, carbs: 340, fat: 75,
     note: "Default targets — complete onboarding to personalise.",
   },
   cut: {
