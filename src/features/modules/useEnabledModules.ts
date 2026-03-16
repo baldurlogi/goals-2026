@@ -2,9 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import {
   loadProfile,
   PROFILE_CHANGED_EVENT,
+  readProfileCache,
 } from "@/features/onboarding/profileStorage";
 import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
 import { supabase } from "@/lib/supabaseClient";
+
+function getModulesFromCache(userId: string | null): Set<ModuleId> | null {
+  if (!userId) return null;
+
+  const cached = readProfileCache(userId);
+  const mods = cached?.enabled_modules;
+
+  if (Array.isArray(mods) && mods.length > 0) {
+    return new Set(mods as ModuleId[]);
+  }
+
+  return null;
+}
 
 export function useEnabledModules(): {
   modules: Set<ModuleId>;
@@ -21,18 +35,33 @@ export function useEnabledModules(): {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const applyAuthState = (nextUserId: string | null) => {
       if (!mounted) return;
-      setUserId(session?.user?.id ?? null);
+
+      setUserId(nextUserId);
       setAuthResolved(true);
+
+      if (!nextUserId) {
+        setLoadedUserId(null);
+        setLoadedModules(new Set(DEFAULT_MODULES));
+        return;
+      }
+
+      const cachedModules = getModulesFromCache(nextUserId);
+      if (cachedModules) {
+        setLoadedModules(cachedModules);
+        setLoadedUserId(nextUserId);
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      applyAuthState(session?.user?.id ?? null);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-      setUserId(session?.user?.id ?? null);
-      setAuthResolved(true);
+      applyAuthState(session?.user?.id ?? null);
     });
 
     return () => {
@@ -47,17 +76,29 @@ export function useEnabledModules(): {
     let cancelled = false;
 
     const syncModules = async () => {
-      const profile = await loadProfile();
-      if (cancelled) return;
+      try {
+        const profile = await loadProfile();
+        if (cancelled) return;
 
-      const mods = profile?.enabled_modules;
-      const nextModules =
-        Array.isArray(mods) && mods.length > 0
-          ? new Set(mods as ModuleId[])
-          : new Set(DEFAULT_MODULES);
+        const mods = profile?.enabled_modules;
+        const nextModules =
+          Array.isArray(mods) && mods.length > 0
+            ? new Set(mods as ModuleId[])
+            : new Set(DEFAULT_MODULES);
 
-      setLoadedModules(nextModules);
-      setLoadedUserId(userId);
+        setLoadedModules(nextModules);
+        setLoadedUserId(userId);
+      } catch (error) {
+        console.warn("useEnabledModules load error:", error);
+
+        if (cancelled) return;
+
+        const cachedModules = getModulesFromCache(userId);
+        if (cachedModules) {
+          setLoadedModules(cachedModules);
+          setLoadedUserId(userId);
+        }
+      }
     };
 
     const handleProfileChanged = () => {
@@ -74,19 +115,27 @@ export function useEnabledModules(): {
   }, [authResolved, userId]);
 
   const modules = useMemo(() => {
-    if (!authResolved || userId === null) {
+    if (!authResolved) {
+      return loadedModules;
+    }
+
+    if (userId === null) {
       return new Set(DEFAULT_MODULES);
     }
 
-    if (loadedUserId !== userId) {
-      return new Set(DEFAULT_MODULES);
+    if (loadedUserId === userId) {
+      return loadedModules;
+    }
+
+    const cachedModules = getModulesFromCache(userId);
+    if (cachedModules) {
+      return cachedModules;
     }
 
     return loadedModules;
   }, [authResolved, userId, loadedUserId, loadedModules]);
 
-  const loading =
-    !authResolved || (userId !== null && loadedUserId !== userId);
+  const loading = !authResolved || (userId !== null && loadedUserId !== userId);
 
   return { modules, loading };
 }

@@ -1,8 +1,8 @@
-import { supabase } from '@/lib/supabaseClient';
-import type { UserGoal, UserGoalStep } from './goalTypes';
-import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { supabase } from "@/lib/supabaseClient";
+import type { UserGoal, UserGoalStep } from "./goalTypes";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 
-const CACHE_KEY = 'cache:user_goals:v1';
+const CACHE_KEY = "cache:user_goals:v1";
 
 // -- Cache helpers ------------------------------
 
@@ -26,22 +26,35 @@ function writeCache(goals: UserGoal[]) {
 // -- Load all goals for the current user ------------------------------
 
 export async function loadUserGoals(): Promise<UserGoal[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
+  const cached = readCache();
 
-  const { data, error } = await supabase
-    .from('user_goals')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: true });
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (error || !data) return readCache();
+    if (!user) return cached;
 
-  const goals: UserGoal[] = data.map(rowToGoal);
-  writeCache(goals);
-  return goals;
+    const { data, error } = await supabase
+      .from("user_goals")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+
+    if (error || !data) {
+      if (error) {
+        console.warn("loadUserGoals error:", error);
+      }
+      return cached;
+    }
+
+    const goals: UserGoal[] = data.map(rowToGoal);
+    writeCache(goals);
+    return goals;
+  } catch (error) {
+    console.warn("loadUserGoals exception:", error);
+    return cached;
+  }
 }
 
 export function seedUserGoals(): UserGoal[] {
@@ -63,8 +76,8 @@ export async function saveUserGoal(goal: UserGoal): Promise<void> {
   if (!user) return;
 
   await supabase
-    .from('user_goals')
-    .upsert(goalToRow(user.id, goal), { onConflict: 'id' });
+    .from("user_goals")
+    .upsert(goalToRow(user.id, goal), { onConflict: "id" });
 }
 
 // -- Delete a goal ------------------------------
@@ -78,10 +91,10 @@ export async function deleteUserGoal(goalId: string): Promise<void> {
   if (!user) return;
 
   await supabase
-    .from('user_goals')
+    .from("user_goals")
     .delete()
-    .eq('id', goalId)
-    .eq('user_id', user.id);
+    .eq("id", goalId)
+    .eq("user_id", user.id);
 }
 
 // -- Factory helpers ------------------------------
@@ -89,11 +102,11 @@ export async function deleteUserGoal(goalId: string): Promise<void> {
 export function createBlankGoal(): UserGoal {
   return {
     id: crypto.randomUUID(),
-    userId: '',
-    title: '',
-    subtitle: '',
-    emoji: '🎯',
-    priority: 'medium',
+    userId: "",
+    title: "",
+    subtitle: "",
+    emoji: "🎯",
+    priority: "medium",
     steps: [],
     createdAt: getLocalDateKey(),
     updatedAt: getLocalDateKey(),
@@ -103,10 +116,10 @@ export function createBlankGoal(): UserGoal {
 export function createBlankStep(sortOrder: number): UserGoalStep {
   return {
     id: crypto.randomUUID(),
-    label: '',
-    notes: '',
+    label: "",
+    notes: "",
     idealFinish: null,
-    estimatedTime: '',
+    estimatedTime: "",
     sortOrder,
   };
 }
@@ -118,9 +131,9 @@ function rowToGoal(row: Record<string, unknown>): UserGoal {
     id: row.id as string,
     userId: row.user_id as string,
     title: row.title as string,
-    subtitle: (row.subtitle as string) ?? '',
-    emoji: (row.emoji as string) ?? '🎯',
-    priority: (row.priority as UserGoal['priority']) ?? 'medium',
+    subtitle: (row.subtitle as string) ?? "",
+    emoji: (row.emoji as string) ?? "🎯",
+    priority: (row.priority as UserGoal["priority"]) ?? "medium",
     steps: (row.steps as UserGoalStep[]) ?? [],
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,

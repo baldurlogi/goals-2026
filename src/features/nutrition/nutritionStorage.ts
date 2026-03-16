@@ -1,13 +1,13 @@
-import { supabase } from '@/lib/supabaseClient';
-import type { NutritionPhase } from '@/features/nutrition/nutritionData';
-import type { Macros } from '@/features/nutrition/nutritionTypes';
-import { meals } from '@/features/nutrition/nutritionData';
-import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { supabase } from "@/lib/supabaseClient";
+import type { NutritionPhase } from "@/features/nutrition/nutritionData";
+import type { Macros } from "@/features/nutrition/nutritionTypes";
+import { meals } from "@/features/nutrition/nutritionData";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 
-export const NUTRITION_CHANGED_EVENT = 'nutrition:changed';
+export const NUTRITION_CHANGED_EVENT = "nutrition:changed";
 
-const LOG_CACHE_KEY = 'cache:nutrition_log:v1';
-const PHASE_CACHE_KEY = 'cache:nutrition_phase:v1';
+const LOG_CACHE_KEY = "cache:nutrition_log:v1";
+const PHASE_CACHE_KEY = "cache:nutrition_phase:v1";
 
 function emit() {
   window.dispatchEvent(new Event(NUTRITION_CHANGED_EVENT));
@@ -18,13 +18,13 @@ function todayKey() {
 }
 
 export type MealKey =
-  | 'breakfast1'
-  | 'breakfast2'
-  | 'lunchWfh'
-  | 'lunchOffice'
-  | 'afternoonSnack'
-  | 'postWorkout'
-  | 'dinner';
+  | "breakfast1"
+  | "breakfast2"
+  | "lunchWfh"
+  | "lunchOffice"
+  | "afternoonSnack"
+  | "postWorkout"
+  | "dinner";
 
 export type CustomEntry = {
   id: string;
@@ -75,7 +75,7 @@ function writeLogCache(log: NutritionLog): void {
 function readPhaseCache(): NutritionPhase | null {
   try {
     const raw = localStorage.getItem(PHASE_CACHE_KEY);
-    return raw === 'cut' || raw === 'maintain' ? raw : null;
+    return raw === "cut" || raw === "maintain" ? raw : null;
   } catch {
     return null;
   }
@@ -101,29 +101,29 @@ export async function loadPhase(): Promise<NutritionPhase> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return 'maintain';
+  if (!user) return "maintain";
 
   const { data, error } = await supabase
-    .from('nutrition_phase')
-    .select('phase')
-    .eq('user_id', user.id)
+    .from("nutrition_phase")
+    .select("phase")
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) {
-    console.warn('loadPhase error:', error);
-    return 'maintain';
+    console.warn("loadPhase error:", error);
+    return "maintain";
   }
 
   if (!data) {
     await supabase
-      .from('nutrition_phase')
-      .insert({ user_id: user.id, phase: 'maintain' });
+      .from("nutrition_phase")
+      .insert({ user_id: user.id, phase: "maintain" });
 
-    writePhaseCache('maintain');
-    return 'maintain';
+    writePhaseCache("maintain");
+    return "maintain";
   }
 
-  const phase = (data.phase as NutritionPhase) ?? 'maintain';
+  const phase = (data.phase as NutritionPhase) ?? "maintain";
   writePhaseCache(phase);
   return phase;
 }
@@ -141,8 +141,8 @@ export async function savePhase(phase: NutritionPhase): Promise<void> {
   }
 
   await supabase
-    .from('nutrition_phase')
-    .upsert({ user_id: user.id, phase }, { onConflict: 'user_id' });
+    .from("nutrition_phase")
+    .upsert({ user_id: user.id, phase }, { onConflict: "user_id" });
 
   emit();
 }
@@ -150,70 +150,95 @@ export async function savePhase(phase: NutritionPhase): Promise<void> {
 export async function loadNutritionLog(
   date = todayKey(),
 ): Promise<NutritionLog> {
-  if (date === todayKey()) {
-    const cached = readLogCache();
-    if (cached) return cached;
-  }
+  const cached = date === todayKey() ? readLogCache() : null;
+  if (cached) return cached;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) return emptyLog(date);
+    if (!user) return cached ?? emptyLog(date);
 
-  const { data, error } = await supabase
-    .from('nutrition_logs')
-    .select('log_date, eaten, custom_entries')
-    .eq('user_id', user.id)
-    .eq('log_date', date)
-    .maybeSingle();
+    const { data, error } = await supabase
+      .from("nutrition_logs")
+      .select("log_date, eaten, custom_entries")
+      .eq("user_id", user.id)
+      .eq("log_date", date)
+      .maybeSingle();
 
-  if (error) {
-    console.warn('loadNutritionLog error:', error);
-    return emptyLog(date);
-  }
+    if (error) {
+      console.warn("loadNutritionLog error:", error);
+      return cached ?? emptyLog(date);
+    }
 
-  if (!data) {
-    const created = {
-      user_id: user.id,
-      log_date: date,
-      eaten: {},
-      custom_entries: [],
+    if (!data) {
+      const created = {
+        user_id: user.id,
+        log_date: date,
+        eaten: {},
+        custom_entries: [],
+      };
+
+      const { error: insertError } = await supabase
+        .from("nutrition_logs")
+        .insert(created);
+
+      if (insertError) {
+        console.warn("loadNutritionLog insert error:", insertError);
+      }
+
+      const fresh = emptyLog(date);
+      if (date === todayKey()) writeLogCache(fresh);
+      return fresh;
+    }
+
+    const log: NutritionLog = {
+      date: data.log_date,
+      eaten: (data.eaten ?? {}) as NutritionLog["eaten"],
+      customEntries: (data.custom_entries ?? []) as NutritionLog["customEntries"],
     };
-    await supabase.from('nutrition_logs').insert(created);
-    return emptyLog(date);
+
+    if (date === todayKey()) writeLogCache(log);
+    return log;
+  } catch (error) {
+    console.warn("loadNutritionLog exception:", error);
+    return cached ?? emptyLog(date);
   }
-
-  const log: NutritionLog = {
-    date: data.log_date,
-    eaten: (data.eaten ?? {}) as NutritionLog['eaten'],
-    customEntries: (data.custom_entries ?? []) as NutritionLog['customEntries'],
-  };
-
-  if (date === todayKey()) writeLogCache(log);
-  return log;
 }
 
 async function saveLog(log: NutritionLog): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return;
-
   if (log.date === todayKey()) writeLogCache(log);
 
-  await supabase.from('nutrition_logs').upsert(
-    {
-      user_id: user.id,
-      log_date: log.date,
-      eaten: log.eaten ?? {},
-      custom_entries: log.customEntries ?? [],
-    },
-    { onConflict: 'user_id,log_date' },
-  );
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  emit();
+    if (!user) {
+      emit();
+      return;
+    }
+
+    const { error } = await supabase.from("nutrition_logs").upsert(
+      {
+        user_id: user.id,
+        log_date: log.date,
+        eaten: log.eaten ?? {},
+        custom_entries: log.customEntries ?? [],
+      },
+      { onConflict: "user_id,log_date" },
+    );
+
+    if (error) {
+      console.warn("saveLog error:", error);
+    }
+
+    emit();
+  } catch (error) {
+    console.warn("saveLog exception:", error);
+    emit();
+  }
 }
 
 export async function toggleMeal(key: MealKey, eaten: boolean): Promise<void> {
@@ -231,7 +256,7 @@ export async function addCustomEntry(
   log.customEntries = log.customEntries ?? [];
   log.customEntries.push({
     id: crypto.randomUUID(),
-    name: name.trim() || 'Custom meal',
+    name: name.trim() || "Custom meal",
     macros,
     loggedAt: Date.now(),
   });
@@ -251,13 +276,13 @@ export async function loadSavedMeals(): Promise<SavedMeal[]> {
   if (!user) return [];
 
   const { data, error } = await supabase
-    .from('saved_meals')
-    .select('id, name, emoji, macros')
-    .eq('user_id', user.id)
-    .order('created_at');
+    .from("saved_meals")
+    .select("id, name, emoji, macros")
+    .eq("user_id", user.id)
+    .order("created_at");
 
   if (error) {
-    console.warn('loadSavedMeals error:', error);
+    console.warn("loadSavedMeals error:", error);
     return [];
   }
 
@@ -267,7 +292,7 @@ export async function loadSavedMeals(): Promise<SavedMeal[]> {
 export async function saveNewMeal(
   name: string,
   macros: Macros,
-  emoji = '🍽️',
+  emoji = "🍽️",
 ): Promise<SavedMeal> {
   const {
     data: { user },
@@ -281,7 +306,7 @@ export async function saveNewMeal(
   };
 
   if (user) {
-    await supabase.from('saved_meals').insert({ ...meal, user_id: user.id });
+    await supabase.from("saved_meals").insert({ ...meal, user_id: user.id });
     emit();
   }
 
@@ -289,7 +314,7 @@ export async function saveNewMeal(
 }
 
 export async function deleteSavedMeal(id: string): Promise<void> {
-  await supabase.from('saved_meals').delete().eq('id', id);
+  await supabase.from("saved_meals").delete().eq("id", id);
   emit();
 }
 
