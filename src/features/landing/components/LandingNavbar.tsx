@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TOKENS } from "../theme/tokens";
 import type { ThemeMode } from "../types";
@@ -5,7 +6,6 @@ import { ThemeToggle } from "./ThemeToggle";
 
 type LandingNavbarProps = {
   theme: ThemeMode;
-  scrolled?: boolean;
   onToggleTheme: () => void;
   onSignIn: () => void;
   onGetStarted: () => void;
@@ -13,12 +13,40 @@ type LandingNavbarProps = {
 
 export function LandingNavbar({
   theme,
-  scrolled = false,
   onToggleTheme,
   onSignIn,
   onGetStarted,
 }: LandingNavbarProps) {
   const t = TOKENS[theme];
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    let frameId = 0;
+
+    const updateScrolled = () => {
+      const next = window.scrollY > 20;
+      setScrolled((prev) => (prev === next ? prev : next));
+    };
+
+    const onScroll = () => {
+      if (frameId) return;
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        updateScrolled();
+      });
+    };
+
+    updateScrolled();
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, []);
 
   function scrollTo(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });

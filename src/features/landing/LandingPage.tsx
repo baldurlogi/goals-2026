@@ -1,34 +1,127 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLandingTheme } from "./hooks/useLandingTheme";
 import { LandingNavbar } from "./components/LandingNavbar";
 import { HeroSection } from "./components/HeroSection";
-import { HowItWorksSection } from "./components/HowItWorksSection";
-import { FeaturesSection } from "./components/FeaturesSection";
-import { DifferentiationSection } from "./components";
-import { PricingSection } from "./components/PricingSection";
-import { FinalCtaSection } from "./components";
-import { LandingFooter } from "./components";
 import type { BillingMode } from "./types";
 import { LandingShell } from "./components/LandingShell";
+
+const HowItWorksSection = lazy(async () => ({
+  default: (await import("./components/HowItWorksSection")).HowItWorksSection,
+}));
+
+const FeaturesSection = lazy(async () => ({
+  default: (await import("./components/FeaturesSection")).FeaturesSection,
+}));
+
+const DifferentiationSection = lazy(async () => ({
+  default: (await import("./components/DifferentiationSection"))
+    .DifferentiationSection,
+}));
+
+const PricingSection = lazy(async () => ({
+  default: (await import("./components/PricingSection")).PricingSection,
+}));
+
+const FinalCtaSection = lazy(async () => ({
+  default: (await import("./components/FinalCtaSection")).FinalCtaSection,
+}));
+
+const LandingFooter = lazy(async () => ({
+  default: (await import("./components/LandingFooter")).LandingFooter,
+}));
+
+function scheduleIdle(callback: () => void, delay = 0) {
+  let timeoutId: number | null = null;
+  let idleId: number | null = null;
+
+  const run = () => {
+    const w = window as Window & {
+      requestIdleCallback?: (
+        cb: () => void,
+        options?: { timeout: number }
+      ) => number;
+    };
+
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(callback, { timeout: 1500 });
+      return;
+    }
+
+    timeoutId = window.setTimeout(callback, 1);
+  };
+
+  timeoutId = window.setTimeout(run, delay);
+
+  return () => {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+
+    const w = window as Window & {
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (idleId !== null && typeof w.cancelIdleCallback === "function") {
+      w.cancelIdleCallback(idleId);
+    }
+  };
+}
+
+function useDeferredMount(delay = 0) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const cancel = scheduleIdle(() => setReady(true), delay);
+    return cancel;
+  }, [delay]);
+
+  return ready;
+}
+
+function SectionPlaceholder({
+  id,
+  minHeight,
+}: {
+  id?: string;
+  minHeight: number;
+}) {
+  return (
+    <section
+      id={id}
+      aria-hidden="true"
+      className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8"
+      style={{ minHeight }}
+    />
+  );
+}
+
+function DeferredSection({
+  when,
+  fallback,
+  children,
+}: {
+  when: boolean;
+  fallback: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  if (!when) return <>{fallback}</>;
+
+  return <Suspense fallback={fallback}>{children}</Suspense>;
+}
 
 export function LandingPage() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useLandingTheme();
   const [billing, setBilling] = useState<BillingMode>("monthly");
-  const [scrolled, setScrolled] = useState(false);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const showStageOne = useDeferredMount(120);
+  const showStageTwo = useDeferredMount(700);
 
   return (
     <LandingShell theme={theme}>
       <LandingNavbar
         theme={theme}
-        scrolled={scrolled}
         onToggleTheme={toggleTheme}
         onSignIn={() => navigate("/auth")}
         onGetStarted={() => navigate("/auth")}
@@ -38,30 +131,66 @@ export function LandingPage() {
         theme={theme}
         onGetStarted={() => navigate("/auth")}
         onSeeHowItWorks={() =>
-          document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })
+          document
+            .getElementById("how-it-works")
+            ?.scrollIntoView({ behavior: "smooth" })
         }
       />
 
-      <HowItWorksSection theme={theme} />
-      <FeaturesSection theme={theme} />
-      <DifferentiationSection theme={theme} />
+      <DeferredSection
+        when={showStageOne}
+        fallback={<SectionPlaceholder id="how-it-works" minHeight={640} />}
+      >
+        <HowItWorksSection theme={theme} />
+      </DeferredSection>
 
-      <PricingSection
-        theme={theme}
-        billing={billing}
-        setBilling={setBilling}
-        onChoosePlan={() => navigate("/auth")}
-      />
+      <DeferredSection
+        when={showStageOne}
+        fallback={<SectionPlaceholder id="features" minHeight={720} />}
+      >
+        <FeaturesSection theme={theme} />
+      </DeferredSection>
 
-      <FinalCtaSection
-        theme={theme}
-        onGetStarted={() => navigate("/auth")}
-        onSeePricing={() =>
-          document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })
-        }
-      />
+      <DeferredSection
+        when={showStageOne}
+        fallback={<SectionPlaceholder minHeight={640} />}
+      >
+        <DifferentiationSection theme={theme} />
+      </DeferredSection>
 
-      <LandingFooter theme={theme} />
+      <DeferredSection
+        when={showStageTwo}
+        fallback={<SectionPlaceholder id="pricing" minHeight={760} />}
+      >
+        <PricingSection
+          theme={theme}
+          billing={billing}
+          setBilling={setBilling}
+          onChoosePlan={() => navigate("/auth")}
+        />
+      </DeferredSection>
+
+      <DeferredSection
+        when={showStageTwo}
+        fallback={<SectionPlaceholder minHeight={320} />}
+      >
+        <FinalCtaSection
+          theme={theme}
+          onGetStarted={() => navigate("/auth")}
+          onSeePricing={() =>
+            document
+              .getElementById("pricing")
+              ?.scrollIntoView({ behavior: "smooth" })
+          }
+        />
+      </DeferredSection>
+
+      <DeferredSection
+        when={showStageTwo}
+        fallback={<SectionPlaceholder minHeight={140} />}
+      >
+        <LandingFooter theme={theme} />
+      </DeferredSection>
     </LandingShell>
   );
 }

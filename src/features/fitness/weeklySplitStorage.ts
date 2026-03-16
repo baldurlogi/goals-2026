@@ -1,6 +1,15 @@
 import { supabase } from "@/lib/supabaseClient";
-import { DAY_KEYS, DEFAULT_SPLIT_LABELS, FITNESS_CHANGED_EVENT } from "./constants";
-import { diffDays, todayISO, yesterdayISO } from "./date";
+import {
+  DAY_KEYS,
+  DEFAULT_SPLIT_LABELS,
+  FITNESS_CHANGED_EVENT,
+} from "./constants";
+import {
+  diffDays,
+  isISOInCurrentWeek,
+  todayISO,
+  yesterdayISO,
+} from "./date";
 import type { DayKey, DaySplit, WeeklySplitConfig } from "./types";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
@@ -12,19 +21,28 @@ function emit() {
   }
 }
 
+function normalizeCompletedDate(completedDate: string | null): string | null {
+  if (!completedDate) return null;
+  return isISOInCurrentWeek(completedDate) ? completedDate : null;
+}
+
 function normalizeWeeklySplit(cfg: WeeklySplitConfig): WeeklySplitConfig {
   const next = { ...cfg, days: { ...cfg.days } };
 
   for (const dk of DAY_KEYS) {
-    if (!next.days[dk]) {
-      next.days[dk] = {
-        label: DEFAULT_SPLIT_LABELS[dk],
-        completedDate: null,
-      };
-    }
+    const existing = next.days[dk];
+
+    next.days[dk] = {
+      label: existing?.label ?? DEFAULT_SPLIT_LABELS[dk],
+      completedDate: normalizeCompletedDate(existing?.completedDate ?? null),
+    };
   }
 
-  return next;
+  return {
+    days: next.days,
+    streak: typeof next.streak === "number" ? next.streak : 0,
+    lastStreakDate: next.lastStreakDate ?? null,
+  };
 }
 
 export function makeDefaultSplit(): WeeklySplitConfig {
@@ -118,19 +136,20 @@ export async function toggleDayCompletion(
   cfg: WeeklySplitConfig,
   day: DayKey,
 ): Promise<WeeklySplitConfig> {
+  const normalizedCfg = normalizeWeeklySplit(cfg);
   const today = todayISO();
   const isToday = day === todayDayKey();
-  const wasCompleted = cfg.days[day].completedDate === today;
+  const wasCompleted = normalizedCfg.days[day].completedDate === today;
 
   const updatedDays: Record<DayKey, DaySplit> = {
-    ...cfg.days,
+    ...normalizedCfg.days,
     [day]: {
-      ...cfg.days[day],
+      ...normalizedCfg.days[day],
       completedDate: wasCompleted ? null : today,
     },
   };
 
-  let { streak, lastStreakDate } = cfg;
+  let { streak, lastStreakDate } = normalizedCfg;
 
   if (isToday) {
     if (!wasCompleted) {
@@ -163,12 +182,14 @@ export async function updateDayLabel(
   day: DayKey,
   label: string,
 ): Promise<WeeklySplitConfig> {
+  const normalizedCfg = normalizeWeeklySplit(cfg);
+
   const next: WeeklySplitConfig = {
-    ...cfg,
+    ...normalizedCfg,
     days: {
-      ...cfg.days,
+      ...normalizedCfg.days,
       [day]: {
-        ...cfg.days[day],
+        ...normalizedCfg.days[day],
         label,
       },
     },

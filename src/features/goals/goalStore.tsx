@@ -229,36 +229,6 @@ export function GoalStoreProvider({
     }
   }, [persistDoneState]);
 
-  React.useEffect(() => {
-    async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        const cached = readCache();
-        dispatch({ type: "hydrate", done: cached });
-        writeCache(cached);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("goal_progress")
-        .select("goal_id, done")
-        .eq("user_id", user.id);
-
-      const done: DoneState = {};
-      for (const row of data ?? []) {
-        done[row.goal_id] = row.done;
-      }
-
-      dispatch({ type: "hydrate", done });
-      writeCache(done);
-    }
-
-    void load();
-  }, []);
-
   const dispatch = React.useCallback(
     (action: Action) => {
       if (action.type === "toggleStep") {
@@ -280,6 +250,63 @@ export function GoalStoreProvider({
     },
     [state.done],
   );
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      const cached = readCache();
+
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          if (!cancelled) {
+            dispatch({ type: "hydrate", done: cached });
+          }
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("goal_progress")
+          .select("goal_id, done")
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.warn("goalStore load error:", error);
+
+          if (!cancelled) {
+            dispatch({ type: "hydrate", done: cached });
+          }
+          return;
+        }
+
+        const done: DoneState = {};
+        for (const row of data ?? []) {
+          done[row.goal_id] = row.done;
+        }
+
+        if (!cancelled) {
+          dispatch({ type: "hydrate", done });
+          writeCache(done);
+        }
+      } catch (error) {
+        console.warn("goalStore load exception:", error);
+
+        if (!cancelled) {
+          dispatch({ type: "hydrate", done: cached });
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch]);
 
   React.useEffect(() => {
     if (!state.loaded) return;

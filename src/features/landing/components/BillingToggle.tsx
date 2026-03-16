@@ -17,7 +17,7 @@ export function BillingToggle({
 
   return (
     <div
-      className="inline-flex items-center gap-1 rounded-full border p-1"
+      className="inline-flex min-h-[50px] items-center gap-1 rounded-full border p-1"
       style={{
         background: t.surface,
         borderColor: t.border,
@@ -27,7 +27,7 @@ export function BillingToggle({
         type="button"
         variant="ghost"
         onClick={() => setBilling("monthly")}
-        className="rounded-full px-4 py-2 text-sm font-semibold"
+        className="min-w-[112px] rounded-full px-4 py-2 text-sm font-semibold"
         style={{
           background: billing === "monthly" ? t.primarySoft : "transparent",
           color: billing === "monthly" ? t.primary : t.muted,
@@ -44,7 +44,7 @@ export function BillingToggle({
         type="button"
         variant="ghost"
         onClick={() => setBilling("yearly")}
-        className="rounded-full px-4 py-2 text-sm font-semibold"
+        className="min-w-[208px] rounded-full px-4 py-2 text-sm font-semibold"
         style={{
           background: billing === "yearly" ? t.primarySoft : "transparent",
           color: billing === "yearly" ? t.primary : t.muted,

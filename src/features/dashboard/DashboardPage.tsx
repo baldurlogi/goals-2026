@@ -10,15 +10,19 @@ import { Link } from "react-router-dom";
 import { Apple, BookOpen, Dumbbell, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-import { AICoachCard } from "./components/AICoachCard";
 import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
-import { AIUsagePill } from "@/features/subscription/AIUsagePill";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
 import { scheduleIdle } from "@/lib/scheduleIdle";
 
+const AICoachCard = lazy(async () => ({
+  default: (await import("./components/AICoachCard")).AICoachCard,
+}));
+const AIUsagePill = lazy(async () => ({
+  default: (await import("@/features/subscription/AIUsagePill")).AIUsagePill,
+}));
 const ReadingCard = lazy(async () => ({
   default: (await import("./components/ReadingCard")).ReadingCard,
 }));
@@ -86,6 +90,23 @@ function DeferredGroup({
   );
 }
 
+function TopCardPlaceholder() {
+  return (
+    <div className="lg:col-span-12 rounded-2xl border bg-card/70 p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="h-6 w-6 rounded-md bg-muted" />
+        <div className="h-3 w-24 rounded bg-muted" />
+      </div>
+      <div className="h-5 w-2/3 rounded bg-muted" />
+      <div className="mt-2 h-3 w-5/6 rounded bg-muted" />
+    </div>
+  );
+}
+
+function UsagePillPlaceholder() {
+  return <div className="h-10 w-[190px] rounded-full border bg-card/70" />;
+}
+
 function QuickAction({
   icon,
   label,
@@ -136,11 +157,10 @@ export default function DashboardPage() {
   const isPro = tierMeets(tier, "pro");
   const has = (id: string) => modules.has(id as never);
 
-  const [goalCount, setGoalCount] = useState<number | null>(() =>
-    seedUserGoals().length
-  );
+  const [goalCount, setGoalCount] = useState<number | null>(null);
 
-  const showStageOne = useDeferredMount(120);
+  const showTopEnhancements = useDeferredMount(120);
+  const showStageOne = useDeferredMount(260);
   const showStageTwo = useDeferredMount(700);
 
   useEffect(() => {
@@ -212,7 +232,9 @@ export default function DashboardPage() {
           </h1>
         </div>
 
-        <AIUsagePill />
+        <Suspense fallback={<UsagePillPlaceholder />}>
+          {showTopEnhancements ? <AIUsagePill /> : <UsagePillPlaceholder />}
+        </Suspense>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
@@ -222,7 +244,9 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <AICoachCard />
+        <Suspense fallback={<TopCardPlaceholder />}>
+          {showTopEnhancements ? <AICoachCard /> : <TopCardPlaceholder />}
+        </Suspense>
 
         {quickActions.length > 0 && (
           <div className="md:col-span-2 lg:col-span-12">

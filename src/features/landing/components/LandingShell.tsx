@@ -13,7 +13,7 @@ export function LandingShell({ theme, children }: LandingShellProps) {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100svh",
         background: t.bg,
         color: t.text,
         transition: "background 0.25s ease, color 0.25s ease",

@@ -124,10 +124,15 @@ function defaultProfile(id: string): UserProfile {
   };
 }
 
-export function readProfileCache(): UserProfile | null {
+export function readProfileCache(userId?: string | null): UserProfile | null {
+  if (!userId) return null;
+
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as UserProfile) : null;
+    const raw = localStorage.getItem(profileCacheKey(userId));
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as UserProfile;
+    return parsed.id === userId ? parsed : null;
   } catch {
     return null;
   }
@@ -208,7 +213,7 @@ export async function saveProfile(
 
   if (error) throw error;
 
-  const cached = readProfileCache();
+  const cached = readProfileCache(user.id);
   const next = cached
     ? ({ ...cached, ...patch } as UserProfile)
     : ({ ...defaultProfile(user.id), ...patch } as UserProfile);

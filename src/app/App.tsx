@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/react"
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { GoalStoreProvider } from "@/features/goals/goalStore";
 import { AuthProvider } from "./providers/AuthProvider";
 import { RequireAuth } from "@/features/auth/RequireAuth";
@@ -44,11 +44,50 @@ export default function App() {
       <AuthProvider>
         <Routes>
           {/* ── PUBLIC ────────────────────────────────────────── */}
-          <Route path="/" element={<RedirectIfAuth><LandingPage /></RedirectIfAuth>} />
-          <Route path="/auth" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
-          <Route path="/auth/callback" element={<AuthCallbackPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/terms" element={<TermsPage />} />
+          <Route
+            path="/"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <RedirectIfAuth>
+                  <LandingPage />
+                </RedirectIfAuth>
+              </Suspense>
+            }
+          />
+          <Route
+            path="/auth"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <RedirectIfAuth>
+                  <LoginPage />
+                </RedirectIfAuth>
+              </Suspense>
+            }
+          />
+          <Route
+            path="/auth/callback"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <AuthCallbackPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/privacy"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <PrivacyPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/terms"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <TermsPage />
+              </Suspense>
+            }
+          />
 
           {/* ── PROTECTED APP ─────────────────────────────────── */}
           <Route
@@ -57,7 +96,9 @@ export default function App() {
               <RequireAuth>
                 <RequireOnboarding>
                   <GoalStoreProvider>
-                    <AppLayout />
+                    <Suspense fallback={<RouteFallback />}>
+                      <AppLayout />
+                    </Suspense>
                   </GoalStoreProvider>
                 </RequireOnboarding>
               </RequireAuth>

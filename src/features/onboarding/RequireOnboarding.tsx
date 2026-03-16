@@ -37,7 +37,6 @@ function RequireOnboardingForUser({ user, children }: InnerProps) {
       setProfile(p);
       setChecking(false);
     });
-  }, [user]);
 
   if (checking) return null;
 

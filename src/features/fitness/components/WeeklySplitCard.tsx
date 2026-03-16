@@ -3,7 +3,12 @@ import { Check, Flame, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DAY_KEYS, REST_LABELS } from "../constants";
-import { todayISO } from "../date";
+import {
+  formatShortDate,
+  formatWeekRange,
+  getDateForWeekIndex,
+  todayISO,
+} from "../date";
 import { type DayKey, type WeeklySplitConfig } from "../types";
 import {
   loadWeeklySplit,
@@ -21,6 +26,7 @@ export function WeeklySplitCard() {
 
   const today = todayISO();
   const todayKey = todayDayKey();
+  const weekRange = formatWeekRange();
 
   useEffect(() => {
     void loadWeeklySplit().then(setCfg);
@@ -69,8 +75,13 @@ export function WeeklySplitCard() {
   return (
     <Card className="rounded-2xl">
       <CardHeader className="px-4 pb-3 pt-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">Weekly Split</CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base font-semibold">Weekly Split</CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {weekRange} · Monday–Sunday
+            </p>
+          </div>
 
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="tabular-nums font-medium text-foreground">
@@ -80,18 +91,20 @@ export function WeeklySplitCard() {
           </div>
         </div>
 
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Tap a day to mark it done. Edit labels to customise your plan.
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Tap a day to mark it done. Every new Monday starts a fresh weekly
+          checklist, while your streak stays the same.
         </p>
       </CardHeader>
 
       <CardContent className="space-y-1 px-4 pb-4">
-        {DAY_KEYS.map((dk) => {
+        {DAY_KEYS.map((dk, index) => {
           const day = cfg.days[dk];
           const isToday = dk === todayKey;
           const isDone = day.completedDate !== null;
           const isRest = REST_LABELS.has(day.label.toLowerCase());
           const isEditing = editingDay === dk;
+          const calendarDate = formatShortDate(getDateForWeekIndex(index));
 
           return (
             <div
@@ -154,6 +167,8 @@ export function WeeklySplitCard() {
 
                 {!isEditing && (
                   <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>{calendarDate}</span>
+                    <span>•</span>
                     {isDone ? (
                       <span>Completed {day.completedDate}</span>
                     ) : isRest ? (

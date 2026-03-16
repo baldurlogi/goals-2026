@@ -10,6 +10,7 @@ import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
+import { useAuth } from "@/features/auth/authContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,9 +34,6 @@ class AIUsageLimitError extends Error {
   }
 }
 
-const CACHE_KEY = "cache:ai-coach:v1";
-const LAST_MODULE_KEY = "cache:ai-coach:last-module";
-const LAST_SESSION_KEY = "cache:ai-coach:last-session:v1";
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const SUPABASE_FN =
   "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
@@ -77,11 +75,25 @@ function scheduleIdle(callback: () => void, delay = 0) {
   };
 }
 
-// ── Cache helpers ─────────────────────────────────────────────────────────────
+// ── User-scoped cache helpers ────────────────────────────────────────────────
 
-function readCache(): CoachSuggestion | null {
+function coachCacheKey(userId: string) {
+  return `cache:ai-coach:v2:${userId}`;
+}
+
+function lastModuleKey(userId: string) {
+  return `cache:ai-coach:last-module:v2:${userId}`;
+}
+
+function lastSessionKey(userId: string) {
+  return `cache:ai-coach:last-session:v2:${userId}`;
+}
+
+function readCache(userId: string | null): CoachSuggestion | null {
+  if (!userId) return null;
+
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(coachCacheKey(userId));
     if (!raw) return null;
     const entry: CacheEntry = JSON.parse(raw);
     if (Date.now() - entry.builtAt > CACHE_TTL) return null;
@@ -91,32 +103,38 @@ function readCache(): CoachSuggestion | null {
   }
 }
 
-function writeCache(suggestion: CoachSuggestion) {
+function writeCache(userId: string | null, suggestion: CoachSuggestion) {
+  if (!userId) return;
+
   try {
     localStorage.setItem(
-      CACHE_KEY,
+      coachCacheKey(userId),
       JSON.stringify({ suggestion, builtAt: Date.now() })
     );
 
     if (suggestion.module) {
-      localStorage.setItem(LAST_MODULE_KEY, suggestion.module);
+      localStorage.setItem(lastModuleKey(userId), suggestion.module);
     }
   } catch {
     // ignore
   }
 }
 
-function clearCache() {
+function clearCache(userId: string | null) {
+  if (!userId) return;
+
   try {
-    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(coachCacheKey(userId));
   } catch {
     // ignore
   }
 }
 
-function readLastModule(): string | null {
+function readLastModule(userId: string | null): string | null {
+  if (!userId) return null;
+
   try {
-    return localStorage.getItem(LAST_MODULE_KEY);
+    return localStorage.getItem(lastModuleKey(userId));
   } catch {
     return null;
   }
@@ -129,9 +147,11 @@ type LastSession = {
   stepLabel: string;
 };
 
-function readLastSession(): LastSession | null {
+function readLastSession(userId: string | null): LastSession | null {
+  if (!userId) return null;
+
   try {
-    const raw = localStorage.getItem(LAST_SESSION_KEY);
+    const raw = localStorage.getItem(lastSessionKey(userId));
     if (!raw) return null;
     return JSON.parse(raw) as LastSession;
   } catch {
@@ -141,7 +161,7 @@ function readLastSession(): LastSession | null {
 
 // ── Fetch from edge function ──────────────────────────────────────────────────
 
-async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
+async function fetchCoachSuggestion(userId: string): Promise<CoachSuggestion> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -149,7 +169,7 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   if (!session?.access_token) throw new Error("Not signed in");
 
   const { systemContext } = await buildAIContext();
-  const lastSuggestedModule = readLastModule();
+  const lastSuggestedModule = readLastModule(userId);
 
   const res = await fetch(SUPABASE_FN, {
     method: "POST",
@@ -270,7 +290,7 @@ function buildStarterSuggestion(
   return null;
 }
 
-async function buildStaticSuggestion(): Promise<CoachSuggestion> {
+async function buildStaticSuggestion(userId: string): Promise<CoachSuggestion> {
   const signals = await buildAISignals();
 
   const starter = buildStarterSuggestion(signals);
@@ -307,7 +327,7 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
     )}-${String(d.getDate()).padStart(2, "0")}`;
   })();
 
-  const session = readLastSession();
+  const session = readLastSession(userId);
   const hasYesterdaySession = session?.date === yesterday;
 
   const reason =
@@ -327,49 +347,56 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
 // ── Card ──────────────────────────────────────────────────────────────────────
 
 function AICoachCardInner() {
-  const [initialCached] = useState<CoachSuggestion | null>(() => readCache());
-  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(initialCached);
-  const [loading, setLoading] = useState(initialCached === null);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+
+  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAI, setIsAI] = useState(false);
   const [limitHit, setLimitHit] = useState(false);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
 
-  const loadStatic = useCallback(async (showSpinner = false) => {
-    if (showSpinner) {
-      setLoading(true);
-    }
-
-    setError(null);
-    setIsAI(false);
-    setLimitHit(false);
-    setLimitMessage(null);
-
-    try {
-      const s = await buildStaticSuggestion();
-      writeCache(s);
-      setSuggestion(s);
-    } catch (e) {
-      const cached = readCache();
-      if (cached) {
-        setSuggestion(cached);
-      } else {
-        setError(e instanceof Error ? e.message : "Something went wrong");
+  const loadStatic = useCallback(
+    async (targetUserId: string, showSpinner = false) => {
+      if (showSpinner) {
+        setLoading(true);
       }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+
+      setError(null);
+      setIsAI(false);
+      setLimitHit(false);
+      setLimitMessage(null);
+
+      try {
+        const s = await buildStaticSuggestion(targetUserId);
+        writeCache(targetUserId, s);
+        setSuggestion(s);
+      } catch (e) {
+        const cached = readCache(targetUserId);
+        if (cached) {
+          setSuggestion(cached);
+        } else {
+          setError(e instanceof Error ? e.message : "Something went wrong");
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   const loadAI = useCallback(async () => {
+    if (!userId) return;
+
     setLoading(true);
     setError(null);
     setLimitHit(false);
     setLimitMessage(null);
 
     try {
-      const s = await fetchCoachSuggestion();
-      writeCache(s);
+      const s = await fetchCoachSuggestion(userId);
+      writeCache(userId, s);
       setSuggestion(s);
       setIsAI(true);
     } catch (e) {
@@ -383,34 +410,55 @@ function AICoachCardInner() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    const cancelIdleLoad = scheduleIdle(
-      () => {
-        void loadStatic(initialCached === null);
-      },
-      initialCached ? 180 : 40
-    );
+    if (!userId) {
+      setSuggestion(null);
+      setLoading(false);
+      setError(null);
+      setIsAI(false);
+      setLimitHit(false);
+      setLimitMessage(null);
+      return;
+    }
+
+    const cached = readCache(userId);
+    setSuggestion(cached);
+    setLoading(cached === null);
+    setError(null);
+    setIsAI(false);
+    setLimitHit(false);
+    setLimitMessage(null);
+
+    let cancelled = false;
+
+    const cancelIdleLoad = scheduleIdle(() => {
+      if (cancelled) return;
+      void loadStatic(userId, cached === null);
+    }, cached ? 180 : 40);
 
     const handleReadingChanged = () => {
-      clearCache();
-      void loadStatic(false);
+      clearCache(userId);
+      void loadStatic(userId, false);
     };
 
     window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
 
     return () => {
+      cancelled = true;
       cancelIdleLoad();
       window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
     };
-  }, [initialCached, loadStatic]);
+  }, [userId, loadStatic]);
 
   function handleRefresh() {
-    clearCache();
+    if (!userId) return;
+
+    clearCache(userId);
 
     if (isAI) {
-      void loadStatic(false);
+      void loadStatic(userId, false);
     } else {
       void loadAI();
     }
@@ -434,7 +482,7 @@ function AICoachCardInner() {
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={loading}
+            disabled={loading || !userId}
             className="rounded-md p-1.5 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground disabled:opacity-30"
             title="Get a new suggestion"
           >

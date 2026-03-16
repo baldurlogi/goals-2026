@@ -60,8 +60,10 @@ export function clearUserCache(): void {
           return;
         }
       }
-    });
+    }
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
   } catch {
-    return;
+    // ignore
   }
 }
