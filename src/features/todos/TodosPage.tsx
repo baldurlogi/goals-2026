@@ -12,6 +12,7 @@ import {
   TODO_CHANGED_EVENT,
   type TodoItem,
 } from "@/features/todos/todoStorage";
+import type { StorageMutationResult } from "@/lib/storageResult";
 
 export function TodosPage() {
   const [todos, setTodos]           = useState<TodoItem[]>([]);
@@ -30,12 +31,35 @@ export function TodosPage() {
     };
   }, []);
 
+  async function handleMutationWithToast(
+    mutation: () => Promise<StorageMutationResult>,
+    retry: () => void,
+    successMessage?: string,
+  ) {
+    const result = await mutation();
+    if (!result.ok) {
+      toast.error(result.error ?? "Couldn't update your todos.", {
+        action: {
+          label: "Retry",
+          onClick: retry,
+        },
+      });
+      return;
+    }
+
+    if (successMessage) toast.success(successMessage);
+  }
+
   function handleAdd() {
     if (!input.trim()) return;
-    addTodo(input);
+    const nextInput = input;
+    void handleMutationWithToast(
+      () => addTodo(nextInput),
+      () => void addTodo(nextInput),
+      "Task added",
+    );
     setInput("");
     inputRef.current?.focus();
-    toast.success("Task added");
   }
 
   const incomplete = todos.filter((t) => !t.done);
@@ -54,7 +78,12 @@ export function TodosPage() {
             variant="ghost"
             size="sm"
             className="h-7 gap-1 text-xs text-muted-foreground"
-            onClick={clearCompleted}
+            onClick={() =>
+              void handleMutationWithToast(
+                () => clearCompleted(),
+                () => void clearCompleted(),
+              )
+            }
           >
             <Trash2 className="h-3 w-3" />
             Clear completed
@@ -85,7 +114,7 @@ export function TodosPage() {
       ) : (
         <div className="divide-y divide-border/50 rounded-xl border bg-card">
           {incomplete.map((item) => (
-            <TodoRow key={item.id} item={item} />
+            <TodoRow key={item.id} item={item} onMutate={handleMutationWithToast} />
           ))}
         </div>
       )}
@@ -107,7 +136,7 @@ export function TodosPage() {
           {showDone && (
             <div className="mt-2 divide-y divide-border/50 rounded-xl border bg-card opacity-70">
               {done.map((item) => (
-                <TodoRow key={item.id} item={item} />
+                <TodoRow key={item.id} item={item} onMutate={handleMutationWithToast} />
               ))}
             </div>
           )}
@@ -117,12 +146,27 @@ export function TodosPage() {
   );
 }
 
-function TodoRow({ item }: { item: TodoItem }) {
+function TodoRow({
+  item,
+  onMutate,
+}: {
+  item: TodoItem;
+  onMutate: (
+    mutation: () => Promise<StorageMutationResult>,
+    retry: () => void,
+    successMessage?: string,
+  ) => Promise<void>;
+}) {
   return (
     <div className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
       <Checkbox
         checked={item.done}
-        onCheckedChange={() => toggleTodo(item.id)}
+        onCheckedChange={() =>
+          void onMutate(
+            () => toggleTodo(item.id),
+            () => void toggleTodo(item.id),
+          )
+        }
         className="shrink-0"
       />
       <span
@@ -134,7 +178,12 @@ function TodoRow({ item }: { item: TodoItem }) {
       </span>
       <button
         type="button"
-        onClick={() => deleteTodo(item.id)}
+        onClick={() =>
+          void onMutate(
+            () => deleteTodo(item.id),
+            () => void deleteTodo(item.id),
+          )
+        }
         className="invisible shrink-0 text-muted-foreground/40 hover:text-muted-foreground group-hover:visible"
       >
         <X className="h-3.5 w-3.5" />

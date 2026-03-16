@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckSquare, ChevronRight, Plus, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,7 +19,17 @@ function TodoCardInner() {
 
   async function handleAdd() {
     if (!input.trim()) return;
-    await addTodo(input);
+    const nextInput = input;
+    const result = await addTodo(nextInput);
+    if (!result.ok) {
+      toast.error(result.error ?? 'Could not add todo', {
+        action: {
+          label: 'Retry',
+          onClick: () => void addTodo(nextInput),
+        },
+      });
+      return;
+    }
     setInput('');
     inputRef.current?.focus();
   }
@@ -59,7 +70,18 @@ function TodoCardInner() {
               >
                 <Checkbox
                   checked={item.done}
-                  onCheckedChange={() => void toggleTodo(item.id)}
+                  onCheckedChange={() =>
+                    void toggleTodo(item.id).then((result) => {
+                      if (!result.ok) {
+                        toast.error(result.error ?? 'Could not update todo', {
+                          action: {
+                            label: 'Retry',
+                            onClick: () => void toggleTodo(item.id),
+                          },
+                        });
+                      }
+                    })
+                  }
                   className="shrink-0"
                 />
                 <span
@@ -71,7 +93,18 @@ function TodoCardInner() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => void deleteTodo(item.id)}
+                  onClick={() =>
+                    void deleteTodo(item.id).then((result) => {
+                      if (!result.ok) {
+                        toast.error(result.error ?? 'Could not delete todo', {
+                          action: {
+                            label: 'Retry',
+                            onClick: () => void deleteTodo(item.id),
+                          },
+                        });
+                      }
+                    })
+                  }
                   className="invisible shrink-0 text-muted-foreground/40 hover:text-muted-foreground group-hover:visible"
                 >
                   <X className="h-3 w-3" />
