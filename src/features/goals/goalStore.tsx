@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 import {
   GoalsStoreContext,
   type Action,
@@ -8,15 +9,103 @@ import {
 } from "./goalStoreContext";
 
 const CACHE_KEY = "cache:goals:v1";
+const LEGACY_WEEKLY_DONE_KEY = "goals:done:v1";
+const STEP_HISTORY_KEY = "goals:step-history:v1";
+
+type StepHistoryEntry = {
+  goalId: string;
+  stepId: string;
+  date: string;
+};
 
 function readCache(): DoneState {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw =
+      localStorage.getItem(CACHE_KEY) ??
+      localStorage.getItem(LEGACY_WEEKLY_DONE_KEY);
     return raw ? (JSON.parse(raw) as DoneState) : {};
   } catch {
-    // ignore corrupted cache / private mode
     return {};
   }
+}
+
+function writeCache(done: DoneState) {
+  try {
+    const serialized = JSON.stringify(done);
+    localStorage.setItem(CACHE_KEY, serialized);
+    localStorage.setItem(LEGACY_WEEKLY_DONE_KEY, serialized);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function readStepHistory(): StepHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(STEP_HISTORY_KEY);
+    return raw ? (JSON.parse(raw) as StepHistoryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStepHistory(entries: StepHistoryEntry[]) {
+  try {
+    localStorage.setItem(STEP_HISTORY_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function addStepHistory(goalId: string, stepId: string) {
+  const today = getLocalDateKey();
+  const next = readStepHistory().filter(
+    (entry) =>
+      !(
+        entry.goalId === goalId &&
+        entry.stepId === stepId &&
+        entry.date === today
+      ),
+  );
+
+  next.push({ goalId, stepId, date: today });
+  writeStepHistory(next);
+}
+
+function removeStepHistoryForToday(goalId: string, stepId: string) {
+  const today = getLocalDateKey();
+  writeStepHistory(
+    readStepHistory().filter(
+      (entry) =>
+        !(
+          entry.goalId === goalId &&
+          entry.stepId === stepId &&
+          entry.date === today
+        ),
+    ),
+  );
+}
+
+function clearGoalHistoryForToday(goalId: string) {
+  const today = getLocalDateKey();
+  writeStepHistory(
+    readStepHistory().filter(
+      (entry) => !(entry.goalId === goalId && entry.date === today),
+    ),
+  );
+}
+
+async function deleteGoalProgress(goalId: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  await supabase
+    .from("goal_progress")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("goal_id", goalId);
 }
 
 function reducer(state: GoalsState, action: Action): GoalsState {
@@ -45,18 +134,26 @@ function reducer(state: GoalsState, action: Action): GoalsState {
   }
 }
 
-export function GoalStoreProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = React.useReducer(reducer, {
-    done: readCache(), // instant paint from cache
+export function GoalStoreProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [state, rawDispatch] = React.useReducer(reducer, {
+    done: readCache(),
     loaded: false,
   });
 
-  // ── Hydrate from Supabase on mount ────────────────────────────────────────
   React.useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) {
-        dispatch({ type: "hydrate", done: readCache() });
+        const cached = readCache();
+        dispatch({ type: "hydrate", done: cached });
+        writeCache(cached);
         return;
       }
 
@@ -66,40 +163,56 @@ export function GoalStoreProvider({ children }: { children: React.ReactNode }) {
         .eq("user_id", user.id);
 
       const done: DoneState = {};
-      for (const row of data ?? []) done[row.goal_id] = row.done;
+      for (const row of data ?? []) {
+        done[row.goal_id] = row.done;
+      }
 
       dispatch({ type: "hydrate", done });
-
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(done));
-      } catch {
-        // ignore quota / private mode
-      }
+      writeCache(done);
     }
+
     void load();
   }, []);
 
-  // ── Persist to Supabase on every state change (after loaded) ─────────────
+  const dispatch = React.useCallback(
+    (action: Action) => {
+      if (action.type === "toggleStep") {
+        const wasDone = !!state.done[action.goalId]?.[action.stepId];
+
+        if (wasDone) {
+          removeStepHistoryForToday(action.goalId, action.stepId);
+        } else {
+          addStepHistory(action.goalId, action.stepId);
+        }
+      }
+
+      if (action.type === "resetGoal") {
+        clearGoalHistoryForToday(action.goalId);
+        void deleteGoalProgress(action.goalId);
+      }
+
+      rawDispatch(action);
+    },
+    [state.done],
+  );
+
   React.useEffect(() => {
     if (!state.loaded) return;
 
     async function persist() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      writeCache(state.done);
+
       if (!user) return;
 
       for (const [goalId, done] of Object.entries(state.done)) {
-        await supabase
-          .from("goal_progress")
-          .upsert(
-            { user_id: user.id, goal_id: goalId, done },
-            { onConflict: "user_id,goal_id" }
-          );
-      }
-
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(state.done));
-      } catch {
-        // ignore quota / private mode
+        await supabase.from("goal_progress").upsert(
+          { user_id: user.id, goal_id: goalId, done },
+          { onConflict: "user_id,goal_id" },
+        );
       }
     }
 

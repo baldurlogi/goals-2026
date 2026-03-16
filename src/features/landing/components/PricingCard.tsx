@@ -9,6 +9,10 @@ type PricingCardProps = PricingPlan & {
   onChoosePlan: () => void;
 };
 
+function formatMonthlyEquivalent(yearly: number) {
+  return (yearly / 12).toFixed(2);
+}
+
 export function PricingCard({
   theme,
   billing,
@@ -23,9 +27,9 @@ export function PricingCard({
 }: PricingCardProps) {
   const t = TOKENS[theme];
   const isFree = monthly === 0;
-  const displayPrice = billing === "monthly" ? monthly : yearly;
-  const helperMonthly =
-    !isFree && billing === "yearly" ? `$${(yearly / 12).toFixed(2)}/mo billed yearly` : null;
+  const isYearly = billing === "yearly";
+  const displayPrice = isYearly ? yearly : monthly;
+  const equivalentMonthly = !isFree ? formatMonthlyEquivalent(yearly) : null;
 
   return (
     <Card
@@ -71,17 +75,42 @@ export function PricingCard({
 
           {!isFree && (
             <div className="mb-1 text-sm" style={{ color: t.faint }}>
-              /{billing === "monthly" ? "mo" : "yr"}
+              /{isYearly ? "yr" : "mo"}
             </div>
           )}
         </div>
 
-        <div className="mb-5 min-h-[20px] text-xs" style={{ color: t.primary }}>
-          {isFree
-            ? "No credit card required"
-            : billing === "yearly"
-              ? `${helperMonthly} · save 17%`
-              : `or $${yearly}/year · save 17%`}
+        <div className="mb-5 min-h-[52px]">
+          {isFree ? (
+            <div className="text-xs" style={{ color: t.primary }}>
+              No credit card required
+            </div>
+          ) : isYearly ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-sm">
+                <span
+                  className="line-through"
+                  style={{ color: t.faint }}
+                >
+                  ${monthly}/mo
+                </span>
+                <span
+                  className="font-semibold"
+                  style={{ color: t.primary }}
+                >
+                  ${equivalentMonthly}/mo equivalent
+                </span>
+              </div>
+
+              <div className="text-xs" style={{ color: t.primary }}>
+                Billed once yearly · save 17%
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs" style={{ color: t.primary }}>
+              or ${yearly}/year · billed once yearly · save 17%
+            </div>
+          )}
         </div>
 
         <div className="mb-6 grid gap-2.5">

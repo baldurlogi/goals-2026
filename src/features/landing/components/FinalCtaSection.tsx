@@ -44,10 +44,10 @@ export function FinalCtaSection({
             color: t.text,
           }}
         >
-          Stop feeling behind.
+          Big goals feel lighter
           <br />
           <em style={{ color: t.primary }}>
-            Start making visible progress.
+            when the next step is clear.
           </em>
         </h2>
 
@@ -55,8 +55,8 @@ export function FinalCtaSection({
           className="mx-auto mb-8 max-w-2xl text-sm leading-8 sm:text-[15px]"
           style={{ color: t.faint }}
         >
-          Daily Life Progress is built for people with meaningful ambitions,
-          busy lives, and brains that need clarity more than more noise.
+          Start with one goal. Let AI build the plan. See your next move and your
+          progress in one place.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -69,7 +69,7 @@ export function FinalCtaSection({
               color: theme === "dark" ? "#052e16" : "#ffffff",
             }}
           >
-            Create your account →
+            Start free →
           </Button>
 
           {onSeePricing && (

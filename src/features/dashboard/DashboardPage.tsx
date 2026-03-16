@@ -1,25 +1,126 @@
-import { useEffect, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router-dom";
 import { Apple, BookOpen, Dumbbell, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-import { ReadingCard } from "./components/ReadingCard";
-import { MacrosCard } from "./components/MacrosCard";
-import { ScheduleCard } from "./components/ScheduleCard";
-import { UpcomingGoalsCard } from "./components/UpcomingGoalsCard";
-import { SpendingCard } from "./components/SpendingCard";
-import { TodoCard } from "./components/TodoCard";
-import { FitnessCard } from "./components/FitnessCard";
 import { AICoachCard } from "./components/AICoachCard";
-import { WaterIntakeCard } from "./components/WaterIntakeCard";
-import { LifeProgressCard } from "./components/LifeProgressCard";
-import { AchievementsCard } from "./components/AchievementsCard";
-import { WeeklyReportCard } from "./components/WeeklyReportCard";
 import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
+import { AIUsagePill } from "@/features/subscription/AIUsagePill";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
+
+const ReadingCard = lazy(async () => ({
+  default: (await import("./components/ReadingCard")).ReadingCard,
+}));
+const MacrosCard = lazy(async () => ({
+  default: (await import("./components/MacrosCard")).MacrosCard,
+}));
+const ScheduleCard = lazy(async () => ({
+  default: (await import("./components/ScheduleCard")).ScheduleCard,
+}));
+const UpcomingGoalsCard = lazy(async () => ({
+  default: (await import("./components/UpcomingGoalsCard")).UpcomingGoalsCard,
+}));
+const SpendingCard = lazy(async () => ({
+  default: (await import("./components/SpendingCard")).SpendingCard,
+}));
+const TodoCard = lazy(async () => ({
+  default: (await import("./components/TodoCard")).TodoCard,
+}));
+const FitnessCard = lazy(async () => ({
+  default: (await import("./components/FitnessCard")).FitnessCard,
+}));
+const WaterIntakeCard = lazy(async () => ({
+  default: (await import("./components/WaterIntakeCard")).WaterIntakeCard,
+}));
+const LifeProgressCard = lazy(async () => ({
+  default: (await import("./components/LifeProgressCard")).LifeProgressCard,
+}));
+const AchievementsCard = lazy(async () => ({
+  default: (await import("./components/AchievementsCard")).AchievementsCard,
+}));
+const WeeklyReportCard = lazy(async () => ({
+  default: (await import("./components/WeeklyReportCard")).WeeklyReportCard,
+}));
+
+function scheduleIdle(callback: () => void, delay = 0) {
+  let timeoutId: number | null = null;
+  let idleId: number | null = null;
+
+  const run = () => {
+    const w = window as Window & {
+      requestIdleCallback?: (
+        cb: () => void,
+        options?: { timeout: number }
+      ) => number;
+    };
+
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(callback, { timeout: 1200 });
+      return;
+    }
+
+    timeoutId = window.setTimeout(callback, 1);
+  };
+
+  timeoutId = window.setTimeout(run, delay);
+
+  return () => {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+
+    const w = window as Window & {
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (idleId !== null && typeof w.cancelIdleCallback === "function") {
+      w.cancelIdleCallback(idleId);
+    }
+  };
+}
+
+function useDeferredMount(delay = 0) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const cancel = scheduleIdle(() => setReady(true), delay);
+    return cancel;
+  }, [delay]);
+
+  return ready;
+}
+
+function DeferredGroup({
+  when,
+  children,
+}: {
+  when: boolean;
+  children: ReactNode;
+}) {
+  if (!when) return null;
+
+  return (
+    <Suspense
+      fallback={
+        <div className="md:col-span-2 lg:col-span-12 rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+          Loading more dashboard cards…
+        </div>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
 
 function QuickAction({
   icon,
@@ -28,7 +129,7 @@ function QuickAction({
   href,
   color,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   sub: string;
   href: string;
@@ -71,57 +172,68 @@ export default function DashboardPage() {
   const isPro = tierMeets(tier, "pro");
   const has = (id: string) => modules.has(id as never);
 
-  const [goalCount, setGoalCount] = useState<number | null>(
-    () => seedUserGoals().length
+  const [goalCount, setGoalCount] = useState<number | null>(() =>
+    seedUserGoals().length
   );
+
+  const showStageOne = useDeferredMount(120);
+  const showStageTwo = useDeferredMount(700);
 
   useEffect(() => {
     let cancelled = false;
+
     loadUserGoals().then((fresh) => {
       if (cancelled) return;
       setGoalCount(fresh.length);
     });
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const showEmptyState = goalCount === 0;
 
-  const quickActions = [
-    has("nutrition") && {
-      icon: <Apple className="h-4 w-4" />,
-      label: "Log a meal",
-      sub: "Nutrition tab",
-      href: "/app/nutrition",
-      color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-    },
-    has("reading") && {
-      icon: <BookOpen className="h-4 w-4" />,
-      label: "Update pages",
-      sub: "Reading tab",
-      href: "/app/reading",
-      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    },
-    has("fitness") && {
-      icon: <Dumbbell className="h-4 w-4" />,
-      label: "Log a PR",
-      sub: "Fitness",
-      href: "/app/fitness",
-      color: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-    },
-    has("goals") && {
-      icon: <TrendingUp className="h-4 w-4" />,
-      label: "Review goals",
-      sub: "Upcoming tasks",
-      href: "/app/upcoming",
-      color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-    },
-  ].filter(Boolean) as {
-    icon: React.ReactNode;
-    label: string;
-    sub: string;
-    href: string;
-    color: string;
-  }[];
+  const quickActions = useMemo(
+    () =>
+      [
+        has("nutrition") && {
+          icon: <Apple className="h-4 w-4" />,
+          label: "Log a meal",
+          sub: "Nutrition tab",
+          href: "/app/nutrition",
+          color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+        },
+        has("reading") && {
+          icon: <BookOpen className="h-4 w-4" />,
+          label: "Update pages",
+          sub: "Reading tab",
+          href: "/app/reading",
+          color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+        },
+        has("fitness") && {
+          icon: <Dumbbell className="h-4 w-4" />,
+          label: "Log a PR",
+          sub: "Fitness",
+          href: "/app/fitness",
+          color: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+        },
+        has("goals") && {
+          icon: <TrendingUp className="h-4 w-4" />,
+          label: "Review goals",
+          sub: "Upcoming tasks",
+          href: "/app/upcoming",
+          color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+        },
+      ].filter(Boolean) as {
+        icon: ReactNode;
+        label: string;
+        sub: string;
+        href: string;
+        color: string;
+      }[],
+    [modules]
+  );
 
   return (
     <div className="space-y-5">
@@ -135,6 +247,8 @@ export default function DashboardPage() {
             {firstName ? ` ${firstName}` : ""} 👋
           </h1>
         </div>
+
+        <AIUsagePill />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
@@ -145,17 +259,6 @@ export default function DashboardPage() {
         )}
 
         <AICoachCard />
-        <LifeProgressCard />
-        {isPro && <WeeklyReportCard />}
-        {has("reading") && <ReadingCard />}
-        {has("nutrition") && <MacrosCard />}
-        {has("schedule") && <ScheduleCard />}
-        {has("goals") && <UpcomingGoalsCard />}
-        {has("finance") && <SpendingCard />}
-        {has("todos") && <TodoCard />}
-        {has("fitness") && <FitnessCard />}
-        {has("nutrition") && <WaterIntakeCard />}
-        <AchievementsCard />
 
         {quickActions.length > 0 && (
           <div className="md:col-span-2 lg:col-span-12">
@@ -166,10 +269,27 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        <DeferredGroup when={showStageOne}>
+          <LifeProgressCard />
+          {isPro && <WeeklyReportCard />}
+          {has("reading") && <ReadingCard />}
+          {has("nutrition") && <MacrosCard />}
+          {has("schedule") && <ScheduleCard />}
+          {has("goals") && <UpcomingGoalsCard />}
+        </DeferredGroup>
+
+        <DeferredGroup when={showStageTwo}>
+          {has("finance") && <SpendingCard />}
+          {has("todos") && <TodoCard />}
+          {has("fitness") && <FitnessCard />}
+          {has("nutrition") && <WaterIntakeCard />}
+          <AchievementsCard />
+        </DeferredGroup>
       </div>
 
       {modules.size === 0 && (
-        <div className="rounded-2xl border border-dashed p-12 text-center space-y-3">
+        <div className="space-y-3 rounded-2xl border border-dashed p-12 text-center">
           <p className="text-lg font-semibold">No modules enabled</p>
           <p className="text-sm text-muted-foreground">
             Go to Profile settings to choose what you want to track.

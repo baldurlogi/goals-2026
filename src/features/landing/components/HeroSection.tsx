@@ -54,7 +54,7 @@ export function HeroSection({
               color: t.text,
             }}
           >
-            Turn your life goals
+            Turn big life goals
             <br />
             <em style={{ color: t.primary, fontStyle: "italic" }}>
               into daily progress.
@@ -65,16 +65,16 @@ export function HeroSection({
             className="mb-3 max-w-2xl text-[clamp(16px,2vw,19px)] leading-8"
             style={{ color: t.muted }}
           >
-            Break big ambitions into clear daily steps with an AI-powered life
-            dashboard.
+            An AI-powered life system that turns one goal into a clear plan,
+            shows your next best action, and makes progress visible across your real life.
           </p>
 
           <p
             className="mb-7 max-w-2xl text-sm leading-8 sm:text-[15px]"
             style={{ color: t.faint }}
           >
-            Goals, habits, fitness, learning and finances — all connected so you
-            can see your real progress and always know what to do next.
+            Replace overwhelm with one connected system for goals, habits, health,
+            learning, routines, and momentum — so you stop guessing and start moving.
           </p>
 
           <div className="mb-6 flex flex-wrap gap-3">
@@ -87,7 +87,7 @@ export function HeroSection({
                 color: theme === "dark" ? "#052e16" : "#ffffff",
               }}
             >
-              Start for free →
+              Start free →
             </Button>
 
             <Button
@@ -101,7 +101,7 @@ export function HeroSection({
                 color: t.textSoft,
               }}
             >
-              See how it works
+              See the flow
             </Button>
           </div>
 

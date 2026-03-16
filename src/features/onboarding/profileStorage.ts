@@ -2,7 +2,12 @@ import { supabase } from "@/lib/supabaseClient";
 import type { ModuleId } from "@/features/modules/modules";
 
 export type Sex = "male" | "female";
-export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "very_active";
+export type ActivityLevel =
+  | "sedentary"
+  | "light"
+  | "moderate"
+  | "active"
+  | "very_active";
 export type ScheduleView = "wfh" | "office" | "weekend";
 
 export type MacroTargets = {
@@ -45,40 +50,36 @@ export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   very_active: 1.9,
 };
 
-/** Mifflin-St Jeor BMR → TDEE */
 export function calculateTDEE(
   weight_kg: number,
   height_cm: number,
   age: number,
   sex: Sex,
-  activity: ActivityLevel,
+  activity: ActivityLevel
 ): number {
   const bmr =
     sex === "male"
       ? 10 * weight_kg + 6.25 * height_cm - 5 * age + 5
       : 10 * weight_kg + 6.25 * height_cm - 5 * age - 161;
+
   return Math.round(bmr * ACTIVITY_MULTIPLIERS[activity]);
 }
 
-/** Generate maintain + cut macro targets from profile */
 export function calculateMacros(
   weight_kg: number,
   height_cm: number,
   age: number,
   sex: Sex,
-  activity: ActivityLevel,
+  activity: ActivityLevel
 ): { maintain: MacroTargets; cut: MacroTargets } {
   const tdee = calculateTDEE(weight_kg, height_cm, age, sex, activity);
 
-  // Protein: 2g per kg bodyweight
   const protein = Math.round(weight_kg * 2);
 
-  // Maintain
   const mCal = tdee;
   const mFat = Math.round((mCal * 0.27) / 9);
   const mCarbs = Math.round((mCal - protein * 4 - mFat * 9) / 4);
 
-  // Cut: 400 kcal deficit, higher protein
   const cCal = tdee - 400;
   const cProtein = Math.round(weight_kg * 2.2);
   const cFat = Math.round((cCal * 0.25) / 9);
@@ -86,14 +87,22 @@ export function calculateMacros(
 
   return {
     maintain: { cal: mCal, protein, carbs: Math.max(0, mCarbs), fat: mFat },
-    cut: { cal: cCal, protein: cProtein, carbs: Math.max(0, cCarbs), fat: cFat },
+    cut: {
+      cal: cCal,
+      protein: cProtein,
+      carbs: Math.max(0, cCarbs),
+      fat: cFat,
+    },
   };
 }
 
 const CACHE_KEY = "cache:profile:v1";
 
 export const PROFILE_CHANGED_EVENT = "profile:changed";
-const emitProfileChanged = () => window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
+const emitProfileChanged = () =>
+  window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
+
+let inFlightProfileLoad: Promise<UserProfile | null> | null = null;
 
 function defaultProfile(id: string): UserProfile {
   return {
@@ -132,24 +141,47 @@ function writeProfileCache(profile: UserProfile) {
 }
 
 export async function loadProfile(): Promise<UserProfile | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  if (!user) {
+    inFlightProfileLoad = null;
+    return null;
+  }
 
-  if (error || !data) return null;
+  if (inFlightProfileLoad) {
+    return inFlightProfileLoad;
+  }
 
-  const profile = data as UserProfile;
-  writeProfileCache(profile);
-  return profile;
+  inFlightProfileLoad = (async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !data) return null;
+
+    const profile = data as UserProfile;
+    writeProfileCache(profile);
+    return profile;
+  })();
+
+  try {
+    return await inFlightProfileLoad;
+  } finally {
+    inFlightProfileLoad = null;
+  }
 }
 
-export async function saveProfile(patch: Partial<Omit<UserProfile, "id">>): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
+export async function saveProfile(
+  patch: Partial<Omit<UserProfile, "id">>
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) return;
 
   const { error } = await supabase
@@ -158,22 +190,23 @@ export async function saveProfile(patch: Partial<Omit<UserProfile, "id">>): Prom
 
   if (error) throw error;
 
-  // Update cache (even if it doesn't exist yet)
   const cached = readProfileCache();
   const next = cached
     ? ({ ...cached, ...patch } as UserProfile)
     : ({ ...defaultProfile(user.id), ...patch } as UserProfile);
 
   writeProfileCache(next);
-
-  // Notify app listeners (useProfile, etc.)
+  inFlightProfileLoad = null;
   emitProfileChanged();
 }
 
 export async function completeOnboarding(
-  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">,
+  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">
 ): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) return;
 
   const macros =
@@ -183,7 +216,7 @@ export async function completeOnboarding(
           profile.height_cm,
           profile.age,
           profile.sex,
-          profile.activity_level,
+          profile.activity_level
         )
       : null;
 

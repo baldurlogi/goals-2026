@@ -11,7 +11,6 @@ import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
 
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
@@ -34,11 +33,49 @@ class AIUsageLimitError extends Error {
   }
 }
 
-const CACHE_KEY          = "cache:ai-coach:v1";
-const LAST_MODULE_KEY    = "cache:ai-coach:last-module";
-const LAST_SESSION_KEY   = "cache:ai-coach:last-session:v1";
-const CACHE_TTL          = 60 * 60 * 1000; // 1 hour
-const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+const CACHE_KEY = "cache:ai-coach:v1";
+const LAST_MODULE_KEY = "cache:ai-coach:last-module";
+const LAST_SESSION_KEY = "cache:ai-coach:last-session:v1";
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const SUPABASE_FN =
+  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+
+function scheduleIdle(callback: () => void, delay = 0) {
+  let timeoutId: number | null = null;
+  let idleId: number | null = null;
+
+  const run = () => {
+    const w = window as Window & {
+      requestIdleCallback?: (
+        cb: () => void,
+        options?: { timeout: number }
+      ) => number;
+    };
+
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(callback, { timeout: 1200 });
+      return;
+    }
+
+    timeoutId = window.setTimeout(callback, 1);
+  };
+
+  timeoutId = window.setTimeout(run, delay);
+
+  return () => {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+
+    const w = window as Window & {
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (idleId !== null && typeof w.cancelIdleCallback === "function") {
+      w.cancelIdleCallback(idleId);
+    }
+  };
+}
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
 
@@ -49,41 +86,66 @@ function readCache(): CoachSuggestion | null {
     const entry: CacheEntry = JSON.parse(raw);
     if (Date.now() - entry.builtAt > CACHE_TTL) return null;
     return entry.suggestion;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function writeCache(suggestion: CoachSuggestion) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ suggestion, builtAt: Date.now() }));
-    // Persist the module so next refresh avoids repeating it
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ suggestion, builtAt: Date.now() })
+    );
+
     if (suggestion.module) {
       localStorage.setItem(LAST_MODULE_KEY, suggestion.module);
     }
-  } catch { /* storage full */ }
+  } catch {
+    // ignore
+  }
 }
 
 function clearCache() {
-  try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 function readLastModule(): string | null {
-  try { return localStorage.getItem(LAST_MODULE_KEY); } catch { return null; }
+  try {
+    return localStorage.getItem(LAST_MODULE_KEY);
+  } catch {
+    return null;
+  }
 }
 
-type LastSession = { date: string; goalId: string; goalTitle: string; stepLabel: string };
+type LastSession = {
+  date: string;
+  goalId: string;
+  goalTitle: string;
+  stepLabel: string;
+};
 
 function readLastSession(): LastSession | null {
   try {
     const raw = localStorage.getItem(LAST_SESSION_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as LastSession;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 // ── Fetch from edge function ──────────────────────────────────────────────────
 
 async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   if (!session?.access_token) throw new Error("Not signed in");
 
   const { systemContext } = await buildAIContext();
@@ -93,7 +155,7 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({
       action: "coach",
@@ -110,7 +172,7 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
     }
 
     throw new AIUsageLimitError(
-      data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions.",
+      data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions."
     );
   }
 
@@ -122,33 +184,31 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   const data = await res.json();
   const s = data.suggestion as CoachSuggestion;
 
-  // Validate shape
   if (!s?.action || !s?.href) throw new Error("Invalid suggestion shape");
   return s;
 }
 
-// ── Card inner ────────────────────────────────────────────────────────────────
+// ── Static suggestion ─────────────────────────────────────────────────────────
 
 function buildStarterSuggestion(
-  signals: Awaited<ReturnType<typeof buildAISignals>>,
+  signals: Awaited<ReturnType<typeof buildAISignals>>
 ): CoachSuggestion | null {
   if (signals.modules.includes("goals") && signals.goals.count === 0) {
     return {
       action: "Create your first goal",
-      reason: "Start with one meaningful goal so your coach can guide your next steps.",
+      reason:
+        "Start with one meaningful goal so your coach can guide your next steps.",
       href: "/app/goals",
       emoji: "🎯",
       module: "goals",
     };
   }
 
-  if (
-    signals.modules.includes("reading") &&
-    !signals.reading.currentBookTitle
-  ) {
+  if (signals.modules.includes("reading") && !signals.reading.currentBookTitle) {
     return {
       action: "Add your current book",
-      reason: "Once a book is set, your coach can help you keep reading momentum.",
+      reason:
+        "Once a book is set, your coach can help you keep reading momentum.",
       href: "/app/reading",
       emoji: "📖",
       module: "reading",
@@ -176,7 +236,8 @@ function buildStarterSuggestion(
   ) {
     return {
       action: "Log your first meal",
-      reason: "A quick nutrition check-in gives the coach something real to work with.",
+      reason:
+        "A quick nutrition check-in gives the coach something real to work with.",
       href: "/app/nutrition",
       emoji: "🥗",
       module: "nutrition",
@@ -209,8 +270,6 @@ function buildStarterSuggestion(
   return null;
 }
 
-
-// Build a static suggestion from priority logic (no AI, no network)
 async function buildStaticSuggestion(): Promise<CoachSuggestion> {
   const signals = await buildAISignals();
 
@@ -239,19 +298,22 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
     schedule: "📅",
   };
 
-  // Check for yesterday's session — if found, prepend continuity to the reason
   const yesterday = (() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
   })();
 
   const session = readLastSession();
   const hasYesterdaySession = session?.date === yesterday;
 
-  const reason = hasYesterdaySession && top.module === "goals" && session.goalId
-    ? `You were working on "${session.goalTitle}" yesterday — keep the momentum going.`
-    : top.reason;
+  const reason =
+    hasYesterdaySession && top.module === "goals" && session.goalId
+      ? `You were working on "${session.goalTitle}" yesterday — keep the momentum going.`
+      : top.reason;
 
   return {
     action: top.action,
@@ -262,44 +324,49 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
   };
 }
 
-
-
+// ── Card ──────────────────────────────────────────────────────────────────────
 
 function AICoachCardInner() {
-  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(null);
-  const [loading, setLoading]       = useState(true); // true on mount — loads static immediately
-  const [error, setError]           = useState<string | null>(null);
-  const [isAI, setIsAI]             = useState(false);
+  const [initialCached] = useState<CoachSuggestion | null>(() => readCache());
+  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(initialCached);
+  const [loading, setLoading] = useState(initialCached === null);
+  const [error, setError] = useState<string | null>(null);
+  const [isAI, setIsAI] = useState(false);
   const [limitHit, setLimitHit] = useState(false);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
 
+  const loadStatic = useCallback(async (showSpinner = false) => {
+    if (showSpinner) {
+      setLoading(true);
+    }
 
-  // On mount: always show static priority-based suggestion, ignore stale AI cache
-  const loadStatic = useCallback(async () => {
-    setLoading(true);
     setError(null);
     setIsAI(false);
     setLimitHit(false);
     setLimitMessage(null);
+
     try {
       const s = await buildStaticSuggestion();
+      writeCache(s);
       setSuggestion(s);
     } catch (e) {
-      // Fall back to AI cache if static fails
       const cached = readCache();
-      if (cached) { setSuggestion(cached); }
-      else { setError(e instanceof Error ? e.message : "Something went wrong"); }
+      if (cached) {
+        setSuggestion(cached);
+      } else {
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // On refresh button: fetch AI suggestion
   const loadAI = useCallback(async () => {
     setLoading(true);
     setError(null);
     setLimitHit(false);
     setLimitMessage(null);
+
     try {
       const s = await fetchCoachSuggestion();
       writeCache(s);
@@ -318,36 +385,39 @@ function AICoachCardInner() {
     }
   }, []);
 
-  // Load static on mount
   useEffect(() => {
-    void loadStatic();
+    const cancelIdleLoad = scheduleIdle(
+      () => {
+        void loadStatic(initialCached === null);
+      },
+      initialCached ? 180 : 40
+    );
 
-    function handleReadingChanged() {
+    const handleReadingChanged = () => {
       clearCache();
-      void loadStatic();
-    }
+      void loadStatic(false);
+    };
 
     window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
 
     return () => {
+      cancelIdleLoad();
       window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
     };
-  }, [loadStatic]);
+  }, [initialCached, loadStatic]);
 
   function handleRefresh() {
     clearCache();
+
     if (isAI) {
-      // Already showing AI — get a new static suggestion first, then AI
-      void loadStatic();
+      void loadStatic(false);
     } else {
-      // Upgrade to AI suggestion
       void loadAI();
     }
   }
 
   return (
     <Card className="relative overflow-hidden lg:col-span-12">
-      {/* Animated gradient top border */}
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-fuchsia-400 via-pink-400 to-orange-400" />
 
       <CardHeader className="pb-3 pt-5">
@@ -368,25 +438,23 @@ function AICoachCardInner() {
             className="rounded-md p-1.5 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground disabled:opacity-30"
             title="Get a new suggestion"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+            />
           </button>
         </div>
       </CardHeader>
 
       <CardContent className="pb-5">
-        {/* Loading state */}
         {loading && !suggestion && (
           <div className="flex items-center gap-3 py-1">
-            <div className="flex gap-1">
-              <span className="h-2 w-2 animate-bounce rounded-full bg-violet-400 [animation-delay:0ms]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-fuchsia-400 [animation-delay:150ms]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-pink-400 [animation-delay:300ms]" />
-            </div>
-            <span className="text-sm text-muted-foreground">Thinking about your day…</span>
+            <div className="h-2 w-2 rounded-full bg-violet-400" />
+            <span className="text-sm text-muted-foreground">
+              Preparing your next move…
+            </span>
           </div>
         )}
 
-        {/* Error state */}
         {error && !suggestion && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
@@ -412,7 +480,6 @@ function AICoachCardInner() {
           </div>
         )}
 
-        {/* Limit hit */}
         {limitHit && (
           <AIUsageLimitNotice
             feature="AI coach refresh"
@@ -421,15 +488,12 @@ function AICoachCardInner() {
           />
         )}
 
-        {/* Suggestion */}
         {suggestion && (
           <div className="flex items-center gap-4">
-            {/* Emoji badge */}
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-2xl">
               {suggestion.emoji}
             </div>
 
-            {/* Text */}
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold leading-snug">
                 {loading ? (
@@ -439,13 +503,12 @@ function AICoachCardInner() {
                 )}
               </p>
               {suggestion.reason && !loading && (
-                <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   {suggestion.reason}
                 </p>
               )}
             </div>
 
-            {/* CTA */}
             {!loading && (
               <Button asChild size="sm" className="shrink-0 gap-1.5">
                 <Link to={suggestion.href}>
@@ -456,17 +519,17 @@ function AICoachCardInner() {
           </div>
         )}
 
-        {/* Powered by badge */}
         <div className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground/40">
           <Zap className="h-2.5 w-2.5" />
-          <span>{isAI ? "AI-powered suggestion" : "Smart suggestion · hit ↻ for AI"} · uses your goals, fitness, reading & nutrition data</span>
+          <span>
+            {isAI ? "AI-powered suggestion" : "Smart suggestion · hit ↻ for AI"} ·
+            uses your goals, fitness, reading & nutrition data
+          </span>
         </div>
       </CardContent>
     </Card>
   );
 }
-
-// ── Export with error boundary ────────────────────────────────────────────────
 
 export function AICoachCard() {
   return (

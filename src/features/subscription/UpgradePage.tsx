@@ -12,6 +12,7 @@ import { useTier, TIER_BADGE, type Tier } from "@/features/subscription/useTier"
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from "@supabase/supabase-js";
+import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
 
 
 const STRIPE_DISABLED = false;
@@ -385,6 +386,8 @@ export function UpgradePage() {
           </div>
         </div>
       </div>
+
+      <AIUsageDetailsCard />
 
       <div className="grid gap-5 md:grid-cols-3">
         {PLANS.map(plan => <PlanCard key={plan.id} plan={plan} isCurrent={tier === plan.id} isYearly={isYearly} />)}

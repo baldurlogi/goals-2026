@@ -3,7 +3,7 @@ import type { PricingPlan } from "../types";
 export const PRICING_PLANS: PricingPlan[] = [
   {
     name: "Free",
-    sub: "Get started and build momentum",
+    sub: "Start tracking your life and build momentum",
     monthly: 0,
     yearly: 0,
     featured: false,
@@ -17,7 +17,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   },
   {
     name: "Pro",
-    sub: "For serious self-improvement",
+    sub: "Turn big goals into daily progress with more AI guidance",
     monthly: 9,
     yearly: 89,
     featured: true,
@@ -26,25 +26,9 @@ export const PRICING_PLANS: PricingPlan[] = [
       "Everything in Free",
       "200 AI prompts / month",
       "AI goal generation",
-      "AI step breakdown",
-      "AI suggestions",
-      "Basic memory + personalization",
-    ],
-  },
-  {
-    name: "Pro Max",
-    sub: "Your AI life coach",
-    monthly: 19,
-    yearly: 189,
-    featured: false,
-    cta: "Get Pro Max",
-    points: [
-      "Everything in Pro",
-      "1000 AI prompts / month",
-      "Persistent AI memory",
-      "Weekly AI life reports",
-      "Deep insights + personalization",
-      "Advanced coaching + recommendations",
+      "AI goal breakdown and suggestions",
+      "Personalized AI guidance",
+      "More clarity, less overwhelm",
     ],
   },
 ];

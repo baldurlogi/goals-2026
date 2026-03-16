@@ -31,7 +31,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
           className="mb-4 font-mono text-[11px] tracking-[0.12em]"
           style={{ color: t.faint }}
         >
-          WHY IT FEELS DIFFERENT
+          WHY IT WORKS
         </div>
 
         <h2
@@ -42,10 +42,10 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
             color: t.text,
           }}
         >
-          Not another task manager.
+          Built to make progress feel
           <br />
           <em style={{ color: t.primary }}>
-            A system that helps you move your life forward.
+            clearer, calmer, and easier to follow.
           </em>
         </h2>
       </div>

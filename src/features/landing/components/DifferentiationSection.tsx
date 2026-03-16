@@ -45,12 +45,25 @@ export function DifferentiationSection({
                 fontSize: 11,
                 color: t.faint,
                 letterSpacing: "0.12em",
-                marginBottom: 18,
+                marginBottom: 10,
                 textAlign: "center",
               }}
             >
-              FOR PEOPLE WHO THINK “I’VE SEEN THIS BEFORE”
+              WHY IT FEELS DIFFERENT
             </div>
+
+            <h2
+              className="mb-8 text-center text-[clamp(24px,3vw,36px)] leading-[1.1] tracking-[-0.03em]"
+              style={{
+                fontFamily: "'Instrument Serif', serif",
+                fontWeight: 400,
+                color: t.text,
+              }}
+            >
+              Less scattered tracking.
+              <br />
+              <em style={{ color: t.primary }}>More visible follow-through.</em>
+            </h2>
 
             <div
               style={{

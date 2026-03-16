@@ -54,7 +54,7 @@ export function PricingSection({
           Start free.
           <br />
           <em style={{ color: t.primary }}>
-            Upgrade when you want more AI guidance.
+            Upgrade to Pro when you want more AI guidance.
           </em>
         </h2>
 
@@ -62,8 +62,8 @@ export function PricingSection({
           className="mx-auto mb-6 max-w-2xl text-sm leading-8 sm:text-[15px]"
           style={{ color: t.faint }}
         >
-          Use the core system for free, unlock more prompts and personalization
-          with Pro, or get a true AI life coach with Pro Max.
+          Keep using the core system for free, or unlock more prompts, better AI
+          planning, and stronger daily guidance with Pro.
         </p>
 
         <BillingToggle
@@ -71,9 +71,18 @@ export function PricingSection({
           setBilling={setBilling}
           theme={theme}
         />
+
+        {billing === "yearly" && (
+          <p
+            className="mx-auto mt-3 text-xs"
+            style={{ color: t.primary }}
+          >
+            Yearly is billed once upfront. The monthly number shown is the lower equivalent.
+          </p>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 md:grid-cols-2">
         {PRICING_PLANS.map((plan) => (
           <PricingCard
             key={plan.name}
@@ -83,6 +92,13 @@ export function PricingSection({
             {...plan}
           />
         ))}
+      </div>
+
+      <div
+        className="mx-auto mt-6 max-w-3xl text-center text-sm"
+        style={{ color: t.faint }}
+      >
+        Pro Max is coming soon. For now, we’re focused on making Pro excellent.
       </div>
     </section>
   );

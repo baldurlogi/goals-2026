@@ -9,15 +9,22 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
-import { useWeeklyReport, isSunday } from "../hooks/useWeeklyReport";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { UpgradeBanner } from "@/features/subscription/UpgradeBanner";
-
+import { useWeeklyReport, isSunday } from "../hooks/useWeeklyReport";
 
 export function WeeklyReportCard() {
   const { modules } = useEnabledModules();
-  const { report, status, error, limitHit, generate, weekStart, isThisWeek } =
-    useWeeklyReport(modules);
+  const {
+    report,
+    status,
+    error,
+    limitHit,
+    generate,
+    weekStart,
+    weekEnd,
+    isThisWeek,
+  } = useWeeklyReport(modules);
 
 
   const isGenerating = status === "generating";
@@ -25,8 +32,19 @@ export function WeeklyReportCard() {
   const showLoadingState = isLoading && !report;
 
   const weekLabel = (() => {
-    const d = new Date(weekStart + "T00:00:00");
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    const start = new Date(weekStart + "T00:00:00");
+    const end = new Date(weekEnd + "T00:00:00");
+
+    const startDay = start.toLocaleDateString("en-GB", { day: "numeric" });
+    const startMonth = start.toLocaleDateString("en-GB", { month: "short" });
+    const endDay = end.toLocaleDateString("en-GB", { day: "numeric" });
+    const endMonth = end.toLocaleDateString("en-GB", { month: "short" });
+
+    if (startMonth === endMonth) {
+      return `${startDay}–${endDay} ${endMonth}`;
+    }
+
+    return `${startDay} ${startMonth} – ${endDay} ${endMonth}`;
   })();
 
   const todayIsSunday = isSunday();

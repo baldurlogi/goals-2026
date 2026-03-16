@@ -54,7 +54,7 @@ export function BillingToggle({
               : "1px solid transparent",
         }}
       >
-        Yearly · save 17%
+        Yearly · billed once · save 17%
       </Button>
     </div>
   );

@@ -29,6 +29,7 @@ import {
   type PreferredTone,
 } from "@/features/ai/aiUserProfile";
 import { toast } from "sonner";
+import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
 
 type EditableProfileFields = Pick<
   UserProfile,
@@ -443,6 +444,8 @@ export function ProfilePage() {
 
       {error ? <div className="text-sm text-destructive">{error}</div> : null}
 
+      <AIUsageDetailsCard />
+
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">👤 Profile</CardTitle>
@@ -722,7 +725,7 @@ export function ProfilePage() {
       </Link>
 
       {/* ── AI Coach Settings ───────────────────────────────────────────── */}
-      <Card className="rounded-2xl">
+      <Card id="ai-settings" className="rounded-2xl">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15">

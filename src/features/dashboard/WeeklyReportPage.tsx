@@ -345,16 +345,34 @@ export function WeeklyReportPage() {
   const { modules } = useEnabledModules();
 
   const {
-    report, status, error, generate,
-    weekStart, isThisWeek,
+    report,
+    status,
+    error,
+    generate,
+    weekStart,
+    weekEnd,
+    isThisWeek,
   } = useWeeklyReport(modules);
 
   const isGenerating = status === "generating";
   const isLoading = status === "loading";
+  const hasThisWeekReport = Boolean(report && isThisWeek);
 
   const weekLabel = (() => {
-    const d = new Date(weekStart + "T00:00:00");
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    const start = new Date(weekStart + "T00:00:00");
+    const end = new Date(weekEnd + "T00:00:00");
+
+    const startDay = start.toLocaleDateString("en-GB", { day: "numeric" });
+    const startMonth = start.toLocaleDateString("en-GB", { month: "long" });
+    const endDay = end.toLocaleDateString("en-GB", { day: "numeric" });
+    const endMonth = end.toLocaleDateString("en-GB", { month: "long" });
+    const endYear = end.toLocaleDateString("en-GB", { year: "numeric" });
+
+    if (startMonth === endMonth) {
+      return `${startDay}–${endDay} ${endMonth} ${endYear}`;
+    }
+
+    return `${startDay} ${startMonth} – ${endDay} ${endMonth} ${endYear}`;
   })();
 
   return (
@@ -380,7 +398,7 @@ export function WeeklyReportPage() {
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Weekly Report</h1>
           </div>
-          {report && isPro && (
+          {hasThisWeekReport && isPro && (
             <Button
               variant="outline" size="sm"
               onClick={generate}
@@ -407,7 +425,7 @@ export function WeeklyReportPage() {
       {!isLoading && !isPro && <LockedState />}
 
       {/* Generate state */}
-      {!isLoading && isPro && !report && (
+      {!isLoading && isPro && !hasThisWeekReport && (
         <GenerateState
           onGenerate={generate}
           generating={isGenerating}
@@ -417,7 +435,7 @@ export function WeeklyReportPage() {
       )}
 
       {/* Report */}
-      {!isLoading && isPro && report && (
+      {!isLoading && isPro && hasThisWeekReport && report && (
         <div className="space-y-4">
           <OverallScoreSection report={report.report} />
           <ModuleScoresSection report={report.report} />

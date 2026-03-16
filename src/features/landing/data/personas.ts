@@ -1,6 +1,6 @@
 export const PERSONA_PILLS = [
-  "Big goals, no clear plan",
-  "Overwhelmed by too many apps",
-  "ADHD-friendly structure",
-  "Need visible progress to stay motivated",
+  "Turn one goal into a plan",
+  "Know your next best action",
+  "See progress across your life",
+  "Less overwhelm, more follow-through",
 ];
