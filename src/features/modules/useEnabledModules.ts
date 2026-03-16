@@ -5,7 +5,7 @@ import {
   readProfileCache,
 } from "@/features/onboarding/profileStorage";
 import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
-import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/features/auth/authContext";
 
 function getModulesFromCache(userId: string | null): Set<ModuleId> | null {
   if (!userId) return null;
@@ -24,8 +24,7 @@ export function useEnabledModules(): {
   modules: Set<ModuleId>;
   loading: boolean;
 } {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [authResolved, setAuthResolved] = useState(false);
+  const { userId, authReady } = useAuth();
 
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [loadedModules, setLoadedModules] = useState<Set<ModuleId>>(
@@ -33,45 +32,7 @@ export function useEnabledModules(): {
   );
 
   useEffect(() => {
-    let mounted = true;
-
-    const applyAuthState = (nextUserId: string | null) => {
-      if (!mounted) return;
-
-      setUserId(nextUserId);
-      setAuthResolved(true);
-
-      if (!nextUserId) {
-        setLoadedUserId(null);
-        setLoadedModules(new Set(DEFAULT_MODULES));
-        return;
-      }
-
-      const cachedModules = getModulesFromCache(nextUserId);
-      if (cachedModules) {
-        setLoadedModules(cachedModules);
-        setLoadedUserId(nextUserId);
-      }
-    };
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      applyAuthState(session?.user?.id ?? null);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      applyAuthState(session?.user?.id ?? null);
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!authResolved || userId === null) return;
+    if (!authReady || userId === null) return;
 
     let cancelled = false;
 
@@ -112,11 +73,11 @@ export function useEnabledModules(): {
       cancelled = true;
       window.removeEventListener(PROFILE_CHANGED_EVENT, handleProfileChanged);
     };
-  }, [authResolved, userId]);
+  }, [authReady, userId]);
 
   const modules = useMemo(() => {
-    if (!authResolved) {
-      return loadedModules;
+    if (!authReady || userId === null) {
+      return new Set(DEFAULT_MODULES);
     }
 
     if (userId === null) {
@@ -133,9 +94,9 @@ export function useEnabledModules(): {
     }
 
     return loadedModules;
-  }, [authResolved, userId, loadedUserId, loadedModules]);
+  }, [authReady, userId, loadedUserId, loadedModules]);
 
-  const loading = !authResolved || (userId !== null && loadedUserId !== userId);
+  const loading = !authReady || (userId !== null && loadedUserId !== userId);
 
   return { modules, loading };
 }

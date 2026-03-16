@@ -1,5 +1,6 @@
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { supabase } from '@/lib/supabaseClient';
+import { cacheKeyBuilders, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
 
 type ReadingStreakState = { lastReadISO: string | null; streak: number };
 
@@ -31,7 +32,7 @@ type ReadingStateRow = {
   };
 };
 
-const ns = (goalId: string, key: string) => `goals:${goalId}:reading:${key}`;
+const ns = (goalId: string, key: string) => cacheKeyBuilders.goalReadingNamespace(goalId, key);
 
 function safeParse<T>(raw: string | null, fallback: T): T {
   try {
@@ -95,9 +96,15 @@ function loadLocalState(goalId: string): GoalReadingState {
 }
 
 function persistLocalState(goalId: string, state: GoalReadingState) {
-  localStorage.setItem(ns(goalId, 'streak'), JSON.stringify(state.streak));
-  localStorage.setItem(ns(goalId, 'minutes'), JSON.stringify(state.minutes));
-  localStorage.setItem(ns(goalId, 'book'), JSON.stringify(state.book));
+  const streakKey = ns(goalId, 'streak');
+  const minutesKey = ns(goalId, 'minutes');
+  const bookKey = ns(goalId, 'book');
+  assertRegisteredCacheWrite(streakKey);
+  localStorage.setItem(streakKey, JSON.stringify(state.streak));
+  assertRegisteredCacheWrite(minutesKey);
+  localStorage.setItem(minutesKey, JSON.stringify(state.minutes));
+  assertRegisteredCacheWrite(bookKey);
+  localStorage.setItem(bookKey, JSON.stringify(state.book));
 }
 
 function normalizeMinutesDay(state: GoalReadingState): GoalReadingState {

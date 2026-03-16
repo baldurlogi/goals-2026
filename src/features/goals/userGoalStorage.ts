@@ -1,8 +1,9 @@
-import { supabase } from "@/lib/supabaseClient";
-import type { UserGoal, UserGoalStep } from "./goalTypes";
-import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { supabase } from '@/lib/supabaseClient';
+import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
+import type { UserGoal, UserGoalStep } from './goalTypes';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
 
-const CACHE_KEY = "cache:user_goals:v1";
+const CACHE_KEY = CACHE_KEYS.USER_GOALS;
 
 // -- Cache helpers ------------------------------
 
@@ -17,6 +18,7 @@ function readCache(): UserGoal[] {
 
 function writeCache(goals: UserGoal[]) {
   try {
+    assertRegisteredCacheWrite(CACHE_KEY);
     localStorage.setItem(CACHE_KEY, JSON.stringify(goals));
   } catch {
     return;

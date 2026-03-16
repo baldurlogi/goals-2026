@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 import type { Tier } from "./useTier";
 
 export type AIUsageSnapshot = {
@@ -19,7 +20,7 @@ type UsageLike = {
   remaining?: number;
 };
 
-const STORAGE_KEY = "cache:ai-usage:v1";
+const STORAGE_KEY = CACHE_KEYS.AI_USAGE;
 export const AI_USAGE_EVENT = "ai-usage-updated";
 
 function getMonthKey(date = new Date()) {
@@ -122,6 +123,7 @@ export function writeAIUsageCache(input: UsageLike): AIUsageSnapshot {
   };
 
   try {
+    assertRegisteredCacheWrite(STORAGE_KEY);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   } catch {
     // ignore storage failures

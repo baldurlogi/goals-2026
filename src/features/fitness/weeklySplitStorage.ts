@@ -11,8 +11,9 @@ import {
   yesterdayISO,
 } from "./date";
 import type { DayKey, DaySplit, WeeklySplitConfig } from "./types";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
-const SPLIT_CACHE_KEY = "cache:fitness_split:v1";
+const SPLIT_CACHE_KEY = CACHE_KEYS.FITNESS_SPLIT;
 
 function emit() {
   if (typeof window !== "undefined") {
@@ -72,6 +73,7 @@ export function readSplitCache(): WeeklySplitConfig {
 
 function writeSplitCache(cfg: WeeklySplitConfig): void {
   try {
+    assertRegisteredCacheWrite(SPLIT_CACHE_KEY);
     localStorage.setItem(SPLIT_CACHE_KEY, JSON.stringify(cfg));
   } catch {
     // ignore

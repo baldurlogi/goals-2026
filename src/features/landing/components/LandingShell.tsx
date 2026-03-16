@@ -16,20 +16,9 @@ export function LandingShell({ theme, children }: LandingShellProps) {
         minHeight: "100svh",
         background: t.bg,
         color: t.text,
-        fontFamily: "'DM Sans', sans-serif",
-        overflowX: "clip",
         transition: "background 0.25s ease, color 0.25s ease",
       }}
     >
-      <style>{`
-        * { box-sizing: border-box; }
-        html {
-          scroll-behavior: smooth;
-          scrollbar-gutter: stable both-edges;
-        }
-        body { margin: 0; }
-      `}</style>
-
       {children}
     </div>
   );

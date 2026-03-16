@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import type { ModuleId } from "@/features/modules/modules";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
 export type Sex = "male" | "female";
 export type ActivityLevel =
@@ -96,17 +97,13 @@ export function calculateMacros(
   };
 }
 
-const LEGACY_CACHE_KEY = "cache:profile:v1";
-
-function profileCacheKey(userId: string) {
-  return `cache:profile:v2:${userId}`;
-}
+const CACHE_KEY = CACHE_KEYS.PROFILE;
 
 export const PROFILE_CHANGED_EVENT = "profile:changed";
 const emitProfileChanged = () =>
   window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
 
-let inFlightProfileLoad: Promise<UserProfile | null> | null = null;
+const inFlightProfileLoads = new Map<string, Promise<UserProfile | null>>();
 
 function defaultProfile(id: string): UserProfile {
   return {
@@ -141,10 +138,14 @@ export function readProfileCache(userId?: string | null): UserProfile | null {
   }
 }
 
+export function clearProfileState(): void {
+  inFlightProfileLoads.clear();
+}
+
 function writeProfileCache(profile: UserProfile) {
   try {
-    localStorage.setItem(profileCacheKey(profile.id), JSON.stringify(profile));
-    localStorage.removeItem(LEGACY_CACHE_KEY);
+    assertRegisteredCacheWrite(CACHE_KEY);
+    localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
   } catch (e) {
     console.warn("write cache failed", e);
   }
@@ -156,20 +157,25 @@ export async function loadProfile(): Promise<UserProfile | null> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    inFlightProfileLoad = null;
+    clearProfileState();
     return null;
   }
 
-  const cached = readProfileCache(user.id);
-  if (cached) {
-    return cached;
+  const cached = readProfileCache();
+  if (cached && cached.id !== user.id) {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch {
+      // Ignore cache storage failures.
+    }
   }
 
-  if (inFlightProfileLoad) {
-    return inFlightProfileLoad;
+  const inFlight = inFlightProfileLoads.get(user.id);
+  if (inFlight) {
+    return inFlight;
   }
 
-  inFlightProfileLoad = (async () => {
+  const loadPromise = (async () => {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -183,10 +189,12 @@ export async function loadProfile(): Promise<UserProfile | null> {
     return profile;
   })();
 
+  inFlightProfileLoads.set(user.id, loadPromise);
+
   try {
-    return await inFlightProfileLoad;
+    return await loadPromise;
   } finally {
-    inFlightProfileLoad = null;
+    inFlightProfileLoads.delete(user.id);
   }
 }
 
@@ -211,7 +219,7 @@ export async function saveProfile(
     : ({ ...defaultProfile(user.id), ...patch } as UserProfile);
 
   writeProfileCache(next);
-  inFlightProfileLoad = null;
+  inFlightProfileLoads.delete(user.id);
   emitProfileChanged();
 }
 

@@ -1,7 +1,11 @@
 import { supabase } from "@/lib/supabaseClient";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { storageError, storageOk, type StorageMutationResult } from "@/lib/storageResult";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
 export const TODO_CHANGED_EVENT = "todos:changed";
+const LOG_TAG = "[storage:todos]";
+const TODO_PENDING_SYNC_KEY = CACHE_KEYS.TODOS_PENDING_SYNC;
 const emit = () => window.dispatchEvent(new Event(TODO_CHANGED_EVENT));
 
 export type Todo = {
@@ -18,8 +22,8 @@ export type TodoCompletionHistoryEntry = {
 };
 
 // ── Cache ──────────────────────────────────────────────────────────────────
-const TODO_CACHE_KEY = "cache:todos:v1";
-const TODO_COMPLETION_HISTORY_KEY = "cache:todos:completion-history:v1";
+export const TODO_CACHE_KEY = CACHE_KEYS.TODOS;
+export const TODO_COMPLETION_HISTORY_KEY = CACHE_KEYS.TODOS_COMPLETION_HISTORY;
 
 function readTodoCache(): Todo[] | null {
   try {
@@ -32,7 +36,36 @@ function readTodoCache(): Todo[] | null {
 
 function writeTodoCache(todos: Todo[]): void {
   try {
+    assertRegisteredCacheWrite(TODO_CACHE_KEY);
     localStorage.setItem(TODO_CACHE_KEY, JSON.stringify(todos));
+  } catch {
+    // ignore
+  }
+}
+
+function writePendingSync(entries: Array<{ op: string; payload: unknown; at: string }>): void {
+  try {
+    assertRegisteredCacheWrite(TODO_PENDING_SYNC_KEY);
+    localStorage.setItem(TODO_PENDING_SYNC_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore
+  }
+}
+
+function markPendingSync(op: string, payload: unknown): void {
+  try {
+    const raw = localStorage.getItem(TODO_PENDING_SYNC_KEY);
+    const current = raw ? (JSON.parse(raw) as Array<{ op: string; payload: unknown; at: string }>) : [];
+    current.push({ op, payload, at: new Date().toISOString() });
+    writePendingSync(current);
+  } catch {
+    // ignore
+  }
+}
+
+function clearPendingSync(): void {
+  try {
+    localStorage.removeItem(TODO_PENDING_SYNC_KEY);
   } catch {
     // ignore
   }
@@ -49,6 +82,7 @@ function readTodoCompletionHistory(): TodoCompletionHistoryEntry[] {
 
 function writeTodoCompletionHistory(entries: TodoCompletionHistoryEntry[]): void {
   try {
+    assertRegisteredCacheWrite(TODO_COMPLETION_HISTORY_KEY);
     localStorage.setItem(TODO_COMPLETION_HISTORY_KEY, JSON.stringify(entries));
   } catch {
     // ignore
@@ -103,72 +137,97 @@ export async function listTodos(): Promise<Todo[]> {
   return todos;
 }
 
-export async function addTodo(text: string): Promise<void> {
+export async function addTodo(text: string): Promise<StorageMutationResult> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const trimmed = text.trim();
-  if (!trimmed) return;
-
-  const { error } = await supabase
-    .from("todos")
-    .insert({ user_id: user.id, text: trimmed, done: false });
-
-  if (error) {
-    console.warn("addTodo error:", error);
-  } else {
-    try {
-      localStorage.removeItem(TODO_CACHE_KEY);
-    } catch {
-      // ignore
-    }
+  if (!user) {
+    markPendingSync("add", { text });
+    return { ok: false, error: "Not signed in. Unable to save todo." };
   }
 
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: false, error: "Todo text is required." };
+
+  const { data, error } = await supabase
+    .from("todos")
+    .insert({ user_id: user.id, text: trimmed, done: false })
+    .select("id,text,done,created_at")
+    .single();
+
+  if (error) {
+    markPendingSync("add", { text: trimmed });
+    const result = storageError(error);
+    console.error(`${LOG_TAG} add failed`, { error: result.error, userId: user.id });
+    emit();
+    return result;
+  }
+
+  writeTodoCache([data as Todo, ...(readTodoCache() ?? [])]);
+  clearPendingSync();
+  console.debug(`${LOG_TAG} add success`, { todoId: data?.id, userId: user.id });
+
   emit();
+  return storageOk();
 }
 
-export async function setTodoDone(id: string, done: boolean): Promise<void> {
+export async function setTodoDone(id: string, done: boolean): Promise<StorageMutationResult> {
   const { error } = await supabase.from("todos").update({ done }).eq("id", id);
 
   if (error) {
-    console.warn("setTodoDone error:", error);
-    return;
+    markPendingSync("setDone", { id, done });
+    const result = storageError(error);
+    console.error(`${LOG_TAG} set done failed`, { id, done, error: result.error });
+    return result;
   }
 
   recordTodoCompletion(id, done);
 
-  try {
-    localStorage.removeItem(TODO_CACHE_KEY);
-  } catch {
-    // ignore
+  const cached = readTodoCache();
+  if (cached) {
+    writeTodoCache(cached.map((todo) => (todo.id === id ? { ...todo, done } : todo)));
   }
+  clearPendingSync();
   emit();
+  return storageOk();
 }
 
-export async function deleteTodo(id: string): Promise<void> {
+export async function deleteTodo(id: string): Promise<StorageMutationResult> {
   const { error } = await supabase.from("todos").delete().eq("id", id);
 
-  if (error) console.warn("deleteTodo error:", error);
-  try {
-    localStorage.removeItem(TODO_CACHE_KEY);
-  } catch {
-    // ignore
+  if (error) {
+    markPendingSync("delete", { id });
+    const result = storageError(error);
+    console.error(`${LOG_TAG} delete failed`, { id, error: result.error });
+    return result;
   }
+
+  const cached = readTodoCache();
+  if (cached) {
+    writeTodoCache(cached.filter((todo) => todo.id !== id));
+  }
+  clearPendingSync();
   emit();
+  return storageOk();
 }
 
-export async function clearCompleted(): Promise<void> {
+export async function clearCompleted(): Promise<StorageMutationResult> {
   const { error } = await supabase.from("todos").delete().eq("done", true);
 
-  if (error) console.warn("clearCompleted error:", error);
-  try {
-    localStorage.removeItem(TODO_CACHE_KEY);
-  } catch {
-    // ignore
+  if (error) {
+    markPendingSync("clearCompleted", { done: true });
+    const result = storageError(error);
+    console.error(`${LOG_TAG} clear completed failed`, { error: result.error });
+    return result;
   }
+
+  const cached = readTodoCache();
+  if (cached) {
+    writeTodoCache(cached.filter((todo) => !todo.done));
+  }
+  clearPendingSync();
   emit();
+  return storageOk();
 }
 
 export function getTodoWeeklySummary(
@@ -213,7 +272,7 @@ export function getTodoWeeklySummary(
 
 export type TodoItem = Todo;
 
-export async function toggleTodo(id: string): Promise<void> {
+export async function toggleTodo(id: string): Promise<StorageMutationResult> {
   const { data, error } = await supabase
     .from("todos")
     .select("done")
@@ -221,8 +280,9 @@ export async function toggleTodo(id: string): Promise<void> {
     .single();
 
   if (error) {
-    console.warn("toggleTodo select error:", error);
-    return;
+    const result = storageError(error);
+    console.error(`${LOG_TAG} toggle select failed`, { id, error: result.error });
+    return result;
   }
 
   const nextDone = !data?.done;
@@ -233,18 +293,21 @@ export async function toggleTodo(id: string): Promise<void> {
     .eq("id", id);
 
   if (updateError) {
-    console.warn("toggleTodo update error:", updateError);
-    return;
+    markPendingSync("toggle", { id });
+    const result = storageError(updateError);
+    console.error(`${LOG_TAG} toggle update failed`, { id, error: result.error });
+    return result;
   }
 
   recordTodoCompletion(id, nextDone);
 
-  try {
-    localStorage.removeItem(TODO_CACHE_KEY);
-  } catch {
-    // ignore
+  const cached = readTodoCache();
+  if (cached) {
+    writeTodoCache(cached.map((todo) => (todo.id === id ? { ...todo, done: nextDone } : todo)));
   }
+  clearPendingSync();
   emit();
+  return storageOk();
 }
 
 export const loadTodos = listTodos;
