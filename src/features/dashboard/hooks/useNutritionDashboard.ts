@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   loadNutritionLog,
   loadPhase,
   getLoggedMacros,
   NUTRITION_CHANGED_EVENT,
+  NUTRITION_LOG_CACHE_KEY,
+  NUTRITION_PHASE_CACHE_KEY,
   type NutritionLog,
 } from '@/features/nutrition/nutritionStorage';
 import {
@@ -11,11 +13,22 @@ import {
   type NutritionPhase,
 } from '@/features/nutrition/nutritionData';
 import { useTodayDate } from '@/hooks/useTodayDate';
-import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { PROFILE_CHANGED_EVENT } from '@/features/onboarding/profileStorage';
+import {
+  hasDateAwareCache,
+  readDateAwareCache,
+  readStringCache,
+  writeDateAwareCache,
+  writeStringCache,
+} from '@/lib/cache';
+import { useDashboardLoadSubscription } from '@/features/dashboard/hooks/useDashboardLoadSubscription';
 
-const LOG_CACHE = 'cache:nutrition_log:v1';
-const PHASE_CACHE = 'cache:nutrition_phase:v1';
+const EMPTY_LOG: NutritionLog = { date: '', eaten: {}, customEntries: [] };
+const PHASE_EVENTS = [NUTRITION_CHANGED_EVENT] as const;
+const NUTRITION_STORAGE_KEYS = [
+  NUTRITION_LOG_CACHE_KEY,
+  NUTRITION_PHASE_CACHE_KEY,
+] as const;
 
 function clamp(v: number, lo = 0, hi = 100) {
   return Math.min(Math.max(v, lo), hi);
@@ -25,109 +38,51 @@ function pct(value: number, target: number) {
   return clamp(target > 0 ? Math.round((value / target) * 100) : 0);
 }
 
-function readLogCache(today = getLocalDateKey()): NutritionLog {
-  try {
-    const raw = localStorage.getItem(LOG_CACHE);
-    if (!raw) return { date: today, eaten: {}, customEntries: [] };
-
-    const parsed = JSON.parse(raw) as NutritionLog;
-    if (parsed.date !== today) {
-      return { date: today, eaten: {}, customEntries: [] };
-    }
-
-    return parsed;
-  } catch {
-    return {
-      date: today,
-      eaten: {},
-      customEntries: [],
-    };
-  }
-}
-
-function hasTodayLogCache(today = getLocalDateKey()): boolean {
-  try {
-    const raw = localStorage.getItem(LOG_CACHE);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw) as NutritionLog;
-    return parsed.date === today;
-  } catch {
-    return false;
-  }
-}
-
-function readPhaseCache(): NutritionPhase {
-  try {
-    const raw = localStorage.getItem(PHASE_CACHE);
-    return raw === 'cut' || raw === 'maintain' ? raw : 'maintain';
-  } catch {
-    return 'maintain';
-  }
-}
-
-function hasPhaseCache(): boolean {
-  try {
-    const raw = localStorage.getItem(PHASE_CACHE);
-    return raw === 'cut' || raw === 'maintain';
-  } catch {
-    return false;
-  }
+function normalizePhase(raw: string): NutritionPhase {
+  return raw === 'cut' || raw === 'maintain' ? raw : 'maintain';
 }
 
 export function useNutritionDashboard() {
   const today = useTodayDate();
 
-  const [log, setLog] = useState<NutritionLog>(() => readLogCache(today));
-  const [phase, setPhase] = useState<NutritionPhase>(readPhaseCache);
-  const [loading, setLoading] = useState(
-    () => !(hasTodayLogCache(today) || hasPhaseCache()),
+  const [log, setLog] = useState<NutritionLog>(() =>
+    readDateAwareCache(NUTRITION_LOG_CACHE_KEY, today, {
+      ...EMPTY_LOG,
+      date: today,
+    }),
   );
+  const [phase, setPhase] = useState<NutritionPhase>(() =>
+    normalizePhase(readStringCache(NUTRITION_PHASE_CACHE_KEY, 'maintain')),
+  );
+  const [loading, setLoading] = useState(() => {
+    const hasLog = hasDateAwareCache(NUTRITION_LOG_CACHE_KEY, today);
+    const hasPhase = readStringCache(NUTRITION_PHASE_CACHE_KEY, '') !== '';
+    return !(hasLog && hasPhase);
+  });
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(async () => {
+    try {
+      const [freshLog, freshPhase] = await Promise.all([
+        loadNutritionLog(),
+        loadPhase(),
+      ]);
 
-    async function fetch() {
-      try {
-        const [freshLog, freshPhase] = await Promise.all([
-          loadNutritionLog(),
-          loadPhase(),
-        ]);
-
-        if (!cancelled) {
-          setLog(freshLog);
-          setPhase(freshPhase);
-
-          try {
-            localStorage.setItem(LOG_CACHE, JSON.stringify(freshLog));
-            localStorage.setItem(PHASE_CACHE, freshPhase);
-          } catch (e) {
-            console.warn('nutrition cache write failed', e);
-          }
-        }
-      } catch (e) {
-        console.warn('nutrition dashboard load failed', e);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+      setLog(freshLog);
+      setPhase(freshPhase);
+      writeDateAwareCache(NUTRITION_LOG_CACHE_KEY, freshLog);
+      writeStringCache(NUTRITION_PHASE_CACHE_KEY, freshPhase);
+    } catch (e) {
+      console.warn('nutrition dashboard load failed', e);
+    } finally {
+      setLoading(false);
     }
-
-    void fetch();
-
-    const sync = () => {
-      void fetch();
-    };
-
-    window.addEventListener(NUTRITION_CHANGED_EVENT, sync);
-    window.addEventListener('storage', sync);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener(NUTRITION_CHANGED_EVENT, sync);
-      window.removeEventListener('storage', sync);
-    };
   }, []);
+
+  useDashboardLoadSubscription({
+    load,
+    events: PHASE_EVENTS,
+    storageKeys: NUTRITION_STORAGE_KEYS,
+  });
 
   const [profileVersion, setProfileVersion] = useState(0);
 
@@ -137,7 +92,10 @@ export function useNutritionDashboard() {
     return () => window.removeEventListener(PROFILE_CHANGED_EVENT, bump);
   }, []);
 
-  const target = useMemo(() => getTargets(phase), [phase, profileVersion]);
+  const target = useMemo(() => {
+    void profileVersion;
+    return getTargets(phase);
+  }, [phase, profileVersion]);
   const logged = useMemo(() => getLoggedMacros(log), [log]);
   const calPct = pct(logged.cal, target.cal);
 
