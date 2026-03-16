@@ -5,43 +5,7 @@ import { ThemeProvider } from "./providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { clearStaleDailyCaches } from "@/hooks/useTodayDate";
-
-function scheduleIdle(callback: () => void, delay = 0) {
-  let timeoutId: number | null = null;
-  let idleId: number | null = null;
-
-  const run = () => {
-    const w = window as Window & {
-      requestIdleCallback?: (
-        cb: () => void,
-        options?: { timeout: number }
-      ) => number;
-    };
-
-    if (typeof w.requestIdleCallback === "function") {
-      idleId = w.requestIdleCallback(callback, { timeout: 1500 });
-      return;
-    }
-
-    timeoutId = window.setTimeout(callback, 1);
-  };
-
-  timeoutId = window.setTimeout(run, delay);
-
-  return () => {
-    if (timeoutId !== null) {
-      window.clearTimeout(timeoutId);
-    }
-
-    const w = window as Window & {
-      cancelIdleCallback?: (id: number) => void;
-    };
-
-    if (idleId !== null && typeof w.cancelIdleCallback === "function") {
-      w.cancelIdleCallback(idleId);
-    }
-  };
-}
+import { scheduleIdle } from "@/lib/scheduleIdle";
 
 export function AppLayout() {
   const [showPwaBanner, setShowPwaBanner] = useState(false);
@@ -51,7 +15,7 @@ export function AppLayout() {
 
     const cancelIdle = scheduleIdle(() => {
       setShowPwaBanner(true);
-    }, 1200);
+    }, 1200, 1500);
 
     return cancelIdle;
   }, []);

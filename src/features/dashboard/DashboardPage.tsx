@@ -17,6 +17,7 @@ import { useProfile } from "../onboarding/useProfile";
 import { AIUsagePill } from "@/features/subscription/AIUsagePill";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
+import { scheduleIdle } from "@/lib/scheduleIdle";
 
 const ReadingCard = lazy(async () => ({
   default: (await import("./components/ReadingCard")).ReadingCard,
@@ -51,43 +52,6 @@ const AchievementsCard = lazy(async () => ({
 const WeeklyReportCard = lazy(async () => ({
   default: (await import("./components/WeeklyReportCard")).WeeklyReportCard,
 }));
-
-function scheduleIdle(callback: () => void, delay = 0) {
-  let timeoutId: number | null = null;
-  let idleId: number | null = null;
-
-  const run = () => {
-    const w = window as Window & {
-      requestIdleCallback?: (
-        cb: () => void,
-        options?: { timeout: number }
-      ) => number;
-    };
-
-    if (typeof w.requestIdleCallback === "function") {
-      idleId = w.requestIdleCallback(callback, { timeout: 1200 });
-      return;
-    }
-
-    timeoutId = window.setTimeout(callback, 1);
-  };
-
-  timeoutId = window.setTimeout(run, delay);
-
-  return () => {
-    if (timeoutId !== null) {
-      window.clearTimeout(timeoutId);
-    }
-
-    const w = window as Window & {
-      cancelIdleCallback?: (id: number) => void;
-    };
-
-    if (idleId !== null && typeof w.cancelIdleCallback === "function") {
-      w.cancelIdleCallback(idleId);
-    }
-  };
-}
 
 function useDeferredMount(delay = 0) {
   const [ready, setReady] = useState(false);
