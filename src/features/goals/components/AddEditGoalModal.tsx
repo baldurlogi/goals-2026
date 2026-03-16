@@ -1,36 +1,53 @@
-import { useEffect, useRef, useState } from 'react';
-import { Trash2, Plus, Sparkles } from 'lucide-react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
-import { createBlankGoal, createBlankStep, saveUserGoal } from '../userGoalStorage';
-import type { UserGoal, UserGoalStep } from '../goalTypes';
-import { getLocalDateKey } from '@/hooks/useTodayDate';
-import { AIPromptScreen } from './AIPromptScreen';
-import { queueAIContextNudge } from './AIContextNudge';
+import { useEffect, useRef, useState } from "react";
+import { Trash2, Plus, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { createBlankGoal, createBlankStep, saveUserGoal } from "../userGoalStorage";
+import type { UserGoal, UserGoalStep } from "../goalTypes";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { AIPromptScreen } from "./AIPromptScreen";
+import { queueAIContextNudge } from "./AIContextNudge";
 
-const PRIORITY_OPTIONS: UserGoal['priority'][] = ['high', 'medium', 'low'];
+const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 
-const PRIORITY_COLOR: Record<UserGoal['priority'], string> = {
-  high: 'border-rose-500/40 bg-rose-500/10 text-rose-400',
-  medium: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
-  low: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
+const PRIORITY_COLOR: Record<UserGoal["priority"], string> = {
+  high: "border-rose-500/40 bg-rose-500/10 text-rose-400",
+  medium: "border-amber-500/40 bg-amber-500/10 text-amber-400",
+  low: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
 };
 
 const EMOJI_SUGGESTIONS = [
-  '🎯', '💪', '📚', '💰', '🏃', '✈️', '💻', '🎬',
-  '🎓', '🌱', '🏋️', '🎨', '🚀', '❤️', '🧘', '🧴', '🧠', '💼',
+  "🎯",
+  "💪",
+  "📚",
+  "💰",
+  "🏃",
+  "✈️",
+  "💻",
+  "🎬",
+  "🎓",
+  "🌱",
+  "🏋️",
+  "🎨",
+  "🚀",
+  "❤️",
+  "🧘",
+  "🧴",
+  "🧠",
+  "💼",
 ];
 
-type Mode = 'ai' | 'manual';
+type Mode = "ai" | "manual";
 
 type Props = {
   initial?: UserGoal;
   onSave: (goal: UserGoal) => void;
   onClose: () => void;
   startWithAI?: boolean;
+  initialAIPrompt?: string;
 };
 
 export function AddEditGoalModal({
@@ -38,10 +55,11 @@ export function AddEditGoalModal({
   onSave,
   onClose,
   startWithAI = false,
+  initialAIPrompt = "",
 }: Props) {
   const isEdit = !!initial;
   const [mode, setMode] = useState<Mode>(
-    isEdit ? 'manual' : startWithAI ? 'ai' : 'manual',
+    isEdit ? "manual" : startWithAI ? "ai" : "manual",
   );
   const [goal, setGoal] = useState<UserGoal>(() => initial ?? createBlankGoal());
   const [saving, setSaving] = useState(false);
@@ -50,7 +68,7 @@ export function AddEditGoalModal({
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (mode === 'manual') titleRef.current?.focus();
+    if (mode === "manual") titleRef.current?.focus();
   }, [mode]);
 
   function updateGoal(patch: Partial<UserGoal>) {
@@ -59,7 +77,7 @@ export function AddEditGoalModal({
 
   function handleAIGenerated(generated: UserGoal) {
     setGoal(generated);
-    setMode('manual');
+    setMode("manual");
   }
 
   function addStep() {
@@ -84,6 +102,7 @@ export function AddEditGoalModal({
     const idx = steps.findIndex((s) => s.id === id);
     const next = idx + dir;
     if (next < 0 || next >= steps.length) return;
+
     [steps[idx], steps[next]] = [steps[next], steps[idx]];
     updateGoal({ steps: steps.map((s, i) => ({ ...s, sortOrder: i })) });
   }
@@ -104,6 +123,7 @@ export function AddEditGoalModal({
     };
 
     setSaving(true);
+
     try {
       await saveUserGoal(trimmedGoal);
 
@@ -111,7 +131,7 @@ export function AddEditGoalModal({
         queueAIContextNudge();
       }
 
-      toast.success(isEdit ? 'Goal updated' : 'Goal created ✨');
+      toast.success(isEdit ? "Goal updated" : "Goal created ✨");
       onSave(trimmedGoal);
     } catch {
       toast.error("Couldn't save goal. Please try again.");
@@ -137,11 +157,13 @@ export function AddEditGoalModal({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2 className="text-base font-semibold">
-                {isEdit ? 'Edit goal' : mode === 'ai' ? 'AI goal planner' : 'New goal'}
+                {isEdit ? "Edit goal" : mode === "ai" ? "AI goal planner" : "New goal"}
               </h2>
-              {mode === 'manual' && goal.title && !isEdit && goal.steps.length > 0 && (
+
+              {mode === "manual" && goal.title && !isEdit && goal.steps.length > 0 && (
                 <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                  <Sparkles className="h-2.5 w-2.5" /> AI generated · review & edit
+                  <Sparkles className="h-2.5 w-2.5" />
+                  AI generated · review & edit
                 </span>
               )}
             </div>
@@ -150,19 +172,21 @@ export function AddEditGoalModal({
               {!isEdit && (
                 <button
                   type="button"
-                  onClick={() => setMode((m) => (m === 'ai' ? 'manual' : 'ai'))}
+                  onClick={() => setMode((m) => (m === "ai" ? "manual" : "ai"))}
                   className={cn(
-                    'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                    mode === 'ai'
-                      ? 'border-primary/40 bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:text-foreground',
+                    "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                    mode === "ai"
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Sparkles className="h-3 w-3" />
-                  {mode === 'ai' ? 'AI mode' : 'Use AI'}
+                  {mode === "ai" ? "AI mode" : "Use AI"}
                 </button>
               )}
+
               <button
+                type="button"
                 onClick={onClose}
                 className="text-xl leading-none text-muted-foreground hover:text-foreground"
               >
@@ -172,16 +196,18 @@ export function AddEditGoalModal({
           </div>
         </div>
 
-        {mode === 'ai' && (
+        {mode === "ai" && (
           <AIPromptScreen
             onGenerated={handleAIGenerated}
-            onBack={() => setMode('manual')}
+            onBack={() => setMode("manual")}
+            initialPrompt={initialAIPrompt}
+            autoStart={Boolean(initialAIPrompt.trim())}
           />
         )}
 
-        {mode === 'manual' && (
+        {mode === "manual" && (
           <>
-            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
               <div className="flex items-start gap-3">
                 <div className="relative">
                   <button
@@ -236,10 +262,10 @@ export function AddEditGoalModal({
                     type="button"
                     onClick={() => updateGoal({ priority: p })}
                     className={cn(
-                      'rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors',
+                      "rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors",
                       goal.priority === p
                         ? PRIORITY_COLOR[p]
-                        : 'border-border text-muted-foreground hover:text-foreground',
+                        : "border-border text-muted-foreground hover:text-foreground",
                     )}
                   >
                     {p}
@@ -259,6 +285,7 @@ export function AddEditGoalModal({
                 <div className="space-y-2">
                   {goal.steps.map((step, idx) => {
                     const isOpen = openStepId === step.id;
+
                     return (
                       <div key={step.id} className="overflow-hidden rounded-xl border">
                         <div className="flex items-center gap-3 px-3 py-3">
@@ -268,7 +295,9 @@ export function AddEditGoalModal({
 
                           <Input
                             value={step.label}
-                            onChange={(e) => updateStep(step.id, { label: e.target.value })}
+                            onChange={(e) =>
+                              updateStep(step.id, { label: e.target.value })
+                            }
                             placeholder="Step label"
                             className="h-9 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                           />
@@ -281,6 +310,7 @@ export function AddEditGoalModal({
                             >
                               ▲
                             </button>
+
                             <button
                               type="button"
                               onClick={() => moveStep(step.id, 1)}
@@ -288,6 +318,7 @@ export function AddEditGoalModal({
                             >
                               ▼
                             </button>
+
                             <button
                               type="button"
                               onClick={() => removeStep(step.id)}
@@ -295,12 +326,13 @@ export function AddEditGoalModal({
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
+
                             <button
                               type="button"
                               onClick={() => setOpenStepId(isOpen ? null : step.id)}
                               className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                             >
-                              {isOpen ? '−' : '+'}
+                              {isOpen ? "−" : "+"}
                             </button>
                           </div>
                         </div>
@@ -310,16 +342,21 @@ export function AddEditGoalModal({
                             <Textarea
                               placeholder="Notes (optional)"
                               value={step.notes}
-                              onChange={(e) => updateStep(step.id, { notes: e.target.value })}
+                              onChange={(e) =>
+                                updateStep(step.id, { notes: e.target.value })
+                              }
                               rows={2}
                               className="resize-none text-sm"
                             />
+
                             <div className="grid grid-cols-2 gap-2">
                               <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">Due date</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Due date
+                                </div>
                                 <Input
                                   type="date"
-                                  value={step.idealFinish ?? ''}
+                                  value={step.idealFinish ?? ""}
                                   onChange={(e) =>
                                     updateStep(step.id, {
                                       idealFinish: e.target.value || null,
@@ -328,8 +365,11 @@ export function AddEditGoalModal({
                                   className="h-8 text-sm"
                                 />
                               </div>
+
                               <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">Est. time</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Est. time
+                                </div>
                                 <Input
                                   placeholder="e.g. 30 min"
                                   value={step.estimatedTime}
@@ -347,21 +387,28 @@ export function AddEditGoalModal({
                       </div>
                     );
                   })}
+
+                  {goal.steps.length === 0 && (
+                    <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                      No steps yet. Add them manually or switch to AI mode.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="shrink-0 border-t px-5 py-4">
               <div className="flex items-center justify-between gap-3">
-                <Button variant="ghost" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
+
                 <Button
-                  onClick={handleSave}
+                  type="button"
+                  onClick={() => void handleSave()}
                   disabled={!isValid || saving}
-                  className="min-w-28"
                 >
-                  {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create goal'}
+                  {saving ? "Saving…" : isEdit ? "Save changes" : "Create goal"}
                 </Button>
               </div>
             </div>

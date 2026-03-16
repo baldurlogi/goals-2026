@@ -9,13 +9,9 @@ import { buildAISignals } from "@/features/ai/aiSignals";
 import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
-import { AIUsageInlineHint } from "@/features/subscription/AIUsageInlineHint";
-import type { Tier } from "@/features/subscription/useTier";
-import {
-  markAIUsageLimitReached,
-  writeAIUsageCache,
-} from "@/features/subscription/aiUsageCache";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
   action: string;
@@ -30,41 +26,58 @@ type CacheEntry = {
   builtAt: number;
 };
 
-type CoachUsagePayload = {
-  tier?: Tier;
-  monthly_limit?: number;
-  prompts_used?: number;
-  remaining?: number;
-};
-
-type CoachResponse = {
-  suggestion?: CoachSuggestion;
-  usage?: CoachUsagePayload;
-};
-
-type CoachLimitPayload = {
-  error?: string;
-  message?: string;
-  tier?: Tier;
-  monthly_limit?: number;
-  prompts_used?: number;
-};
-
 class AIUsageLimitError extends Error {
-  tier?: Tier;
-
-  constructor(message: string, tier?: Tier) {
+  constructor(message: string) {
     super(message);
     this.name = "AIUsageLimitError";
-    this.tier = tier;
   }
 }
 
 const CACHE_KEY = "cache:ai-coach:v1";
 const LAST_MODULE_KEY = "cache:ai-coach:last-module";
 const LAST_SESSION_KEY = "cache:ai-coach:last-session:v1";
-const CACHE_TTL = 60 * 60 * 1000;
-const SUPABASE_FN = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const SUPABASE_FN =
+  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+
+function scheduleIdle(callback: () => void, delay = 0) {
+  let timeoutId: number | null = null;
+  let idleId: number | null = null;
+
+  const run = () => {
+    const w = window as Window & {
+      requestIdleCallback?: (
+        cb: () => void,
+        options?: { timeout: number }
+      ) => number;
+    };
+
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(callback, { timeout: 1200 });
+      return;
+    }
+
+    timeoutId = window.setTimeout(callback, 1);
+  };
+
+  timeoutId = window.setTimeout(run, delay);
+
+  return () => {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+
+    const w = window as Window & {
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (idleId !== null && typeof w.cancelIdleCallback === "function") {
+      w.cancelIdleCallback(idleId);
+    }
+  };
+}
+
+// ── Cache helpers ─────────────────────────────────────────────────────────────
 
 function readCache(): CoachSuggestion | null {
   try {
@@ -80,12 +93,16 @@ function readCache(): CoachSuggestion | null {
 
 function writeCache(suggestion: CoachSuggestion) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ suggestion, builtAt: Date.now() }));
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ suggestion, builtAt: Date.now() })
+    );
+
     if (suggestion.module) {
       localStorage.setItem(LAST_MODULE_KEY, suggestion.module);
     }
   } catch {
-    // ignore storage failures
+    // ignore
   }
 }
 
@@ -105,7 +122,12 @@ function readLastModule(): string | null {
   }
 }
 
-type LastSession = { date: string; goalId: string; goalTitle: string; stepLabel: string };
+type LastSession = {
+  date: string;
+  goalId: string;
+  goalTitle: string;
+  stepLabel: string;
+};
 
 function readLastSession(): LastSession | null {
   try {
@@ -117,10 +139,13 @@ function readLastSession(): LastSession | null {
   }
 }
 
+// ── Fetch from edge function ──────────────────────────────────────────────────
+
 async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
+
   if (!session?.access_token) throw new Error("Not signed in");
 
   const { systemContext } = await buildAIContext();
@@ -140,21 +165,14 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   });
 
   if (res.status === 429) {
-    const data = (await res.json().catch(() => ({}))) as CoachLimitPayload;
+    const data = await res.json().catch(() => ({}));
 
     if (data.error === "rate_limit_exceeded") {
       throw new Error(data.message ?? "Too many requests. Please wait a moment.");
     }
 
-    markAIUsageLimitReached({
-      tier: data.tier,
-      monthly_limit: data.monthly_limit,
-      prompts_used: data.prompts_used,
-    });
-
     throw new AIUsageLimitError(
-      data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions.",
-      data.tier,
+      data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions."
     );
   }
 
@@ -163,26 +181,23 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
     throw new Error(err.error ?? "Failed to fetch suggestion");
   }
 
-  const data = (await res.json()) as CoachResponse;
-  if (data.usage) {
-    writeAIUsageCache(data.usage);
-  }
+  const data = await res.json();
+  const s = data.suggestion as CoachSuggestion;
 
-  const suggestion = data.suggestion as CoachSuggestion;
-  if (!suggestion?.action || !suggestion?.href) {
-    throw new Error("Invalid suggestion shape");
-  }
-
-  return suggestion;
+  if (!s?.action || !s?.href) throw new Error("Invalid suggestion shape");
+  return s;
 }
 
+// ── Static suggestion ─────────────────────────────────────────────────────────
+
 function buildStarterSuggestion(
-  signals: Awaited<ReturnType<typeof buildAISignals>>,
+  signals: Awaited<ReturnType<typeof buildAISignals>>
 ): CoachSuggestion | null {
   if (signals.modules.includes("goals") && signals.goals.count === 0) {
     return {
       action: "Create your first goal",
-      reason: "Start with one meaningful goal so your coach can guide your next steps.",
+      reason:
+        "Start with one meaningful goal so your coach can guide your next steps.",
       href: "/app/goals",
       emoji: "🎯",
       module: "goals",
@@ -192,7 +207,8 @@ function buildStarterSuggestion(
   if (signals.modules.includes("reading") && !signals.reading.currentBookTitle) {
     return {
       action: "Add your current book",
-      reason: "Once a book is set, your coach can help you keep reading momentum.",
+      reason:
+        "Once a book is set, your coach can help you keep reading momentum.",
       href: "/app/reading",
       emoji: "📖",
       module: "reading",
@@ -220,7 +236,8 @@ function buildStarterSuggestion(
   ) {
     return {
       action: "Log your first meal",
-      reason: "A quick nutrition check-in gives the coach something real to work with.",
+      reason:
+        "A quick nutrition check-in gives the coach something real to work with.",
       href: "/app/nutrition",
       emoji: "🥗",
       module: "nutrition",
@@ -237,7 +254,10 @@ function buildStarterSuggestion(
     };
   }
 
-  if (signals.modules.includes("schedule") && signals.schedule?.totalBlocks === 0) {
+  if (
+    signals.modules.includes("schedule") &&
+    signals.schedule?.totalBlocks === 0
+  ) {
     return {
       action: "Set up today’s schedule",
       reason: "A simple plan makes your next move much easier to choose.",
@@ -281,9 +301,10 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
   const yesterday = (() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate(),
-    ).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
   })();
 
   const session = readLastSession();
@@ -303,26 +324,31 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
   };
 }
 
+// ── Card ──────────────────────────────────────────────────────────────────────
+
 function AICoachCardInner() {
-  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialCached] = useState<CoachSuggestion | null>(() => readCache());
+  const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(initialCached);
+  const [loading, setLoading] = useState(initialCached === null);
   const [error, setError] = useState<string | null>(null);
   const [isAI, setIsAI] = useState(false);
   const [limitHit, setLimitHit] = useState(false);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
-  const [limitTier, setLimitTier] = useState<Tier | null>(null);
 
-  const loadStatic = useCallback(async () => {
-    setLoading(true);
+  const loadStatic = useCallback(async (showSpinner = false) => {
+    if (showSpinner) {
+      setLoading(true);
+    }
+
     setError(null);
     setIsAI(false);
     setLimitHit(false);
     setLimitMessage(null);
-    setLimitTier(null);
 
     try {
-      const next = await buildStaticSuggestion();
-      setSuggestion(next);
+      const s = await buildStaticSuggestion();
+      writeCache(s);
+      setSuggestion(s);
     } catch (e) {
       const cached = readCache();
       if (cached) {
@@ -340,18 +366,16 @@ function AICoachCardInner() {
     setError(null);
     setLimitHit(false);
     setLimitMessage(null);
-    setLimitTier(null);
 
     try {
-      const next = await fetchCoachSuggestion();
-      writeCache(next);
-      setSuggestion(next);
+      const s = await fetchCoachSuggestion();
+      writeCache(s);
+      setSuggestion(s);
       setIsAI(true);
     } catch (e) {
       if (e instanceof AIUsageLimitError) {
         setLimitHit(true);
         setLimitMessage(e.message);
-        setLimitTier(e.tier ?? null);
         setError(null);
       } else {
         setError(e instanceof Error ? e.message : "Something went wrong");
@@ -362,23 +386,31 @@ function AICoachCardInner() {
   }, []);
 
   useEffect(() => {
-    void loadStatic();
+    const cancelIdleLoad = scheduleIdle(
+      () => {
+        void loadStatic(initialCached === null);
+      },
+      initialCached ? 180 : 40
+    );
 
-    function handleReadingChanged() {
+    const handleReadingChanged = () => {
       clearCache();
-      void loadStatic();
-    }
+      void loadStatic(false);
+    };
 
     window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+
     return () => {
+      cancelIdleLoad();
       window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
     };
-  }, [loadStatic]);
+  }, [initialCached, loadStatic]);
 
   function handleRefresh() {
     clearCache();
+
     if (isAI) {
-      void loadStatic();
+      void loadStatic(false);
     } else {
       void loadAI();
     }
@@ -406,7 +438,9 @@ function AICoachCardInner() {
             className="rounded-md p-1.5 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground disabled:opacity-30"
             title="Get a new suggestion"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+            />
           </button>
         </div>
       </CardHeader>
@@ -414,19 +448,17 @@ function AICoachCardInner() {
       <CardContent className="pb-5">
         {loading && !suggestion && (
           <div className="flex items-center gap-3 py-1">
-            <div className="flex gap-1">
-              <span className="h-2 w-2 animate-bounce rounded-full bg-violet-400 [animation-delay:0ms]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-fuchsia-400 [animation-delay:150ms]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-pink-400 [animation-delay:300ms]" />
-            </div>
-            <span className="text-sm text-muted-foreground">Thinking about your day…</span>
+            <div className="h-2 w-2 rounded-full bg-violet-400" />
+            <span className="text-sm text-muted-foreground">
+              Preparing your next move…
+            </span>
           </div>
         )}
 
         {error && !suggestion && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Couldn&apos;t load your next suggestion right now.
+              Couldn't load your next suggestion right now.
             </p>
 
             <div className="flex flex-wrap gap-2">
@@ -450,7 +482,6 @@ function AICoachCardInner() {
 
         {limitHit && (
           <AIUsageLimitNotice
-            tier={limitTier ?? undefined}
             feature="AI coach refresh"
             message={limitMessage ?? undefined}
             className="mb-4"
@@ -465,7 +496,11 @@ function AICoachCardInner() {
 
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold leading-snug">
-                {loading ? <span className="text-muted-foreground">Refreshing…</span> : suggestion.action}
+                {loading ? (
+                  <span className="text-muted-foreground">Refreshing…</span>
+                ) : (
+                  suggestion.action
+                )}
               </p>
               {suggestion.reason && !loading && (
                 <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
@@ -484,17 +519,12 @@ function AICoachCardInner() {
           </div>
         )}
 
-        <div className="mt-3 space-y-2">
-          {!limitHit && (
-            <AIUsageInlineHint actionLabel="Refreshing for an AI suggestion uses 1 AI prompt" />
-          )}
-
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground/40">
-            <Zap className="h-2.5 w-2.5" />
-            <span>
-              {isAI ? 'AI-powered suggestion' : 'Smart suggestion · hit ↻ for AI'} · uses your goals, fitness, reading & nutrition data
-            </span>
-          </div>
+        <div className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground/40">
+          <Zap className="h-2.5 w-2.5" />
+          <span>
+            {isAI ? "AI-powered suggestion" : "Smart suggestion · hit ↻ for AI"} ·
+            uses your goals, fitness, reading & nutrition data
+          </span>
         </div>
       </CardContent>
     </Card>

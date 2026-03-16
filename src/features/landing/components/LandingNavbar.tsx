@@ -64,7 +64,7 @@ export function LandingNavbar({
             className="px-3 py-2 text-sm transition-opacity"
             style={{ color: t.muted }}
           >
-            Features
+            Why it works
           </button>
 
           <button

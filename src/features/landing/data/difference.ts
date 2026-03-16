@@ -1,14 +1,14 @@
 export const DIFFERENT_SECTION = [
   {
-    title: "Not just tasks",
-    body: "Most productivity tools stop at task lists. Daily Life Progress connects tasks to your actual goals and the life you want to build.",
+    title: "Not just another planner",
+    body: "Most tools help you collect tasks. Daily Life Progress helps you turn a meaningful goal into a path you can actually follow.",
   },
   {
-    title: "Not just habits",
-    body: "This is not another isolated habit tracker. It combines habits, goals, progress, schedule, and AI planning into one connected system.",
+    title: "Not six disconnected apps",
+    body: "Goals, routines, health, learning, and daily execution live together, so your progress feels connected instead of scattered.",
   },
   {
-    title: "Not just motivation",
-    body: "When motivation disappears, structure matters. The app helps reduce overwhelm by giving you clarity, momentum, and a visible sense of progress.",
+    title: "Not motivation-dependent",
+    body: "When motivation drops, clarity matters. The app reduces overwhelm by showing what matters next and making progress visible.",
   },
 ];
