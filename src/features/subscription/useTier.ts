@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import { useAuth } from "@/features/auth/authContext";
 
 export type Tier = "free" | "pro" | "pro_max";
@@ -27,7 +28,7 @@ export function tierMeets(userTier: Tier, required: Tier): boolean {
   return rank[userTier] >= rank[required];
 }
 
-const TIER_CACHE_KEY = "cache:user-tier:v1";
+const TIER_CACHE_KEY = CACHE_KEYS.USER_TIER;
 
 function readTierCache(): Tier {
   try {

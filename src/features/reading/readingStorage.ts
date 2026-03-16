@@ -2,13 +2,14 @@
 import type { ReadingInputs } from "./readingTypes";
 import { supabase } from "@/lib/supabaseClient";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
 // Local key only used for optional legacy fallback + migration safety
-const STORAGE_KEY = "daily-life:reading:v2";
-const READING_DAILY_PROGRESS_KEY = "cache:reading:today-progress:v1";
-const AI_SIGNALS_CACHE_KEY = "cache:ai-signals:v1";
+const STORAGE_KEY = CACHE_KEYS.READING;
+const READING_DAILY_PROGRESS_KEY = CACHE_KEYS.READING_DAILY_PROGRESS;
+const AI_SIGNALS_CACHE_KEY = CACHE_KEYS.AI_SIGNALS;
 
-const READING_HISTORY_KEY = "cache:reading:history:v1";
+const READING_HISTORY_KEY = CACHE_KEYS.READING_HISTORY;
 
 export type ReadingHistoryEntry = {
   date: string;
@@ -109,6 +110,7 @@ function readDailyProgressCache(): ReadingDailyProgressCache | null {
 
 function writeDailyProgressCache(cache: ReadingDailyProgressCache) {
   try {
+    assertRegisteredCacheWrite(READING_DAILY_PROGRESS_KEY);
     localStorage.setItem(READING_DAILY_PROGRESS_KEY, JSON.stringify(cache));
   } catch {
     // ignore
@@ -134,6 +136,7 @@ function readReadingHistoryCache(): ReadingHistoryEntry[] {
 
 function writeReadingHistoryCache(entries: ReadingHistoryEntry[]) {
   try {
+    assertRegisteredCacheWrite(READING_HISTORY_KEY);
     localStorage.setItem(READING_HISTORY_KEY, JSON.stringify(entries));
   } catch {
     // ignore
@@ -356,6 +359,7 @@ export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
   const previousInputs = await loadPreviousInputs();
 
   try {
+    assertRegisteredCacheWrite(STORAGE_KEY);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
   } catch {
     // ignore

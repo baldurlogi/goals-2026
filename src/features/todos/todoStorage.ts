@@ -1,10 +1,11 @@
 import { supabase } from "@/lib/supabaseClient";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { storageError, storageOk, type StorageMutationResult } from "@/lib/storageResult";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 
 export const TODO_CHANGED_EVENT = "todos:changed";
 const LOG_TAG = "[storage:todos]";
-const TODO_PENDING_SYNC_KEY = "cache:todos:pending-sync:v1";
+const TODO_PENDING_SYNC_KEY = CACHE_KEYS.TODOS_PENDING_SYNC;
 const emit = () => window.dispatchEvent(new Event(TODO_CHANGED_EVENT));
 
 export type Todo = {
@@ -21,8 +22,8 @@ export type TodoCompletionHistoryEntry = {
 };
 
 // ── Cache ──────────────────────────────────────────────────────────────────
-export const TODO_CACHE_KEY = "cache:todos:v1";
-export const TODO_COMPLETION_HISTORY_KEY = "cache:todos:completion-history:v1";
+export const TODO_CACHE_KEY = CACHE_KEYS.TODOS;
+export const TODO_COMPLETION_HISTORY_KEY = CACHE_KEYS.TODOS_COMPLETION_HISTORY;
 
 function readTodoCache(): Todo[] | null {
   try {
@@ -35,6 +36,7 @@ function readTodoCache(): Todo[] | null {
 
 function writeTodoCache(todos: Todo[]): void {
   try {
+    assertRegisteredCacheWrite(TODO_CACHE_KEY);
     localStorage.setItem(TODO_CACHE_KEY, JSON.stringify(todos));
   } catch {
     // ignore
@@ -43,6 +45,7 @@ function writeTodoCache(todos: Todo[]): void {
 
 function writePendingSync(entries: Array<{ op: string; payload: unknown; at: string }>): void {
   try {
+    assertRegisteredCacheWrite(TODO_PENDING_SYNC_KEY);
     localStorage.setItem(TODO_PENDING_SYNC_KEY, JSON.stringify(entries));
   } catch {
     // ignore
@@ -79,6 +82,7 @@ function readTodoCompletionHistory(): TodoCompletionHistoryEntry[] {
 
 function writeTodoCompletionHistory(entries: TodoCompletionHistoryEntry[]): void {
   try {
+    assertRegisteredCacheWrite(TODO_COMPLETION_HISTORY_KEY);
     localStorage.setItem(TODO_COMPLETION_HISTORY_KEY, JSON.stringify(entries));
   } catch {
     // ignore

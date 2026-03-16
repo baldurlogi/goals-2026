@@ -3,11 +3,12 @@ import type { NutritionPhase } from '@/features/nutrition/nutritionData';
 import type { Macros } from '@/features/nutrition/nutritionTypes';
 import { meals } from '@/features/nutrition/nutritionData';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
 
 export const NUTRITION_CHANGED_EVENT = 'nutrition:changed';
 
-export const NUTRITION_LOG_CACHE_KEY = 'cache:nutrition_log:v1';
-export const NUTRITION_PHASE_CACHE_KEY = 'cache:nutrition_phase:v1';
+export const NUTRITION_LOG_CACHE_KEY = CACHE_KEYS.NUTRITION_LOG;
+export const NUTRITION_PHASE_CACHE_KEY = CACHE_KEYS.NUTRITION_PHASE;
 
 function emit() {
   window.dispatchEvent(new Event(NUTRITION_CHANGED_EVENT));
@@ -66,6 +67,7 @@ function readLogCache(): NutritionLog | null {
 
 function writeLogCache(log: NutritionLog): void {
   try {
+    assertRegisteredCacheWrite(NUTRITION_LOG_CACHE_KEY);
     localStorage.setItem(NUTRITION_LOG_CACHE_KEY, JSON.stringify(log));
   } catch {
     // ignore
@@ -83,6 +85,7 @@ function readPhaseCache(): NutritionPhase | null {
 
 function writePhaseCache(phase: NutritionPhase): void {
   try {
+    assertRegisteredCacheWrite(NUTRITION_PHASE_CACHE_KEY);
     localStorage.setItem(NUTRITION_PHASE_CACHE_KEY, phase);
   } catch {
     // ignore

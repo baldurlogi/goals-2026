@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import { cacheKeyBuilders } from '@/lib/cacheRegistry';
 
 export type FinanceCategoryId =
   | 'rent'
@@ -57,7 +58,7 @@ export function defaultFinanceState(month: string): FinanceMonthState {
 }
 
 function cacheKey(goalId: string, month: string) {
-  return `cache:finance:${goalId}:${month}`;
+  return cacheKeyBuilders.finance(goalId, month);
 }
 
 function readCache(goalId: string, month: string): FinanceMonthState | null {
