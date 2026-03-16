@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { ThemeContext, type Theme } from "./theme-context";
 
 function getInitialTheme(): Theme {
@@ -10,17 +10,30 @@ function getInitialTheme(): Theme {
   }
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  root.classList.toggle("dark", theme === "dark");
+  root.style.colorScheme = theme;
+}
 
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const initial = getInitialTheme();
+
+    if (typeof document !== "undefined") {
+      applyTheme(initial);
+    }
+
+    return initial;
+  });
+
+  useLayoutEffect(() => {
+    applyTheme(theme);
 
     try {
       localStorage.setItem("theme", theme);
     } catch {
-      return;
+      // ignore
     }
   }, [theme]);
 
