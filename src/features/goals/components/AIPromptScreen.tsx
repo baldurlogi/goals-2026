@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -63,44 +63,10 @@ export function AIPromptScreen({
     setPrompt((prev) => (prev.trim() ? prev : initialPrompt));
   }, [initialPrompt]);
 
-  useEffect(() => {
-    if (!autoStart || autoStartedRef.current) return;
-    if (screen !== "prompt") return;
-    if (!prompt.trim()) return;
-
-    autoStartedRef.current = true;
-    void handleNext(prompt);
-  }, [autoStart, prompt, screen]);
-
-  async function handleNext(promptOverride?: string) {
-    const nextPrompt = (promptOverride ?? prompt).trim();
-    if (!nextPrompt) return;
-
-    setLoadingQuestions(true);
-    setError(null);
-
-    try {
-      const qs = await getClarifyingQuestions(nextPrompt);
-
-      if (qs.length === 0) {
-        await handleGenerate({}, nextPrompt);
-        return;
-      }
-
-      setQuestions(qs);
-      setAnswers({});
-      setScreen("clarifying");
-    } catch {
-      await handleGenerate({}, nextPrompt);
-    } finally {
-      setLoadingQuestions(false);
-    }
-  }
-
-  async function handleGenerate(
+  const handleGenerate = useCallback(async (
     answersOverride?: Record<string, string>,
     promptOverride?: string,
-  ) {
+  ) => {
     const finalPrompt = (promptOverride ?? prompt).trim();
     if (!finalPrompt) return;
 
@@ -137,7 +103,41 @@ export function AIPromptScreen({
     } finally {
       setLoadingGoal(false);
     }
-  }
+  }, [answers, onGenerated, prompt, questions.length, screen]);
+
+  const handleNext = useCallback(async (promptOverride?: string) => {
+    const nextPrompt = (promptOverride ?? prompt).trim();
+    if (!nextPrompt) return;
+
+    setLoadingQuestions(true);
+    setError(null);
+
+    try {
+      const qs = await getClarifyingQuestions(nextPrompt);
+
+      if (qs.length === 0) {
+        await handleGenerate({}, nextPrompt);
+        return;
+      }
+
+      setQuestions(qs);
+      setAnswers({});
+      setScreen("clarifying");
+    } catch {
+      await handleGenerate({}, nextPrompt);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  }, [handleGenerate, prompt]);
+
+  useEffect(() => {
+    if (!autoStart || autoStartedRef.current) return;
+    if (screen !== "prompt") return;
+    if (!prompt.trim()) return;
+
+    autoStartedRef.current = true;
+    void handleNext(prompt);
+  }, [autoStart, handleNext, prompt, screen]);
 
   const activeStep: ActiveStep = screen === "generating" ? "generating" : screen;
   const hasActionableError = Boolean(error);
