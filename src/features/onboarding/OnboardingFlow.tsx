@@ -70,6 +70,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"setup" | "goal">("setup");
+  const [showGoalSkipConfirm, setShowGoalSkipConfirm] = useState(false);
 
   function update(patch: Partial<OnboardingData>) {
     setData((prev) => ({ ...prev, ...patch }));
@@ -153,12 +154,32 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   if (phase === "goal") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <AddEditGoalModal
-          onSave={() => onComplete()}
-          onClose={onComplete}
-          startWithAI
-          initialAIPrompt={buildInitialAIPrompt(data.main_goal, data.goal_why)}
-        />
+        {showGoalSkipConfirm ? (
+          <div className="w-full max-w-sm space-y-4 rounded-2xl border bg-card p-5 shadow-xl">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold">Skip goal setup for now?</h2>
+              <p className="text-sm text-muted-foreground">
+                You can always create or edit goals later from your dashboard.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setShowGoalSkipConfirm(false)}>
+                Continue setup
+              </Button>
+              <Button type="button" onClick={onComplete}>
+                Skip for now
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <AddEditGoalModal
+            onSave={() => onComplete()}
+            onClose={() => setShowGoalSkipConfirm(true)}
+            startWithAI
+            initialAIPrompt={buildInitialAIPrompt(data.main_goal, data.goal_why)}
+          />
+        )}
       </div>
     );
   }
