@@ -10,12 +10,12 @@ import { AddEditGoalModal } from '@/features/goals/components/AddEditGoalModal';
 import { ImproveGoalModal } from '@/features/goals/components/ImproveGoalModal';
 import { UpgradeBanner } from '@/features/subscription/UpgradeBanner';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
+import { useAuth } from '@/features/auth/authContext';
 import { loadUserGoals, saveUserGoal } from '@/features/goals/userGoalStorage';
 import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 const AI_SIGNALS_CACHE_KEY = 'cache:ai-signals:v1';
-const LAST_SESSION_KEY = 'cache:ai-coach:last-session:v1';
 
 function clearAISignalsCache() {
   try {
@@ -25,14 +25,28 @@ function clearAISignalsCache() {
   }
 }
 
-function writeLastSession(goalId: string, goalTitle: string, stepLabel: string) {
+function lastSessionKey(userId: string) {
+  return `cache:ai-coach:last-session:v2:${userId}`;
+}
+
+function writeLastSession(
+  userId: string | null,
+  goalId: string,
+  goalTitle: string,
+  stepLabel: string,
+) {
+  if (!userId) return;
+
   try {
-    localStorage.setItem(LAST_SESSION_KEY, JSON.stringify({
-      date: getLocalDateKey(),
-      goalId,
-      goalTitle,
-      stepLabel,
-    }));
+    localStorage.setItem(
+      lastSessionKey(userId),
+      JSON.stringify({
+        date: getLocalDateKey(),
+        goalId,
+        goalTitle,
+        stepLabel,
+      }),
+    );
   } catch {
     // ignore
   }
@@ -52,6 +66,8 @@ function toGoalStep(s: UserGoalStep) {
 export function UserGoalPage() {
   const { goalId } = useParams<{ goalId: string }>();
   const { state, dispatch } = useGoalsStore();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [goal, setGoal] = useState<UserGoal | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -115,7 +131,7 @@ export function UserGoalPage() {
     if (!wasDone) {
       const nextDoneCount = doneCount + 1;
       const step = activeGoal.steps.find((s) => s.id === stepId);
-      if (step) writeLastSession(activeGoal.id, activeGoal.title, step.label);
+      if (step) writeLastSession(userId, activeGoal.id, activeGoal.title, step.label);
 
       toast.success(`1 step closer to ${activeGoal.title} 🎯`, {
         description: `${nextDoneCount}/${total} steps complete`,
