@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import posthog from "posthog-js";
+
 import { supabase } from "@/lib/supabaseClient";
 import { AuthContext } from "@/features/auth/authContext";
 import { clearUserCache } from "@/lib/clearUserCache";
@@ -44,7 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const previousUserIdRef = useRef<string | null | undefined>(undefined);
 
-  function syncAuthState(nextSession: Session | null, checkCacheMismatch = false) {
+  function syncAuthState(
+    nextSession: Session | null,
+    checkCacheMismatch = false,
+  ) {
     const nextUser = nextSession?.user ?? null;
     const nextUserId = nextUser?.id ?? null;
     const previousUserId = previousUserIdRef.current;
@@ -60,6 +65,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearUserCache();
     }
 
+    if (nextUser) {
+      posthog.identify(nextUser.id, {
+        email: nextUser.email ?? undefined,
+      });
+    } else {
+      posthog.reset();
+    }
+
     previousUserIdRef.current = nextUserId;
     setSession(nextSession);
     setUser(nextUser);
@@ -69,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    void supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       syncAuthState(data.session ?? null, true);
     });
@@ -90,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     await supabase.auth.signOut();
     clearUserCache();
+    posthog.reset();
   }
 
   return (
