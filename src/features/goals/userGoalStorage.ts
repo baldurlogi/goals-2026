@@ -16,12 +16,30 @@ function readCache(): UserGoal[] {
   }
 }
 
-function writeCache(goals: UserGoal[]) {
+function writeCache(goals: UserGoal[]): boolean {
   try {
     assertRegisteredCacheWrite(CACHE_KEY);
     localStorage.setItem(CACHE_KEY, JSON.stringify(goals));
+    return true;
   } catch {
-    return;
+    return false;
+  }
+}
+
+export type GoalPersistenceStatus = {
+  localCacheWriteSucceeded: boolean;
+  remoteSyncSucceeded: boolean;
+};
+
+export class GoalRemotePersistenceError extends Error {
+  readonly operation: 'save' | 'delete';
+  readonly localCacheWriteSucceeded: boolean;
+
+  constructor(operation: 'save' | 'delete', localCacheWriteSucceeded: boolean) {
+    super(`Goal ${operation} failed to sync to Supabase.`);
+    this.name = 'GoalRemotePersistenceError';
+    this.operation = operation;
+    this.localCacheWriteSucceeded = localCacheWriteSucceeded;
   }
 }
 
@@ -65,38 +83,68 @@ export function seedUserGoals(): UserGoal[] {
 
 // -- Save (upsert) a single goal ------------------------------
 
-export async function saveUserGoal(goal: UserGoal): Promise<void> {
+export async function saveUserGoal(goal: UserGoal): Promise<GoalPersistenceStatus> {
   const cached = readCache();
   const idx = cached.findIndex((g) => g.id === goal.id);
   if (idx >= 0) cached[idx] = goal;
   else cached.push(goal);
-  writeCache(cached);
+  const localCacheWriteSucceeded = writeCache(cached);
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) {
+    return {
+      localCacheWriteSucceeded,
+      remoteSyncSucceeded: false,
+    } satisfies GoalPersistenceStatus;
+  }
 
-  await supabase
+  const { error } = await supabase
     .from("user_goals")
     .upsert(goalToRow(user.id, goal), { onConflict: "id" });
+
+  if (error) {
+    throw new GoalRemotePersistenceError('save', localCacheWriteSucceeded);
+  }
+
+  return {
+    localCacheWriteSucceeded,
+    remoteSyncSucceeded: true,
+  } satisfies GoalPersistenceStatus;
 }
 
 // -- Delete a goal ------------------------------
 
-export async function deleteUserGoal(goalId: string): Promise<void> {
-  writeCache(readCache().filter((g) => g.id !== goalId));
+export async function deleteUserGoal(goalId: string): Promise<GoalPersistenceStatus> {
+  const localCacheWriteSucceeded = writeCache(
+    readCache().filter((g) => g.id !== goalId),
+  );
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) {
+    return {
+      localCacheWriteSucceeded,
+      remoteSyncSucceeded: false,
+    };
+  }
 
-  await supabase
+  const { error } = await supabase
     .from("user_goals")
     .delete()
     .eq("id", goalId)
     .eq("user_id", user.id);
+
+  if (error) {
+    throw new GoalRemotePersistenceError('delete', localCacheWriteSucceeded);
+  }
+
+  return {
+    localCacheWriteSucceeded,
+    remoteSyncSucceeded: true,
+  };
 }
 
 // -- Factory helpers ------------------------------

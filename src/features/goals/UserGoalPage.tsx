@@ -11,7 +11,11 @@ import { ImproveGoalModal } from '@/features/goals/components/ImproveGoalModal';
 import { UpgradeBanner } from '@/features/subscription/UpgradeBanner';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
 import { useAuth } from '@/features/auth/authContext';
-import { loadUserGoals, saveUserGoal } from '@/features/goals/userGoalStorage';
+import {
+  GoalRemotePersistenceError,
+  loadUserGoals,
+  saveUserGoal,
+} from '@/features/goals/userGoalStorage';
 import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 
@@ -243,10 +247,8 @@ export function UserGoalPage() {
           initial={activeGoal}
           onSave={(updated) => {
             setGoal(updated);
-            saveUserGoal(updated);
             clearAISignalsCache();
             setEditing(false);
-            toast.success('Goal updated');
           }}
           onClose={() => setEditing(false)}
         />
@@ -262,10 +264,24 @@ export function UserGoalPage() {
               updatedAt: getLocalDateKey(),
             };
             setGoal(updated);
-            saveUserGoal(updated);
             clearAISignalsCache();
             setImproving(false);
-            toast.success('Goal steps improved ✨');
+
+            void saveUserGoal(updated)
+              .then((status) => {
+                if (status.remoteSyncSucceeded) {
+                  toast.success('Goal steps improved ✨');
+                } else {
+                  toast.warning("Goal steps improved locally, syncing failed. We'll retry.");
+                }
+              })
+              .catch((error) => {
+                if (error instanceof GoalRemotePersistenceError && error.localCacheWriteSucceeded) {
+                  toast.warning("Goal steps improved locally, syncing failed. We'll retry.");
+                  return;
+                }
+                toast.error('Could not sync improved steps. Please try again.');
+              });
           }}
           onClose={() => setImproving(false)}
         />
