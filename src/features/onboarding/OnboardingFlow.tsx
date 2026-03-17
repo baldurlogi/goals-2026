@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/authContext";
+import { captureOnce } from "@/lib/analytics";
 import { completeOnboarding, calculateMacros } from "./profileStorage";
 import { AddEditGoalModal } from "@/features/goals/components/AddEditGoalModal";
 import { StepProfile } from "./components/StepProfile";
@@ -65,6 +67,7 @@ const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> 
 };
 
 export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
+  const { userId } = useAuth();
   const [step, setStep] = useState<OnboardingStep>(0);
   const [data, setData] = useState<OnboardingData>(INITIAL_ONBOARDING_DATA);
   const [saving, setSaving] = useState(false);
@@ -135,6 +138,11 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
         default_schedule_view: data.default_schedule_view,
         daily_reading_goal: Number(data.daily_reading_goal) || 20,
         enabled_modules: data.enabled_modules,
+      });
+
+      captureOnce("onboarding_completed", userId, {
+        enabled_modules_count: data.enabled_modules.length,
+        has_main_goal_intent: Boolean(data.main_goal.trim()),
       });
 
       if (data.main_goal.trim()) {
