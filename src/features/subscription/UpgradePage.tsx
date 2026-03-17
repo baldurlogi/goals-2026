@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from "@supabase/supabase-js";
 import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
+import { capture } from "@/lib/analytics";
 
 
 const STRIPE_DISABLED = false;
@@ -199,7 +200,17 @@ async function redirectToPortal() {
   toast.error(data?.error || "Could not open billing portal");
 }
 
-function PlanCard({ plan, isCurrent, isYearly }: { plan: Plan; isCurrent: boolean; isYearly: boolean }) {
+function PlanCard({
+  plan,
+  isCurrent,
+  isYearly,
+  currentTier,
+}: {
+  plan: Plan;
+  isCurrent: boolean;
+  isYearly: boolean;
+  currentTier: Tier;
+}) {
   const [loading, setLoading] = useState(false);
 
   const displayPrice = plan.id === "free" ? plan.monthlyPrice
@@ -212,6 +223,16 @@ function PlanCard({ plan, isCurrent, isYearly }: { plan: Plan; isCurrent: boolea
 
   async function handleUpgrade() {
     if (!priceKey) return;
+
+    capture("upgrade_clicked", {
+      plan: plan.id,
+      plan_id: plan.id,
+      billing_interval: isYearly ? "yearly" : "monthly",
+      current_tier: currentTier,
+      source: "upgrade_page_plan_card",
+      route: window.location.pathname,
+    });
+
     setLoading(true);
     try { await redirectToCheckout(priceKey); }
     finally { setLoading(false); }
@@ -390,7 +411,15 @@ export function UpgradePage() {
       <AIUsageDetailsCard />
 
       <div className="grid gap-5 md:grid-cols-3">
-        {PLANS.map(plan => <PlanCard key={plan.id} plan={plan} isCurrent={tier === plan.id} isYearly={isYearly} />)}
+        {PLANS.map(plan => (
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            isCurrent={tier === plan.id}
+            isYearly={isYearly}
+            currentTier={tier}
+          />
+        ))}
       </div>
 
       {(tier === "pro" || tier === "pro_max") && !STRIPE_DISABLED && (

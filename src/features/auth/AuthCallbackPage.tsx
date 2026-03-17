@@ -1,8 +1,20 @@
 import { useEffect } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/authContext";
+import { captureOnce } from "@/lib/analytics";
 
 const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
+const SIGNUP_WINDOW_MS = 5 * 60 * 1000;
+
+function isLikelySignup(user: { created_at?: string; last_sign_in_at?: string }): boolean {
+  const createdAt = user.created_at ? Date.parse(user.created_at) : Number.NaN;
+  const lastSignInAt = user.last_sign_in_at
+    ? Date.parse(user.last_sign_in_at)
+    : Number.NaN;
+
+  if (Number.isNaN(createdAt) || Number.isNaN(lastSignInAt)) return false;
+  return Math.abs(lastSignInAt - createdAt) <= SIGNUP_WINDOW_MS;
+}
 
 function resolvePostLoginPath(value: unknown) {
   if (typeof value !== "string") return null;
@@ -18,6 +30,14 @@ export function AuthCallbackPage() {
 
   useEffect(() => {
     if (!loading && user) {
+      if (isLikelySignup(user)) {
+        captureOnce("signup_completed", user.id, {
+          method: "google",
+          source: "auth_callback",
+          route: "/auth/callback",
+        });
+      }
+
       const state = location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null;
       const statePath = state?.from
         ? `${state.from.pathname ?? ""}${state.from.search ?? ""}${state.from.hash ?? ""}`

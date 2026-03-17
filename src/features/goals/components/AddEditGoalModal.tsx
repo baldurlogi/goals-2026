@@ -10,11 +10,14 @@ import {
   createBlankStep,
   GoalRemotePersistenceError,
   saveUserGoal,
+  seedUserGoals,
 } from "../userGoalStorage";
 import type { UserGoal, UserGoalStep } from "../goalTypes";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { AIPromptScreen } from "./AIPromptScreen";
 import { queueAIContextNudge } from "./AIContextNudge.utils";
+import { useAuth } from "@/features/auth/authContext";
+import { capture, captureOnce } from "@/lib/analytics";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 
@@ -62,6 +65,7 @@ export function AddEditGoalModal({
   startWithAI = false,
   initialAIPrompt = "",
 }: Props) {
+  const { userId } = useAuth();
   const isEdit = !!initial;
   const [mode, setMode] = useState<Mode>(
     isEdit ? "manual" : startWithAI ? "ai" : "manual",
@@ -71,10 +75,31 @@ export function AddEditGoalModal({
   const [openStepId, setOpenStepId] = useState<string | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const creationStartTrackedRef = useRef(false);
+  const initialGoalCountRef = useRef<number>(isEdit ? 1 : seedUserGoals().length);
 
   useEffect(() => {
     if (mode === "manual") titleRef.current?.focus();
   }, [mode]);
+
+  useEffect(() => {
+    if (isEdit || creationStartTrackedRef.current) return;
+    if (initialGoalCountRef.current > 0) return;
+
+    creationStartTrackedRef.current = true;
+
+    captureOnce("first_goal_creation_started", userId, {
+      entry_mode: startWithAI ? "ai" : "manual",
+      is_first_goal: true,
+      source: "goal_modal",
+      route: window.location.pathname,
+    });
+  }, [isEdit, startWithAI, userId]);
+
+  function cacheLooksLikeFirstGoal(goalId: string): boolean {
+    const goals = seedUserGoals();
+    return goals.length === 1 && goals[0]?.id === goalId;
+  }
 
   function updateGoal(patch: Partial<UserGoal>) {
     setGoal((g) => ({ ...g, ...patch, updatedAt: getLocalDateKey() }));
@@ -134,6 +159,17 @@ export function AddEditGoalModal({
 
       if (!isEdit) {
         queueAIContextNudge();
+        if (status.isFirstGoalCreated) {
+          capture("first_goal_saved", {
+            goal_id: trimmedGoal.id,
+            goal_title: trimmedGoal.title,
+            steps_count: trimmedGoal.steps.length,
+            creation_mode: mode,
+            is_first_goal: true,
+            source: "goal_modal",
+            route: window.location.pathname,
+          });
+        }
       }
 
       onSave(trimmedGoal);
@@ -147,6 +183,17 @@ export function AddEditGoalModal({
       if (error instanceof GoalRemotePersistenceError && error.localCacheWriteSucceeded) {
         if (!isEdit) {
           queueAIContextNudge();
+          if (cacheLooksLikeFirstGoal(trimmedGoal.id)) {
+            capture("first_goal_saved", {
+              goal_id: trimmedGoal.id,
+              goal_title: trimmedGoal.title,
+              steps_count: trimmedGoal.steps.length,
+              creation_mode: mode,
+              is_first_goal: true,
+              source: "goal_modal",
+              route: window.location.pathname,
+            });
+          }
         }
         onSave(trimmedGoal);
         toast.warning("Saved locally, syncing failed. We'll retry.");
