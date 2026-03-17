@@ -5,6 +5,7 @@ import type {
   UserScheduleTemplates,
 } from '@/features/schedule/scheduleTypes';
 import { DEFAULT_USER_SCHEDULE } from '@/features/schedule/scheduleData';
+import { normalizeWeeklySchedule, type WeekdayKey, type WeeklySchedule } from '@/features/onboarding/profileStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
 import { getActiveUserId, scopedKey } from '@/lib/activeUser';
@@ -18,6 +19,26 @@ function emit(event: string) {
 
 function todayKey() {
   return getLocalDateKey();
+}
+
+const DAY_INDEX_TO_KEY: WeekdayKey[] = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+
+function currentWeekdayKey(): WeekdayKey {
+  return DAY_INDEX_TO_KEY[new Date().getDay()] ?? 'monday';
+}
+
+function scheduleValueToView(value: WeeklySchedule[WeekdayKey]): ScheduleView {
+  if (value === 'office') return 'office';
+  if (value === 'wfh') return 'wfh';
+  return 'weekend';
 }
 
 // ── Schedule log (daily check-off) ───────────────────────────────────────
@@ -145,12 +166,16 @@ export async function loadScheduleLog(): Promise<ScheduleLog> {
   if (!data) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('default_schedule_view')
+      .select('default_schedule_view, weekly_schedule')
       .eq('id', user.id)
       .single();
 
-    const defaultView =
-      (profile?.default_schedule_view as ScheduleView) ?? 'wfh';
+    const weeklySchedule = normalizeWeeklySchedule(
+      (profile?.weekly_schedule as WeeklySchedule | null | undefined) ?? null,
+      (profile?.default_schedule_view as ScheduleView | null | undefined) ?? null,
+    );
+
+    const defaultView = scheduleValueToView(weeklySchedule[currentWeekdayKey()]);
 
     const next: ScheduleLog = { ...empty, view: defaultView };
 

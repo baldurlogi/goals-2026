@@ -58,7 +58,7 @@ const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> 
   },
   4: {
     label: "Schedule",
-    subtitle: "A default schedule view reduces friction in daily planning.",
+    subtitle: "Set your weekly defaults once so daily planning matches real life.",
   },
   5: {
     label: "Reading",
@@ -135,7 +135,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
         activity_level: data.activity_level,
         macro_maintain: data.macro_maintain ?? calculated?.maintain ?? null,
         macro_cut: data.macro_cut ?? calculated?.cut ?? null,
-        default_schedule_view: data.default_schedule_view,
+        weekly_schedule: data.weekly_schedule,
         daily_reading_goal: Number(data.daily_reading_goal) || 20,
         enabled_modules: data.enabled_modules,
       });
