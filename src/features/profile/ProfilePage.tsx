@@ -4,13 +4,14 @@ import { ArrowRight, Check, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import {
   calculateMacros,
   loadProfile,
   saveProfile,
   type UserProfile,
-  type ScheduleView,
+  WEEKDAY_ORDER,
+  type WeekdayKey,
+  type WeeklyScheduleValue,
 } from "@/features/onboarding/profileStorage";
 import { loadAIProfile, saveAIProfile, type PreferredTone } from "@/features/ai/aiUserProfile";
 import { toast } from "sonner";
@@ -28,6 +29,17 @@ import {
   type EditableProfileFields,
   type ProfileForm,
 } from "./utils/profileForm";
+
+
+const DAY_LABELS: Record<WeekdayKey, string> = {
+  monday: "Monday",
+  tuesday: "Tuesday",
+  wednesday: "Wednesday",
+  thursday: "Thursday",
+  friday: "Friday",
+  saturday: "Saturday",
+  sunday: "Sunday",
+};
 
 export function ProfilePage() {
   const [loading, setLoading] = useState(true);
@@ -83,7 +95,7 @@ export function ProfilePage() {
       onboarding_done: profile.onboarding_done,
       macro_maintain: profile.macro_maintain,
       macro_cut: profile.macro_cut,
-      default_schedule_view: profile.default_schedule_view,
+      weekly_schedule: profile.weekly_schedule,
       daily_reading_goal: profile.daily_reading_goal,
       enabled_modules: normalizeEnabledModules(profile.enabled_modules),
     };
@@ -201,13 +213,28 @@ export function ProfilePage() {
 
       <Card className="rounded-2xl">
         <CardHeader><CardTitle className="text-base">📅 Schedule</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {([
-            { value: "wfh", label: "Work from home", sub: "Mon / Tue — no commute", icon: "🏠" },
-            { value: "office", label: "Office day", sub: "Wed / Thu / Fri — commute", icon: "🏢" },
-            { value: "weekend", label: "Weekend", sub: "Sat / Sun — flexible", icon: "☀️" },
-          ] as { value: ScheduleView; label: string; sub: string; icon: string }[]).map((opt) => (
-            <button key={opt.value} type="button" onClick={() => update({ default_schedule_view: opt.value })} className={cn("w-full rounded-xl border px-4 py-4 text-left transition-all", form.default_schedule_view === opt.value ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border hover:border-primary/40")}>{opt.label}</button>
+        <CardContent className="space-y-2">
+          {WEEKDAY_ORDER.map((day) => (
+            <div key={day} className="grid grid-cols-[1fr,auto] items-center gap-3 rounded-xl border px-3 py-2">
+              <p className="text-sm font-medium">{DAY_LABELS[day] ?? day}</p>
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={form.weekly_schedule[day]}
+                onChange={(e) =>
+                  update({
+                    weekly_schedule: {
+                      ...form.weekly_schedule,
+                      [day]: e.target.value as WeeklyScheduleValue,
+                    },
+                  })
+                }
+              >
+                <option value="office">Office</option>
+                <option value="wfh">WFH</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
           ))}
         </CardContent>
       </Card>

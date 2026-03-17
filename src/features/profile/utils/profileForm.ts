@@ -1,10 +1,11 @@
 import type {
   ActivityLevel,
   MacroTargets,
-  ScheduleView,
   Sex,
   UserProfile,
+  WeeklySchedule,
 } from "@/features/onboarding/profileStorage";
+import { normalizeWeeklySchedule } from "@/features/onboarding/profileStorage";
 import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
 
 export type EditableProfileFields = Pick<
@@ -18,7 +19,7 @@ export type EditableProfileFields = Pick<
   | "onboarding_done"
   | "macro_maintain"
   | "macro_cut"
-  | "default_schedule_view"
+  | "weekly_schedule"
   | "daily_reading_goal"
   | "enabled_modules"
 >;
@@ -32,7 +33,7 @@ export type ProfileForm = {
   activity_level: ActivityLevel;
   macro_maintain: MacroTargets | null;
   macro_cut: MacroTargets | null;
-  default_schedule_view: ScheduleView;
+  weekly_schedule: WeeklySchedule;
   daily_reading_goal: string;
   enabled_modules: ModuleId[];
 };
@@ -55,7 +56,7 @@ export function profileToForm(p: UserProfile): ProfileForm {
     activity_level: p.activity_level ?? "active",
     macro_maintain: p.macro_maintain ?? null,
     macro_cut: p.macro_cut ?? null,
-    default_schedule_view: p.default_schedule_view ?? "wfh",
+    weekly_schedule: normalizeWeeklySchedule(p.weekly_schedule, p.default_schedule_view),
     daily_reading_goal: (p.daily_reading_goal ?? 20).toString(),
     enabled_modules: normalizeEnabledModules(p.enabled_modules),
   };
@@ -72,7 +73,7 @@ export function formToFullPatch(f: ProfileForm): EditableProfileFields {
     onboarding_done: true,
     macro_maintain: f.macro_maintain ?? null,
     macro_cut: f.macro_cut ?? null,
-    default_schedule_view: f.default_schedule_view,
+    weekly_schedule: normalizeWeeklySchedule(f.weekly_schedule, null),
     daily_reading_goal: Number(f.daily_reading_goal) || 20,
     enabled_modules: f.enabled_modules,
   };

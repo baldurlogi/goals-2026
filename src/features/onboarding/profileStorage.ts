@@ -8,7 +8,37 @@ export type ActivityLevel =
   | "moderate"
   | "active"
   | "very_active";
-export type ScheduleView = "wfh" | "office" | "weekend";
+export type LegacyScheduleView = "wfh" | "office" | "weekend";
+export type WeeklyScheduleValue = "office" | "wfh" | "hybrid" | "off";
+export type WeekdayKey =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+export type WeeklySchedule = Record<WeekdayKey, WeeklyScheduleValue>;
+
+export const WEEKDAY_ORDER: WeekdayKey[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
+
+export const DEFAULT_WEEKLY_SCHEDULE: WeeklySchedule = {
+  monday: "office",
+  tuesday: "office",
+  wednesday: "office",
+  thursday: "office",
+  friday: "office",
+  saturday: "off",
+  sunday: "off",
+};
 
 export type MacroTargets = {
   cal: number;
@@ -28,7 +58,8 @@ export type UserProfile = {
   onboarding_done: boolean;
   macro_maintain: MacroTargets | null;
   macro_cut: MacroTargets | null;
-  default_schedule_view: ScheduleView;
+  default_schedule_view: LegacyScheduleView;
+  weekly_schedule: WeeklySchedule;
   daily_reading_goal: number;
   enabled_modules: ModuleId[] | null;
   tier: "free" | "pro" | "pro_max";
@@ -38,6 +69,85 @@ const LEGACY_CACHE_KEY = "cache:profile:v1";
 
 function profileCacheKey(userId: string) {
   return `cache:profile:v2:${userId}`;
+}
+
+export function mapLegacyScheduleToWeekly(
+  legacy: LegacyScheduleView | null | undefined,
+): WeeklySchedule {
+  if (legacy === "wfh") {
+    return {
+      monday: "wfh",
+      tuesday: "wfh",
+      wednesday: "wfh",
+      thursday: "wfh",
+      friday: "wfh",
+      saturday: "off",
+      sunday: "off",
+    };
+  }
+
+  if (legacy === "weekend") {
+    return {
+      monday: "hybrid",
+      tuesday: "hybrid",
+      wednesday: "hybrid",
+      thursday: "hybrid",
+      friday: "hybrid",
+      saturday: "off",
+      sunday: "off",
+    };
+  }
+
+  return { ...DEFAULT_WEEKLY_SCHEDULE };
+}
+
+export function normalizeWeeklySchedule(
+  weekly: Partial<Record<WeekdayKey, unknown>> | null | undefined,
+  legacy: LegacyScheduleView | null | undefined,
+): WeeklySchedule {
+  const fallback = mapLegacyScheduleToWeekly(legacy);
+  const next = { ...fallback } as WeeklySchedule;
+
+  for (const day of WEEKDAY_ORDER) {
+    const value = weekly?.[day];
+    if (
+      value === "office" ||
+      value === "wfh" ||
+      value === "hybrid" ||
+      value === "off"
+    ) {
+      next[day] = value;
+    }
+  }
+
+  return next;
+}
+
+export function deriveLegacyScheduleView(
+  weekly: WeeklySchedule | null | undefined,
+): LegacyScheduleView {
+  if (!weekly) return "office";
+
+  const weekdayValues = WEEKDAY_ORDER.slice(0, 5).map((day) => weekly[day]);
+  const officeCount = weekdayValues.filter((v) => v === "office").length;
+  const wfhCount = weekdayValues.filter((v) => v === "wfh").length;
+
+  if (officeCount >= 3) return "office";
+  if (wfhCount >= 3) return "wfh";
+  return "weekend";
+}
+
+function normalizeProfile(raw: UserProfile): UserProfile {
+  const weeklySchedule = normalizeWeeklySchedule(
+    (raw as UserProfile & { weekly_schedule?: WeeklySchedule | null }).weekly_schedule,
+    raw.default_schedule_view,
+  );
+
+  return {
+    ...raw,
+    weekly_schedule: weeklySchedule,
+    default_schedule_view: deriveLegacyScheduleView(weeklySchedule),
+  };
 }
 
 export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
@@ -120,7 +230,8 @@ function defaultProfile(id: string): UserProfile {
     onboarding_done: false,
     macro_maintain: null,
     macro_cut: null,
-    default_schedule_view: "wfh",
+    default_schedule_view: "office",
+    weekly_schedule: { ...DEFAULT_WEEKLY_SCHEDULE },
     daily_reading_goal: 20,
     enabled_modules: null,
     tier: "free",
@@ -134,7 +245,7 @@ export function readProfileCache(userId?: string | null): UserProfile | null {
     const raw = localStorage.getItem(profileCacheKey(userId));
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as UserProfile;
+    const parsed = normalizeProfile(JSON.parse(raw) as UserProfile);
     return parsed.id === userId ? parsed : null;
   } catch {
     return null;
@@ -149,7 +260,7 @@ function writeProfileCache(profile: UserProfile) {
   try {
     localStorage.setItem(
       profileCacheKey(profile.id),
-      JSON.stringify(profile),
+      JSON.stringify(normalizeProfile(profile)),
     );
     localStorage.removeItem(LEGACY_CACHE_KEY);
   } catch (e) {
@@ -186,7 +297,7 @@ export async function loadProfile(): Promise<UserProfile | null> {
 
     if (error || !data) return null;
 
-    const profile = data as UserProfile;
+    const profile = normalizeProfile(data as UserProfile);
     writeProfileCache(profile);
     return profile;
   })();
@@ -209,16 +320,29 @@ export async function saveProfile(
 
   if (!user) return;
 
+  const normalizedPatch = { ...patch };
+  if (normalizedPatch.weekly_schedule) {
+    normalizedPatch.weekly_schedule = normalizeWeeklySchedule(
+      normalizedPatch.weekly_schedule,
+      normalizedPatch.default_schedule_view,
+    );
+    normalizedPatch.default_schedule_view = deriveLegacyScheduleView(
+      normalizedPatch.weekly_schedule,
+    );
+  }
+
   const { error } = await supabase
     .from("profiles")
-    .upsert({ id: user.id, ...patch }, { onConflict: "id" });
+    .upsert({ id: user.id, ...normalizedPatch }, { onConflict: "id" });
 
   if (error) throw error;
 
   const cached = readProfileCache(user.id);
-  const next = cached
-    ? ({ ...cached, ...patch } as UserProfile)
-    : ({ ...defaultProfile(user.id), ...patch } as UserProfile);
+  const next = normalizeProfile(
+    cached
+      ? ({ ...cached, ...normalizedPatch } as UserProfile)
+      : ({ ...defaultProfile(user.id), ...normalizedPatch } as UserProfile),
+  );
 
   writeProfileCache(next);
   inFlightProfileLoads.delete(user.id);
@@ -226,7 +350,7 @@ export async function saveProfile(
 }
 
 export async function completeOnboarding(
-  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">,
+  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier" | "default_schedule_view">,
 ): Promise<void> {
   const {
     data: { user },

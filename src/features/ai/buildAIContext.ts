@@ -69,7 +69,7 @@ function buildSystemPrompt(
 ## User summary
 Name: ${signals.profile.displayName ?? 'Unknown'}
 Activity level: ${signals.profile.activityLevel ?? 'Unknown'}
-Preferred schedule view: ${signals.profile.preferredScheduleView ?? 'Unknown'}
+Weekly schedule: ${signals.profile.weeklyScheduleSummary ?? 'Unknown'}
 Daily reading goal: ${signals.profile.dailyReadingGoal ?? 'Unknown'}
 Plan tier: ${signals.profile.tier ?? 'free'}
 

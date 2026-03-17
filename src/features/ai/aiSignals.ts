@@ -1,4 +1,8 @@
-import { loadProfile } from '@/features/onboarding/profileStorage';
+import {
+  loadProfile,
+  WEEKDAY_ORDER,
+  type WeeklySchedule,
+} from '@/features/onboarding/profileStorage';
 import { DEFAULT_MODULES, type ModuleId } from '@/features/modules/modules';
 import { loadUserGoals } from '@/features/goals/userGoalStorage';
 import {
@@ -44,7 +48,7 @@ export type AISignals = {
   profile: {
     displayName: string | null;
     activityLevel: string | null;
-    preferredScheduleView: string | null;
+    weeklyScheduleSummary: string | null;
     dailyReadingGoal: number | null;
     tier: 'free' | 'pro' | 'pro_max' | null;
   };
@@ -112,6 +116,13 @@ function writeCache(signals: AISignals) {
   } catch {
     // ignore
   }
+}
+
+
+function formatWeeklyScheduleSummary(schedule: WeeklySchedule | null | undefined): string | null {
+  if (!schedule) return null;
+
+  return WEEKDAY_ORDER.map((day) => `${day.slice(0, 3)}: ${schedule[day]}`).join(', ');
 }
 
 function normalizeModules(modules: ModuleId[] | null | undefined): ModuleId[] {
@@ -456,7 +467,7 @@ export async function buildAISignals(
     profile: {
       displayName: profile?.display_name ?? null,
       activityLevel: profile?.activity_level ?? null,
-      preferredScheduleView: profile?.default_schedule_view ?? null,
+      weeklyScheduleSummary: formatWeeklyScheduleSummary(profile?.weekly_schedule),
       dailyReadingGoal: profile?.daily_reading_goal ?? null,
       tier: profile?.tier ?? null,
     },
