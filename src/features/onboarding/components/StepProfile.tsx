@@ -11,6 +11,12 @@ import type { OnboardingData } from "./types";
 
 type Props = { data: OnboardingData; onChange: (p: Partial<OnboardingData>) => void };
 
+
+function sanitizeNumberInput(value: string) {
+  if (!value) return "";
+  return /^\d*(?:\.\d{0,1})?$/.test(value) ? value : null;
+}
+
 function PillSelect<T extends string>({
   options,
   value,
@@ -61,10 +67,40 @@ export const StepProfile = memo(function StepProfile({ data, onChange }: Props) 
           />
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Input type="number" placeholder="Age" value={data.age} onChange={(e) => onChange({ age: e.target.value })} />
-          <Input type="number" placeholder="Weight" value={data.weight_kg} onChange={(e) => onChange({ weight_kg: e.target.value })} />
-          <Input type="number" placeholder="Height" value={data.height_cm} onChange={(e) => onChange({ height_cm: e.target.value })} />
+          <Input
+            type="text"
+            inputMode="numeric"
+            placeholder="Age (years)"
+            value={data.age}
+            onChange={(e) => {
+              const next = /^\d*$/.test(e.target.value) ? e.target.value : null;
+              if (next !== null) onChange({ age: next });
+            }}
+          />
+          <Input
+            type="text"
+            inputMode="decimal"
+            placeholder="Weight (kg)"
+            value={data.weight_kg}
+            onChange={(e) => {
+              const next = sanitizeNumberInput(e.target.value);
+              if (next !== null) onChange({ weight_kg: next });
+            }}
+          />
+          <Input
+            type="text"
+            inputMode="decimal"
+            placeholder="Height (cm)"
+            value={data.height_cm}
+            onChange={(e) => {
+              const next = sanitizeNumberInput(e.target.value);
+              if (next !== null) onChange({ height_cm: next });
+            }}
+          />
         </div>
+        <p className="text-xs text-muted-foreground">
+          Use metric units: weight in kilograms (kg) and height in centimeters (cm).
+        </p>
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Activity level</label>
           <div className="space-y-2">
