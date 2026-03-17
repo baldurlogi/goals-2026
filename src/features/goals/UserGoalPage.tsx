@@ -149,14 +149,14 @@ export function UserGoalPage() {
               {activeGoal.priority}
             </span>
           </div>
-          <div className="mt-3 max-w-xl">
+          <div className="mt-4 max-w-xl space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 {doneCount}/{total} steps
               </span>
               <span>{pct}%</span>
             </div>
-            <Progress value={pct} className="mt-2 h-2" />
+            <Progress value={pct} className="h-2" />
           </div>
         </div>
 
@@ -218,7 +218,7 @@ export function UserGoalPage() {
           steps={activeGoal.steps.map(toGoalStep)}
           doneMap={doneMap}
           onToggle={handleToggleStep}
-          heightClassName="h-[600px]"
+          maxHeightClassName="max-h-none md:max-h-[560px] lg:max-h-[640px]"
         />
       )}
 

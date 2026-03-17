@@ -35,10 +35,16 @@ export function StepsCard(props: {
     steps: GoalStep[];
     doneMap?: Record<string, boolean>;
     onToggle: (stepId: string) => void;
-    heightClassName?: string; // e.g. "h-[640px]"
+    maxHeightClassName?: string; // e.g. "md:max-h-[640px]"
     className?: string;
 }) {
-    const { steps: rawSteps, doneMap, onToggle, heightClassName = "h-[640px]", className } = props;
+    const {
+        steps: rawSteps,
+        doneMap,
+        onToggle,
+        maxHeightClassName = "max-h-none lg:max-h-[640px]",
+        className,
+    } = props;
     const steps = sortedSteps(rawSteps, doneMap);
 
     const nextIndex = useMemo(
@@ -75,8 +81,8 @@ export function StepsCard(props: {
                 </div>
             </div>
 
-            {/* Scroll are inside card */}
-            <div className={cn("overflow-auto pr-2", heightClassName)}>
+            {/* Keep mobile interactions single-scroll; constrain list on larger screens. */}
+            <div className={cn("pr-1 overflow-visible lg:overflow-auto", maxHeightClassName)}>
                 <div className="space-y-3">
                     {steps.map((step, index) => {
                         const checked = !!doneMap?.[step.id];
