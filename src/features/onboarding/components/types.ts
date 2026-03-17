@@ -4,7 +4,7 @@ import type {
   ScheduleView,
   Sex,
 } from "@/features/onboarding/profileStorage";
-import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
+import type { ModuleId } from "@/features/modules/modules";
 
 export type OnboardingData = {
   display_name: string;
@@ -33,7 +33,7 @@ export const INITIAL_ONBOARDING_DATA: OnboardingData = {
   macro_cut: null,
   default_schedule_view: "wfh",
   daily_reading_goal: "20",
-  enabled_modules: DEFAULT_MODULES,
+  enabled_modules: ["goals"],
   main_goal: "",
   goal_why: "",
 };
