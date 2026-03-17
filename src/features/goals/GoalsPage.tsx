@@ -10,10 +10,11 @@ import { ImproveGoalModal } from './components/ImproveGoalModal';
 import { GoalsPageSkeleton } from '@/features/dashboard/skeletons';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
 import {
-  loadUserGoals,
-  seedUserGoals,
+  GoalRemotePersistenceError,
   deleteUserGoal,
+  loadUserGoals,
   saveUserGoal,
+  seedUserGoals,
 } from './userGoalStorage';
 import type { UserGoal } from './goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
@@ -127,8 +128,25 @@ export function GoalsPage() {
 
   async function handleDelete(goalId: string) {
     if (!confirm("Delete this goal? This can't be undone.")) return;
+
+    const previousGoals = goals;
     setGoals((prev) => prev.filter((g) => g.id !== goalId));
-    await deleteUserGoal(goalId);
+
+    try {
+      const status = await deleteUserGoal(goalId);
+      if (!status.remoteSyncSucceeded) {
+        toast.warning("Deleted locally, syncing failed. We'll retry.");
+      }
+    } catch (error) {
+      if (error instanceof GoalRemotePersistenceError) {
+        setGoals(previousGoals);
+        toast.error('Delete failed to sync. Goal was restored.');
+        return;
+      }
+
+      setGoals(previousGoals);
+      toast.error('Delete failed. Please try again.');
+    }
   }
 
   function handleSaved(saved: UserGoal) {
@@ -262,9 +280,23 @@ export function GoalsPage() {
               updatedAt: getLocalDateKey(),
             };
             handleSaved(updated);
-            saveUserGoal(updated);
             setImprovingGoal(null);
-            toast.success('Goal steps improved ✨');
+
+            void saveUserGoal(updated)
+              .then((status) => {
+                if (status.remoteSyncSucceeded) {
+                  toast.success('Goal steps improved ✨');
+                } else {
+                  toast.warning("Goal steps improved locally, syncing failed. We'll retry.");
+                }
+              })
+              .catch((error) => {
+                if (error instanceof GoalRemotePersistenceError && error.localCacheWriteSucceeded) {
+                  toast.warning("Goal steps improved locally, syncing failed. We'll retry.");
+                  return;
+                }
+                toast.error('Could not sync improved steps. Please try again.');
+              });
           }}
           onClose={() => setImprovingGoal(null)}
         />
