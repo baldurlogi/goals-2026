@@ -7,6 +7,7 @@ import { AuthProvider } from "./providers/AuthProvider";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
 import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
+import { Skeleton, WidgetCardSkeleton } from "@/features/dashboard/skeletons";
 
 const AppLayout = lazy(async () => ({
   default: (await import("@/app/AppLayout")).AppLayout,
@@ -87,8 +88,32 @@ const WeeklyReportPage = lazy(async () => ({
 function RouteFallback() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground lg:px-10">
-        Loading…
+      <div className="sticky top-0 z-40 border-b bg-background/95">
+        <div className="flex h-14 items-center gap-3 px-4 lg:px-10">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-4" />
+          <Skeleton className="h-8 w-36 rounded-md" />
+          <div className="flex-1" />
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <Skeleton className="h-8 w-32 rounded-full" />
+        </div>
+      </div>
+
+      <div className="w-full space-y-6 px-4 py-6 lg:px-10">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-36" />
+            <Skeleton className="h-4 w-72 max-w-[80vw]" />
+          </div>
+          <Skeleton className="h-9 w-32 rounded-lg" />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <WidgetCardSkeleton rows={5} />
+          <WidgetCardSkeleton rows={5} />
+          <WidgetCardSkeleton rows={4} />
+          <WidgetCardSkeleton rows={4} />
+        </div>
       </div>
     </div>
   );
@@ -96,8 +121,24 @@ function RouteFallback() {
 
 function AppRouteFallback() {
   return (
-    <div className="w-full rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-      Loading…
+    <div className="w-full min-h-[560px] space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-80 max-w-[85vw]" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-28 rounded-lg" />
+          <Skeleton className="h-9 w-32 rounded-lg" />
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <WidgetCardSkeleton rows={4} />
+        <WidgetCardSkeleton rows={4} />
+      </div>
+
+      <WidgetCardSkeleton rows={5} />
     </div>
   );
 }
