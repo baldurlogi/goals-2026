@@ -403,7 +403,12 @@ export function UpgradePage() {
               <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isYearly ? "translate-x-5" : "translate-x-0.5"}`} />
             </button>
             <span className={`text-sm font-medium ${isYearly ? "text-foreground" : "text-muted-foreground"}`}>Yearly</span>
-            {isYearly && <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-400">~2 months free</span>}
+            <span
+              className={`min-w-[108px] rounded-full bg-emerald-500/15 px-2 py-0.5 text-left text-xs font-semibold text-emerald-400 ${isYearly ? "visible" : "invisible"}`}
+              aria-hidden={!isYearly}
+            >
+              ~2 months free
+            </span>
           </div>
         </div>
       </div>
