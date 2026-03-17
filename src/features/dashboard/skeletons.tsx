@@ -219,6 +219,114 @@ export function FitnessCardSkeleton() {
   );
 }
 
+export function WaterIntakeCardSkeleton() {
+  return (
+    <SkeletonCard
+      colSpan="lg:col-span-4"
+      accentColor="bg-gradient-to-r from-cyan-500 via-sky-400 to-blue-400"
+    >
+      <CardHeader className="space-y-2 pb-2 pt-5">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-5 w-36" />
+      </CardHeader>
+      <CardContent className="space-y-3 pb-5">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <div className="grid grid-cols-3 gap-2">
+          <Skeleton className="h-10 rounded-lg" />
+          <Skeleton className="h-10 rounded-lg" />
+          <Skeleton className="h-10 rounded-lg" />
+        </div>
+      </CardContent>
+    </SkeletonCard>
+  );
+}
+
+export function AchievementsCardSkeleton() {
+  return (
+    <SkeletonCard
+      colSpan="lg:col-span-4"
+      className="min-h-[170px]"
+      accentColor="bg-gradient-to-r from-amber-500 via-orange-400 to-rose-400"
+    >
+      <CardHeader className="space-y-2 pb-2 pt-5">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-5 w-2/3" />
+      </CardHeader>
+      <CardContent className="space-y-2 pb-5">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center justify-between">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-6 w-12 rounded-full" />
+          </div>
+        ))}
+      </CardContent>
+    </SkeletonCard>
+  );
+}
+
+export function LifeProgressCardSkeleton() {
+  return (
+    <SkeletonCard
+      colSpan="lg:col-span-12"
+      accentColor="bg-gradient-to-r from-blue-500 via-violet-400 to-fuchsia-400"
+    >
+      <CardHeader className="space-y-2 pb-2 pt-5">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-5 w-1/2" />
+      </CardHeader>
+      <CardContent className="space-y-4 pb-5">
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-14 rounded-lg" />
+          ))}
+        </div>
+      </CardContent>
+    </SkeletonCard>
+  );
+}
+
+export function WeeklyReportCardSkeleton() {
+  return (
+    <div className="lg:col-span-6 min-h-[220px] space-y-4 rounded-2xl border bg-card p-5">
+      <Skeleton className="h-3 w-24" />
+      <Skeleton className="h-6 w-2/3" />
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex justify-between">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-14" />
+          </div>
+        ))}
+      </div>
+      <Skeleton className="h-8 w-32 rounded-md" />
+    </div>
+  );
+}
+
+export function AICoachCardSkeleton() {
+  return (
+    <SkeletonCard
+      colSpan="lg:col-span-12"
+      accentColor="bg-gradient-to-r from-fuchsia-500 via-violet-400 to-cyan-400"
+    >
+      <CardHeader className="space-y-2 pb-2 pt-5">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-5 w-2/3" />
+        <Skeleton className="h-3 w-1/2" />
+      </CardHeader>
+      <CardContent className="space-y-3 pb-5">
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Skeleton className="h-14 rounded-lg" />
+          <Skeleton className="h-14 rounded-lg" />
+          <Skeleton className="h-14 rounded-lg" />
+        </div>
+      </CardContent>
+    </SkeletonCard>
+  );
+}
+
 // ── Goals page skeletons ──────────────────────────────────────────────────
 
 export function GoalCardSkeleton() {
