@@ -25,7 +25,7 @@ export function AppLayout() {
       <Toaster />
       <div className="min-h-screen bg-background text-foreground">
         <DailyPlanHeader />
-        <main className="w-full space-y-6 px-4 py-6 lg:px-10">
+        <main className="w-full space-y-6 px-4 pb-24 pt-6 md:pb-6 lg:px-10">
           <Outlet />
         </main>
       </div>
