@@ -20,7 +20,10 @@ export const StepModules = memo(function StepModules({ data, onChange }: Props) 
 
   return (
     <div className="space-y-5">
+      <div className="space-y-1">
       <h2 className="text-xl font-bold">What do you want to track?</h2>
+      <p className="text-sm text-muted-foreground">Goals is preselected. Add anything else you want right now.</p>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         {ALL_MODULES.map((mod) => {
           const enabled = data.enabled_modules.includes(mod.id);

@@ -54,7 +54,7 @@ const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> 
   },
   3: {
     label: "Nutrition",
-    subtitle: "Nutrition targets make healthy progress easier to measure.",
+    subtitle: "Set activity and macros using AI suggestions or manual targets.",
   },
   4: {
     label: "Schedule",
@@ -169,7 +169,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
             <div className="space-y-1">
               <h2 className="text-base font-semibold">Skip goal setup for now?</h2>
               <p className="text-sm text-muted-foreground">
-                You can always create or edit goals later from your dashboard.
+                You can always create or edit goals later from the Goals tab in your dashboard.
               </p>
             </div>
 
@@ -207,7 +207,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-lg space-y-8">
         <div className="flex justify-center">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="-mx-1 flex snap-x snap-mandatory items-center gap-2 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
             {visibleSteps.map((s, i) => {
               const Icon = STEP_ICONS[s];
               const done = i < currentIndex;
@@ -216,7 +216,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
               return (
                 <div key={s} className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 rounded-full border border-transparent px-2 py-1">
+                  <div className="flex snap-start items-center gap-2 rounded-full border border-transparent px-2 py-1">
                     <div
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
@@ -246,7 +246,9 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
         {error ? <div className="text-sm text-destructive">{error}</div> : null}
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">After setup, go to <span className="font-medium text-foreground">Goals</span> to view or edit your goals.</p>
+          <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="outline" onClick={goBack} disabled={currentIndex <= 0 || saving} className="gap-2">
             <ChevronLeft className="h-4 w-4" />
             Back
@@ -254,7 +256,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
           {isLastStep ? (
             <Button type="button" onClick={() => void handleFinish()} disabled={!canAdvance() || saving} className="gap-2">
-              {saving ? "Saving…" : data.main_goal.trim() ? "Continue with AI" : "Finish"}
+              {saving ? "Saving…" : data.main_goal.trim() ? "Continue with AI" : "Finish to dashboard"}
               <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
@@ -263,6 +265,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
               <ChevronRight className="h-4 w-4" />
             </Button>
           )}
+          </div>
         </div>
       </div>
     </div>

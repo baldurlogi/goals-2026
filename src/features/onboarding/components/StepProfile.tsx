@@ -1,16 +1,9 @@
 import { memo } from "react";
-import { Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import {
-  ACTIVITY_LABELS,
-  type ActivityLevel,
-  type Sex,
-} from "@/features/onboarding/profileStorage";
+import type { Sex } from "@/features/onboarding/profileStorage";
 import type { OnboardingData } from "./types";
 
 type Props = { data: OnboardingData; onChange: (p: Partial<OnboardingData>) => void };
-
 
 function sanitizeNumberInput(value: string) {
   if (!value) return "";
@@ -33,12 +26,8 @@ function PillSelect<T extends string>({
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
-          className={cn(
-            "rounded-full border px-4 py-1.5 text-sm font-medium transition-all",
-            value === o.value
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-muted/40 text-muted-foreground hover:border-primary/50",
-          )}
+          className="rounded-full border border-border bg-muted/40 px-4 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/50 data-[active=true]:border-primary data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
+          data-active={value === o.value}
         >
           {o.label}
         </button>
@@ -101,29 +90,6 @@ export const StepProfile = memo(function StepProfile({ data, onChange }: Props) 
         <p className="text-xs text-muted-foreground">
           Use metric units: weight in kilograms (kg) and height in centimeters (cm).
         </p>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Activity level</label>
-          <div className="space-y-2">
-            {(Object.entries(ACTIVITY_LABELS) as [ActivityLevel, string][]).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onChange({ activity_level: value })}
-                className={cn(
-                  "w-full rounded-lg border px-4 py-2.5 text-left text-sm transition-all",
-                  data.activity_level === value
-                    ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                    : "border-border hover:border-primary/40",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  {label}
-                  {data.activity_level === value ? <Check className="h-4 w-4 text-primary" /> : null}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
