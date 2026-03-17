@@ -34,6 +34,7 @@ import {
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { getActiveUserId, scopedKey } from "@/lib/activeUser";
 
 type ModuleProgress = {
   id: string;
@@ -63,8 +64,14 @@ function pluralize(count: number, singular: string, plural = `${singular}s`): st
 }
 
 function readDoneCache(): GoalDoneCache {
+  const userId = getActiveUserId();
+
   try {
-    for (const key of GOAL_DONE_CACHE_KEYS) {
+    const scopedKeys = userId
+      ? GOAL_DONE_CACHE_KEYS.map((key) => scopedKey(key, userId))
+      : GOAL_DONE_CACHE_KEYS;
+
+    for (const key of scopedKeys) {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       const parsed = JSON.parse(raw) as unknown;

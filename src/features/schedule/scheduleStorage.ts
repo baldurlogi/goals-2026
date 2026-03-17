@@ -7,6 +7,7 @@ import type {
 import { DEFAULT_USER_SCHEDULE } from '@/features/schedule/scheduleData';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
+import { getActiveUserId, scopedKey } from '@/lib/activeUser';
 
 export const SCHEDULE_CHANGED_EVENT = 'schedule:changed';
 export const SCHEDULE_TEMPLATE_EVENT = 'schedule:template:changed';
@@ -37,9 +38,13 @@ export const DEFAULT_SCHEDULE_LOG: ScheduleLog = {
 
 export const SCHEDULE_LOG_CACHE_KEY = CACHE_KEYS.SCHEDULE_LOG;
 
-function readLogCache(): ScheduleLog | null {
+function scheduleLogKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(SCHEDULE_LOG_CACHE_KEY, userId);
+}
+
+function readLogCache(userId: string | null = getActiveUserId()): ScheduleLog | null {
   try {
-    const raw = localStorage.getItem(SCHEDULE_LOG_CACHE_KEY);
+    const raw = localStorage.getItem(scheduleLogKey(userId));
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as ScheduleLog;
@@ -50,10 +55,11 @@ function readLogCache(): ScheduleLog | null {
   }
 }
 
-function writeLogCache(log: ScheduleLog): void {
+function writeLogCache(log: ScheduleLog, userId: string | null = getActiveUserId()): void {
   try {
-    assertRegisteredCacheWrite(SCHEDULE_LOG_CACHE_KEY);
-    localStorage.setItem(SCHEDULE_LOG_CACHE_KEY, JSON.stringify(log));
+    const key = scheduleLogKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(log));
   } catch {
     // ignore
   }
@@ -121,7 +127,7 @@ export async function loadScheduleLog(): Promise<ScheduleLog> {
 
   if (!user) return empty;
 
-  const cached = readLogCache();
+  const cached = readLogCache(user.id);
   if (cached) return cached;
 
   const { data, error } = await supabase
@@ -238,19 +244,24 @@ export function getScheduleSummary(log: ScheduleLog, total: number) {
 
 const TEMPLATE_CACHE_KEY = CACHE_KEYS.SCHEDULE_TEMPLATES;
 
-function readTemplateCache(): UserScheduleTemplates | null {
+function scheduleTemplateKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(TEMPLATE_CACHE_KEY, userId);
+}
+
+function readTemplateCache(userId: string | null = getActiveUserId()): UserScheduleTemplates | null {
   try {
-    const raw = localStorage.getItem(TEMPLATE_CACHE_KEY);
+    const raw = localStorage.getItem(scheduleTemplateKey(userId));
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-function writeTemplateCache(t: UserScheduleTemplates) {
+function writeTemplateCache(t: UserScheduleTemplates, userId: string | null = getActiveUserId()) {
   try {
-    assertRegisteredCacheWrite(TEMPLATE_CACHE_KEY);
-    localStorage.setItem(TEMPLATE_CACHE_KEY, JSON.stringify(t));
+    const key = scheduleTemplateKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(t));
   } catch {
     return;
   }
@@ -292,7 +303,7 @@ export async function loadScheduleTemplates(): Promise<UserScheduleTemplates> {
     weekend: (data.weekend as TimelineItem[]) ?? DEFAULT_USER_SCHEDULE.weekend,
   };
 
-  writeTemplateCache(templates);
+  writeTemplateCache(templates, user.id);
   return templates;
 }
 
@@ -316,7 +327,7 @@ export async function saveScheduleTemplates(
 
   if (error) throw error;
 
-  writeTemplateCache(templates);
+  writeTemplateCache(templates, user.id);
   emit(SCHEDULE_TEMPLATE_EVENT);
 }
 

@@ -5,6 +5,7 @@ import posthog from "posthog-js";
 import { supabase } from "@/lib/supabaseClient";
 import { AuthContext } from "@/features/auth/authContext";
 import { clearUserCache } from "@/lib/clearUserCache";
+import { setActiveUserId } from "@/lib/activeUser";
 
 function hasCachedProfileMismatch(nextUserId: string | null): boolean {
   try {
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       posthog.reset();
     }
 
+    setActiveUserId(nextUserId);
     previousUserIdRef.current = nextUserId;
     setSession(nextSession);
     setUser(nextUser);
@@ -102,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     await supabase.auth.signOut();
+    setActiveUserId(null);
     clearUserCache();
     posthog.reset();
   }
