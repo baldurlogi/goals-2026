@@ -1,8 +1,7 @@
 import posthog from "posthog-js";
-import { getLocalDateKey } from "@/hooks/useTodayDate";
 
 const ONCE_PREFIX = "analytics:once";
-const LAST_SEEN_DATE_KEY = "app:last-seen-date";
+const RETURNED_NEXT_DAY_PREFIX = "analytics:return-next-day";
 
 function safeRead(key: string): string | null {
   try {
@@ -24,14 +23,22 @@ function onceKey(userId: string, event: string): string {
   return `${ONCE_PREFIX}:${userId}:${event}`;
 }
 
-function oncePerDayKey(userId: string, event: string, dateKey: string): string {
-  return `${ONCE_PREFIX}:${userId}:${event}:${dateKey}`;
+function returnedNextDayKey(userId: string): string {
+  return `${RETURNED_NEXT_DAY_PREFIX}:${userId}`;
 }
 
-function yesterdayDateKey(): string {
-  const now = new Date();
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  return getLocalDateKey(yesterday);
+function getLocalDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getDayDifference(fromDateKey: string, toDateKey: string): number {
+  const from = new Date(`${fromDateKey}T00:00:00`);
+  const to = new Date(`${toDateKey}T00:00:00`);
+  const msPerDay = 1000 * 60 * 60 * 24;
+  return Math.round((to.getTime() - from.getTime()) / msPerDay);
 }
 
 export function capture(event: string, properties?: Record<string, unknown>): void {
@@ -56,31 +63,24 @@ export function captureOnce(
   safeWrite(key, "1");
 }
 
-function captureOncePerDay(
-  event: string,
-  userId: string | null | undefined,
-  dateKey: string,
-  properties?: Record<string, unknown>,
-): void {
-  if (!userId) return;
-
-  const key = oncePerDayKey(userId, event, dateKey);
-  if (safeRead(key)) return;
-
-  capture(event, properties);
-  safeWrite(key, "1");
-}
-
 export function captureReturnedNextDay(userId: string | null | undefined): void {
   if (!userId) return;
 
+  const key = returnedNextDayKey(userId);
   const today = getLocalDateKey();
-  const lastSeen = safeRead(LAST_SEEN_DATE_KEY);
-  if (!lastSeen || lastSeen === today) return;
+  const lastSeenDate = safeRead(key);
 
-  if (lastSeen === yesterdayDateKey()) {
-    captureOncePerDay("returned_next_day", userId, today, {
-      days_since_last_seen: 1,
-    });
+  if (lastSeenDate) {
+    const diff = getDayDifference(lastSeenDate, today);
+
+    if (diff === 1) {
+      capture("returned_next_day", {
+        userId,
+        lastSeenDate,
+        returnedDate: today,
+      });
+    }
   }
+
+  safeWrite(key, today);
 }

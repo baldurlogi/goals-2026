@@ -129,9 +129,24 @@ export function UserGoalPage() {
 
   function handleToggleStep(stepId: string) {
     const wasDone = !!doneMap[stepId];
+    const hadCompletedAnyStep = Object.values(state.done).some((goalDone) =>
+      Object.values(goalDone).some(Boolean),
+    );
 
     dispatch({ type: 'toggleStep', goalId: activeGoal.id, stepId });
     clearAISignalsCache();
+
+    if (!wasDone && !hadCompletedAnyStep) {
+      captureOnce('first_step_completed', userId, {
+        goal_id: activeGoal.id,
+        goal_title: activeGoal.title,
+        step_id: stepId,
+        total_steps: total,
+        is_first_step: true,
+        source: 'user_goal_page',
+        route: window.location.pathname,
+      });
+    }
 
     if (!wasDone) {
       captureOnce('first_step_completed', userId, {

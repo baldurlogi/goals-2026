@@ -225,9 +225,12 @@ function PlanCard({
     if (!priceKey) return;
 
     capture("upgrade_clicked", {
+      plan: plan.id,
       plan_id: plan.id,
       billing_interval: isYearly ? "yearly" : "monthly",
       current_tier: currentTier,
+      source: "upgrade_page_plan_card",
+      route: window.location.pathname,
     });
 
     setLoading(true);

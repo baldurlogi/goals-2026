@@ -143,6 +143,8 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
       captureOnce("onboarding_completed", userId, {
         enabled_modules_count: data.enabled_modules.length,
         has_main_goal_intent: Boolean(data.main_goal.trim()),
+        source: "onboarding_flow",
+        route: "/app",
       });
 
       if (data.main_goal.trim()) {
