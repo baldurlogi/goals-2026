@@ -117,7 +117,7 @@ export function SpendingDonutCard(props: {
   }
 
   return (
-    <div className={cn("rounded-2xl border bg-card p-5 shadow-sm", className)}>
+    <div className={cn("rounded-xl border bg-card p-5 shadow-sm", className)}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm text-muted-foreground">Spending breakdown</div>
@@ -128,7 +128,7 @@ export function SpendingDonutCard(props: {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
         {/* LEFT: Donut */}
-        <div className="rounded-2xl border bg-card/30 p-6">
+        <div className="rounded-xl border bg-card/30 p-6">
           <div className="relative h-80 w-full">
             {isEmpty ? (
               <div className="h-full rounded-xl border border-dashed flex items-center justify-center text-sm text-muted-foreground">
@@ -186,7 +186,7 @@ export function SpendingDonutCard(props: {
         </div>
 
         {/* RIGHT: Editable category table */}
-        <div className="rounded-2xl border bg-card/30 p-6 space-y-4">
+        <div className="rounded-xl border bg-card/30 p-6 space-y-4">
           {/* Income */}
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-medium">Monthly income</span>

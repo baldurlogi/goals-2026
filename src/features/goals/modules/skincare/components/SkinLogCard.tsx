@@ -68,7 +68,7 @@ export function SkinLogCard({ goalId }: { goalId: string }) {
   const latest = state.entries[0];
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-xl">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base">📝 Skin log</CardTitle>

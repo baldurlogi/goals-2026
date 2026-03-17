@@ -79,7 +79,7 @@ export function ExpenseTrackerCard(props: {
   }
 
   return (
-    <div className={cn("rounded-2xl border bg-card p-5 shadow-sm space-y-4", className)}>
+    <div className={cn("rounded-xl border bg-card p-5 shadow-sm space-y-4", className)}>
       {/* Header row */}
       <div className="flex items-start justify-between gap-4">
         <div>
