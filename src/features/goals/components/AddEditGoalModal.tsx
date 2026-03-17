@@ -5,11 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { createBlankGoal, createBlankStep, saveUserGoal } from "../userGoalStorage";
+import {
+  createBlankGoal,
+  createBlankStep,
+  GoalRemotePersistenceError,
+  saveUserGoal,
+} from "../userGoalStorage";
 import type { UserGoal, UserGoalStep } from "../goalTypes";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { AIPromptScreen } from "./AIPromptScreen";
 import { queueAIContextNudge } from "./AIContextNudge.utils";
+import { useAuth } from "@/features/auth/authContext";
+import { captureOnce } from "@/lib/analytics";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 
@@ -57,6 +64,7 @@ export function AddEditGoalModal({
   startWithAI = false,
   initialAIPrompt = "",
 }: Props) {
+  const { userId } = useAuth();
   const isEdit = !!initial;
   const [mode, setMode] = useState<Mode>(
     isEdit ? "manual" : startWithAI ? "ai" : "manual",
@@ -66,10 +74,20 @@ export function AddEditGoalModal({
   const [openStepId, setOpenStepId] = useState<string | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const creationStartTrackedRef = useRef(false);
 
   useEffect(() => {
     if (mode === "manual") titleRef.current?.focus();
   }, [mode]);
+
+  useEffect(() => {
+    if (isEdit || creationStartTrackedRef.current) return;
+    creationStartTrackedRef.current = true;
+
+    captureOnce("first_goal_creation_started", userId, {
+      entry_mode: startWithAI ? "ai" : "manual",
+    });
+  }, [isEdit, startWithAI, userId]);
 
   function updateGoal(patch: Partial<UserGoal>) {
     setGoal((g) => ({ ...g, ...patch, updatedAt: getLocalDateKey() }));
@@ -125,16 +143,37 @@ export function AddEditGoalModal({
     setSaving(true);
 
     try {
-      await saveUserGoal(trimmedGoal);
+      const status = await saveUserGoal(trimmedGoal);
 
       if (!isEdit) {
         queueAIContextNudge();
+        captureOnce("first_goal_saved", userId, {
+          creation_mode: mode,
+          steps_count: trimmedGoal.steps.length,
+        });
       }
 
-      toast.success(isEdit ? "Goal updated" : "Goal created ✨");
       onSave(trimmedGoal);
-    } catch {
-      toast.error("Couldn't save goal. Please try again.");
+
+      if (status.remoteSyncSucceeded) {
+        toast.success(isEdit ? "Goal updated" : "Goal created ✨");
+      } else {
+        toast.warning("Saved locally, syncing failed. We'll retry.");
+      }
+    } catch (error) {
+      if (error instanceof GoalRemotePersistenceError && error.localCacheWriteSucceeded) {
+        if (!isEdit) {
+          queueAIContextNudge();
+          captureOnce("first_goal_saved", userId, {
+            creation_mode: mode,
+            steps_count: trimmedGoal.steps.length,
+          });
+        }
+        onSave(trimmedGoal);
+        toast.warning("Saved locally, syncing failed. We'll retry.");
+      } else {
+        toast.error("Couldn't save goal. Please try again.");
+      }
     } finally {
       setSaving(false);
     }

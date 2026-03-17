@@ -1,51 +1,47 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/features/auth/authContext";
 import {
   loadProfile,
   PROFILE_CHANGED_EVENT,
+  readProfileCache,
   type UserProfile,
 } from "@/features/onboarding/profileStorage";
 
-function readAnyProfileCache(): UserProfile | null {
-  try {
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith("cache:profile:v2:")) continue;
-
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-
-      const parsed = JSON.parse(raw) as UserProfile;
-      if (parsed?.id) return parsed;
-    }
-
-    const legacyRaw = localStorage.getItem("cache:profile:v1");
-    if (!legacyRaw) return null;
-
-    const legacy = JSON.parse(legacyRaw) as UserProfile;
-    return legacy?.id ? legacy : null;
-  } catch {
-    return null;
-  }
-}
-
 export function useProfile() {
+  const { userId, authReady } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(() =>
-    readAnyProfileCache(),
+    readProfileCache(userId),
   );
 
   useEffect(() => {
+    if (!authReady) {
+      setProfile(null);
+      return;
+    }
+
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
+
+    setProfile((current) =>
+      current?.id === userId ? current : readProfileCache(userId),
+    );
+
     let cancelled = false;
 
     const sync = () => {
       void loadProfile().then((next) => {
         if (cancelled) return;
 
-        if (next) {
+        if (next?.id === userId) {
           setProfile(next);
           return;
         }
 
-        setProfile((current) => current ?? readAnyProfileCache());
+        setProfile((current) =>
+          current?.id === userId ? current : readProfileCache(userId),
+        );
       });
     };
 
@@ -56,7 +52,7 @@ export function useProfile() {
       cancelled = true;
       window.removeEventListener(PROFILE_CHANGED_EVENT, sync);
     };
-  }, []);
+  }, [authReady, userId]);
 
   return profile;
 }

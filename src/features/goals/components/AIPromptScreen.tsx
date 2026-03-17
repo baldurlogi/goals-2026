@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import type { UserGoal } from "../goalTypes";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import type { Tier } from "@/features/subscription/useTier";
+import { useAuth } from "@/features/auth/authContext";
+import { captureOnce } from "@/lib/analytics";
 import {
   generateGoalFromPrompt,
   getClarifyingQuestions,
@@ -38,6 +40,7 @@ export function AIPromptScreen({
   initialPrompt = "",
   autoStart = false,
 }: Props) {
+  const { userId } = useAuth();
   const [screen, setScreen] = useState<Screen>("prompt");
   const [prompt, setPrompt] = useState(initialPrompt);
   const [questions, setQuestions] = useState<ClarifyingQuestion[]>([]);
@@ -83,6 +86,11 @@ export function AIPromptScreen({
         finalPrompt,
         finalAnswers,
       );
+
+      captureOnce("first_goal_generated", userId, {
+        had_clarifying_questions: Object.keys(finalAnswers).length > 0,
+      });
+
       setUsage(u);
       onGenerated(goal);
     } catch (e) {

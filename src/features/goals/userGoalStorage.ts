@@ -5,38 +5,90 @@ import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 const CACHE_KEY = CACHE_KEYS.USER_GOALS;
 
+function scopedCacheKey(userId: string) {
+  return `${CACHE_KEY}:${userId}`;
+}
+
 // -- Cache helpers ------------------------------
 
-function readCache(): UserGoal[] {
+function readCache(userId: string): UserGoal[] {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as UserGoal[]) : [];
+    const scopedKey = scopedCacheKey(userId);
+    const raw = localStorage.getItem(scopedKey);
+
+    if (raw) return JSON.parse(raw) as UserGoal[];
+
+    const legacyRaw = localStorage.getItem(CACHE_KEY);
+    if (!legacyRaw) return [];
+
+    const legacyGoals = JSON.parse(legacyRaw) as UserGoal[];
+    writeCache(userId, legacyGoals);
+    localStorage.removeItem(CACHE_KEY);
+    return legacyGoals;
   } catch {
     return [];
   }
 }
 
-function writeCache(goals: UserGoal[]) {
+function readAnyScopedCache(): UserGoal[] {
   try {
-    assertRegisteredCacheWrite(CACHE_KEY);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(goals));
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(`${CACHE_KEY}:`)) continue;
+
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+
+      return JSON.parse(raw) as UserGoal[];
+    }
   } catch {
-    return;
+    // ignore
+  }
+
+  return [];
+}
+
+function writeCache(userId: string, goals: UserGoal[]): boolean {
+  try {
+    const key = scopedCacheKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(goals));
+    localStorage.removeItem(CACHE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export type GoalPersistenceStatus = {
+  localCacheWriteSucceeded: boolean;
+  remoteSyncSucceeded: boolean;
+};
+
+export class GoalRemotePersistenceError extends Error {
+  readonly operation: 'save' | 'delete';
+  readonly localCacheWriteSucceeded: boolean;
+
+  constructor(operation: 'save' | 'delete', localCacheWriteSucceeded: boolean) {
+    super(`Goal ${operation} failed to sync to Supabase.`);
+    this.name = 'GoalRemotePersistenceError';
+    this.operation = operation;
+    this.localCacheWriteSucceeded = localCacheWriteSucceeded;
   }
 }
 
 // -- Load all goals for the current user ------------------------------
 
 export async function loadUserGoals(): Promise<UserGoal[]> {
-  const cached = readCache();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const cached = readCache(user.id);
 
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return cached;
-
     const { data, error } = await supabase
       .from("user_goals")
       .select("*")
@@ -51,7 +103,7 @@ export async function loadUserGoals(): Promise<UserGoal[]> {
     }
 
     const goals: UserGoal[] = data.map(rowToGoal);
-    writeCache(goals);
+    writeCache(user.id, goals);
     return goals;
   } catch (error) {
     console.warn("loadUserGoals exception:", error);
@@ -60,43 +112,83 @@ export async function loadUserGoals(): Promise<UserGoal[]> {
 }
 
 export function seedUserGoals(): UserGoal[] {
-  return readCache();
+  const scoped = readAnyScopedCache();
+  if (scoped.length > 0) return scoped;
+
+  try {
+    const legacyRaw = localStorage.getItem(CACHE_KEY);
+    return legacyRaw ? (JSON.parse(legacyRaw) as UserGoal[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 // -- Save (upsert) a single goal ------------------------------
 
-export async function saveUserGoal(goal: UserGoal): Promise<void> {
-  const cached = readCache();
-  const idx = cached.findIndex((g) => g.id === goal.id);
-  if (idx >= 0) cached[idx] = goal;
-  else cached.push(goal);
-  writeCache(cached);
-
+export async function saveUserGoal(goal: UserGoal): Promise<GoalPersistenceStatus> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
 
-  await supabase
+  if (!user) {
+    return {
+      localCacheWriteSucceeded: false,
+      remoteSyncSucceeded: false,
+    } satisfies GoalPersistenceStatus;
+  }
+
+  const cached = readCache(user.id);
+  const idx = cached.findIndex((g) => g.id === goal.id);
+  if (idx >= 0) cached[idx] = goal;
+  else cached.push(goal);
+  const localCacheWriteSucceeded = writeCache(user.id, cached);
+
+  const { error } = await supabase
     .from("user_goals")
     .upsert(goalToRow(user.id, goal), { onConflict: "id" });
+
+  if (error) {
+    throw new GoalRemotePersistenceError('save', localCacheWriteSucceeded);
+  }
+
+  return {
+    localCacheWriteSucceeded,
+    remoteSyncSucceeded: true,
+  } satisfies GoalPersistenceStatus;
 }
 
 // -- Delete a goal ------------------------------
 
-export async function deleteUserGoal(goalId: string): Promise<void> {
-  writeCache(readCache().filter((g) => g.id !== goalId));
-
+export async function deleteUserGoal(goalId: string): Promise<GoalPersistenceStatus> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) {
+    return {
+      localCacheWriteSucceeded: false,
+      remoteSyncSucceeded: false,
+    };
+  }
 
-  await supabase
+  const localCacheWriteSucceeded = writeCache(
+    user.id,
+    readCache(user.id).filter((g) => g.id !== goalId),
+  );
+
+  const { error } = await supabase
     .from("user_goals")
     .delete()
     .eq("id", goalId)
     .eq("user_id", user.id);
+
+  if (error) {
+    throw new GoalRemotePersistenceError('delete', localCacheWriteSucceeded);
+  }
+
+  return {
+    localCacheWriteSucceeded,
+    remoteSyncSucceeded: true,
+  };
 }
 
 // -- Factory helpers ------------------------------

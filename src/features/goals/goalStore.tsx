@@ -21,53 +21,87 @@ type StepHistoryEntry = {
   date: string;
 };
 
+function scopedKey(baseKey: string, userId: string) {
+  return `${baseKey}:${userId}`;
+}
+
 function cloneDoneState(done: DoneState): DoneState {
   return Object.fromEntries(
     Object.entries(done).map(([goalId, steps]) => [goalId, { ...steps }]),
   );
 }
 
-function readCache(): DoneState {
+function readDoneCache(userId: string): DoneState {
   try {
-    const raw =
+    const scopedCacheKey = scopedKey(CACHE_KEY, userId);
+    const scopedLegacyDoneKey = scopedKey(LEGACY_WEEKLY_DONE_KEY, userId);
+
+    const scopedRaw =
+      localStorage.getItem(scopedCacheKey) ??
+      localStorage.getItem(scopedLegacyDoneKey);
+
+    if (scopedRaw) {
+      return JSON.parse(scopedRaw) as DoneState;
+    }
+
+    const legacyRaw =
       localStorage.getItem(CACHE_KEY) ??
       localStorage.getItem(LEGACY_WEEKLY_DONE_KEY);
-    return raw ? (JSON.parse(raw) as DoneState) : {};
+
+    if (!legacyRaw) return {};
+
+    const legacyDone = JSON.parse(legacyRaw) as DoneState;
+    writeDoneCache(userId, legacyDone);
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(LEGACY_WEEKLY_DONE_KEY);
+    return legacyDone;
   } catch {
     return {};
   }
 }
 
-function writeCache(done: DoneState) {
+function writeDoneCache(userId: string, done: DoneState) {
   try {
     const serialized = JSON.stringify(done);
-    localStorage.setItem(CACHE_KEY, serialized);
-    localStorage.setItem(LEGACY_WEEKLY_DONE_KEY, serialized);
+    localStorage.setItem(scopedKey(CACHE_KEY, userId), serialized);
+    localStorage.setItem(scopedKey(LEGACY_WEEKLY_DONE_KEY, userId), serialized);
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(LEGACY_WEEKLY_DONE_KEY);
   } catch {
     // ignore quota / private mode
   }
 }
 
-function readStepHistory(): StepHistoryEntry[] {
+function readStepHistory(userId: string): StepHistoryEntry[] {
   try {
-    const raw = localStorage.getItem(STEP_HISTORY_KEY);
-    return raw ? (JSON.parse(raw) as StepHistoryEntry[]) : [];
+    const scopedHistoryKey = scopedKey(STEP_HISTORY_KEY, userId);
+    const scopedRaw = localStorage.getItem(scopedHistoryKey);
+    if (scopedRaw) return JSON.parse(scopedRaw) as StepHistoryEntry[];
+
+    const legacyRaw = localStorage.getItem(STEP_HISTORY_KEY);
+    if (!legacyRaw) return [];
+
+    const legacyHistory = JSON.parse(legacyRaw) as StepHistoryEntry[];
+    writeStepHistory(userId, legacyHistory);
+    localStorage.removeItem(STEP_HISTORY_KEY);
+    return legacyHistory;
   } catch {
     return [];
   }
 }
 
-function writeStepHistory(entries: StepHistoryEntry[]) {
+function writeStepHistory(userId: string, entries: StepHistoryEntry[]) {
   try {
-    localStorage.setItem(STEP_HISTORY_KEY, JSON.stringify(entries));
+    localStorage.setItem(scopedKey(STEP_HISTORY_KEY, userId), JSON.stringify(entries));
+    localStorage.removeItem(STEP_HISTORY_KEY);
   } catch {
     // ignore quota / private mode
   }
 }
 
-function addStepHistory(goalId: string, stepId: string) {
+function addStepHistory(userId: string, goalId: string, stepId: string) {
   const today = getLocalDateKey();
-  const next = readStepHistory().filter(
+  const next = readStepHistory(userId).filter(
     (entry) =>
       !(
         entry.goalId === goalId &&
@@ -77,13 +111,14 @@ function addStepHistory(goalId: string, stepId: string) {
   );
 
   next.push({ goalId, stepId, date: today });
-  writeStepHistory(next);
+  writeStepHistory(userId, next);
 }
 
-function removeStepHistoryForToday(goalId: string, stepId: string) {
+function removeStepHistoryForToday(userId: string, goalId: string, stepId: string) {
   const today = getLocalDateKey();
   writeStepHistory(
-    readStepHistory().filter(
+    userId,
+    readStepHistory(userId).filter(
       (entry) =>
         !(
           entry.goalId === goalId &&
@@ -94,10 +129,11 @@ function removeStepHistoryForToday(goalId: string, stepId: string) {
   );
 }
 
-function clearGoalHistoryForToday(goalId: string) {
+function clearGoalHistoryForToday(userId: string, goalId: string) {
   const today = getLocalDateKey();
   writeStepHistory(
-    readStepHistory().filter(
+    userId,
+    readStepHistory(userId).filter(
       (entry) => !(entry.goalId === goalId && entry.date === today),
     ),
   );
@@ -149,9 +185,10 @@ export function GoalStoreProvider({
   children: React.ReactNode;
 }) {
   const [state, rawDispatch] = React.useReducer(reducer, {
-    done: readCache(),
+    done: {},
     loaded: false,
   });
+  const [userId, setUserId] = React.useState<string | null>(null);
   const debounceTimerRef = React.useRef<number | null>(null);
   const retryTimerRef = React.useRef<number | null>(null);
   const persistInFlightRef = React.useRef(false);
@@ -231,32 +268,30 @@ export function GoalStoreProvider({
 
   const dispatch = React.useCallback(
     (action: Action) => {
-      if (action.type === "toggleStep") {
+      if (action.type === "toggleStep" && userId) {
         const wasDone = !!state.done[action.goalId]?.[action.stepId];
 
         if (wasDone) {
-          removeStepHistoryForToday(action.goalId, action.stepId);
+          removeStepHistoryForToday(userId, action.goalId, action.stepId);
         } else {
-          addStepHistory(action.goalId, action.stepId);
+          addStepHistory(userId, action.goalId, action.stepId);
         }
       }
 
-      if (action.type === "resetGoal") {
-        clearGoalHistoryForToday(action.goalId);
+      if (action.type === "resetGoal" && userId) {
+        clearGoalHistoryForToday(userId, action.goalId);
         void deleteGoalProgress(action.goalId);
       }
 
       rawDispatch(action);
     },
-    [state.done],
+    [state.done, userId],
   );
 
   React.useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const cached = readCache();
-
       try {
         const {
           data: { user },
@@ -264,9 +299,16 @@ export function GoalStoreProvider({
 
         if (!user) {
           if (!cancelled) {
-            dispatch({ type: "hydrate", done: cached });
+            setUserId(null);
+            dispatch({ type: "hydrate", done: {} });
           }
           return;
+        }
+
+        const cached = readDoneCache(user.id);
+
+        if (!cancelled) {
+          setUserId(user.id);
         }
 
         const { data, error } = await supabase
@@ -290,13 +332,13 @@ export function GoalStoreProvider({
 
         if (!cancelled) {
           dispatch({ type: "hydrate", done });
-          writeCache(done);
+          writeDoneCache(user.id, done);
         }
       } catch (error) {
         console.warn("goalStore load exception:", error);
 
         if (!cancelled) {
-          dispatch({ type: "hydrate", done: cached });
+          dispatch({ type: "hydrate", done: {} });
         }
       }
     }
@@ -309,9 +351,9 @@ export function GoalStoreProvider({
   }, [dispatch]);
 
   React.useEffect(() => {
-    if (!state.loaded) return;
+    if (!state.loaded || !userId) return;
 
-    writeCache(state.done);
+    writeDoneCache(userId, state.done);
     queuedDoneRef.current = cloneDoneState(state.done);
 
     if (debounceTimerRef.current != null) {
@@ -321,7 +363,7 @@ export function GoalStoreProvider({
     debounceTimerRef.current = window.setTimeout(() => {
       void flushPersistQueue();
     }, PERSIST_DEBOUNCE_MS);
-  }, [flushPersistQueue, state.done, state.loaded]);
+  }, [flushPersistQueue, state.done, state.loaded, userId]);
 
   React.useEffect(
     () => () => {
