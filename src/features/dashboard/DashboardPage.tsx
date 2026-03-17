@@ -17,6 +17,21 @@ import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
 import { scheduleIdle } from "@/lib/scheduleIdle";
 
+import {
+  AICoachCardSkeleton,
+  AchievementsCardSkeleton,
+  FitnessCardSkeleton,
+  LifeProgressCardSkeleton,
+  MacrosCardSkeleton,
+  ReadingCardSkeleton,
+  ScheduleCardSkeleton,
+  SpendingCardSkeleton,
+  TodoCardSkeleton,
+  UpcomingGoalsCardSkeleton,
+  WaterIntakeCardSkeleton,
+  WeeklyReportCardSkeleton,
+} from "./skeletons";
+
 const AICoachCard = lazy(async () => ({
   default: (await import("./components/AICoachCard")).AICoachCard,
 }));
@@ -66,41 +81,6 @@ function useDeferredMount(delay = 0) {
   }, [delay]);
 
   return ready;
-}
-
-function DeferredGroup({
-  when,
-  children,
-}: {
-  when: boolean;
-  children: ReactNode;
-}) {
-  if (!when) return null;
-
-  return (
-    <Suspense
-      fallback={
-        <div className="md:col-span-2 lg:col-span-12 rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-          Loading more dashboard cards…
-        </div>
-      }
-    >
-      {children}
-    </Suspense>
-  );
-}
-
-function TopCardPlaceholder() {
-  return (
-    <div className="lg:col-span-12 rounded-2xl border bg-card/70 p-5">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="h-6 w-6 rounded-md bg-muted" />
-        <div className="h-3 w-24 rounded bg-muted" />
-      </div>
-      <div className="h-5 w-2/3 rounded bg-muted" />
-      <div className="mt-2 h-3 w-5/6 rounded bg-muted" />
-    </div>
-  );
 }
 
 function UsagePillPlaceholder() {
@@ -161,9 +141,8 @@ export default function DashboardPage() {
     return seedUserGoals().length;
   });
 
-  const showTopEnhancements = useDeferredMount(120);
-  const showStageOne = useDeferredMount(260);
-  const showStageTwo = useDeferredMount(700);
+  const showTopEnhancements = useDeferredMount(160);
+  const showSecondaryEnhancements = useDeferredMount(380);
 
   useEffect(() => {
     let cancelled = false;
@@ -246,8 +225,8 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <Suspense fallback={<TopCardPlaceholder />}>
-          {showTopEnhancements ? <AICoachCard /> : <TopCardPlaceholder />}
+        <Suspense fallback={<AICoachCardSkeleton />}>
+          {showTopEnhancements ? <AICoachCard /> : <AICoachCardSkeleton />}
         </Suspense>
 
         {quickActions.length > 0 && (
@@ -260,22 +239,83 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <DeferredGroup when={showStageOne}>
-          <LifeProgressCard />
-          {isPro && <WeeklyReportCard />}
-          {has("reading") && <ReadingCard />}
-          {has("nutrition") && <MacrosCard />}
-          {has("schedule") && <ScheduleCard />}
-          {has("goals") && <UpcomingGoalsCard />}
-        </DeferredGroup>
+        <Suspense fallback={<LifeProgressCardSkeleton />}>
+          {showTopEnhancements ? <LifeProgressCard /> : <LifeProgressCardSkeleton />}
+        </Suspense>
 
-        <DeferredGroup when={showStageTwo}>
-          {has("finance") && <SpendingCard />}
-          {has("todos") && <TodoCard />}
-          {has("fitness") && <FitnessCard />}
-          {has("nutrition") && <WaterIntakeCard />}
-          <AchievementsCard />
-        </DeferredGroup>
+        {isPro && (
+          <Suspense fallback={<WeeklyReportCardSkeleton />}>
+            {showSecondaryEnhancements ? (
+              <WeeklyReportCard />
+            ) : (
+              <WeeklyReportCardSkeleton />
+            )}
+          </Suspense>
+        )}
+
+        {has("reading") && (
+          <Suspense fallback={<ReadingCardSkeleton />}>
+            {showTopEnhancements ? <ReadingCard /> : <ReadingCardSkeleton />}
+          </Suspense>
+        )}
+
+        {has("nutrition") && (
+          <Suspense fallback={<MacrosCardSkeleton />}>
+            {showTopEnhancements ? <MacrosCard /> : <MacrosCardSkeleton />}
+          </Suspense>
+        )}
+
+        {has("schedule") && (
+          <Suspense fallback={<ScheduleCardSkeleton />}>
+            {showTopEnhancements ? <ScheduleCard /> : <ScheduleCardSkeleton />}
+          </Suspense>
+        )}
+
+        {has("goals") && (
+          <Suspense fallback={<UpcomingGoalsCardSkeleton />}>
+            {showTopEnhancements ? (
+              <UpcomingGoalsCard />
+            ) : (
+              <UpcomingGoalsCardSkeleton />
+            )}
+          </Suspense>
+        )}
+
+        {has("finance") && (
+          <Suspense fallback={<SpendingCardSkeleton />}>
+            {showSecondaryEnhancements ? <SpendingCard /> : <SpendingCardSkeleton />}
+          </Suspense>
+        )}
+
+        {has("todos") && (
+          <Suspense fallback={<TodoCardSkeleton />}>
+            {showSecondaryEnhancements ? <TodoCard /> : <TodoCardSkeleton />}
+          </Suspense>
+        )}
+
+        {has("fitness") && (
+          <Suspense fallback={<FitnessCardSkeleton />}>
+            {showSecondaryEnhancements ? <FitnessCard /> : <FitnessCardSkeleton />}
+          </Suspense>
+        )}
+
+        {has("nutrition") && (
+          <Suspense fallback={<WaterIntakeCardSkeleton />}>
+            {showSecondaryEnhancements ? (
+              <WaterIntakeCard />
+            ) : (
+              <WaterIntakeCardSkeleton />
+            )}
+          </Suspense>
+        )}
+
+        <Suspense fallback={<AchievementsCardSkeleton />}>
+          {showSecondaryEnhancements ? (
+            <AchievementsCard />
+          ) : (
+            <AchievementsCardSkeleton />
+          )}
+        </Suspense>
       </div>
 
       {modules.size === 0 && (
