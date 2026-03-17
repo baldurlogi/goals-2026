@@ -232,7 +232,7 @@ export default function DashboardPage() {
 
         {quickActions.length > 0 && (
           <div className="md:col-span-2 lg:col-span-12">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
               {quickActions.map((qa) => (
                 <QuickAction key={qa.href} {...qa} />
               ))}
