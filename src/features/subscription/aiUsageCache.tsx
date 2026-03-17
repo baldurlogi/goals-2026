@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
+import { getActiveUserId, scopedKey } from "@/lib/activeUser";
 import type { Tier } from "./useTier";
 
 export type AIUsageSnapshot = {
@@ -21,6 +22,10 @@ type UsageLike = {
 };
 
 const STORAGE_KEY = CACHE_KEYS.AI_USAGE;
+
+function getStorageKey() {
+  return scopedKey(STORAGE_KEY, getActiveUserId());
+}
 export const AI_USAGE_EVENT = "ai-usage-updated";
 
 function getMonthKey(date = new Date()) {
@@ -47,14 +52,15 @@ export function readAIUsageCache(): AIUsageSnapshot | null {
   if (typeof window === "undefined") return null;
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const key = getStorageKey();
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as Partial<AIUsageSnapshot>;
     const currentMonth = getMonthKey();
 
     if (parsed.monthKey !== currentMonth) {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(key);
       return null;
     }
 
@@ -123,8 +129,9 @@ export function writeAIUsageCache(input: UsageLike): AIUsageSnapshot {
   };
 
   try {
-    assertRegisteredCacheWrite(STORAGE_KEY);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    const key = getStorageKey();
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(snapshot));
   } catch {
     // ignore storage failures
   }

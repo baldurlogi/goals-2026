@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import { useAuth } from "@/features/auth/authContext";
+import { getActiveUserId, scopedKey } from "@/lib/activeUser";
 
 export type Tier = "free" | "pro" | "pro_max";
 
@@ -30,9 +31,13 @@ export function tierMeets(userTier: Tier, required: Tier): boolean {
 
 const TIER_CACHE_KEY = CACHE_KEYS.USER_TIER;
 
+function tierCacheKey() {
+  return scopedKey(TIER_CACHE_KEY, getActiveUserId());
+}
+
 function readTierCache(): Tier {
   try {
-    const raw = localStorage.getItem(TIER_CACHE_KEY);
+    const raw = localStorage.getItem(tierCacheKey());
     if (raw === "pro" || raw === "pro_max") return raw;
   } catch {
     // ignore
@@ -42,7 +47,7 @@ function readTierCache(): Tier {
 
 function writeTierCache(tier: Tier) {
   try {
-    localStorage.setItem(TIER_CACHE_KEY, tier);
+    localStorage.setItem(tierCacheKey(), tier);
   } catch {
     // ignore
   }
@@ -117,7 +122,7 @@ export function useTier(): Tier {
 export function clearTierCache() {
   currentTier = "free";
   try {
-    localStorage.removeItem(TIER_CACHE_KEY);
+    localStorage.removeItem(tierCacheKey());
   } catch {
     // ignore
   }

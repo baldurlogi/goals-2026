@@ -11,6 +11,7 @@ import {
   loadNutritionLog,
   loadPhase,
 } from '@/features/nutrition/nutritionStorage';
+import { getActiveUserId, scopedKey } from '@/lib/activeUser';
 
 const CACHE_KEY = 'cache:ai-signals:v1';
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -87,9 +88,13 @@ export type AISignals = {
   } | null;
 };
 
+function cacheKey() {
+  return scopedKey(CACHE_KEY, getActiveUserId());
+}
+
 function readCache(): AISignals | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKey());
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as AISignals;
@@ -103,7 +108,7 @@ function readCache(): AISignals | null {
 
 function writeCache(signals: AISignals) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(signals));
+    localStorage.setItem(cacheKey(), JSON.stringify(signals));
   } catch {
     // ignore
   }
@@ -168,36 +173,15 @@ function extractDoneMap(payload: unknown): GoalDoneMap | null {
 }
 
 function readGoalDoneMap(): GoalDoneMap {
-  const likelyKeys = [
-    'goal-store',
-    'goal_store',
-    'goals-store',
-    'goals_store',
-    'goalStore',
-    'goalsStore',
-    'cache:goal_store:v1',
-    'cache:goals_store:v1',
-    'daily-life:goal-store:v1',
-    'daily-life:goals-store:v1',
-  ];
+  const userId = getActiveUserId();
+  const keys = userId
+    ? [
+        scopedKey('cache:goals:v1', userId),
+        scopedKey('goals:done:v1', userId),
+      ]
+    : ['cache:goals:v1', 'goals:done:v1'];
 
-  for (const key of likelyKeys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-
-      const parsed = JSON.parse(raw);
-      const doneMap = extractDoneMap(parsed);
-      if (doneMap) return doneMap;
-    } catch {
-      // ignore
-    }
-  }
-
-  for (let i = 0; i < localStorage.length; i += 1) {
-    const key = localStorage.key(i);
-    if (!key) continue;
-
+  for (const key of keys) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
@@ -303,7 +287,7 @@ function countOverdueIncompleteSteps(
 
 function readReadingState(): ReadingState {
   try {
-    const raw = localStorage.getItem('daily-life:reading:v2');
+    const raw = localStorage.getItem(scopedKey('daily-life:reading:v2', getActiveUserId()));
     if (!raw) {
       return {
         currentBookTitle: null,
@@ -367,7 +351,8 @@ function readReadingState(): ReadingState {
 
 function readTodosSignal(): AISignals['todos'] {
   try {
-    const raw = localStorage.getItem('todos_v1');
+    const userId = getActiveUserId();
+    const raw = localStorage.getItem(userId ? `cache:todos:v1:${userId}` : 'cache:todos:v1');
     if (!raw) return null;
 
     const todos = JSON.parse(raw) as Array<{

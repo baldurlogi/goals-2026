@@ -6,13 +6,18 @@ import {
 } from "@/features/reading/readingStorage";
 import { inputsToPlan, getReadingStats } from "@/features/reading/readingUtils";
 import type { ReadingInputs } from "@/features/reading/readingTypes";
+import { getActiveUserId, scopedKey } from "@/lib/activeUser";
 
 const CACHE_KEY = "daily-life:reading:v2";
+
+function readingCacheKey() {
+  return scopedKey(CACHE_KEY, getActiveUserId());
+}
 
 /** Read cached value from localStorage synchronously — instant on first paint */
 function readCache(): ReadingInputs {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(readingCacheKey());
     return raw ? JSON.parse(raw) : DEFAULT_READING_INPUTS;
   } catch {
     return DEFAULT_READING_INPUTS;
@@ -34,7 +39,7 @@ export function useReadingDashboard() {
         setLoading(false);
         // Keep cache in sync for next load
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+          localStorage.setItem(readingCacheKey(), JSON.stringify(fresh));
         } catch(e) {
           console.warn("read cache failed", e);
           return {};

@@ -12,6 +12,7 @@ import {
 } from "./date";
 import type { DayKey, DaySplit, WeeklySplitConfig } from "./types";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
+import { getActiveUserId, scopedKey } from "@/lib/activeUser";
 
 const SPLIT_CACHE_KEY = CACHE_KEYS.FITNESS_SPLIT;
 
@@ -60,9 +61,13 @@ export function todayDayKey(): DayKey {
   return map[new Date().getDay()];
 }
 
-export function readSplitCache(): WeeklySplitConfig {
+function splitCacheKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(SPLIT_CACHE_KEY, userId);
+}
+
+export function readSplitCache(userId: string | null = getActiveUserId()): WeeklySplitConfig {
   try {
-    const raw = localStorage.getItem(SPLIT_CACHE_KEY);
+    const raw = localStorage.getItem(splitCacheKey(userId));
     if (!raw) return makeDefaultSplit();
 
     return normalizeWeeklySplit(JSON.parse(raw) as WeeklySplitConfig);
@@ -71,10 +76,11 @@ export function readSplitCache(): WeeklySplitConfig {
   }
 }
 
-function writeSplitCache(cfg: WeeklySplitConfig): void {
+function writeSplitCache(cfg: WeeklySplitConfig, userId: string | null = getActiveUserId()): void {
   try {
-    assertRegisteredCacheWrite(SPLIT_CACHE_KEY);
-    localStorage.setItem(SPLIT_CACHE_KEY, JSON.stringify(cfg));
+    const key = splitCacheKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(cfg));
   } catch {
     // ignore
   }
