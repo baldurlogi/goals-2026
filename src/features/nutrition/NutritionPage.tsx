@@ -28,6 +28,11 @@ import { PROFILE_CHANGED_EVENT } from "@/features/onboarding/profileStorage";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function sanitizeNumericInput(value: string) {
+  if (!value) return "";
+  return /^\d*(?:\.\d{0,1})?$/.test(value) ? value : null;
+}
+
 function MacroInputRow({
   label, value, unit, onChange,
 }: {
@@ -40,12 +45,16 @@ function MacroInputRow({
       </label>
       <div className="flex items-center gap-1">
         <input
-          type="number"
-          min={0}
+          type="text"
+          inputMode="decimal"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const next = sanitizeNumericInput(e.target.value.trim());
+            if (next !== null) onChange(next);
+          }}
           className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="0"
+          aria-label={`${label} in ${unit}`}
         />
         <span className="shrink-0 text-xs text-muted-foreground">{unit}</span>
       </div>

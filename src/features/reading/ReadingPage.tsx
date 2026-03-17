@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReadingFieldPath, ReadingInputs } from "./readingTypes";
 import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan, updateReadingStreak } from "./readingUtils";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
@@ -9,6 +9,7 @@ import { ReadingInputsCard } from "./components/ReadingInputsCard";
 import {
   loadReadingInputs,
   saveReadingInputs,
+  seedReadingInputs,
   DEFAULT_READING_INPUTS,
   READING_CHANGED_EVENT,
 } from "./readingStorage";
@@ -81,6 +82,7 @@ function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
 
 export function ReadingPage() {
   const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
+  const lastLocalWriteAtRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,11 +94,24 @@ export function ReadingPage() {
 
     sync();
 
+    const syncFromLocalMirror = () => {
+      const localSnapshot = seedReadingInputs();
+      setInputs((prev) => {
+        const nextSerialized = JSON.stringify(localSnapshot);
+        const prevSerialized = JSON.stringify(prev);
+        if (nextSerialized === prevSerialized) return prev;
+
+        const now = Date.now();
+        if (now - lastLocalWriteAtRef.current < 300) return prev;
+        return localSnapshot;
+      });
+    };
+
     const handleReadingChanged: EventListener = () => {
-      void sync();
+      syncFromLocalMirror();
     };
     const handleStorageChange = () => {
-      void sync();
+      syncFromLocalMirror();
     };
 
     window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
@@ -117,6 +132,7 @@ export function ReadingPage() {
   function setAndPersist(updater: (prev: ReadingInputs) => ReadingInputs) {
     setInputs((prev) => {
       const next = updater(prev);
+      lastLocalWriteAtRef.current = Date.now();
       void Promise.resolve(saveReadingInputs(next));
       return next;
     });
