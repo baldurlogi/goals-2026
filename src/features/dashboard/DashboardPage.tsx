@@ -1,6 +1,7 @@
 import {
   Suspense,
   lazy,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -135,7 +136,7 @@ export default function DashboardPage() {
   const { modules } = useEnabledModules();
   const tier = useTier();
   const isPro = tierMeets(tier, "pro");
-  const has = (id: string) => modules.has(id as never);
+  const has = useCallback((id: string) => modules.has(id as never), [modules]);
 
   const [goalCount, setGoalCount] = useState<number | null>(() => {
     return seedUserGoals().length;
@@ -197,7 +198,7 @@ export default function DashboardPage() {
         href: string;
         color: string;
       }[],
-    [modules]
+    [has]
   );
 
   return (
