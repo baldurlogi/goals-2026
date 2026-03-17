@@ -4,11 +4,20 @@ import type { Macros } from '@/features/nutrition/nutritionTypes';
 import { meals } from '@/features/nutrition/nutritionData';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
+import { getActiveUserId, scopedKey } from '@/lib/activeUser';
 
 export const NUTRITION_CHANGED_EVENT = "nutrition:changed";
 
 export const NUTRITION_LOG_CACHE_KEY = CACHE_KEYS.NUTRITION_LOG;
 export const NUTRITION_PHASE_CACHE_KEY = CACHE_KEYS.NUTRITION_PHASE;
+
+function logCacheKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(NUTRITION_LOG_CACHE_KEY, userId);
+}
+
+function phaseCacheKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(NUTRITION_PHASE_CACHE_KEY, userId);
+}
 
 function emit() {
   window.dispatchEvent(new Event(NUTRITION_CHANGED_EVENT));
@@ -51,9 +60,9 @@ function emptyLog(date = todayKey()): NutritionLog {
   return { date, eaten: {}, customEntries: [] };
 }
 
-function readLogCache(): NutritionLog | null {
+function readLogCache(userId: string | null = getActiveUserId()): NutritionLog | null {
   try {
-    const raw = localStorage.getItem(NUTRITION_LOG_CACHE_KEY);
+    const raw = localStorage.getItem(logCacheKey(userId));
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as NutritionLog;
@@ -65,28 +74,30 @@ function readLogCache(): NutritionLog | null {
   }
 }
 
-function writeLogCache(log: NutritionLog): void {
+function writeLogCache(log: NutritionLog, userId: string | null = getActiveUserId()): void {
   try {
-    assertRegisteredCacheWrite(NUTRITION_LOG_CACHE_KEY);
-    localStorage.setItem(NUTRITION_LOG_CACHE_KEY, JSON.stringify(log));
+    const key = logCacheKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(log));
   } catch {
     // ignore
   }
 }
 
-function readPhaseCache(): NutritionPhase | null {
+function readPhaseCache(userId: string | null = getActiveUserId()): NutritionPhase | null {
   try {
-    const raw = localStorage.getItem(NUTRITION_PHASE_CACHE_KEY);
+    const raw = localStorage.getItem(phaseCacheKey(userId));
     return raw === 'cut' || raw === 'maintain' ? raw : null;
   } catch {
     return null;
   }
 }
 
-function writePhaseCache(phase: NutritionPhase): void {
+function writePhaseCache(phase: NutritionPhase, userId: string | null = getActiveUserId()): void {
   try {
-    assertRegisteredCacheWrite(NUTRITION_PHASE_CACHE_KEY);
-    localStorage.setItem(NUTRITION_PHASE_CACHE_KEY, phase);
+    const key = phaseCacheKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, phase);
   } catch {
     // ignore
   }
@@ -122,18 +133,16 @@ export async function loadPhase(): Promise<NutritionPhase> {
       .from("nutrition_phase")
       .insert({ user_id: user.id, phase: "maintain" });
 
-    writePhaseCache("maintain");
+    writePhaseCache("maintain", user.id);
     return "maintain";
   }
 
   const phase = (data.phase as NutritionPhase) ?? "maintain";
-  writePhaseCache(phase);
+  writePhaseCache(phase, user.id);
   return phase;
 }
 
 export async function savePhase(phase: NutritionPhase): Promise<void> {
-  writePhaseCache(phase);
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -142,6 +151,8 @@ export async function savePhase(phase: NutritionPhase): Promise<void> {
     emit();
     return;
   }
+
+  writePhaseCache(phase, user.id);
 
   await supabase
     .from("nutrition_phase")

@@ -3,6 +3,7 @@ import type { ReadingInputs } from "./readingTypes";
 import { supabase } from "@/lib/supabaseClient";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
+import { getActiveUserId, scopedKey } from "@/lib/activeUser";
 
 // Local key only used for optional legacy fallback + migration safety
 const STORAGE_KEY = CACHE_KEYS.READING;
@@ -10,6 +11,22 @@ const READING_DAILY_PROGRESS_KEY = CACHE_KEYS.READING_DAILY_PROGRESS;
 const AI_SIGNALS_CACHE_KEY = CACHE_KEYS.AI_SIGNALS;
 
 const READING_HISTORY_KEY = CACHE_KEYS.READING_HISTORY;
+
+function readingKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(STORAGE_KEY, userId);
+}
+
+function dailyProgressKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(READING_DAILY_PROGRESS_KEY, userId);
+}
+
+function readingHistoryKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(READING_HISTORY_KEY, userId);
+}
+
+function aiSignalsKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(AI_SIGNALS_CACHE_KEY, userId);
+}
 
 export type ReadingHistoryEntry = {
   date: string;
@@ -45,9 +62,9 @@ export type TodayReadingProgress = {
   pct: number;
 };
 
-function clearAISignalsCache() {
+function clearAISignalsCache(userId: string | null = getActiveUserId()) {
   try {
-    localStorage.removeItem(AI_SIGNALS_CACHE_KEY);
+    localStorage.removeItem(aiSignalsKey(userId));
   } catch {
     // ignore
   }
@@ -88,9 +105,9 @@ function getBookKey(inputs: ReadingInputs): string {
   return [title, author, totalPages].join("::");
 }
 
-function readDailyProgressCache(): ReadingDailyProgressCache | null {
+function readDailyProgressCache(userId: string | null = getActiveUserId()): ReadingDailyProgressCache | null {
   try {
-    const raw = localStorage.getItem(READING_DAILY_PROGRESS_KEY);
+    const raw = localStorage.getItem(dailyProgressKey(userId));
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as ReadingDailyProgressCache;
@@ -108,36 +125,38 @@ function readDailyProgressCache(): ReadingDailyProgressCache | null {
   }
 }
 
-function writeDailyProgressCache(cache: ReadingDailyProgressCache) {
+function writeDailyProgressCache(cache: ReadingDailyProgressCache, userId: string | null = getActiveUserId()) {
   try {
-    assertRegisteredCacheWrite(READING_DAILY_PROGRESS_KEY);
-    localStorage.setItem(READING_DAILY_PROGRESS_KEY, JSON.stringify(cache));
+    const key = dailyProgressKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(cache));
   } catch {
     // ignore
   }
 }
 
-function clearDailyProgressCache() {
+function clearDailyProgressCache(userId: string | null = getActiveUserId()) {
   try {
-    localStorage.removeItem(READING_DAILY_PROGRESS_KEY);
+    localStorage.removeItem(dailyProgressKey(userId));
   } catch {
     // ignore
   }
 }
 
-function readReadingHistoryCache(): ReadingHistoryEntry[] {
+function readReadingHistoryCache(userId: string | null = getActiveUserId()): ReadingHistoryEntry[] {
   try {
-    const raw = localStorage.getItem(READING_HISTORY_KEY);
+    const raw = localStorage.getItem(readingHistoryKey(userId));
     return raw ? (JSON.parse(raw) as ReadingHistoryEntry[]) : [];
   } catch {
     return [];
   }
 }
 
-function writeReadingHistoryCache(entries: ReadingHistoryEntry[]) {
+function writeReadingHistoryCache(entries: ReadingHistoryEntry[], userId: string | null = getActiveUserId()) {
   try {
-    assertRegisteredCacheWrite(READING_HISTORY_KEY);
-    localStorage.setItem(READING_HISTORY_KEY, JSON.stringify(entries));
+    const key = readingHistoryKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(entries));
   } catch {
     // ignore
   }
@@ -147,6 +166,7 @@ function upsertReadingHistoryEntry(
   inputs: ReadingInputs,
   cache: ReadingDailyProgressCache,
   goalPages: number,
+  userId: string | null = getActiveUserId(),
 ) {
   const title = inputs.current.title.trim();
   const author = inputs.current.author.trim();
@@ -167,12 +187,12 @@ function upsertReadingHistoryEntry(
     updatedAt: new Date().toISOString(),
   };
 
-  const existing = readReadingHistoryCache().filter(
+  const existing = readReadingHistoryCache(userId).filter(
     (item) => !(item.date === entry.date && item.bookKey === entry.bookKey),
   );
 
   existing.push(entry);
-  writeReadingHistoryCache(existing);
+  writeReadingHistoryCache(existing, userId);
 }
 
 function createProgressSnapshot(
@@ -191,18 +211,19 @@ function createProgressSnapshot(
 function syncTodayReadingProgress(
   nextInputs: ReadingInputs,
   previousInputs?: ReadingInputs | null,
+  userId: string | null = getActiveUserId(),
 ): TodayReadingProgress {
   const bookKey = getBookKey(nextInputs);
   const currentPage = parsePage(nextInputs.current.currentPage);
   const goalPages = parseGoalPages(nextInputs.dailyGoalPages);
 
   if (!bookKey.trim()) {
-    clearDailyProgressCache();
+    clearDailyProgressCache(userId);
     return { hasBook: false, goalPages, pagesRead: 0, pct: 0 };
   }
 
   const today = getLocalDateKey();
-  const cached = readDailyProgressCache();
+  const cached = readDailyProgressCache(userId);
 
   const previousPage =
     previousInputs && getBookKey(previousInputs) === bookKey
@@ -251,8 +272,8 @@ function syncTodayReadingProgress(
     }
   }
 
-  writeDailyProgressCache(nextCache);
-  upsertReadingHistoryEntry(nextInputs, nextCache, goalPages);
+  writeDailyProgressCache(nextCache, userId);
+  upsertReadingHistoryEntry(nextInputs, nextCache, goalPages, userId);
 
   const pagesRead = Math.max(nextCache.latestPage - nextCache.baselinePage, 0);
   const pct =
@@ -294,9 +315,9 @@ function normalizeReadingInputs(parsed: Partial<ReadingInputs> | null | undefine
   };
 }
 
-async function loadPreviousInputs(): Promise<ReadingInputs | null> {
+async function loadPreviousInputs(userId: string | null = getActiveUserId()): Promise<ReadingInputs | null> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(readingKey(userId));
     return raw ? normalizeReadingInputs(JSON.parse(raw)) : null;
   } catch {
     return null;
@@ -317,9 +338,9 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
     const user = auth?.user;
 
     if (!user) {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(readingKey(getActiveUserId()));
       const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
-      syncTodayReadingProgress(inputs);
+      syncTodayReadingProgress(inputs, undefined, null);
       return inputs;
     }
 
@@ -333,18 +354,18 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
 
     const state = (data?.state ?? null) as Partial<ReadingInputs> | null;
     if (!state) {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(readingKey(getActiveUserId()));
       const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
-      syncTodayReadingProgress(inputs);
+      syncTodayReadingProgress(inputs, undefined, user.id);
       return inputs;
     }
 
     const inputs = normalizeReadingInputs(state);
-    syncTodayReadingProgress(inputs);
+    syncTodayReadingProgress(inputs, undefined, user.id);
     return inputs;
   } catch (error) {
     console.warn("loadReadingInputs failed, falling back to defaults/local:", error);
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(readingKey(getActiveUserId()));
     const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
     syncTodayReadingProgress(inputs);
     return inputs;
@@ -356,22 +377,23 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
  * Also mirrors to localStorage for offline-ish resilience.
  */
 export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
-  const previousInputs = await loadPreviousInputs();
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth?.user;
+  const scopedUserId = user?.id ?? null;
+  const previousInputs = await loadPreviousInputs(scopedUserId);
 
   try {
-    assertRegisteredCacheWrite(STORAGE_KEY);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    const key = readingKey(scopedUserId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // ignore
   }
 
-  syncTodayReadingProgress(value, previousInputs);
-
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth?.user;
+  syncTodayReadingProgress(value, previousInputs, scopedUserId);
 
   if (!user) {
-    clearAISignalsCache();
+    clearAISignalsCache(null);
     emitReadingChanged();
     return;
   }
@@ -389,12 +411,12 @@ export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
 
   if (error) throw error;
 
-  clearAISignalsCache();
+  clearAISignalsCache(user.id);
   emitReadingChanged();
 }
 
 export async function resetReadingInputs(): Promise<ReadingInputs> {
-  clearDailyProgressCache();
+  clearDailyProgressCache(getActiveUserId());
   await saveReadingInputs(DEFAULT_READING_INPUTS);
   return DEFAULT_READING_INPUTS;
 }
@@ -402,7 +424,7 @@ export async function resetReadingInputs(): Promise<ReadingInputs> {
 /** Synchronous seed — reads from localStorage mirror. Zero network. */
 export function seedReadingInputs(): ReadingInputs {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(readingKey(getActiveUserId()));
     const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
     syncTodayReadingProgress(inputs);
     return inputs;
@@ -417,7 +439,7 @@ export function getWeeklyReadingSummary(
   weekStart: string,
   weekEnd: string,
 ): WeeklyReadingSummary {
-  const history = readReadingHistoryCache()
+  const history = readReadingHistoryCache(getActiveUserId())
     .filter((entry) => entry.date >= weekStart && entry.date <= weekEnd)
     .sort((a, b) => a.date.localeCompare(b.date));
 

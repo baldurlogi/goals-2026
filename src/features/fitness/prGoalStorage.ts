@@ -3,6 +3,7 @@ import { FITNESS_CHANGED_EVENT } from "./constants";
 import { todayISO } from "./date";
 import type { MetricType, PREntry, PRCategory, PRGoal } from "./types";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
+import { getActiveUserId, scopedKey } from "@/lib/activeUser";
 
 const PR_CACHE_KEY = CACHE_KEYS.FITNESS_PRS;
 
@@ -34,19 +35,24 @@ function mapRowToGoal(row: {
   };
 }
 
-export function readPRCache(): PRGoal[] {
+function prCacheKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(PR_CACHE_KEY, userId);
+}
+
+export function readPRCache(userId: string | null = getActiveUserId()): PRGoal[] {
   try {
-    const raw = localStorage.getItem(PR_CACHE_KEY);
+    const raw = localStorage.getItem(prCacheKey(userId));
     return raw ? (JSON.parse(raw) as PRGoal[]) : [];
   } catch {
     return [];
   }
 }
 
-function writePRCache(goals: PRGoal[]): void {
+function writePRCache(goals: PRGoal[], userId: string | null = getActiveUserId()): void {
   try {
-    assertRegisteredCacheWrite(PR_CACHE_KEY);
-    localStorage.setItem(PR_CACHE_KEY, JSON.stringify(goals));
+    const key = prCacheKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(goals));
   } catch {
     // ignore
   }
@@ -71,7 +77,7 @@ export async function loadPRGoals(): Promise<PRGoal[]> {
   }
 
   const goals = (data ?? []).map(mapRowToGoal);
-  writePRCache(goals);
+  writePRCache(goals, user.id);
   return goals;
 }
 
