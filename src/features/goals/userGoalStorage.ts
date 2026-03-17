@@ -63,6 +63,7 @@ function writeCache(userId: string, goals: UserGoal[]): boolean {
 export type GoalPersistenceStatus = {
   localCacheWriteSucceeded: boolean;
   remoteSyncSucceeded: boolean;
+  isFirstGoalCreated: boolean;
 };
 
 export class GoalRemotePersistenceError extends Error {
@@ -134,11 +135,13 @@ export async function saveUserGoal(goal: UserGoal): Promise<GoalPersistenceStatu
     return {
       localCacheWriteSucceeded: false,
       remoteSyncSucceeded: false,
+      isFirstGoalCreated: false,
     } satisfies GoalPersistenceStatus;
   }
 
   const cached = readCache(user.id);
   const idx = cached.findIndex((g) => g.id === goal.id);
+  const isFirstGoalCreated = idx < 0 && cached.length === 0;
   if (idx >= 0) cached[idx] = goal;
   else cached.push(goal);
   const localCacheWriteSucceeded = writeCache(user.id, cached);
@@ -154,6 +157,7 @@ export async function saveUserGoal(goal: UserGoal): Promise<GoalPersistenceStatu
   return {
     localCacheWriteSucceeded,
     remoteSyncSucceeded: true,
+    isFirstGoalCreated,
   } satisfies GoalPersistenceStatus;
 }
 
@@ -167,6 +171,7 @@ export async function deleteUserGoal(goalId: string): Promise<GoalPersistenceSta
     return {
       localCacheWriteSucceeded: false,
       remoteSyncSucceeded: false,
+      isFirstGoalCreated: false,
     };
   }
 
@@ -188,6 +193,7 @@ export async function deleteUserGoal(goalId: string): Promise<GoalPersistenceSta
   return {
     localCacheWriteSucceeded,
     remoteSyncSucceeded: true,
+    isFirstGoalCreated: false,
   };
 }
 

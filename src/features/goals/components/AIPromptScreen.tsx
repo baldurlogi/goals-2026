@@ -15,6 +15,7 @@ import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import type { Tier } from "@/features/subscription/useTier";
 import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
+import { seedUserGoals } from "../userGoalStorage";
 import {
   generateGoalFromPrompt,
   getClarifyingQuestions,
@@ -89,6 +90,9 @@ export function AIPromptScreen({
 
       captureOnce("first_goal_generated", userId, {
         had_clarifying_questions: Object.keys(finalAnswers).length > 0,
+        is_first_goal: seedUserGoals().length === 0,
+        source: "goal_ai_prompt",
+        route: window.location.pathname,
       });
 
       setUsage(u);
