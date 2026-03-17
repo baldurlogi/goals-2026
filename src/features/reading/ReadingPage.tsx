@@ -95,7 +95,7 @@ export function ReadingPage() {
     const handleReadingChanged: EventListener = () => {
       void sync();
     };
-    const handleStorageChange = (_event: StorageEvent) => {
+    const handleStorageChange = () => {
       void sync();
     };
 
