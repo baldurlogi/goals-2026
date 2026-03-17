@@ -348,7 +348,7 @@ export function GoalStoreProvider({
     return () => {
       cancelled = true;
     };
-  }, [dispatch]);
+  }, []);
 
   React.useEffect(() => {
     if (!state.loaded || !userId) return;
@@ -364,6 +364,22 @@ export function GoalStoreProvider({
       void flushPersistQueue();
     }, PERSIST_DEBOUNCE_MS);
   }, [flushPersistQueue, state.done, state.loaded, userId]);
+
+
+  React.useEffect(() => {
+    queuedDoneRef.current = null;
+    retryAttemptRef.current = 0;
+
+    if (debounceTimerRef.current != null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    if (retryTimerRef.current != null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, [userId]);
 
   React.useEffect(
     () => () => {

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
 import type { UserGoal, UserGoalStep } from './goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { getActiveUserId } from '@/lib/activeUser';
 
 const CACHE_KEY = CACHE_KEYS.USER_GOALS;
 
@@ -28,24 +29,6 @@ function readCache(userId: string): UserGoal[] {
   } catch {
     return [];
   }
-}
-
-function readAnyScopedCache(): UserGoal[] {
-  try {
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith(`${CACHE_KEY}:`)) continue;
-
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-
-      return JSON.parse(raw) as UserGoal[];
-    }
-  } catch {
-    // ignore
-  }
-
-  return [];
 }
 
 function writeCache(userId: string, goals: UserGoal[]): boolean {
@@ -113,8 +96,11 @@ export async function loadUserGoals(): Promise<UserGoal[]> {
 }
 
 export function seedUserGoals(): UserGoal[] {
-  const scoped = readAnyScopedCache();
-  if (scoped.length > 0) return scoped;
+  const activeUserId = getActiveUserId();
+
+  if (activeUserId) {
+    return readCache(activeUserId);
+  }
 
   try {
     const legacyRaw = localStorage.getItem(CACHE_KEY);
