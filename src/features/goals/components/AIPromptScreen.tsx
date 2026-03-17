@@ -23,6 +23,7 @@ import {
 } from "./generateGoal";
 
 type Screen = "prompt" | "clarifying" | "generating";
+type ActiveStep = "prompt" | "clarifying" | "generating";
 
 type Props = {
   onGenerated: (goal: UserGoal) => void;
@@ -104,6 +105,7 @@ export function AIPromptScreen({
     if (!finalPrompt) return;
 
     setLoadingGoal(true);
+    const sourceScreen = screen;
     setScreen("generating");
     setError(null);
     setLimitHit(false);
@@ -123,12 +125,60 @@ export function AIPromptScreen({
         setLimitHit(true);
         setScreen("prompt");
       } else {
-        setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
-        setScreen(questions.length > 0 ? "clarifying" : "prompt");
+        const fallbackScreen = questions.length > 0 ? "clarifying" : "prompt";
+        const returnScreen = sourceScreen === "generating" ? fallbackScreen : sourceScreen;
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Something went wrong while generating. Review your input and retry.",
+        );
+        setScreen(returnScreen);
       }
     } finally {
       setLoadingGoal(false);
     }
+  }
+
+  const activeStep: ActiveStep = screen === "generating" ? "generating" : screen;
+  const hasActionableError = Boolean(error);
+
+  function StepIndicator() {
+    const steps: { key: ActiveStep; label: string }[] = [
+      { key: "prompt", label: "Prompt" },
+      { key: "clarifying", label: "Clarify" },
+      { key: "generating", label: "Generate" },
+    ];
+
+    const activeIndex = steps.findIndex((step) => step.key === activeStep);
+
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        {steps.map((step, index) => {
+          const isActive = activeStep === step.key;
+          const isDone = index < activeIndex;
+
+          return (
+            <div key={step.key} className="flex items-center gap-2">
+              <div
+                className={`h-1.5 w-1.5 rounded-full ${
+                  isActive || isDone ? "bg-primary" : "bg-muted-foreground/40"
+                }`}
+              />
+              <span
+                className={
+                  isActive ? "font-semibold text-foreground" : "text-muted-foreground"
+                }
+              >
+                {step.label}
+              </span>
+              {index < steps.length - 1 && (
+                <span className="text-muted-foreground/50">→</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
   }
 
   if (limitHit) {
@@ -149,6 +199,7 @@ export function AIPromptScreen({
     return (
       <div className="flex flex-1 items-center justify-center px-5 py-10">
         <div className="flex flex-col items-center gap-4 text-center">
+          <StepIndicator />
           <div className="flex gap-1">
             <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-violet-400 [animation-delay:0ms]" />
             <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-fuchsia-400 [animation-delay:150ms]" />
@@ -159,6 +210,9 @@ export function AIPromptScreen({
             <p className="mt-1 text-xs text-muted-foreground">
               Claude is breaking this into concrete, actionable steps
             </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This can take around 10–20 seconds.
+            </p>
           </div>
         </div>
       </div>
@@ -168,7 +222,8 @@ export function AIPromptScreen({
   if (screen === "clarifying") {
     return (
       <div className="flex flex-1 flex-col overflow-y-auto px-5 py-5">
-        <div className="space-y-5">
+      <div className="space-y-5">
+          <StepIndicator />
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
@@ -206,7 +261,8 @@ export function AIPromptScreen({
 
           {error && (
             <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
+              {error} You’re still on clarifying questions. Update any response and retry,
+              or skip and generate.
             </div>
           )}
 
@@ -225,7 +281,11 @@ export function AIPromptScreen({
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-between gap-2 border-t pt-4">
+      <div className="mt-6 space-y-2 border-t pt-4">
+        <p className="text-right text-xs text-muted-foreground">
+          Generating usually takes around 10–20 seconds.
+        </p>
+        <div className="flex items-center justify-between gap-2">
           <Button
             variant="ghost"
             size="sm"
@@ -262,7 +322,7 @@ export function AIPromptScreen({
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  Generate plan
+                  {hasActionableError ? "Retry" : "Generate plan"}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </>
               )}
@@ -270,12 +330,14 @@ export function AIPromptScreen({
           </div>
         </div>
       </div>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-5 py-5">
       <div className="space-y-5">
+        <StepIndicator />
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -303,7 +365,7 @@ export function AIPromptScreen({
 
         {error && (
           <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
+            {error} You’re still on your prompt. Edit your goal details, then retry.
           </div>
         )}
 
@@ -348,7 +410,11 @@ export function AIPromptScreen({
         </div>
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-2 border-t pt-4">
+      <div className="mt-6 space-y-2 border-t pt-4">
+        <p className="text-right text-xs text-muted-foreground">
+          Generating usually takes around 10–20 seconds.
+        </p>
+        <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5">
           <ArrowLeft className="h-3.5 w-3.5" />
           Back
@@ -366,11 +432,12 @@ export function AIPromptScreen({
             </>
           ) : (
             <>
-              Next
+              {hasActionableError ? "Retry" : "Continue"}
               <ArrowRight className="h-3.5 w-3.5" />
             </>
           )}
         </Button>
+        </div>
       </div>
     </div>
   );
