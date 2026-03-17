@@ -26,9 +26,18 @@ import {
   type OnboardingData,
 } from "./components/types";
 
-const STEP_ICONS = [User, LayoutGrid, Target, Dumbbell, CalendarDays, BookOpen];
+type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
 
-const STEP_CONTENT = {
+const STEP_ICONS: Record<OnboardingStep, typeof User> = {
+  0: User,
+  1: LayoutGrid,
+  2: Target,
+  3: Dumbbell,
+  4: CalendarDays,
+  5: BookOpen,
+};
+
+const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> = {
   0: {
     label: "Profile",
     subtitle: "This helps us personalize recommendations right from the start.",
@@ -53,10 +62,10 @@ const STEP_CONTENT = {
     label: "Reading",
     subtitle: "A daily reading target helps you build a consistent learning habit.",
   },
-} as const;
+};
 
 export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState<OnboardingStep>(0);
   const [data, setData] = useState<OnboardingData>(INITIAL_ONBOARDING_DATA);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +77,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
   const visibleSteps = useMemo(
     () =>
-      [0, 1, 2, 3, 4, 5].filter((s) => {
+      ([0, 1, 2, 3, 4, 5] as OnboardingStep[]).filter((s) => {
         if (s === 3) return data.enabled_modules.includes("nutrition");
         if (s === 4) return data.enabled_modules.includes("schedule");
         if (s === 5) return data.enabled_modules.includes("reading");
@@ -154,7 +163,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     );
   }
 
-  const stepComponents: Record<number, ReactNode> = {
+  const stepComponents: Record<OnboardingStep, ReactNode> = {
     0: <StepProfile data={data} onChange={update} />,
     1: <StepModules data={data} onChange={update} />,
     2: <StepGoal data={data} onChange={update} />,
