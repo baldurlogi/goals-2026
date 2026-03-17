@@ -52,7 +52,13 @@ export function RequireOnboarding({ children }: Props) {
   const profile = userId ? loadedProfile ?? cachedProfile ?? null : null;
   const checking = Boolean(userId) && loadedProfile === undefined && !cachedProfile;
 
-  if (checking) return null;
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
+        <div className="animate-pulse text-sm text-muted-foreground">Loading your setup…</div>
+      </div>
+    );
+  }
 
   if (!profile?.onboarding_done) {
     return (
