@@ -6,11 +6,15 @@ import { Toaster } from "@/components/ui/sonner";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { clearStaleDailyCaches } from "@/hooks/useTodayDate";
 import { scheduleIdle } from "@/lib/scheduleIdle";
+import { useAuth } from "@/features/auth/authContext";
+import { captureReturnedNextDay } from "@/lib/analytics";
 
 export function AppLayout() {
+  const { userId } = useAuth();
   const [showPwaBanner, setShowPwaBanner] = useState(false);
 
   useEffect(() => {
+    captureReturnedNextDay(userId);
     clearStaleDailyCaches();
 
     const cancelIdle = scheduleIdle(() => {
@@ -18,7 +22,7 @@ export function AppLayout() {
     }, 1200, 1500);
 
     return cancelIdle;
-  }, []);
+  }, [userId]);
 
   return (
     <ThemeProvider>

@@ -149,6 +149,10 @@ export function UserGoalPage() {
     }
 
     if (!wasDone) {
+      captureOnce('first_step_completed', userId, {
+        total_steps: total,
+      });
+
       const nextDoneCount = doneCount + 1;
       const step = activeGoal.steps.find((s) => s.id === stepId);
       if (step) writeLastSession(userId, activeGoal.id, activeGoal.title, step.label);
