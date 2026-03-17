@@ -9,7 +9,7 @@ import { createBlankGoal, createBlankStep, saveUserGoal } from "../userGoalStora
 import type { UserGoal, UserGoalStep } from "../goalTypes";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { AIPromptScreen } from "./AIPromptScreen";
-import { queueAIContextNudge } from "./AIContextNudge";
+import { queueAIContextNudge } from "./AIContextNudge.utils";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 

@@ -2,49 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, X } from 'lucide-react';
 import { loadAIProfile } from '@/features/ai/aiUserProfile';
-
-const DISMISSED_KEY = 'kairo:ai-context-nudge:dismissed:v1';
-const PENDING_KEY = 'kairo:ai-context-nudge:pending:v1';
-
-function isDismissed() {
-  try {
-    return localStorage.getItem(DISMISSED_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function dismissPermanently() {
-  try {
-    localStorage.setItem(DISMISSED_KEY, '1');
-  } catch {
-    // ignore
-  }
-}
-
-function hasPendingNudge() {
-  try {
-    return sessionStorage.getItem(PENDING_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function clearPendingNudge() {
-  try {
-    sessionStorage.removeItem(PENDING_KEY);
-  } catch {
-    // ignore
-  }
-}
-
-export function queueAIContextNudge() {
-  try {
-    sessionStorage.setItem(PENDING_KEY, '1');
-  } catch {
-    // ignore
-  }
-}
+import {
+  clearPendingAIContextNudge,
+  dismissAIContextNudgePermanently,
+  hasPendingAIContextNudge,
+  isAIContextNudgeDismissed,
+} from './AIContextNudge.utils';
 
 /**
  * Renders only when:
@@ -58,8 +21,8 @@ export function AIContextNudge() {
   useEffect(() => {
     let cancelled = false;
 
-    if (isDismissed()) return;
-    if (!hasPendingNudge()) return;
+    if (isAIContextNudgeDismissed()) return;
+    if (!hasPendingAIContextNudge()) return;
 
     loadAIProfile().then((ai) => {
       if (cancelled) return;
@@ -73,7 +36,7 @@ export function AIContextNudge() {
       if (!hasContext) {
         setVisible(true);
       } else {
-        clearPendingNudge();
+        clearPendingAIContextNudge();
       }
     });
 
@@ -83,13 +46,13 @@ export function AIContextNudge() {
   }, []);
 
   function handleDismiss() {
-    dismissPermanently();
-    clearPendingNudge();
+    dismissAIContextNudgePermanently();
+    clearPendingAIContextNudge();
     setVisible(false);
   }
 
   function handleGoToProfile() {
-    clearPendingNudge();
+    clearPendingAIContextNudge();
     setVisible(false);
   }
 
