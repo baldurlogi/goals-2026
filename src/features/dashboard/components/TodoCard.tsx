@@ -37,7 +37,7 @@ function TodoCardInner() {
   if (loading && total === 0) return <TodoCardSkeleton />;
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-3 min-h-[260px]">
+    <Card className="relative overflow-hidden lg:col-span-4 min-h-[240px]">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-sky-500 via-blue-400 to-indigo-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -166,7 +166,7 @@ export function TodoCard() {
           error={error}
           onRetry={reset}
           label="Todo"
-          colSpan="lg:col-span-5"
+          colSpan="lg:col-span-4"
         />
       )}
     >

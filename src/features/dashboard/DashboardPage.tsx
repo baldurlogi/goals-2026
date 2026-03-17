@@ -219,104 +219,116 @@ export default function DashboardPage() {
         </Suspense>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
-        {showEmptyState && (
-          <div className="md:col-span-2 lg:col-span-12">
-            <DashboardStartHereCard />
-          </div>
-        )}
+      <div className="space-y-4">
+        {showEmptyState && <DashboardStartHereCard />}
 
-        <Suspense fallback={<AICoachCardSkeleton />}>
-          {showTopEnhancements ? <AICoachCard /> : <AICoachCardSkeleton />}
-        </Suspense>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+          <Suspense fallback={<AICoachCardSkeleton />}>
+            {showTopEnhancements ? <AICoachCard /> : <AICoachCardSkeleton />}
+          </Suspense>
 
-        {quickActions.length > 0 && (
-          <div className="md:col-span-2 lg:col-span-12">
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
-              {quickActions.map((qa) => (
-                <QuickAction key={qa.href} {...qa} />
-              ))}
+          {quickActions.length > 0 && (
+            <div className="md:col-span-2 lg:col-span-12">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
+                {quickActions.map((qa) => (
+                  <QuickAction key={qa.href} {...qa} />
+                ))}
+              </div>
             </div>
+          )}
+
+          <Suspense fallback={<LifeProgressCardSkeleton />}>
+            {showTopEnhancements ? <LifeProgressCard /> : <LifeProgressCardSkeleton />}
+          </Suspense>
+        </div>
+
+        {(has("schedule") || has("goals")) && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+            {has("schedule") && (
+              <Suspense fallback={<ScheduleCardSkeleton />}>
+                {showTopEnhancements ? <ScheduleCard /> : <ScheduleCardSkeleton />}
+              </Suspense>
+            )}
+
+            {has("goals") && (
+              <Suspense fallback={<UpcomingGoalsCardSkeleton />}>
+                {showTopEnhancements ? (
+                  <UpcomingGoalsCard />
+                ) : (
+                  <UpcomingGoalsCardSkeleton />
+                )}
+              </Suspense>
+            )}
           </div>
         )}
 
-        <Suspense fallback={<LifeProgressCardSkeleton />}>
-          {showTopEnhancements ? <LifeProgressCard /> : <LifeProgressCardSkeleton />}
-        </Suspense>
-
-        {isPro && (
-          <Suspense fallback={<WeeklyReportCardSkeleton />}>
-            {showSecondaryEnhancements ? (
-              <WeeklyReportCard />
-            ) : (
-              <WeeklyReportCardSkeleton />
+        {(has("nutrition") || has("reading")) && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+            {has("nutrition") && (
+              <Suspense fallback={<MacrosCardSkeleton />}>
+                {showTopEnhancements ? <MacrosCard /> : <MacrosCardSkeleton />}
+              </Suspense>
             )}
-          </Suspense>
-        )}
 
-        {has("reading") && (
-          <Suspense fallback={<ReadingCardSkeleton />}>
-            {showTopEnhancements ? <ReadingCard /> : <ReadingCardSkeleton />}
-          </Suspense>
-        )}
-
-        {has("nutrition") && (
-          <Suspense fallback={<MacrosCardSkeleton />}>
-            {showTopEnhancements ? <MacrosCard /> : <MacrosCardSkeleton />}
-          </Suspense>
-        )}
-
-        {has("schedule") && (
-          <Suspense fallback={<ScheduleCardSkeleton />}>
-            {showTopEnhancements ? <ScheduleCard /> : <ScheduleCardSkeleton />}
-          </Suspense>
-        )}
-
-        {has("goals") && (
-          <Suspense fallback={<UpcomingGoalsCardSkeleton />}>
-            {showTopEnhancements ? (
-              <UpcomingGoalsCard />
-            ) : (
-              <UpcomingGoalsCardSkeleton />
+            {has("reading") && (
+              <Suspense fallback={<ReadingCardSkeleton />}>
+                {showTopEnhancements ? <ReadingCard /> : <ReadingCardSkeleton />}
+              </Suspense>
             )}
-          </Suspense>
+          </div>
         )}
 
-        {has("finance") && (
-          <Suspense fallback={<SpendingCardSkeleton />}>
-            {showSecondaryEnhancements ? <SpendingCard /> : <SpendingCardSkeleton />}
-          </Suspense>
-        )}
-
-        {has("todos") && (
-          <Suspense fallback={<TodoCardSkeleton />}>
-            {showSecondaryEnhancements ? <TodoCard /> : <TodoCardSkeleton />}
-          </Suspense>
-        )}
-
-        {has("fitness") && (
-          <Suspense fallback={<FitnessCardSkeleton />}>
-            {showSecondaryEnhancements ? <FitnessCard /> : <FitnessCardSkeleton />}
-          </Suspense>
-        )}
-
-        {has("nutrition") && (
-          <Suspense fallback={<WaterIntakeCardSkeleton />}>
-            {showSecondaryEnhancements ? (
-              <WaterIntakeCard />
-            ) : (
-              <WaterIntakeCardSkeleton />
+        {(isPro || has("finance")) && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+            {isPro && (
+              <Suspense fallback={<WeeklyReportCardSkeleton />}>
+                {showSecondaryEnhancements ? (
+                  <WeeklyReportCard />
+                ) : (
+                  <WeeklyReportCardSkeleton />
+                )}
+              </Suspense>
             )}
-          </Suspense>
+
+            {has("finance") && (
+              <Suspense fallback={<SpendingCardSkeleton />}>
+                {showSecondaryEnhancements ? <SpendingCard /> : <SpendingCardSkeleton />}
+              </Suspense>
+            )}
+          </div>
         )}
 
-        <Suspense fallback={<AchievementsCardSkeleton />}>
-          {showSecondaryEnhancements ? (
-            <AchievementsCard />
-          ) : (
-            <AchievementsCardSkeleton />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+          {has("fitness") && (
+            <Suspense fallback={<FitnessCardSkeleton />}>
+              {showSecondaryEnhancements ? <FitnessCard /> : <FitnessCardSkeleton />}
+            </Suspense>
           )}
-        </Suspense>
+
+          {has("nutrition") && (
+            <Suspense fallback={<WaterIntakeCardSkeleton />}>
+              {showSecondaryEnhancements ? (
+                <WaterIntakeCard />
+              ) : (
+                <WaterIntakeCardSkeleton />
+              )}
+            </Suspense>
+          )}
+
+          <Suspense fallback={<AchievementsCardSkeleton />}>
+            {showSecondaryEnhancements ? (
+              <AchievementsCard />
+            ) : (
+              <AchievementsCardSkeleton />
+            )}
+          </Suspense>
+
+          {has("todos") && (
+            <Suspense fallback={<TodoCardSkeleton />}>
+              {showSecondaryEnhancements ? <TodoCard /> : <TodoCardSkeleton />}
+            </Suspense>
+          )}
+        </div>
       </div>
 
       {modules.size === 0 && (
