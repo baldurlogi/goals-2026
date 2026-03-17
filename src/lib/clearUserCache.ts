@@ -12,10 +12,18 @@ export function clearUserCache() {
         key === "cache:ai-coach:last-module" ||
         key === "cache:ai-coach:last-session:v1" ||
         key === "cache:user-tier:v1" ||
+        key === "cache:user_goals:v1" ||
+        key === "cache:goals:v1" ||
+        key === "goals:done:v1" ||
+        key === "goals:step-history:v1" ||
         key.startsWith("cache:profile:v2:") ||
         key.startsWith("cache:ai-coach:v2:") ||
         key.startsWith("cache:ai-coach:last-module:v2:") ||
-        key.startsWith("cache:ai-coach:last-session:v2:")
+        key.startsWith("cache:ai-coach:last-session:v2:") ||
+        key.startsWith("cache:user_goals:v1:") ||
+        key.startsWith("cache:goals:v1:") ||
+        key.startsWith("goals:done:v1:") ||
+        key.startsWith("goals:step-history:v1:")
       ) {
         keysToRemove.push(key);
       }

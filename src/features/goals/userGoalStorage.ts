@@ -5,21 +5,55 @@ import { getLocalDateKey } from '@/hooks/useTodayDate';
 
 const CACHE_KEY = CACHE_KEYS.USER_GOALS;
 
+function scopedCacheKey(userId: string) {
+  return `${CACHE_KEY}:${userId}`;
+}
+
 // -- Cache helpers ------------------------------
 
-function readCache(): UserGoal[] {
+function readCache(userId: string): UserGoal[] {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as UserGoal[]) : [];
+    const scopedKey = scopedCacheKey(userId);
+    const raw = localStorage.getItem(scopedKey);
+
+    if (raw) return JSON.parse(raw) as UserGoal[];
+
+    const legacyRaw = localStorage.getItem(CACHE_KEY);
+    if (!legacyRaw) return [];
+
+    const legacyGoals = JSON.parse(legacyRaw) as UserGoal[];
+    writeCache(userId, legacyGoals);
+    localStorage.removeItem(CACHE_KEY);
+    return legacyGoals;
   } catch {
     return [];
   }
 }
 
-function writeCache(goals: UserGoal[]): boolean {
+function readAnyScopedCache(): UserGoal[] {
   try {
-    assertRegisteredCacheWrite(CACHE_KEY);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(goals));
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(`${CACHE_KEY}:`)) continue;
+
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+
+      return JSON.parse(raw) as UserGoal[];
+    }
+  } catch {
+    // ignore
+  }
+
+  return [];
+}
+
+function writeCache(userId: string, goals: UserGoal[]): boolean {
+  try {
+    const key = scopedCacheKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(goals));
+    localStorage.removeItem(CACHE_KEY);
     return true;
   } catch {
     return false;
@@ -46,15 +80,15 @@ export class GoalRemotePersistenceError extends Error {
 // -- Load all goals for the current user ------------------------------
 
 export async function loadUserGoals(): Promise<UserGoal[]> {
-  const cached = readCache();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const cached = readCache(user.id);
 
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return cached;
-
     const { data, error } = await supabase
       .from("user_goals")
       .select("*")
@@ -69,7 +103,7 @@ export async function loadUserGoals(): Promise<UserGoal[]> {
     }
 
     const goals: UserGoal[] = data.map(rowToGoal);
-    writeCache(goals);
+    writeCache(user.id, goals);
     return goals;
   } catch (error) {
     console.warn("loadUserGoals exception:", error);
@@ -78,27 +112,36 @@ export async function loadUserGoals(): Promise<UserGoal[]> {
 }
 
 export function seedUserGoals(): UserGoal[] {
-  return readCache();
+  const scoped = readAnyScopedCache();
+  if (scoped.length > 0) return scoped;
+
+  try {
+    const legacyRaw = localStorage.getItem(CACHE_KEY);
+    return legacyRaw ? (JSON.parse(legacyRaw) as UserGoal[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 // -- Save (upsert) a single goal ------------------------------
 
 export async function saveUserGoal(goal: UserGoal): Promise<GoalPersistenceStatus> {
-  const cached = readCache();
-  const idx = cached.findIndex((g) => g.id === goal.id);
-  if (idx >= 0) cached[idx] = goal;
-  else cached.push(goal);
-  const localCacheWriteSucceeded = writeCache(cached);
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   if (!user) {
     return {
-      localCacheWriteSucceeded,
+      localCacheWriteSucceeded: false,
       remoteSyncSucceeded: false,
     } satisfies GoalPersistenceStatus;
   }
+
+  const cached = readCache(user.id);
+  const idx = cached.findIndex((g) => g.id === goal.id);
+  if (idx >= 0) cached[idx] = goal;
+  else cached.push(goal);
+  const localCacheWriteSucceeded = writeCache(user.id, cached);
 
   const { error } = await supabase
     .from("user_goals")
@@ -117,19 +160,20 @@ export async function saveUserGoal(goal: UserGoal): Promise<GoalPersistenceStatu
 // -- Delete a goal ------------------------------
 
 export async function deleteUserGoal(goalId: string): Promise<GoalPersistenceStatus> {
-  const localCacheWriteSucceeded = writeCache(
-    readCache().filter((g) => g.id !== goalId),
-  );
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
     return {
-      localCacheWriteSucceeded,
+      localCacheWriteSucceeded: false,
       remoteSyncSucceeded: false,
     };
   }
+
+  const localCacheWriteSucceeded = writeCache(
+    user.id,
+    readCache(user.id).filter((g) => g.id !== goalId),
+  );
 
   const { error } = await supabase
     .from("user_goals")
