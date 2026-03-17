@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/authContext";
+import { captureOnce } from "@/lib/analytics";
 
 const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
 
@@ -18,6 +19,10 @@ export function AuthCallbackPage() {
 
   useEffect(() => {
     if (!loading && user) {
+      captureOnce("signup_completed", user.id, {
+        method: "google",
+      });
+
       const state = location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null;
       const statePath = state?.from
         ? `${state.from.pathname ?? ""}${state.from.search ?? ""}${state.from.hash ?? ""}`

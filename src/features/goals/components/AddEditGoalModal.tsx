@@ -15,6 +15,8 @@ import type { UserGoal, UserGoalStep } from "../goalTypes";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { AIPromptScreen } from "./AIPromptScreen";
 import { queueAIContextNudge } from "./AIContextNudge.utils";
+import { useAuth } from "@/features/auth/authContext";
+import { captureOnce } from "@/lib/analytics";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 
@@ -62,6 +64,7 @@ export function AddEditGoalModal({
   startWithAI = false,
   initialAIPrompt = "",
 }: Props) {
+  const { userId } = useAuth();
   const isEdit = !!initial;
   const [mode, setMode] = useState<Mode>(
     isEdit ? "manual" : startWithAI ? "ai" : "manual",
@@ -71,10 +74,20 @@ export function AddEditGoalModal({
   const [openStepId, setOpenStepId] = useState<string | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const creationStartTrackedRef = useRef(false);
 
   useEffect(() => {
     if (mode === "manual") titleRef.current?.focus();
   }, [mode]);
+
+  useEffect(() => {
+    if (isEdit || creationStartTrackedRef.current) return;
+    creationStartTrackedRef.current = true;
+
+    captureOnce("first_goal_creation_started", userId, {
+      entry_mode: startWithAI ? "ai" : "manual",
+    });
+  }, [isEdit, startWithAI, userId]);
 
   function updateGoal(patch: Partial<UserGoal>) {
     setGoal((g) => ({ ...g, ...patch, updatedAt: getLocalDateKey() }));
@@ -134,6 +147,10 @@ export function AddEditGoalModal({
 
       if (!isEdit) {
         queueAIContextNudge();
+        captureOnce("first_goal_saved", userId, {
+          creation_mode: mode,
+          steps_count: trimmedGoal.steps.length,
+        });
       }
 
       onSave(trimmedGoal);
@@ -147,6 +164,10 @@ export function AddEditGoalModal({
       if (error instanceof GoalRemotePersistenceError && error.localCacheWriteSucceeded) {
         if (!isEdit) {
           queueAIContextNudge();
+          captureOnce("first_goal_saved", userId, {
+            creation_mode: mode,
+            steps_count: trimmedGoal.steps.length,
+          });
         }
         onSave(trimmedGoal);
         toast.warning("Saved locally, syncing failed. We'll retry.");

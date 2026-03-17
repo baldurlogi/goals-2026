@@ -18,6 +18,7 @@ import {
 } from '@/features/goals/userGoalStorage';
 import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { captureOnce } from '@/lib/analytics';
 
 const AI_SIGNALS_CACHE_KEY = 'cache:ai-signals:v1';
 
@@ -133,6 +134,10 @@ export function UserGoalPage() {
     clearAISignalsCache();
 
     if (!wasDone) {
+      captureOnce('first_step_completed', userId, {
+        total_steps: total,
+      });
+
       const nextDoneCount = doneCount + 1;
       const step = activeGoal.steps.find((s) => s.id === stepId);
       if (step) writeLastSession(userId, activeGoal.id, activeGoal.title, step.label);
