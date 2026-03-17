@@ -223,7 +223,7 @@ export function ProfilePage() {
         <Card className="mb-6 cursor-pointer rounded-2xl border-amber-500/20 bg-amber-500/5 transition-all hover:bg-amber-500/10">
           <CardContent className="flex items-center gap-4 py-5">
             <Trophy className="h-5 w-5 text-amber-500" />
-            <div className="flex-1">🏆 Achievements</div>
+            <div className="flex-1">Achievements</div>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
           </CardContent>
         </Card>
