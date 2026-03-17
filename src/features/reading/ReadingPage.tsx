@@ -92,13 +92,20 @@ export function ReadingPage() {
 
     sync();
 
-    window.addEventListener(READING_CHANGED_EVENT, sync as any);
-    window.addEventListener("storage", sync as any);
+    const handleReadingChanged: EventListener = () => {
+      void sync();
+    };
+    const handleStorageChange = () => {
+      void sync();
+    };
+
+    window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+    window.addEventListener("storage", handleStorageChange);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(READING_CHANGED_EVENT, sync as any);
-      window.removeEventListener("storage", sync as any);
+      window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, []);
 

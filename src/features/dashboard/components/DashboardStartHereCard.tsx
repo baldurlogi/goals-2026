@@ -3,11 +3,7 @@ import { Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export function DashboardStartHereCard({
-  onDismiss: _onDismiss,
-}: {
-  onDismiss: () => void;
-}) {
+export function DashboardStartHereCard() {
   const navigate = useNavigate();
 
   function handleGenerate() {

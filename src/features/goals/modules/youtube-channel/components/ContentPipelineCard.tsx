@@ -73,7 +73,7 @@ export function ContentPipelineCard({ goalId }: { goalId: string }) {
   }, [state.items]);
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-xl">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base">🎬 Content pipeline</CardTitle>

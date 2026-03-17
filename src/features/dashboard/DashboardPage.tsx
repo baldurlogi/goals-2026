@@ -1,6 +1,7 @@
 import {
   Suspense,
   lazy,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -16,6 +17,21 @@ import { useProfile } from "../onboarding/useProfile";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
 import { scheduleIdle } from "@/lib/scheduleIdle";
+
+import {
+  AICoachCardSkeleton,
+  AchievementsCardSkeleton,
+  FitnessCardSkeleton,
+  LifeProgressCardSkeleton,
+  MacrosCardSkeleton,
+  ReadingCardSkeleton,
+  ScheduleCardSkeleton,
+  SpendingCardSkeleton,
+  TodoCardSkeleton,
+  UpcomingGoalsCardSkeleton,
+  WaterIntakeCardSkeleton,
+  WeeklyReportCardSkeleton,
+} from "./skeletons";
 
 const AICoachCard = lazy(async () => ({
   default: (await import("./components/AICoachCard")).AICoachCard,
@@ -66,41 +82,6 @@ function useDeferredMount(delay = 0) {
   }, [delay]);
 
   return ready;
-}
-
-function DeferredGroup({
-  when,
-  children,
-}: {
-  when: boolean;
-  children: ReactNode;
-}) {
-  if (!when) return null;
-
-  return (
-    <Suspense
-      fallback={
-        <div className="md:col-span-2 lg:col-span-12 rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-          Loading more dashboard cards…
-        </div>
-      }
-    >
-      {children}
-    </Suspense>
-  );
-}
-
-function TopCardPlaceholder() {
-  return (
-    <div className="lg:col-span-12 rounded-2xl border bg-card/70 p-5">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="h-6 w-6 rounded-md bg-muted" />
-        <div className="h-3 w-24 rounded bg-muted" />
-      </div>
-      <div className="h-5 w-2/3 rounded bg-muted" />
-      <div className="mt-2 h-3 w-5/6 rounded bg-muted" />
-    </div>
-  );
 }
 
 function UsagePillPlaceholder() {
@@ -155,15 +136,14 @@ export default function DashboardPage() {
   const { modules } = useEnabledModules();
   const tier = useTier();
   const isPro = tierMeets(tier, "pro");
-  const has = (id: string) => modules.has(id as never);
+  const has = useCallback((id: string) => modules.has(id as never), [modules]);
 
   const [goalCount, setGoalCount] = useState<number | null>(() => {
     return seedUserGoals().length;
   });
 
-  const showTopEnhancements = useDeferredMount(120);
-  const showStageOne = useDeferredMount(260);
-  const showStageTwo = useDeferredMount(700);
+  const showTopEnhancements = useDeferredMount(160);
+  const showSecondaryEnhancements = useDeferredMount(380);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,7 +198,7 @@ export default function DashboardPage() {
         href: string;
         color: string;
       }[],
-    [modules]
+    [has]
   );
 
   return (
@@ -239,43 +219,116 @@ export default function DashboardPage() {
         </Suspense>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
-        {showEmptyState && (
-          <div className="md:col-span-2 lg:col-span-12">
-            <DashboardStartHereCard onDismiss={() => {}} />
-          </div>
-        )}
+      <div className="space-y-4">
+        {showEmptyState && <DashboardStartHereCard />}
 
-        <Suspense fallback={<TopCardPlaceholder />}>
-          {showTopEnhancements ? <AICoachCard /> : <TopCardPlaceholder />}
-        </Suspense>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+          <Suspense fallback={<AICoachCardSkeleton />}>
+            {showTopEnhancements ? <AICoachCard /> : <AICoachCardSkeleton />}
+          </Suspense>
 
-        {quickActions.length > 0 && (
-          <div className="md:col-span-2 lg:col-span-12">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {quickActions.map((qa) => (
-                <QuickAction key={qa.href} {...qa} />
-              ))}
+          {quickActions.length > 0 && (
+            <div className="md:col-span-2 lg:col-span-12">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
+                {quickActions.map((qa) => (
+                  <QuickAction key={qa.href} {...qa} />
+                ))}
+              </div>
             </div>
+          )}
+
+          <Suspense fallback={<LifeProgressCardSkeleton />}>
+            {showTopEnhancements ? <LifeProgressCard /> : <LifeProgressCardSkeleton />}
+          </Suspense>
+        </div>
+
+        {(has("schedule") || has("goals")) && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+            {has("schedule") && (
+              <Suspense fallback={<ScheduleCardSkeleton />}>
+                {showTopEnhancements ? <ScheduleCard /> : <ScheduleCardSkeleton />}
+              </Suspense>
+            )}
+
+            {has("goals") && (
+              <Suspense fallback={<UpcomingGoalsCardSkeleton />}>
+                {showTopEnhancements ? (
+                  <UpcomingGoalsCard />
+                ) : (
+                  <UpcomingGoalsCardSkeleton />
+                )}
+              </Suspense>
+            )}
           </div>
         )}
 
-        <DeferredGroup when={showStageOne}>
-          <LifeProgressCard />
-          {isPro && <WeeklyReportCard />}
-          {has("reading") && <ReadingCard />}
-          {has("nutrition") && <MacrosCard />}
-          {has("schedule") && <ScheduleCard />}
-          {has("goals") && <UpcomingGoalsCard />}
-        </DeferredGroup>
+        {(has("nutrition") || has("reading")) && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+            {has("nutrition") && (
+              <Suspense fallback={<MacrosCardSkeleton />}>
+                {showTopEnhancements ? <MacrosCard /> : <MacrosCardSkeleton />}
+              </Suspense>
+            )}
 
-        <DeferredGroup when={showStageTwo}>
-          {has("finance") && <SpendingCard />}
-          {has("todos") && <TodoCard />}
-          {has("fitness") && <FitnessCard />}
-          {has("nutrition") && <WaterIntakeCard />}
-          <AchievementsCard />
-        </DeferredGroup>
+            {has("reading") && (
+              <Suspense fallback={<ReadingCardSkeleton />}>
+                {showTopEnhancements ? <ReadingCard /> : <ReadingCardSkeleton />}
+              </Suspense>
+            )}
+          </div>
+        )}
+
+        {(isPro || has("finance")) && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+            {isPro && (
+              <Suspense fallback={<WeeklyReportCardSkeleton />}>
+                {showSecondaryEnhancements ? (
+                  <WeeklyReportCard />
+                ) : (
+                  <WeeklyReportCardSkeleton />
+                )}
+              </Suspense>
+            )}
+
+            {has("finance") && (
+              <Suspense fallback={<SpendingCardSkeleton />}>
+                {showSecondaryEnhancements ? <SpendingCard /> : <SpendingCardSkeleton />}
+              </Suspense>
+            )}
+          </div>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+          {has("fitness") && (
+            <Suspense fallback={<FitnessCardSkeleton />}>
+              {showSecondaryEnhancements ? <FitnessCard /> : <FitnessCardSkeleton />}
+            </Suspense>
+          )}
+
+          {has("nutrition") && (
+            <Suspense fallback={<WaterIntakeCardSkeleton />}>
+              {showSecondaryEnhancements ? (
+                <WaterIntakeCard />
+              ) : (
+                <WaterIntakeCardSkeleton />
+              )}
+            </Suspense>
+          )}
+
+          <Suspense fallback={<AchievementsCardSkeleton />}>
+            {showSecondaryEnhancements ? (
+              <AchievementsCard />
+            ) : (
+              <AchievementsCardSkeleton />
+            )}
+          </Suspense>
+
+          {has("todos") && (
+            <Suspense fallback={<TodoCardSkeleton />}>
+              {showSecondaryEnhancements ? <TodoCard /> : <TodoCardSkeleton />}
+            </Suspense>
+          )}
+        </div>
       </div>
 
       {modules.size === 0 && (

@@ -18,6 +18,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -69,20 +70,20 @@ function LogForm({
   return (
     <div className="mt-2 space-y-2 rounded-xl border bg-muted/20 p-3">
       <div className="flex gap-2">
-        <input
+        <Input
           type="number"
           min={0}
           placeholder={placeholder}
           value={val}
           onChange={(e) => setVal(e.target.value)}
-          className="w-28 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 w-28 bg-background px-2.5 py-1.5 text-sm"
         />
-        <input
+        <Input
           type="text"
           placeholder="Notes (optional)"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="flex-1 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 flex-1 bg-background px-2.5 py-1.5 text-sm"
         />
       </div>
 
@@ -117,12 +118,12 @@ function GoalEditor({
 
   return (
     <span className="inline-flex items-center gap-1">
-      <input
+      <Input
         type="number"
         value={val}
         min={0}
         onChange={(e) => setVal(e.target.value)}
-        className="w-20 rounded border bg-background px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-7 w-20 bg-background px-1.5 py-0.5 text-xs"
       />
       <span className="text-xs text-muted-foreground">{unit}</span>
       <button

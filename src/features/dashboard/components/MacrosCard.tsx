@@ -216,7 +216,7 @@ export function MacrosCard() {
           error={error}
           onRetry={reset}
           label="Macros"
-          colSpan="lg:col-span-5"
+          colSpan="lg:col-span-7"
         />
       )}
     >

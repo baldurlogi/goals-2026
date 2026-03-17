@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Dumbbell, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PageHeader, PageScaffold, SectionHeading } from "@/components/PageScaffold";
 import { AddPRGoalModal } from "@/features/fitness/components/AddPRGoalModal";
 import { PRCard } from "@/features/fitness/components/PRCard";
 import { WeeklySplitCard } from "@/features/fitness/components/WeeklySplitCard";
@@ -21,7 +22,7 @@ const CATEGORIES = Object.keys(CATEGORY_LABELS) as PRCategory[];
 
 function PRCardPlaceholder() {
   return (
-    <div className="min-h-[260px] animate-pulse rounded-2xl border bg-card p-4">
+    <div className="min-h-[260px] animate-pulse rounded-xl border bg-card p-4">
       <div className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 space-y-2">
@@ -146,34 +147,29 @@ export function FitnessPage() {
   const showInitialPlaceholder = !initialSyncDone && goals.length === 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Dumbbell className="h-5 w-5 text-violet-500" />
-        <div>
-          <h1 className="text-xl font-semibold">Fitness</h1>
-          <p className="text-sm text-muted-foreground">
-            Weekly plan, workout streak, and personal records.
-          </p>
-        </div>
-      </div>
+    <PageScaffold width="wide" className="space-y-6">
+      <PageHeader
+        title="Fitness"
+        description="Weekly plan, workout streak, and personal records."
+        icon={<Dumbbell className="h-5 w-5 text-violet-500" />}
+      />
 
       <WeeklySplitCard />
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Personal Records
-          </h2>
-
-          <Button
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            onClick={() => setShowAdd(true)}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add PR Goal
-          </Button>
-        </div>
+        <SectionHeading
+          title="Personal Records"
+          action={(
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => setShowAdd(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add PR Goal
+            </Button>
+          )}
+        />
 
         {usedCategories.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
@@ -219,7 +215,7 @@ export function FitnessPage() {
             ))}
           </div>
         ) : goals.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-10 text-center">
+          <div className="rounded-xl border border-dashed p-10 text-center">
             <Dumbbell className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
             <p className="text-sm font-medium text-muted-foreground">
               No PR goals yet
@@ -255,6 +251,6 @@ export function FitnessPage() {
           onClose={() => setShowAdd(false)}
         />
       )}
-    </div>
+    </PageScaffold>
   );
 }

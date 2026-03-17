@@ -234,17 +234,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
 
   const originalById = Object.fromEntries(goal.steps.map((s) => [s.id, s]));
 
-  const load = useCallback(
-    async (showLoading = true) => {
-      if (showLoading) {
-        setPhase("loading");
-        setError(null);
-        setResult(null);
-        setAccepted({});
-        setLimitMessage(null);
-        setLimitTier(null);
-      }
-
+  const load = useCallback(async () => {
       try {
         const r = await fetchImprovedSteps(goal);
         setResult(r);
@@ -269,12 +259,24 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
           setPhase("error");
         }
       }
-    },
-    [goal],
-  );
+    }, [goal]);
+
+  const reload = useCallback(() => {
+    setPhase("loading");
+    setError(null);
+    setResult(null);
+    setAccepted({});
+    setLimitMessage(null);
+    setLimitTier(null);
+    void load();
+  }, [load]);
 
   useEffect(() => {
-    void load(true);
+    const timeoutId = window.setTimeout(() => {
+      void load();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [load]);
 
   useEffect(() => {
@@ -392,7 +394,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
                 <p className="font-medium">Couldn&apos;t generate improvements</p>
                 <p className="mt-1 text-sm text-muted-foreground">{error}</p>
               </div>
-              <Button variant="outline" onClick={() => void load(true)} className="gap-2">
+              <Button variant="outline" onClick={reload} className="gap-2">
                 <RotateCcw className="h-3.5 w-3.5" />
                 Try again
               </Button>
@@ -456,7 +458,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => void load(true)}
+                onClick={reload}
                 className="gap-1.5 text-xs"
               >
                 <RotateCcw className="h-3 w-3" />

@@ -26,10 +26,46 @@ import {
   type OnboardingData,
 } from "./components/types";
 
-const STEP_ICONS = [User, LayoutGrid, Target, Dumbbell, CalendarDays, BookOpen];
+type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
+
+const STEP_ICONS: Record<OnboardingStep, typeof User> = {
+  0: User,
+  1: LayoutGrid,
+  2: Target,
+  3: Dumbbell,
+  4: CalendarDays,
+  5: BookOpen,
+};
+
+const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> = {
+  0: {
+    label: "Profile",
+    subtitle: "This helps us personalize recommendations right from the start.",
+  },
+  1: {
+    label: "Modules",
+    subtitle: "Picking modules keeps your workspace focused on what you care about.",
+  },
+  2: {
+    label: "Goals",
+    subtitle: "Clear goals turn intentions into a plan you can follow.",
+  },
+  3: {
+    label: "Nutrition",
+    subtitle: "Nutrition targets make healthy progress easier to measure.",
+  },
+  4: {
+    label: "Schedule",
+    subtitle: "A default schedule view reduces friction in daily planning.",
+  },
+  5: {
+    label: "Reading",
+    subtitle: "A daily reading target helps you build a consistent learning habit.",
+  },
+};
 
 export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState<OnboardingStep>(0);
   const [data, setData] = useState<OnboardingData>(INITIAL_ONBOARDING_DATA);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +77,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
   const visibleSteps = useMemo(
     () =>
-      [0, 1, 2, 3, 4, 5].filter((s) => {
+      ([0, 1, 2, 3, 4, 5] as OnboardingStep[]).filter((s) => {
         if (s === 3) return data.enabled_modules.includes("nutrition");
         if (s === 4) return data.enabled_modules.includes("schedule");
         if (s === 5) return data.enabled_modules.includes("reading");
@@ -52,6 +88,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
   const currentIndex = visibleSteps.indexOf(step);
   const isLastStep = currentIndex === visibleSteps.length - 1;
+  const currentStepContent = STEP_CONTENT[step];
 
   function canAdvance(): boolean {
     if (step === 0) return !!data.display_name.trim();
@@ -126,7 +163,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     );
   }
 
-  const stepComponents: Record<number, ReactNode> = {
+  const stepComponents: Record<OnboardingStep, ReactNode> = {
     0: <StepProfile data={data} onChange={update} />,
     1: <StepModules data={data} onChange={update} />,
     2: <StepGoal data={data} onChange={update} />,
@@ -139,28 +176,39 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-lg space-y-8">
         <div className="flex justify-center">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
             {visibleSteps.map((s, i) => {
               const Icon = STEP_ICONS[s];
               const done = i < currentIndex;
               const active = s === step;
+              const stepContent = STEP_CONTENT[s];
 
               return (
                 <div key={s} className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
-                      done && "border-primary bg-primary text-primary-foreground",
-                      active && "border-primary bg-primary/10 text-primary",
-                      !done && !active && "border-muted-foreground/30 text-muted-foreground",
-                    )}
-                  >
-                    {done ? <Check className="h-4 w-4" /> : <Icon className="h-3.5 w-3.5" />}
+                  <div className="flex items-center gap-2 rounded-full border border-transparent px-2 py-1">
+                    <div
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
+                        done && "border-primary bg-primary text-primary-foreground",
+                        active && "border-primary bg-primary/10 text-primary",
+                        !done && !active && "border-muted-foreground/30 text-muted-foreground",
+                      )}
+                    >
+                      {done ? <Check className="h-4 w-4" /> : <Icon className="h-3.5 w-3.5" />}
+                    </div>
+                    <div className={cn("text-xs font-medium", active ? "text-foreground" : "text-muted-foreground")}>{stepContent.label}</div>
                   </div>
                 </div>
               );
             })}
           </div>
+        </div>
+
+        <div className="space-y-1 text-center">
+          <p className="text-sm font-medium text-muted-foreground">
+            Step {currentIndex + 1} of {visibleSteps.length}: {currentStepContent.label}
+          </p>
+          <p className="text-sm text-muted-foreground">{currentStepContent.subtitle}</p>
         </div>
 
         <div className="rounded-2xl border bg-card p-6 shadow-sm">{stepComponents[step]}</div>

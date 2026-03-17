@@ -54,7 +54,7 @@ export function StudyStreakCard({ goalId }: { goalId: string }) {
   }
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-xl">
       <CardHeader>
         <CardTitle className="text-base">📚 Study streak</CardTitle>
       </CardHeader>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { getAISystemContext } from '@/features/ai/buildAIContext';
 import { loadUserGoals } from '@/features/goals/userGoalStorage';
+import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
 import { readProfileCache } from '@/features/onboarding/profileStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import {
@@ -123,6 +124,172 @@ type WeeklyDataPayload = {
   };
 };
 
+type GoalSummaryModel = Pick<UserGoal, 'id' | 'title' | 'priority' | 'steps'>;
+
+type NutritionLogRow = {
+  log_date: string;
+  eaten: NutritionLog['eaten'];
+  custom_entries: NutritionLog['customEntries'];
+};
+
+type TodoRow = Todo;
+
+type ScheduleLogRow = {
+  log_date: string;
+  view: 'office' | 'weekend' | 'wfh' | null;
+  completed: unknown[];
+};
+
+type WeeklyReportDbRow = {
+  id: string;
+  week_start: string;
+  report: WeeklyReport;
+  created_at: string;
+};
+
+type WeeklyReportFnResponse = {
+  report: WeeklyReport;
+  usage?: {
+    prompts_used: number;
+    monthly_limit: number;
+    remaining: number;
+  };
+};
+
+type SplitDayCacheEntry = {
+  label?: string;
+  completedDate?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function toGoalStep(value: unknown): UserGoalStep | null {
+  if (!isRecord(value) || typeof value.id !== 'string') return null;
+
+  return {
+    id: value.id,
+    label: typeof value.label === 'string' ? value.label : '',
+    notes: typeof value.notes === 'string' ? value.notes : '',
+    idealFinish: typeof value.idealFinish === 'string' ? value.idealFinish : null,
+    estimatedTime:
+      typeof value.estimatedTime === 'string' ? value.estimatedTime : '',
+    sortOrder: typeof value.sortOrder === 'number' ? value.sortOrder : 0,
+  };
+}
+
+function toGoalSummaryModel(goal: unknown): GoalSummaryModel | null {
+  if (!isRecord(goal) || typeof goal.id !== 'string') return null;
+
+  const stepsRaw = Array.isArray(goal.steps) ? goal.steps : [];
+  const steps = stepsRaw
+    .map((step) => toGoalStep(step))
+    .filter((step): step is UserGoalStep => step !== null);
+
+  return {
+    id: goal.id,
+    title: typeof goal.title === 'string' ? goal.title : 'Untitled goal',
+    priority: goal.priority === 'high' || goal.priority === 'low' ? goal.priority : 'medium',
+    steps,
+  };
+}
+
+function toSplitDayCacheEntry(value: unknown): SplitDayCacheEntry | null {
+  if (!isRecord(value)) return null;
+
+  return {
+    label: typeof value.label === 'string' ? value.label : undefined,
+    completedDate:
+      typeof value.completedDate === 'string' ? value.completedDate : undefined,
+  };
+}
+
+function toNutritionLogRow(row: unknown): NutritionLogRow | null {
+  if (!isRecord(row) || typeof row.log_date !== 'string') return null;
+
+  return {
+    log_date: row.log_date,
+    eaten: isRecord(row.eaten) ? (row.eaten as NutritionLog['eaten']) : {},
+    custom_entries: Array.isArray(row.custom_entries)
+      ? (row.custom_entries as NutritionLog['customEntries'])
+      : [],
+  };
+}
+
+function toTodoRow(row: unknown): TodoRow | null {
+  if (!isRecord(row)) return null;
+  if (
+    typeof row.id !== 'string' ||
+    typeof row.text !== 'string' ||
+    typeof row.done !== 'boolean' ||
+    typeof row.created_at !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    text: row.text,
+    done: row.done,
+    created_at: row.created_at,
+  };
+}
+
+function toScheduleLogRow(row: unknown): ScheduleLogRow | null {
+  if (!isRecord(row) || typeof row.log_date !== 'string') return null;
+
+  const view =
+    row.view === 'office' || row.view === 'weekend' || row.view === 'wfh'
+      ? row.view
+      : null;
+
+  return {
+    log_date: row.log_date,
+    view,
+    completed: Array.isArray(row.completed) ? row.completed : [],
+  };
+}
+
+function toWeeklyReportDbRow(row: unknown): WeeklyReportDbRow | null {
+  if (!isRecord(row)) return null;
+  if (
+    typeof row.id !== 'string' ||
+    typeof row.week_start !== 'string' ||
+    typeof row.created_at !== 'string' ||
+    !isRecord(row.report)
+  ) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    week_start: row.week_start,
+    report: row.report as WeeklyReport,
+    created_at: row.created_at,
+  };
+}
+
+function toWeeklyReportFnResponse(value: unknown): WeeklyReportFnResponse | null {
+  if (!isRecord(value) || !isRecord(value.report)) return null;
+
+  const usage = isRecord(value.usage)
+    && typeof value.usage.prompts_used === 'number'
+    && typeof value.usage.monthly_limit === 'number'
+    && typeof value.usage.remaining === 'number'
+    ? {
+        prompts_used: value.usage.prompts_used,
+        monthly_limit: value.usage.monthly_limit,
+        remaining: value.usage.remaining,
+      }
+    : undefined;
+
+  return {
+    report: value.report as WeeklyReport,
+    usage,
+  };
+}
+
 function readLatestReportCache(): WeeklyReportRecord | null {
   try {
     const raw = localStorage.getItem(WEEKLY_REPORT_CACHE_KEY);
@@ -198,7 +365,7 @@ export function isSunday(): boolean {
   return new Date().getDay() === 0;
 }
 
-function summarizeGoals(goals: Array<Record<string, any>>) {
+function summarizeGoals(goals: GoalSummaryModel[]) {
   const doneMap =
     readJson<Record<string, Record<string, boolean>>>('goals:done:v1') ?? {};
   const history = readJson<Array<{ date?: string }>>('goals:step-history:v1') ?? [];
@@ -209,7 +376,7 @@ function summarizeGoals(goals: Array<Record<string, any>>) {
   const topGoals = goals.slice(0, 5).map((goal) => {
     const steps = Array.isArray(goal.steps) ? goal.steps : [];
     const done = doneMap[String(goal.id)] ?? {};
-    const doneCount = steps.filter((step: any) => done[String(step.id)]).length;
+    const doneCount = steps.filter((step) => done[String(step.id)]).length;
     const pct = steps.length > 0 ? Math.round((doneCount / steps.length) * 100) : 0;
 
     return {
@@ -225,7 +392,7 @@ function summarizeGoals(goals: Array<Record<string, any>>) {
 
     return (
       count +
-      steps.filter((step: any) => {
+      steps.filter((step) => {
         const idealFinish =
           typeof step?.idealFinish === 'string' ? step.idealFinish : null;
         if (!idealFinish) return false;
@@ -262,20 +429,19 @@ function tryReadWeeklySplitSummary(
     const key = localStorage.key(i);
     if (!key || !/fitness|split/i.test(key)) continue;
 
-    const parsed = readJson<any>(key);
-    if (!parsed || typeof parsed !== 'object' || !parsed.days) continue;
+    const parsed = readJson<unknown>(key);
+    if (!isRecord(parsed) || !isRecord(parsed.days)) continue;
 
-    const days = parsed.days as Record<string, any>;
-    if (!dayKeys.every((day) => typeof days?.[day] === 'object')) continue;
+    const days = parsed.days;
+    if (!dayKeys.every((day) => isRecord(days[day]))) continue;
 
     let workoutsThisWeek = 0;
     let lastCompletedDate: string | null = null;
 
     for (const dayKey of dayKeys) {
-      const item = days[dayKey];
-      const label = String(item?.label ?? '').trim().toLowerCase();
-      const completedDate =
-        typeof item?.completedDate === 'string' ? item.completedDate : null;
+      const item = toSplitDayCacheEntry(days[dayKey]);
+      const label = item?.label?.trim().toLowerCase() ?? '';
+      const completedDate = item?.completedDate ?? null;
 
       if (!completedDate) continue;
       if (label && REST_LABELS.has(label)) continue;
@@ -367,11 +533,14 @@ async function collectNutritionData(
     };
   }
 
-  const logs: NutritionLog[] = (data ?? []).map((row) => ({
-    date: row.log_date,
-    eaten: (row.eaten ?? {}) as NutritionLog['eaten'],
-    customEntries: (row.custom_entries ?? []) as NutritionLog['customEntries'],
-  }));
+  const logs: NutritionLog[] = (data ?? [])
+    .map((row) => toNutritionLogRow(row))
+    .filter((row): row is NutritionLogRow => row !== null)
+    .map((row) => ({
+      date: row.log_date,
+      eaten: row.eaten,
+      customEntries: row.custom_entries,
+    }));
 
   const loggedDays = logs.filter(hasNutritionData);
   const totals = loggedDays.reduce(
@@ -449,7 +618,9 @@ async function collectTodosData(
     };
   }
 
-  const todos = (data ?? []) as Todo[];
+  const todos = (data ?? [])
+    .map((row) => toTodoRow(row))
+    .filter((row): row is TodoRow => row !== null);
   return getTodoWeeklySummary(weekStart, weekEnd, todos);
 }
 
@@ -482,21 +653,25 @@ async function collectScheduleData(
   let blocksCompletedThisWeek = 0;
   let totalBlocksThisWeek = 0;
 
-  for (const row of data ?? []) {
-    const rawView = row?.view;
+  const scheduleRows = (data ?? [])
+    .map((row) => toScheduleLogRow(row))
+    .filter((row): row is ScheduleLogRow => row !== null);
+
+  for (const row of scheduleRows) {
+    const rawView = row.view;
     const view: keyof typeof templates =
       rawView === 'office' || rawView === 'weekend' || rawView === 'wfh'
         ? rawView
         : 'wfh';
 
     const blocks = templates[view]?.length ?? 0;
-    const completed = Array.isArray(row?.completed) ? row.completed.length : 0;
+    const completed = row.completed.length;
 
     totalBlocksThisWeek += blocks;
     blocksCompletedThisWeek += completed;
   }
 
-  const activeDays = (data ?? []).length;
+  const activeDays = scheduleRows.length;
 
   return {
     blocksCompletedThisWeek,
@@ -562,11 +737,17 @@ export function useWeeklyReport(modules: Set<string>) {
           return;
         }
 
+        const row = toWeeklyReportDbRow(data);
+        if (!row) {
+          setStatus('idle');
+          return;
+        }
+
         const latest: WeeklyReportRecord = {
-          id: data.id,
-          weekStart: data.week_start,
-          report: data.report as WeeklyReport,
-          createdAt: data.created_at,
+          id: row.id,
+          weekStart: row.week_start,
+          report: row.report,
+          createdAt: row.created_at,
         };
 
         setReport(latest);
@@ -631,7 +812,11 @@ export function useWeeklyReport(modules: Set<string>) {
           activityLevel: profile?.activity_level ?? null,
           dailyReadingGoal: profile?.daily_reading_goal ?? null,
         },
-        goals: summarizeGoals(goals as Array<Record<string, any>>),
+        goals: summarizeGoals(
+          goals
+            .map((goal) => toGoalSummaryModel(goal))
+            .filter((goal): goal is GoalSummaryModel => goal !== null),
+        ),
         fitness,
         nutrition,
         reading,
@@ -672,12 +857,16 @@ export function useWeeklyReport(modules: Set<string>) {
         throw new Error(d.error ?? 'Failed to generate report');
       }
 
-      const data = await res.json();
+      const dataRaw: unknown = await res.json();
+      const data = toWeeklyReportFnResponse(dataRaw);
+      if (!data) {
+        throw new Error('Failed to parse report response');
+      }
 
       const newRecord: WeeklyReportRecord = {
         id: crypto.randomUUID(),
         weekStart,
-        report: data.report as WeeklyReport,
+        report: data.report,
         createdAt: new Date().toISOString(),
       };
 

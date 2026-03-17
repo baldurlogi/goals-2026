@@ -159,9 +159,26 @@ export function GoalsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-end justify-end gap-2 sm:w-auto">
+          <div className="order-1 flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <Button
+              onClick={() => setLocalModal('new')}
+              className="w-full gap-2 sm:w-auto"
+            >
+              <Plus className="h-4 w-4" /> Add goal
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => setLocalModal('ai')}
+              className="w-full gap-2 sm:w-auto"
+            >
+              <Sparkles className="h-4 w-4" /> Generate with AI
+            </Button>
+          </div>
+
           {goals.length > 0 && (
-            <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
+            <div className="order-2 flex items-center gap-1 rounded-lg border bg-card p-1 sm:order-1">
               <SortButton
                 active={sort === 'priority'}
                 onClick={() => setSort('priority')}
@@ -176,21 +193,6 @@ export function GoalsPage() {
               </SortButton>
             </div>
           )}
-
-          <Button
-            variant="outline"
-            onClick={() => setLocalModal('ai')}
-            className="gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
-          >
-            <Sparkles className="h-4 w-4" /> Generate with AI
-          </Button>
-
-          <Button
-            onClick={() => setLocalModal('new')}
-            className="gap-2 hover:border-primary/30 hover:text-white bg-primary/5 text-primary"
-          >
-            <Plus className="h-4 w-4" /> Add goal
-          </Button>
         </div>
       </div>
 

@@ -3,6 +3,8 @@ import { CheckSquare, ChevronDown, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { PageHeader, PageScaffold } from "@/components/PageScaffold";
 import {
   loadTodos,
   addTodo,
@@ -66,13 +68,13 @@ export function TodosPage() {
   const done       = todos.filter((t) => t.done);
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CheckSquare className="h-5 w-5 text-sky-500" />
-          <h1 className="text-xl font-semibold">To-do</h1>
-        </div>
+    <PageScaffold width="narrow" className="space-y-6">
+      <div className="flex items-start justify-between gap-3">
+        <PageHeader
+          title="To-do"
+          description="Keep daily tasks clear and focused."
+          icon={<CheckSquare className="h-5 w-5 text-sky-500" />}
+        />
         {done.length > 0 && (
           <Button
             variant="ghost"
@@ -93,13 +95,13 @@ export function TodosPage() {
 
       {/* Quick-add */}
       <div className="flex items-center gap-2">
-        <input
+        <Input
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           placeholder="Add a task and press Enter…"
-          className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+          className="h-10 flex-1 bg-card"
         />
         <Button onClick={handleAdd} disabled={!input.trim()} size="sm">
           Add
@@ -142,7 +144,7 @@ export function TodosPage() {
           )}
         </div>
       )}
-    </div>
+    </PageScaffold>
   );
 }
 

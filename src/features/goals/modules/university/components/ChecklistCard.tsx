@@ -43,7 +43,7 @@ export function ChecklistCard({ goalId }: { goalId: string }) {
   const done = state.checklist.filter((c) => c.done).length;
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-xl">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base">✅ Checklist</CardTitle>

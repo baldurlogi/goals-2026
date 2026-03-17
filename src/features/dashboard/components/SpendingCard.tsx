@@ -73,7 +73,7 @@ function SpendingCardInner() {
   const topCategories = donutData.slice(0, 3);
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-5">
+    <Card className="relative overflow-hidden lg:col-span-6">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -178,7 +178,7 @@ export function SpendingCard() {
           error={error}
           onRetry={reset}
           label="Spending"
-          colSpan="lg:col-span-7"
+          colSpan="lg:col-span-6"
         />
       )}
     >

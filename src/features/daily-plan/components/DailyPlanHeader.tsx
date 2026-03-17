@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   ChevronDown,
+  Ellipsis,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -137,6 +138,35 @@ export function DailyPlanHeader() {
   const email = user?.email ?? "";
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
   const CurrentIcon = currentItem?.icon;
+
+  const mobilePrimaryItems = useMemo(() => {
+    const enabledDefs = ALL_MODULES.filter((m) => modules.has(m.id));
+    const preferredOrder = ["goals", "reading", "nutrition", "schedule"];
+    const topModules = preferredOrder
+      .map((id) => enabledDefs.find((m) => m.id === id))
+      .filter((m): m is ModuleDef => Boolean(m))
+      .slice(0, 4);
+
+    return [
+      {
+        label: "Dashboard",
+        href: "/app",
+        icon: LayoutDashboard,
+      },
+      ...topModules.map((m) => ({
+        label: m.navLabel,
+        href: m.href,
+        icon: m.icon,
+      })),
+    ].slice(0, 5);
+  }, [modules]);
+
+  const overflowMobileItems = useMemo(() => {
+    const primaryHrefs = new Set(mobilePrimaryItems.map((item) => item.href));
+    return sections
+      .flatMap((section) => section.items)
+      .filter((item) => !primaryHrefs.has(item.href));
+  }, [mobilePrimaryItems, sections]);
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 md:backdrop-blur supports-[backdrop-filter]:md:bg-background/60">
@@ -294,6 +324,78 @@ export function DailyPlanHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-2 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:hidden">
+        <div className="mx-auto flex max-w-xl items-center justify-between gap-1">
+          {mobilePrimaryItems.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              item.href === "/app"
+                ? pathname === "/app"
+                : pathname.startsWith(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-1 py-2 text-[11px] font-medium leading-none transition-colors",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "flex h-auto min-w-0 flex-1 flex-col gap-1 rounded-md px-1 py-2 text-[11px] font-medium leading-none",
+                  overflowMobileItems.some((item) => pathname.startsWith(item.href))
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground",
+                )}
+              >
+                <Ellipsis className="h-4 w-4" />
+                <span>More</span>
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="mb-2 w-56">
+              {overflowMobileItems.length === 0 ? (
+                <DropdownMenuItem asChild>
+                  <Link to="/app/profile">Configure modules</Link>
+                </DropdownMenuItem>
+              ) : (
+                overflowMobileItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link
+                        to={item.href}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2",
+                          pathname.startsWith(item.href) && "font-semibold",
+                        )}
+                      >
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </nav>
     </header>
   );
 }
