@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Plus, Sparkles } from "lucide-react";
+import { Trash2, Plus, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -282,6 +282,10 @@ export function AddEditGoalModal({
                   </Button>
                 </div>
 
+                <p className="text-xs text-muted-foreground">
+                  Keep it simple: add a step title first. Details are optional.
+                </p>
+
                 <div className="space-y-2">
                   {goal.steps.map((step, idx) => {
                     const isOpen = openStepId === step.id;
@@ -302,37 +306,53 @@ export function AddEditGoalModal({
                             className="h-9 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                           />
 
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => moveStep(step.id, -1)}
-                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            >
-                              ▲
-                            </button>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 rounded-lg border bg-background/50 p-0.5">
+                              <button
+                                type="button"
+                                onClick={() => moveStep(step.id, -1)}
+                                title="Move up"
+                                aria-label="Move up"
+                                className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => moveStep(step.id, 1)}
+                                title="Move down"
+                                aria-label="Move down"
+                                className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </button>
+                            </div>
 
                             <button
                               type="button"
-                              onClick={() => moveStep(step.id, 1)}
-                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              onClick={() => setOpenStepId(isOpen ? null : step.id)}
+                              title={isOpen ? "Hide details" : "Show details"}
+                              aria-label={isOpen ? "Hide details" : "Show details"}
+                              className="inline-flex h-10 min-w-20 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
                             >
-                              ▼
+                              <span>Details</span>
+                              <ChevronDown
+                                className={cn(
+                                  "h-4 w-4 transition-transform",
+                                  isOpen && "rotate-180",
+                                )}
+                              />
                             </button>
 
                             <button
                               type="button"
                               onClick={() => removeStep(step.id)}
-                              className="shrink-0 text-muted-foreground hover:text-destructive"
+                              title="Delete step"
+                              aria-label="Delete step"
+                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setOpenStepId(isOpen ? null : step.id)}
-                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            >
-                              {isOpen ? "−" : "+"}
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
