@@ -49,7 +49,7 @@ export function DeadlinesCard({ goalId }: { goalId: string }) {
   const nextBadge = next ? `${Math.max(0, daysUntil(next.dueISO))}d` : "All done";
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-xl">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base">⏳ Deadlines</CardTitle>

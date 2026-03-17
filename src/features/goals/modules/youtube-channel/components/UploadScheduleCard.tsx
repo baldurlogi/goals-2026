@@ -64,7 +64,7 @@ export function UploadScheduleCard({ goalId }: { goalId: string }) {
   }
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-xl">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base">📅 Upload schedule</CardTitle>

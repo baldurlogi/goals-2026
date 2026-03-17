@@ -51,7 +51,7 @@ export function RunStreakCard({ goalId }: { goalId: string }) {
   }
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-xl">
       <CardHeader>
         <CardTitle className="text-base">🏃 Run streak</CardTitle>
       </CardHeader>

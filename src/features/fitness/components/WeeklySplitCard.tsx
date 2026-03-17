@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Flame, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { DAY_KEYS, REST_LABELS } from "../constants";
 import {
   formatShortDate,
@@ -73,7 +74,7 @@ export function WeeklySplitCard() {
   ).length;
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-xl">
       <CardHeader className="px-4 pb-3 pt-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -134,7 +135,7 @@ export function WeeklySplitCard() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   {isEditing ? (
-                    <input
+                    <Input
                       ref={inputRef}
                       value={editVal}
                       onChange={(e) => setEditVal(e.target.value)}
@@ -143,7 +144,7 @@ export function WeeklySplitCard() {
                         if (e.key === "Enter") void commitEdit(dk);
                         if (e.key === "Escape") setEditingDay(null);
                       }}
-                      className="w-full rounded-md border bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="w-full bg-background px-2 py-1 text-sm"
                     />
                   ) : (
                     <>

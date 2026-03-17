@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { X, Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { CATEGORY_LABELS, PR_SUGGESTIONS, UNIT_OPTIONS } from "../constants";
 import { fmtValue, slugify } from "../selectors";
 import { type MetricType, type PRCategory, type PRGoal } from "../types";
@@ -75,7 +76,7 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border bg-background shadow-xl">
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl border bg-background shadow-xl">
         <div className="flex shrink-0 items-center justify-between px-5 pb-3 pt-5">
           <div>
             <h2 className="text-base font-semibold">Add PR Goal</h2>
@@ -126,11 +127,11 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
             <div className="space-y-4">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
+                <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search lifts, movements, runs..."
-                  className="w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full bg-background py-2 pl-9 pr-3 text-sm"
                 />
               </div>
 
@@ -166,7 +167,7 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
               </div>
 
               {filtered.length === 0 ? (
-                <div className="rounded-2xl border border-dashed px-4 py-8 text-center">
+                <div className="rounded-xl border border-dashed px-4 py-8 text-center">
                   <p className="text-sm font-medium text-muted-foreground">
                     No matching suggestions
                   </p>
@@ -211,11 +212,11 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
                 <label className="text-xs font-medium text-muted-foreground">
                   Label
                 </label>
-                <input
+                <Input
                   value={customLabel}
                   onChange={(e) => setCustomLabel(e.target.value)}
                   placeholder="e.g. Weighted Pull-up"
-                  className="w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full bg-background px-3 py-2 text-sm"
                 />
               </div>
 
@@ -227,7 +228,7 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
                   <select
                     value={customUnit}
                     onChange={(e) => setCustomUnit(e.target.value as MetricType)}
-                    className="w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="w-full bg-background px-3 py-2 text-sm"
                   >
                     {UNIT_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -244,7 +245,7 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
                   <select
                     value={customCat}
                     onChange={(e) => setCustomCat(e.target.value as PRCategory)}
-                    className="w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="w-full bg-background px-3 py-2 text-sm"
                   >
                     {ALL_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -260,13 +261,13 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
                   <label className="text-xs font-medium text-muted-foreground">
                     Goal value
                   </label>
-                  <input
+                  <Input
                     type="number"
                     min={0}
                     value={customGoal}
                     onChange={(e) => setCustomGoal(e.target.value)}
                     placeholder="e.g. 100"
-                    className="w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="w-full bg-background px-3 py-2 text-sm"
                   />
                 </div>
 
@@ -274,11 +275,11 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
                   <label className="text-xs font-medium text-muted-foreground">
                     Goal label (optional)
                   </label>
-                  <input
+                  <Input
                     value={customGoalLabel}
                     onChange={(e) => setCustomGoalLabel(e.target.value)}
                     placeholder={`Defaults to ${customGoal ? fmtValue(Number(customGoal), customUnit) : "formatted value"}`}
-                    className="w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="w-full bg-background px-3 py-2 text-sm"
                   />
                 </div>
               </div>

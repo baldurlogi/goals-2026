@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { PageHeader, PageScaffold } from "@/components/PageScaffold";
 
 import { SavingsCard } from "./components/SavingsCard";
 import { ExpenseTrackerCard } from "./components/ExpenseTrackerCard";
@@ -39,16 +40,14 @@ export function FinanceGoalPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">💰 Finance</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Track savings, monthly spending, and budget categories.
-        </p>
-      </div>
+    <PageScaffold width="wide">
+      <PageHeader
+        title="💰 Finance"
+        description="Track savings, monthly spending, and budget categories."
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           <ExpenseTrackerCard
             month={month}
             setMonth={setMonth}
@@ -57,7 +56,7 @@ export function FinanceGoalPage() {
           />
         </div>
 
-        <div className="lg:col-span-1 space-y-6">
+        <div className="space-y-6 lg:col-span-1">
           <SavingsCard goalId={GOAL_ID} target={75000} currency="DKK" />
         </div>
 
@@ -65,6 +64,6 @@ export function FinanceGoalPage() {
           <SpendingDonutCard goalId={GOAL_ID} month={month} />
         </div>
       </div>
-    </div>
+    </PageScaffold>
   );
 }
