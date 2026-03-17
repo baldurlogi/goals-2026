@@ -151,7 +151,7 @@ export function UpcomingGoalsCardSkeleton() {
 export function SpendingCardSkeleton() {
   return (
     <SkeletonCard
-      colSpan="lg:col-span-5"
+      colSpan="lg:col-span-6"
       accentColor="bg-gradient-to-r from-violet-500 via-purple-400 to-fuchsia-400"
     >
       <CardHeader className="space-y-2 pb-2 pt-5">
@@ -178,7 +178,7 @@ export function SpendingCardSkeleton() {
 export function TodoCardSkeleton() {
   return (
     <SkeletonCard
-      colSpan="lg:col-span-3"
+      colSpan="lg:col-span-4"
       accentColor="bg-gradient-to-r from-sky-500 via-blue-400 to-indigo-400"
     >
       <CardHeader className="space-y-2 pb-2 pt-5">
