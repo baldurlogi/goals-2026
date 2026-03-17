@@ -19,6 +19,7 @@ export function LandingNavbar({
 }: LandingNavbarProps) {
   const t = TOKENS[theme];
   const [scrolled, setScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let frameId = 0;
@@ -50,6 +51,16 @@ export function LandingNavbar({
 
   function scrollTo(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function handleMobileScrollTo(id: string) {
+    scrollTo(id);
+    setIsMobileMenuOpen(false);
+  }
+
+  function handleMobileSignIn() {
+    onSignIn();
+    setIsMobileMenuOpen(false);
   }
 
   return (
@@ -111,6 +122,22 @@ export function LandingNavbar({
           <Button
             type="button"
             variant="ghost"
+            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="landing-mobile-menu"
+            className="rounded-xl border px-3 md:hidden"
+            style={{
+              background: "transparent",
+              borderColor: t.border,
+              color: t.textSoft,
+            }}
+          >
+            Menu
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
             onClick={onSignIn}
             className="hidden rounded-xl border px-4 md:inline-flex"
             style={{
@@ -135,6 +162,50 @@ export function LandingNavbar({
           </Button>
         </div>
       </div>
+
+      {isMobileMenuOpen ? (
+        <div
+          id="landing-mobile-menu"
+          className="mx-auto mt-2 w-full max-w-7xl rounded-2xl border p-2 md:hidden"
+          style={{
+            background: theme === "dark" ? "rgba(6,11,20,0.96)" : "rgba(255,255,255,0.97)",
+            borderColor: t.border,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => handleMobileScrollTo("how-it-works")}
+            className="w-full rounded-xl px-3 py-2 text-left text-sm"
+            style={{ color: t.textSoft }}
+          >
+            How it works
+          </button>
+          <button
+            type="button"
+            onClick={() => handleMobileScrollTo("features")}
+            className="w-full rounded-xl px-3 py-2 text-left text-sm"
+            style={{ color: t.textSoft }}
+          >
+            Why it works
+          </button>
+          <button
+            type="button"
+            onClick={() => handleMobileScrollTo("pricing")}
+            className="w-full rounded-xl px-3 py-2 text-left text-sm"
+            style={{ color: t.textSoft }}
+          >
+            Pricing
+          </button>
+          <button
+            type="button"
+            onClick={handleMobileSignIn}
+            className="w-full rounded-xl px-3 py-2 text-left text-sm"
+            style={{ color: t.textSoft }}
+          >
+            Sign in
+          </button>
+        </div>
+      ) : null}
     </nav>
   );
 }
