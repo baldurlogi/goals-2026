@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useGoalsStore } from '@/features/goals/goalStoreContext';
+import { useGoalProgressQuery } from '@/features/goals/goalStore';
 import { useGoalsQuery } from '@/features/goals/useGoalsQuery';
 import type { UserGoal } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
@@ -60,12 +60,12 @@ function getUpcomingItems(
 }
 
 export function useGoalsDashboard() {
-  const { state: goalsState } = useGoalsStore();
+  const { data: goalProgress = {} } = useGoalProgressQuery();
   const { data: goals = [], isLoading: loading } = useGoalsQuery();
 
   const upcomingItems = useMemo<UpcomingItem[]>(
-    () => getUpcomingItems(goals, goalsState.done, HORIZON),
-    [goals, goalsState.done],
+    () => getUpcomingItems(goals, goalProgress, HORIZON),
+    [goalProgress, goals],
   );
 
   const overdueCount = useMemo(

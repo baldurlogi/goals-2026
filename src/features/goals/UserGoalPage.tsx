@@ -4,7 +4,7 @@ import { Pencil, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { useGoalsStore } from '@/features/goals/goalStoreContext';
+import { useGoalProgressQuery, useResetGoalProgressMutation, useToggleGoalStepMutation } from '@/features/goals/goalStore';
 import { StepsCard } from '@/features/goals/components/StepsCard';
 import { AddEditGoalModal } from '@/features/goals/components/AddEditGoalModal';
 import { ImproveGoalModal } from '@/features/goals/components/ImproveGoalModal';
@@ -14,6 +14,7 @@ import { useAuth } from '@/features/auth/authContext';
 import { GoalRemotePersistenceError } from '@/features/goals/userGoalStorage';
 import { useGoalsQuery, useSaveGoalMutation } from '@/features/goals/useGoalsQuery';
 import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
+import type { GoalPersistenceStatus } from '@/features/goals/userGoalStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { captureOnce } from '@/lib/analytics';
 
@@ -67,7 +68,9 @@ function toGoalStep(s: UserGoalStep) {
 
 export function UserGoalPage() {
   const { goalId } = useParams<{ goalId: string }>();
-  const { state, dispatch } = useGoalsStore();
+  const { data: doneState = {} } = useGoalProgressQuery();
+  const toggleGoalStepMutation = useToggleGoalStepMutation();
+  const resetGoalProgressMutation = useResetGoalProgressMutation();
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { data: goals = [], isLoading: loading } = useGoalsQuery();
@@ -77,7 +80,7 @@ export function UserGoalPage() {
   const tier = useTier();
   const isPro = tierMeets(tier, 'pro');
 
-  const goal = useMemo(() => goals.find((item) => item.id === goalId) ?? null, [goalId, goals]);
+  const goal = useMemo(() => goals.find((item: UserGoal) => item.id === goalId) ?? null, [goalId, goals]);
 
   if (loading) {
     return (
@@ -102,9 +105,9 @@ export function UserGoalPage() {
 
   const activeGoal = goal;
 
-  const doneMap = state.done[activeGoal.id] ?? {};
+  const doneMap = doneState[activeGoal.id] ?? {};
   const total = activeGoal.steps.length;
-  const doneCount = activeGoal.steps.filter((s) => doneMap[s.id]).length;
+  const doneCount = activeGoal.steps.filter((s: UserGoalStep) => doneMap[s.id]).length;
   const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
 
   const PRIORITY_COLOR: Record<string, string> = {
@@ -115,11 +118,11 @@ export function UserGoalPage() {
 
   function handleToggleStep(stepId: string) {
     const wasDone = !!doneMap[stepId];
-    const hadCompletedAnyStep = Object.values(state.done).some((goalDone) =>
+    const hadCompletedAnyStep = Object.values(doneState).some((goalDone: Record<string, boolean>) =>
       Object.values(goalDone).some(Boolean),
     );
 
-    dispatch({ type: 'toggleStep', goalId: activeGoal.id, stepId });
+    void toggleGoalStepMutation.mutate({ goalId: activeGoal.id, stepId });
     clearAISignalsCache();
 
     if (!wasDone && !hadCompletedAnyStep) {
@@ -140,7 +143,7 @@ export function UserGoalPage() {
       });
 
       const nextDoneCount = doneCount + 1;
-      const step = activeGoal.steps.find((s) => s.id === stepId);
+      const step = activeGoal.steps.find((s: UserGoalStep) => s.id === stepId);
       if (step) writeLastSession(userId, activeGoal.id, activeGoal.title, step.label);
 
       toast.success(`1 step closer to ${activeGoal.title} 🎯`, {
@@ -149,6 +152,8 @@ export function UserGoalPage() {
     }
   }
 
+  const goalProgressIsPending =
+    toggleGoalStepMutation.isPending || resetGoalProgressMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -211,7 +216,7 @@ export function UserGoalPage() {
             variant="ghost"
             size="sm"
             onClick={() => {
-              dispatch({ type: 'resetGoal', goalId: activeGoal.id });
+              void resetGoalProgressMutation.mutate({ goalId: activeGoal.id });
               clearAISignalsCache();
             }}
           >
@@ -244,6 +249,7 @@ export function UserGoalPage() {
           steps={activeGoal.steps.map(toGoalStep)}
           doneMap={doneMap}
           onToggle={handleToggleStep}
+          disabled={goalProgressIsPending}
           maxHeightClassName="max-h-none md:max-h-[560px] lg:max-h-[640px]"
         />
       )}
@@ -274,14 +280,14 @@ export function UserGoalPage() {
             setImproving(false);
 
             void saveGoalMutation.mutateAsync(updated)
-              .then((status) => {
+              .then((status: GoalPersistenceStatus) => {
                 if (status.remoteSyncSucceeded) {
                   toast.success('Goal steps improved ✨');
                 } else {
                   toast.warning("Goal steps improved locally, syncing failed. We'll retry.");
                 }
               })
-              .catch((error) => {
+              .catch((error: unknown) => {
                 if (error instanceof GoalRemotePersistenceError && error.localCacheWriteSucceeded) {
                   toast.warning("Goal steps improved locally, syncing failed. We'll retry.");
                   return;

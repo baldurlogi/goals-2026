@@ -11,6 +11,7 @@ import {
 } from "@/lib/activeUser";
 
 export function clearUserCache(userId: string | null = getActiveUserId()) {
+  // Query-seed / rollback caches and local-only UX state are the only supported localStorage data here.
   try {
     const namespace = getUserCacheNamespace(userId);
     const keysToRemove = new Set<string>();

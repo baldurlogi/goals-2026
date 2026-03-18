@@ -35,6 +35,7 @@ export function StepsCard(props: {
     steps: GoalStep[];
     doneMap?: Record<string, boolean>;
     onToggle: (stepId: string) => void;
+    disabled?: boolean;
     maxHeightClassName?: string; // e.g. "md:max-h-[640px]"
     className?: string;
 }) {
@@ -44,6 +45,7 @@ export function StepsCard(props: {
         onToggle,
         maxHeightClassName = "max-h-none lg:max-h-[640px]",
         className,
+        disabled = false,
     } = props;
     const steps = sortedSteps(rawSteps, doneMap);
 
@@ -103,6 +105,7 @@ export function StepsCard(props: {
                                         <Checkbox
                                             id={step.id}
                                             checked={checked}
+                                            disabled={disabled}
                                             onCheckedChange={() => onToggle(step.id)}
                                         />
 

@@ -194,7 +194,7 @@ function readGoalDoneMap(): GoalDoneMap {
   const userId = getActiveUserId();
   if (!userId) return {};
 
-  const keys = ["cache:goals:v1", "goals:done:v1"] as const;
+  const keys = ["goals:done:v1", "cache:goals:v1"] as const;
 
   for (const key of keys) {
     try {

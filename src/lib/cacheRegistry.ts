@@ -1,3 +1,4 @@
+/* localStorage keys are limited to query seeding, optimistic rollback, or local-only UX state. Server-backed entities should flow through TanStack Query. */
 export const CACHE_KEYS = {
   AI_COACH: "cache:ai-coach:v1",
   AI_COACH_LAST_MODULE: "cache:ai-coach:last-module:v2",
@@ -8,7 +9,6 @@ export const CACHE_KEYS = {
   FITNESS: "cache:fitness:v1",
   FITNESS_PRS: "cache:fitness_prs:v1",
   FITNESS_SPLIT: "cache:fitness_split:v1",
-  GOALS_STORE: "cache:goals:v1",
   GOALS_DONE: "goals:done:v1",
   GOALS_STEP_HISTORY: "goals:step-history:v1",
   NUTRITION_LOG: "cache:nutrition_log:v1",
@@ -38,9 +38,6 @@ export const LEGACY_CACHE_KEYS = {
   WEEKLY_REPORT_V1: "cache:weekly-report:latest:v1",
   USER_TIER_V1: "cache:user-tier:v1",
   USER_GOALS_V1: "cache:user_goals:v1",
-  GOALS_STORE_V1: "cache:goals:v1",
-  GOALS_DONE_V1: "goals:done:v1",
-  GOALS_STEP_HISTORY_V1: "goals:step-history:v1",
   GOALS_V1: "goals_v1",
   TODOS_V1: "todos_v1",
   SCHEDULE_LOG_V1: "schedule_log_v1",
@@ -80,7 +77,6 @@ export const USER_SCOPED_CACHE_KEYS = [
   CACHE_KEYS.WEEKLY_REPORT,
   CACHE_KEYS.USER_TIER,
   CACHE_KEYS.USER_GOALS,
-  CACHE_KEYS.GOALS_STORE,
   CACHE_KEYS.GOALS_DONE,
   CACHE_KEYS.GOALS_STEP_HISTORY,
   CACHE_KEYS.TODOS,
@@ -110,9 +106,6 @@ export const LEGACY_USER_SCOPED_EXACT_KEYS = [
   LEGACY_CACHE_KEYS.WEEKLY_REPORT_V1,
   LEGACY_CACHE_KEYS.USER_TIER_V1,
   LEGACY_CACHE_KEYS.USER_GOALS_V1,
-  LEGACY_CACHE_KEYS.GOALS_STORE_V1,
-  LEGACY_CACHE_KEYS.GOALS_DONE_V1,
-  LEGACY_CACHE_KEYS.GOALS_STEP_HISTORY_V1,
 ] as const;
 
 export const LEGACY_USER_SCOPED_PREFIXES = [CACHE_PREFIXES.WATER] as const;
