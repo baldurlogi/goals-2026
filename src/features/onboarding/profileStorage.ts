@@ -137,7 +137,7 @@ export function deriveLegacyScheduleView(
   return "weekend";
 }
 
-function normalizeProfile(raw: UserProfile): UserProfile {
+export function normalizeUserProfile(raw: UserProfile): UserProfile {
   const weeklySchedule = normalizeWeeklySchedule(
     (raw as UserProfile & { weekly_schedule?: WeeklySchedule | null }).weekly_schedule,
     raw.default_schedule_view,
@@ -245,7 +245,7 @@ export function readProfileCache(userId?: string | null): UserProfile | null {
     const raw = localStorage.getItem(profileCacheKey(userId));
     if (!raw) return null;
 
-    const parsed = normalizeProfile(JSON.parse(raw) as UserProfile);
+    const parsed = normalizeUserProfile(JSON.parse(raw) as UserProfile);
     return parsed.id === userId ? parsed : null;
   } catch {
     return null;
@@ -260,7 +260,7 @@ function writeProfileCache(profile: UserProfile) {
   try {
     localStorage.setItem(
       profileCacheKey(profile.id),
-      JSON.stringify(normalizeProfile(profile)),
+      JSON.stringify(normalizeUserProfile(profile)),
     );
     localStorage.removeItem(LEGACY_CACHE_KEY);
   } catch (e) {
@@ -297,7 +297,7 @@ export async function loadProfile(): Promise<UserProfile | null> {
 
     if (error || !data) return null;
 
-    const profile = normalizeProfile(data as UserProfile);
+    const profile = normalizeUserProfile(data as UserProfile);
     writeProfileCache(profile);
     return profile;
   })();
@@ -338,7 +338,7 @@ export async function saveProfile(
   if (error) throw error;
 
   const cached = readProfileCache(user.id);
-  const next = normalizeProfile(
+  const next = normalizeUserProfile(
     cached
       ? ({ ...cached, ...normalizedPatch } as UserProfile)
       : ({ ...defaultProfile(user.id), ...normalizedPatch } as UserProfile),

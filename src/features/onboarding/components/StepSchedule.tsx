@@ -18,11 +18,11 @@ const DAY_LABELS: Record<WeekdayKey, string> = {
   sunday: "Sunday",
 };
 
-const OPTIONS: { value: WeeklyScheduleValue; label: string }[] = [
-  { value: "office", label: "Office" },
-  { value: "wfh", label: "WFH" },
-  { value: "hybrid", label: "Hybrid" },
-  { value: "off", label: "Off" },
+const OPTIONS: { value: WeeklyScheduleValue; label: string; description: string }[] = [
+  { value: "office", label: "Office", description: "Mostly in person" },
+  { value: "wfh", label: "WFH", description: "Mostly remote" },
+  { value: "hybrid", label: "Hybrid", description: "Mixed day" },
+  { value: "off", label: "Off", description: "Day off" },
 ];
 
 export const StepSchedule = memo(function StepSchedule({ data, onChange }: Props) {
@@ -34,8 +34,13 @@ export const StepSchedule = memo(function StepSchedule({ data, onChange }: Props
       </div>
       <div className="space-y-2">
         {WEEKDAY_ORDER.map((day) => (
-          <div key={day} className="grid grid-cols-[1fr,auto] items-center gap-3 rounded-xl border px-3 py-2">
-            <p className="text-sm font-medium">{DAY_LABELS[day]}</p>
+          <div key={day} className="grid grid-cols-[minmax(0,1fr),auto] items-center gap-3 rounded-xl border bg-card px-3 py-3">
+            <div>
+              <p className="text-sm font-medium">{DAY_LABELS[day]}</p>
+              <p className="text-xs text-muted-foreground">
+                {OPTIONS.find((option) => option.value === data.weekly_schedule[day])?.description}
+              </p>
+            </div>
             <select
               className="h-9 rounded-md border bg-background px-2 text-sm"
               value={data.weekly_schedule[day]}
