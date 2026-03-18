@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 
 import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
-import { useProfile } from "../onboarding/useProfile";
+import { useProfileQuery } from "../onboarding/useProfileQuery";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { useGoalsQuery } from "@/features/goals/useGoalsQuery";
 import { scheduleIdle } from "@/lib/scheduleIdle";
@@ -121,7 +121,8 @@ function QuickAction({
 }
 
 export default function DashboardPage() {
-  const profile = useProfile();
+  const profileQuery = useProfileQuery();
+  const profile = profileQuery.data;
   const firstName = profile?.display_name?.trim().split(/\s+/)[0] ?? "";
 
   const hour = new Date().getHours();
@@ -133,18 +134,18 @@ export default function DashboardPage() {
     month: "long",
   });
 
-  const { modules } = useEnabledModules();
+  const { modules, loading: modulesLoading } = useEnabledModules();
   const tier = useTier();
   const isPro = tierMeets(tier, "pro");
   const has = useCallback((id: string) => modules.has(id as never), [modules]);
 
-  const { data: goals = [] } = useGoalsQuery();
+  const { data: goals = [], isLoading: goalsLoading } = useGoalsQuery();
   const goalCount = goals.length;
 
   const showTopEnhancements = useDeferredMount(160);
   const showSecondaryEnhancements = useDeferredMount(380);
 
-  const showEmptyState = goalCount === 0;
+  const showEmptyState = !profileQuery.isLoading && !modulesLoading && !goalsLoading && goalCount === 0;
 
   const quickActions = useMemo(
     () =>
@@ -317,7 +318,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {modules.size === 0 && (
+      {!modulesLoading && modules.size === 0 && (
         <div className="space-y-3 rounded-2xl border border-dashed p-12 text-center">
           <p className="text-lg font-semibold">No modules enabled</p>
           <p className="text-sm text-muted-foreground">

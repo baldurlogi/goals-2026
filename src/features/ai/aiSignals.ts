@@ -185,12 +185,12 @@ function extractDoneMap(payload: unknown): GoalDoneMap | null {
 
 function readGoalDoneMap(): GoalDoneMap {
   const userId = getActiveUserId();
-  const keys = userId
-    ? [
-        scopedKey('cache:goals:v1', userId),
-        scopedKey('goals:done:v1', userId),
-      ]
-    : ['cache:goals:v1', 'goals:done:v1'];
+  if (!userId) return {};
+
+  const keys = [
+    scopedKey('cache:goals:v1', userId),
+    scopedKey('goals:done:v1', userId),
+  ];
 
   for (const key of keys) {
     try {
@@ -363,7 +363,9 @@ function readReadingState(): ReadingState {
 function readTodosSignal(): AISignals['todos'] {
   try {
     const userId = getActiveUserId();
-    const raw = localStorage.getItem(userId ? `cache:todos:v1:${userId}` : 'cache:todos:v1');
+    if (!userId) return null;
+
+    const raw = localStorage.getItem(`cache:todos:v1:${userId}`);
     if (!raw) return null;
 
     const todos = JSON.parse(raw) as Array<{

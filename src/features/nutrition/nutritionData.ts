@@ -1,5 +1,5 @@
+import type { UserProfile } from "@/features/onboarding/profileStorage";
 import type { Meal, Macros } from "./nutritionTypes";
-import { readProfileCache } from "@/features/onboarding/profileStorage";
 
 export type NutritionPhase = "maintain" | "cut";
 
@@ -16,9 +16,10 @@ const FALLBACK_TARGETS: Record<NutritionPhase, Macros & { note: string }> = {
 };
 
 /** Returns macro targets — from user profile if available, fallback otherwise */
-export function getTargets(phase: NutritionPhase): Macros & { note: string } {
-  const profile = readProfileCache();
-
+export function getTargets(
+  phase: NutritionPhase,
+  profile?: Pick<UserProfile, "display_name" | "macro_maintain" | "macro_cut"> | null,
+): Macros & { note: string } {
   if (phase === "maintain" && profile?.macro_maintain) {
     return { ...profile.macro_maintain, note: `Personalised · ${profile.display_name ?? "you"}` };
   }
@@ -29,13 +30,7 @@ export function getTargets(phase: NutritionPhase): Macros & { note: string } {
   return FALLBACK_TARGETS[phase];
 }
 
-export const meals: {
-  breakfast: { option1: Meal; option2: Meal };
-  lunch: { wfh: Meal; office: Meal };
-  afternoonSnack: Meal;
-  postWorkout: Meal;
-  dinner: Meal;
-} = {
+export const meals = {
   breakfast: {
     option1: {
       name: "Overnight Oats + Protein Powder",
@@ -84,4 +79,10 @@ export const meals: {
     note: "Cut olive oil by half to save 80-120 kcal.",
     when: "~6:00pm",
   },
+} satisfies {
+  breakfast: { option1: Meal; option2: Meal };
+  lunch: { wfh: Meal; office: Meal };
+  afternoonSnack: Meal;
+  postWorkout: Meal;
+  dinner: Meal;
 };

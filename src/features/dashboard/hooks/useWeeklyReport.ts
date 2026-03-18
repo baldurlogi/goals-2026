@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getAISystemContext } from '@/features/ai/buildAIContext';
 import { loadUserGoals } from '@/features/goals/userGoalStorage';
 import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
-import { readProfileCache } from '@/features/onboarding/profileStorage';
+import { loadProfile } from '@/features/onboarding/profileStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import {
   loadPhase,
@@ -11,6 +11,7 @@ import {
   type NutritionLog,
 } from '@/features/nutrition/nutritionStorage';
 import { getTargets } from '@/features/nutrition/nutritionData';
+import { getActiveUserId, scopedKey } from '@/lib/activeUser';
 import {
   loadReadingInputs,
   getWeeklyReadingSummary,
@@ -290,9 +291,13 @@ function toWeeklyReportFnResponse(value: unknown): WeeklyReportFnResponse | null
   };
 }
 
+function weeklyReportCacheKey() {
+  return scopedKey(WEEKLY_REPORT_CACHE_KEY, getActiveUserId());
+}
+
 function readLatestReportCache(): WeeklyReportRecord | null {
   try {
-    const raw = localStorage.getItem(WEEKLY_REPORT_CACHE_KEY);
+    const raw = localStorage.getItem(weeklyReportCacheKey());
     if (!raw) return null;
     const parsed = JSON.parse(raw) as WeeklyReportRecord | null;
     if (!parsed?.id || !parsed?.weekStart || !parsed?.report) return null;
@@ -305,10 +310,10 @@ function readLatestReportCache(): WeeklyReportRecord | null {
 function writeLatestReportCache(report: WeeklyReportRecord | null) {
   try {
     if (!report) {
-      localStorage.removeItem(WEEKLY_REPORT_CACHE_KEY);
+      localStorage.removeItem(weeklyReportCacheKey());
       return;
     }
-    localStorage.setItem(WEEKLY_REPORT_CACHE_KEY, JSON.stringify(report));
+    localStorage.setItem(weeklyReportCacheKey(), JSON.stringify(report));
   } catch {
     // ignore
   }
@@ -366,9 +371,13 @@ export function isSunday(): boolean {
 }
 
 function summarizeGoals(goals: GoalSummaryModel[]) {
-  const doneMap =
-    readJson<Record<string, Record<string, boolean>>>('goals:done:v1') ?? {};
-  const history = readJson<Array<{ date?: string }>>('goals:step-history:v1') ?? [];
+  const userId = getActiveUserId();
+  const doneMap = userId
+    ? readJson<Record<string, Record<string, boolean>>>(scopedKey('goals:done:v1', userId)) ?? {}
+    : {};
+  const history = userId
+    ? readJson<Array<{ date?: string }>>(scopedKey('goals:step-history:v1', userId)) ?? []
+    : [];
 
   const today = getLocalDateKey();
   const weekStart = getCurrentWeekStart();
@@ -512,11 +521,27 @@ async function collectNutritionData(
   if (!modules.has('nutrition')) return undefined;
 
   const phase = await loadPhase();
-  const targets = getTargets(phase);
+  const profile = await loadProfile();
+  const targets = getTargets(phase, profile);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      avgCaloriesLogged: 0,
+      calorieTarget: targets.cal,
+      avgProteinLogged: 0,
+      proteinTarget: targets.protein,
+      daysLogged: 0,
+      dataCompleteness: 'unknown' as Completeness,
+    };
+  }
 
   const { data, error } = await supabase
     .from('nutrition_logs')
     .select('log_date, eaten, custom_entries')
+    .eq('user_id', user.id)
     .gte('log_date', weekStart)
     .lte('log_date', weekEnd)
     .order('log_date', { ascending: true });
@@ -602,9 +627,24 @@ async function collectTodosData(
 ) {
   if (!modules.has('todos')) return undefined;
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      completedThisWeek: null,
+      totalCreatedThisWeek: 0,
+      completedTotal: 0,
+      openCount: 0,
+      dataCompleteness: 'unknown' as Completeness,
+    };
+  }
+
   const { data, error } = await supabase
     .from('todos')
     .select('id, text, done, created_at')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -632,10 +672,23 @@ async function collectScheduleData(
   if (!modules.has('schedule')) return undefined;
 
   const templates = await loadScheduleTemplates();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      blocksCompletedThisWeek: 0,
+      totalBlocksThisWeek: 0,
+      activeDays: 0,
+      dataCompleteness: 'unknown' as Completeness,
+    };
+  }
 
   const { data, error } = await supabase
     .from('schedule_logs')
     .select('log_date, view, completed')
+    .eq('user_id', user.id)
     .gte('log_date', weekStart)
     .lte('log_date', weekEnd)
     .order('log_date', { ascending: true });
@@ -789,7 +842,7 @@ export function useWeeklyReport(modules: Set<string>) {
           collectScheduleData(modules, weekStart, weekEnd),
         ]);
 
-      const profile = readProfileCache();
+      const profile = await loadProfile();
 
       let userContext = '';
       try {
@@ -798,10 +851,7 @@ export function useWeeklyReport(modules: Set<string>) {
         // non-fatal
       }
 
-      const enabledModulesRaw = localStorage.getItem('cache:enabled_modules:v1');
-      const enabledModules: Set<string> = enabledModulesRaw
-        ? new Set(JSON.parse(enabledModulesRaw))
-        : modules;
+      const enabledModules: Set<string> = modules;
 
       const weeklyData: WeeklyDataPayload = {
         weekStart,

@@ -12,13 +12,19 @@ function scopedCacheKey(userId: string) {
 
 // -- Cache helpers ------------------------------
 
-function readCache(userId: string): UserGoal[] {
+function readScopedCache(userId: string): UserGoal[] {
   try {
-    const scopedKey = scopedCacheKey(userId);
-    const raw = localStorage.getItem(scopedKey);
+    const raw = localStorage.getItem(scopedCacheKey(userId));
+    return raw ? (JSON.parse(raw) as UserGoal[]) : [];
+  } catch {
+    return [];
+  }
+}
 
-    if (raw) return JSON.parse(raw) as UserGoal[];
+function migrateLegacyCache(userId: string): UserGoal[] {
+  if (getActiveUserId() !== userId) return [];
 
+  try {
     const legacyRaw = localStorage.getItem(CACHE_KEY);
     if (!legacyRaw) return [];
 
@@ -29,6 +35,13 @@ function readCache(userId: string): UserGoal[] {
   } catch {
     return [];
   }
+}
+
+function readCache(userId: string, options?: { allowLegacyMigration?: boolean }): UserGoal[] {
+  const scoped = readScopedCache(userId);
+  if (scoped.length > 0) return scoped;
+  if (options?.allowLegacyMigration) return migrateLegacyCache(userId);
+  return scoped;
 }
 
 function writeCache(userId: string, goals: UserGoal[]): boolean {
@@ -70,7 +83,7 @@ export async function loadUserGoals(): Promise<UserGoal[]> {
 
   if (!user) return [];
 
-  const cached = readCache(user.id);
+  const cached = readCache(user.id, { allowLegacyMigration: true });
 
   try {
     const { data, error } = await supabase
@@ -102,12 +115,7 @@ export function seedUserGoals(): UserGoal[] {
     return readCache(activeUserId);
   }
 
-  try {
-    const legacyRaw = localStorage.getItem(CACHE_KEY);
-    return legacyRaw ? (JSON.parse(legacyRaw) as UserGoal[]) : [];
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 // -- Save (upsert) a single goal ------------------------------
