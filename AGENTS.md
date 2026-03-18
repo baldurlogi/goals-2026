@@ -7,13 +7,12 @@
 - App shell and providers live under `src/app/`.
 - Shared UI primitives live under `src/components/ui/`.
 - Supabase is used for auth and persistence.
-- Many features use localStorage cache plus Supabase sync.
 
 ## Main priorities
 - Protect mobile performance first.
 - Preserve current UX unless the task explicitly changes UX.
 - Prefer small, production-safe changes over large rewrites.
-- Avoid introducing regressions in auth, onboarding, cache hydration, and route loading.
+- Avoid introducing regressions in auth, onboarding, hydration, and route loading.
 - Keep the app feeling fast, stable, and clear.
 
 ## Commands
@@ -39,12 +38,23 @@
 - Keep naming practical and consistent with the current repo style.
 - Avoid adding new dependencies unless clearly justified.
 
-## Data-loading and cache rules
-- Prefer cached data over empty-state flicker when auth/profile/session is still resolving.
-- Never treat temporary auth or Supabase delay as “no user data” if cache exists.
-- Do not overwrite good cache with empty data from a transient failure.
-- Be careful with user-scoped cache keys.
-- Changes touching auth, cache invalidation, onboarding, profile loading, or localStorage must be extra conservative.
+## State management rules
+- TanStack Query is the source of truth for async server/Supabase state.
+- Zustand is for UI state only.
+- Do not store fetched Supabase/server data in Zustand.
+- Do not create duplicate client-side copies of server state unless there is a clear, temporary optimistic update reason.
+- Query keys must be scoped by authenticated user id when data is user-specific.
+- Mutations must invalidate or update the correct user-scoped queries.
+- On login/logout/user switch, reset or isolate user-bound persisted UI state and avoid cross-user leakage.
+- Prefer one clear source of truth over mixed local cache + component state + store state patterns.
+
+## Data-loading and persistence rules
+- Prefer TanStack Query over ad hoc localStorage caching for server data.
+- Never treat temporary auth or Supabase delay as “no user data” if known good user-scoped data is still resolving.
+- Do not overwrite good data with empty data from a transient failure.
+- Be careful with hydration paths, query invalidation, and auth-change resets.
+- Changes touching auth, onboarding, profile loading, persistence, or localStorage/sessionStorage must be extra conservative.
+- If a bug may be caused by environment mismatch, verify whether localhost and production point to the same Supabase project before changing behavior.
 
 ## Performance rules
 - Optimize the worst offender first, not everything at once.
@@ -75,7 +85,7 @@ When unsure, inspect these first:
 ## When planning is required
 Use a plan first when:
 - a task touches more than 3 files
-- a task changes auth, onboarding, caching, or route loading
+- a task changes auth, onboarding, hydration, persistence, or route loading
 - a task is a significant refactor
 - a task is performance work across a route or feature slice
 
@@ -92,11 +102,12 @@ A task is only done when:
 - affected files are explained clearly
 - likely regressions are called out
 - `pnpm typecheck` and `pnpm build` are expected to pass
-- the change does not obviously regress auth, onboarding, cache hydration, or mobile performance
+- the change does not obviously regress auth, onboarding, hydration, persistence, or mobile performance
 
 ## What to avoid
 - Broad rewrites without a measured user benefit
-- Replacing working cached behavior with empty initial state
+- Replacing working user-scoped data with empty initial state
 - Touching many modules when one feature slice is enough
-- Large architecture changes in the same task as a bug fix
+- Large architecture changes in the same task as a small bug fix unless explicitly requested
 - Adding new UI polish that slows first paint or interaction
+- Mixing TanStack Query, Zustand, component state, and localStorage for the same server-backed data

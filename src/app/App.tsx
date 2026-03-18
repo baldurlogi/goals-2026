@@ -8,6 +8,8 @@ import { RequireAuth } from "@/features/auth/RequireAuth";
 import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
 import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
 import { Skeleton, WidgetCardSkeleton } from "@/features/dashboard/skeletons";
+import { useUiStore } from "./store/uiStore";
+
 
 const AppLayout = lazy(async () => ({
   default: (await import("@/app/AppLayout")).AppLayout,
@@ -144,6 +146,8 @@ function AppRouteFallback() {
 }
 
 export default function App() {
+  const { activeTab, setActiveTab } = useUiStore();
+
   return (
     <BrowserRouter>
       <Analytics />
