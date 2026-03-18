@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,10 +10,11 @@ import {
   type WeekdayKey,
   type WeeklyScheduleValue,
 } from "@/features/onboarding/profileStorage";
-import { useProfileQuery, useSaveProfileMutation } from "@/features/onboarding/useProfileQuery";
+import { useProfileState, useSaveProfileMutation } from "@/features/onboarding/useProfileQuery";
 import { loadAIProfile, saveAIProfile, type PreferredTone } from "@/features/ai/aiUserProfile";
 import { toast } from "sonner";
 import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
+import { ProfileStateCard } from "@/features/onboarding/components/ProfileStateCard";
 import { BodyMetricsSection } from "./components/BodyMetricsSection";
 import { IdentitySection } from "./components/IdentitySection";
 import { ModulesSection } from "./components/ModulesSection";
@@ -28,7 +29,6 @@ import {
   type ProfileForm,
 } from "./utils/profileForm";
 
-
 const DAY_LABELS: Record<WeekdayKey, string> = {
   monday: "Monday",
   tuesday: "Tuesday",
@@ -39,8 +39,15 @@ const DAY_LABELS: Record<WeekdayKey, string> = {
   sunday: "Sunday",
 };
 
+const SCHEDULE_OPTIONS: { value: WeeklyScheduleValue; label: string; description: string }[] = [
+  { value: "office", label: "Office", description: "Mostly in person" },
+  { value: "wfh", label: "WFH", description: "Mostly remote" },
+  { value: "hybrid", label: "Hybrid", description: "Mixed day" },
+  { value: "off", label: "Off", description: "Day off" },
+];
+
 export function ProfilePage() {
-  const { data: profile, isLoading: loading, refetch } = useProfileQuery();
+  const { profile, isAuthLoading, isProfileLoading, isMissingProfile, error: loadError, isFetching, refetch } = useProfileState();
   const saveProfileMutation = useSaveProfileMutation();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -94,6 +101,7 @@ export function ProfilePage() {
 
   const update = useCallback((p: Partial<ProfileForm>) => {
     setSaved(false);
+    setError(null);
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
   }, []);
 
@@ -109,11 +117,11 @@ export function ProfilePage() {
     setSaved(false);
     try {
       await saveProfileMutation.mutateAsync(patch);
-      await refetch();
       setSaved(true);
+      void refetch();
     } catch (e) {
       console.error(e);
-      setError("Could not save profile. Please try again.");
+      setError("Could not save profile. Your previous saved values are still intact.");
     }
   }, [patch, refetch, saveProfileMutation]);
 
@@ -136,24 +144,98 @@ export function ProfilePage() {
     }
   }, [aiAboutMe, aiFocusAreas, aiGoalsSummary, aiLifestyleNotes, aiTone]);
 
-  if (loading) return <div className="mx-auto max-w-3xl p-6 text-sm text-muted-foreground">Loading profile…</div>;
-  if (!profile || !form) return <div className="mx-auto max-w-3xl p-6">No profile found.</div>;
+  if (isAuthLoading) {
+    return (
+      <ProfileStateCard
+        title="Checking your account"
+        description="We're confirming your session before loading profile settings."
+        status="loading"
+      />
+    );
+  }
+
+  if (isProfileLoading) {
+    return (
+      <ProfileStateCard
+        title="Loading profile settings"
+        description="Your saved profile is still loading, so we'll wait instead of showing an empty state too early."
+        status="loading"
+      />
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ProfileStateCard
+        title="We couldn't load profile settings"
+        description="This looks like a temporary fetch problem. Retry to keep working from your saved profile once it's available."
+        status="error"
+        actionLabel="Retry"
+        onAction={() => void refetch()}
+        busy={isFetching}
+      />
+    );
+  }
+
+  if (isMissingProfile || !profile || !form) {
+    return (
+      <ProfileStateCard
+        title="No profile record found"
+        description="Your account is available, but we couldn't find a saved profile yet. Retry first, then rerun onboarding if needed."
+        status="empty"
+        actionLabel="Retry lookup"
+        onAction={() => void refetch()}
+        busy={isFetching}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 lg:p-8">
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="text-2xl font-bold">Profile settings</h1>
-        <div className="flex items-center gap-2">
-          {saved ? <div className="flex items-center gap-1 text-xs text-emerald-600"><Check className="h-4 w-4" /> Saved</div> : null}
-          <Button onClick={handleSave} disabled={!isDirty || saveProfileMutation.isPending} className="min-w-28">{saveProfileMutation.isPending ? "Saving…" : "Save changes"}</Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold">Profile settings</h1>
+          <p className="text-sm text-muted-foreground">
+            Update the same saved profile used by onboarding, dashboard defaults, and goal setup.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 self-start">
+          {saved ? (
+            <div className="flex items-center gap-1 text-xs text-emerald-600"><Check className="h-4 w-4" /> Saved</div>
+          ) : null}
+          <Button onClick={() => void handleSave()} disabled={!isDirty || saveProfileMutation.isPending} className="min-w-28 gap-2">
+            {saveProfileMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {saveProfileMutation.isPending ? "Saving…" : "Save changes"}
+          </Button>
         </div>
       </div>
 
-      {error ? <div className="text-sm text-destructive">{error}</div> : null}
+      <Card className="rounded-2xl border-dashed bg-muted/20 py-4 shadow-none">
+        <CardContent className="space-y-2 pt-0 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium text-foreground">Save status</p>
+            <span className="text-xs text-muted-foreground">
+              {saveProfileMutation.isPending
+                ? "Saving updates to your profile…"
+                : isDirty
+                  ? "You have unsaved changes."
+                  : "All changes are synced with your saved profile."}
+            </span>
+          </div>
+          <p className="text-muted-foreground">
+            Changes here update the same normalized profile data used during onboarding, so dashboard defaults stay aligned right away.
+          </p>
+          {error ? <p className="font-medium text-destructive">{error}</p> : null}
+        </CardContent>
+      </Card>
+
       <AIUsageDetailsCard />
 
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-base">👤 Profile</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">👤 Profile</CardTitle>
+          <CardDescription>Basic identity and body metrics used for personalization and nutrition targets.</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-5">
           <IdentitySection
             displayName={form.display_name}
@@ -174,10 +256,22 @@ export function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">🧩 Modules</CardTitle></CardHeader><CardContent><ModulesSection value={form.enabled_modules} onChange={(next) => update({ enabled_modules: next })} /></CardContent></Card>
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">🧩 Modules</CardTitle>
+          <CardDescription>Keep dashboard modules aligned with the workspace you actually want to use.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ModulesSection value={form.enabled_modules} onChange={(next) => update({ enabled_modules: next })} />
+        </CardContent>
+      </Card>
 
       <Card className="rounded-2xl">
-        <CardContent className="space-y-5 pt-6">
+        <CardHeader>
+          <CardTitle className="text-base">🥗 Macros</CardTitle>
+          <CardDescription>Adjust your saved nutrition targets or recalculate them from your current metrics.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
           <MacrosSection
             macroMaintain={form.macro_maintain}
             macroCut={form.macro_cut}
@@ -193,11 +287,19 @@ export function ProfilePage() {
       </Card>
 
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-base">📅 Schedule</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">📅 Schedule</CardTitle>
+          <CardDescription>Use the same card-style defaults from onboarding so weekly planning stays predictable.</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-2">
           {WEEKDAY_ORDER.map((day) => (
-            <div key={day} className="grid grid-cols-[1fr,auto] items-center gap-3 rounded-xl border px-3 py-2">
-              <p className="text-sm font-medium">{DAY_LABELS[day] ?? day}</p>
+            <div key={day} className="grid grid-cols-[minmax(0,1fr),auto] items-center gap-3 rounded-xl border bg-background px-3 py-3">
+              <div>
+                <p className="text-sm font-medium">{DAY_LABELS[day] ?? day}</p>
+                <p className="text-xs text-muted-foreground">
+                  {SCHEDULE_OPTIONS.find((option) => option.value === form.weekly_schedule[day])?.description}
+                </p>
+              </div>
               <select
                 className="h-9 rounded-md border bg-background px-2 text-sm"
                 value={form.weekly_schedule[day]}
@@ -210,10 +312,11 @@ export function ProfilePage() {
                   })
                 }
               >
-                <option value="office">Office</option>
-                <option value="wfh">WFH</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="off">Off</option>
+                {SCHEDULE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           ))}
@@ -221,7 +324,10 @@ export function ProfilePage() {
       </Card>
 
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-base">📖 Reading</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">📖 Reading</CardTitle>
+          <CardDescription>Set a clear daily pages target that matches your reading routine.</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-4">
           <Input type="number" min="1" max="200" className="w-40" value={form.daily_reading_goal} onChange={(e) => update({ daily_reading_goal: e.target.value })} />
         </CardContent>

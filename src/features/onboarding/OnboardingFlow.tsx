@@ -3,6 +3,8 @@ import {
   Check,
   ChevronRight,
   ChevronLeft,
+  Loader2,
+  Sparkles,
   User,
   Dumbbell,
   CalendarDays,
@@ -16,6 +18,7 @@ import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
 import { completeOnboarding, calculateMacros } from "./profileStorage";
 import { AddEditGoalModal } from "@/features/goals/components/AddEditGoalModal";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StepProfile } from "./components/StepProfile";
 import { StepModules } from "./components/StepModules";
 import { StepGoal } from "./components/StepGoal";
@@ -76,6 +79,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const [showGoalSkipConfirm, setShowGoalSkipConfirm] = useState(false);
 
   function update(patch: Partial<OnboardingData>) {
+    setError(null);
     setData((prev) => ({ ...prev, ...patch }));
   }
 
@@ -93,6 +97,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const currentIndex = visibleSteps.indexOf(step);
   const isLastStep = currentIndex === visibleSteps.length - 1;
   const currentStepContent = STEP_CONTENT[step];
+  const hasGoalIntent = Boolean(data.main_goal.trim());
 
   function canAdvance(): boolean {
     if (step === 0) return !!data.display_name.trim();
@@ -142,19 +147,19 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
       captureOnce("onboarding_completed", userId, {
         enabled_modules_count: data.enabled_modules.length,
-        has_main_goal_intent: Boolean(data.main_goal.trim()),
+        has_main_goal_intent: hasGoalIntent,
         source: "onboarding_flow",
         route: "/app",
       });
 
-      if (data.main_goal.trim()) {
+      if (hasGoalIntent) {
         setPhase("goal");
         return;
       }
 
       onComplete();
     } catch (e) {
-      setError("Something went wrong saving your profile. Please try again.");
+      setError("We saved nothing yet. Please retry and we'll keep your current answers in place.");
       console.error(e);
     } finally {
       setSaving(false);
@@ -165,30 +170,47 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         {showGoalSkipConfirm ? (
-          <div className="w-full max-w-sm space-y-4 rounded-2xl border bg-card p-5 shadow-xl">
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold">Skip goal setup for now?</h2>
-              <p className="text-sm text-muted-foreground">
-                You can always create or edit goals later from the Goals tab in your dashboard.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Card className="w-full max-w-sm rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-base">Skip goal setup for now?</CardTitle>
+              <CardDescription>
+                Your onboarding details are already saved. You can always create or edit goals later from the Goals tab in your dashboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" onClick={() => setShowGoalSkipConfirm(false)}>
                 Continue setup
               </Button>
               <Button type="button" onClick={onComplete}>
-                Skip for now
+                Open dashboard
               </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         ) : (
-          <AddEditGoalModal
-            onSave={() => onComplete()}
-            onClose={() => setShowGoalSkipConfirm(true)}
-            startWithAI
-            initialAIPrompt={buildInitialAIPrompt(data.main_goal, data.goal_why)}
-          />
+          <div className="w-full max-w-3xl space-y-4">
+            <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-sm">
+              <CardHeader className="gap-3 sm:flex sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Onboarding saved. Next up: goal setup.
+                  </CardTitle>
+                  <CardDescription>
+                    We'll use your goal idea to draft a stronger starting point. You can still skip this and finish inside the dashboard.
+                  </CardDescription>
+                </div>
+                <div className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                  Step 2 of 2
+                </div>
+              </CardHeader>
+            </Card>
+            <AddEditGoalModal
+              onSave={() => onComplete()}
+              onClose={() => setShowGoalSkipConfirm(true)}
+              startWithAI
+              initialAIPrompt={buildInitialAIPrompt(data.main_goal, data.goal_why)}
+            />
+          </div>
         )}
       </div>
     );
@@ -205,7 +227,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-lg space-y-8">
+      <div className="w-full max-w-lg space-y-6">
         <div className="flex justify-center">
           <div className="-mx-1 flex snap-x snap-mandatory items-center gap-2 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
             {visibleSteps.map((s, i) => {
@@ -235,20 +257,33 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
           </div>
         </div>
 
-        <div className="space-y-1 text-center">
+        <div className="space-y-2 text-center">
           <p className="text-sm font-medium text-muted-foreground">
             Step {currentIndex + 1} of {visibleSteps.length}: {currentStepContent.label}
           </p>
           <p className="text-sm text-muted-foreground">{currentStepContent.subtitle}</p>
         </div>
 
-        <div className="rounded-2xl border bg-card p-6 shadow-sm max-h-[min(70vh,720px)] overflow-y-auto overscroll-contain">{stepComponents[step]}</div>
+        <Card className="max-h-[min(70vh,720px)] overflow-y-auto rounded-2xl overscroll-contain">
+          <CardContent className="space-y-4 pt-6">{stepComponents[step]}</CardContent>
+        </Card>
 
-        {error ? <div className="text-sm text-destructive">{error}</div> : null}
+        <Card className="rounded-2xl border-dashed bg-muted/20 py-4 shadow-none">
+          <CardContent className="space-y-2 text-sm pt-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium text-foreground">Save status</p>
+              <span className={cn("text-xs", saving ? "text-primary" : "text-muted-foreground")}>
+                {saving ? "Saving your onboarding details…" : "Nothing is saved until you finish this step flow."}
+              </span>
+            </div>
+            <p className="text-muted-foreground">
+              After setup, your dashboard will open with your goal state ready. You can review or edit everything later in <span className="font-medium text-foreground">Goals</span> and <span className="font-medium text-foreground">Profile</span>.
+            </p>
+            {error ? <p className="text-sm font-medium text-destructive">{error}</p> : null}
+          </CardContent>
+        </Card>
 
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">After setup, your dashboard will open with your goal state ready. You can review or edit everything in <span className="font-medium text-foreground">Goals</span>.</p>
-          <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="outline" onClick={goBack} disabled={currentIndex <= 0 || saving} className="gap-2">
             <ChevronLeft className="h-4 w-4" />
             Back
@@ -256,8 +291,22 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
           {isLastStep ? (
             <Button type="button" onClick={() => void handleFinish()} disabled={!canAdvance() || saving} className="gap-2">
-              {saving ? "Saving…" : data.main_goal.trim() ? "Continue with AI" : "Finish to dashboard"}
-              <ChevronRight className="h-4 w-4" />
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : hasGoalIntent ? (
+                <>
+                  Continue to goal setup
+                  <Sparkles className="h-4 w-4" />
+                </>
+              ) : (
+                <>
+                  Finish to dashboard
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
           ) : (
             <Button type="button" onClick={goNext} disabled={!canAdvance() || saving} className="gap-2">
@@ -265,7 +314,6 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
               <ChevronRight className="h-4 w-4" />
             </Button>
           )}
-          </div>
         </div>
       </div>
     </div>

@@ -74,27 +74,27 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
               type="button"
               onClick={() => onChange({ activity_level: value })}
               className={cn(
-                "w-full rounded-lg border px-4 py-2.5 text-left text-sm transition-all",
+                "w-full rounded-xl border bg-card px-4 py-3 text-left text-sm transition-all",
                 data.activity_level === value
                   ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                   : "border-border hover:border-primary/40",
               )}
             >
-              <div className="flex items-center justify-between">
-                {label}
-                {data.activity_level === value ? <Check className="h-4 w-4 text-primary" /> : null}
+              <div className="flex items-center justify-between gap-3">
+                <span>{label}</span>
+                {data.activity_level === value ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
               </div>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 rounded-lg border p-1">
+      <div className="grid grid-cols-2 gap-2 rounded-xl border bg-card p-1">
         <button
           type="button"
           onClick={() => onChange({ macro_maintain: null, macro_cut: null })}
           className={cn(
-            "rounded-md px-3 py-2 text-sm font-medium",
+            "rounded-lg px-3 py-2 text-sm font-medium",
             !manualMode ? "bg-primary text-primary-foreground" : "text-muted-foreground",
           )}
         >
@@ -109,7 +109,7 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
             })
           }
           className={cn(
-            "rounded-md px-3 py-2 text-sm font-medium",
+            "rounded-lg px-3 py-2 text-sm font-medium",
             manualMode ? "bg-primary text-primary-foreground" : "text-muted-foreground",
           )}
         >
@@ -118,18 +118,18 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
       </div>
 
       {!maintain || !cut ? (
-        <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-dashed bg-muted/20 p-3 text-sm text-muted-foreground">
           Add age, weight, and height to generate suggestions, or switch to manual entry right now.
         </div>
       ) : (
-        <>
+        <div className="grid gap-3 sm:grid-cols-2">
           <MacroCard label="Maintain" targets={maintain} color="text-primary" />
           <MacroCard label="Cut" targets={cut} color="text-amber-500" />
-        </>
+        </div>
       )}
 
       {manualMode && maintain && cut ? (
-        <div className="space-y-3">
+        <div className="space-y-3 rounded-xl border bg-card p-4">
           <div>
             <p className="text-sm font-medium">Manual targets</p>
             <p className="text-xs text-muted-foreground">You can edit these anytime later from Nutrition.</p>
