@@ -242,12 +242,12 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
           <p className="text-sm text-muted-foreground">{currentStepContent.subtitle}</p>
         </div>
 
-        <div className="rounded-2xl border bg-card p-6 shadow-sm">{stepComponents[step]}</div>
+        <div className="rounded-2xl border bg-card p-6 shadow-sm max-h-[min(70vh,720px)] overflow-y-auto overscroll-contain">{stepComponents[step]}</div>
 
         {error ? <div className="text-sm text-destructive">{error}</div> : null}
 
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">After setup, go to <span className="font-medium text-foreground">Goals</span> to view or edit your goals.</p>
+          <p className="text-xs text-muted-foreground">After setup, your dashboard will open with your goal state ready. You can review or edit everything in <span className="font-medium text-foreground">Goals</span>.</p>
           <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="outline" onClick={goBack} disabled={currentIndex <= 0 || saving} className="gap-2">
             <ChevronLeft className="h-4 w-4" />

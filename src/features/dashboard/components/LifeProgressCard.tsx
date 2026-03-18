@@ -9,7 +9,8 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { loadNutritionLog, seedNutritionLog } from "@/features/nutrition/nutritionStorage";
+import { loadNutritionLog, loadPhase, seedNutritionLog } from "@/features/nutrition/nutritionStorage";
+import { getTargets, meals } from "@/features/nutrition/nutritionData";
 import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
 import {
   loadReadingInputs,
@@ -53,6 +54,17 @@ type GoalDoneCache = Record<string, boolean | Record<string, boolean>>;
 
 const GOAL_DONE_CACHE_KEYS = ["cache:goals:v1", "cache:goal_steps_done:v1"] as const;
 const MODULE_ORDER = ["goals", "fitness", "nutrition", "reading", "todos", "schedule"];
+
+const MEAL_MACROS_BY_KEY = {
+  breakfast1: meals.breakfast.option1.macros,
+  breakfast2: meals.breakfast.option2.macros,
+  lunchWfh: meals.lunch.wfh.macros,
+  lunchOffice: meals.lunch.office.macros,
+  afternoonSnack: meals.afternoonSnack.macros,
+  postWorkout: meals.postWorkout.macros,
+  dinner: meals.dinner.macros,
+} as const;
+
 
 function clampPct(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -195,11 +207,57 @@ function buildFitnessProgress(
   };
 }
 
-function buildNutritionProgress(log: Awaited<ReturnType<typeof loadNutritionLog>>): ModuleProgress {
-  const mealsLogged = Object.values(log.eaten ?? {}).filter(Boolean).length;
-  const customCount = (log.customEntries ?? []).length;
-  const itemsLogged = mealsLogged + customCount;
-  const pct = clampPct((itemsLogged / 4) * 100);
+function getMacroScore(log: Awaited<ReturnType<typeof loadNutritionLog>>, targets: { cal: number; protein: number; carbs: number; fat: number; }) {
+  const totals = ["calories", "protein", "carbs", "fat"].reduce<Record<string, number>>((acc, key) => {
+    acc[key] = 0;
+    return acc;
+  }, {});
+
+  for (const [mealKey, eaten] of Object.entries(log.eaten ?? {})) {
+    if (!eaten) continue;
+    const meal = MEAL_MACROS_BY_KEY[mealKey as keyof typeof MEAL_MACROS_BY_KEY];
+    if (!meal) continue;
+    totals.calories += meal.cal;
+    totals.protein += meal.protein;
+    totals.carbs += meal.carbs;
+    totals.fat += meal.fat;
+  }
+
+  for (const entry of log.customEntries ?? []) {
+    totals.calories += entry.macros.cal;
+    totals.protein += entry.macros.protein;
+    totals.carbs += entry.macros.carbs;
+    totals.fat += entry.macros.fat;
+  }
+
+  const targetMap = {
+    calories: targets.cal,
+    protein: targets.protein,
+    carbs: targets.carbs,
+    fat: targets.fat,
+  };
+
+  const keys = ["calories", "protein", "carbs", "fat"] as const;
+  let inRange = 0;
+
+  for (const key of keys) {
+    const target = targetMap[key];
+    if (!target || target <= 0) continue;
+    const value = totals[key];
+    const min = target * 0.9;
+    const max = target * 1.1;
+    if (value >= min && value <= max) inRange += 1;
+  }
+
+  return { inRange, totals };
+}
+
+function buildNutritionProgress(
+  log: Awaited<ReturnType<typeof loadNutritionLog>>,
+  targets: { cal: number; protein: number; carbs: number; fat: number },
+): ModuleProgress {
+  const { inRange } = getMacroScore(log, targets);
+  const pct = clampPct((inRange / 4) * 100);
 
   return {
     id: "nutrition",
@@ -207,11 +265,8 @@ function buildNutritionProgress(log: Awaited<ReturnType<typeof loadNutritionLog>
     href: "/app/nutrition",
     icon: <Apple className="h-3.5 w-3.5" />,
     pct,
-    primaryStat: `${pluralize(itemsLogged, "meal", "meals")} logged`,
-    secondaryStat:
-      customCount > 0
-        ? `${pluralize(customCount, "custom entry", "custom entries")}`
-        : undefined,
+    primaryStat: `${inRange}/4 macros in range`,
+    secondaryStat: inRange === 4 ? 'Green across calories, protein, carbs, and fat' : 'Score is based on macro target ranges, not meal count',
     color: "orange",
     accentClass: "bg-orange-500",
   };
@@ -306,7 +361,7 @@ function seedProgress(enabledModules: Set<string>): ModuleProgress[] {
     }
 
     if (enabledModules.has("nutrition")) {
-      results.push(buildNutritionProgress(seedNutritionLog()));
+      results.push(buildNutritionProgress(seedNutritionLog(), getTargets("maintain")));
     }
 
     if (enabledModules.has("reading")) {
@@ -345,7 +400,8 @@ async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgres
     })(),
     (async () => {
       if (!enabledModules.has("nutrition")) return;
-      results.push(buildNutritionProgress(await loadNutritionLog()));
+      const [log, phase] = await Promise.all([loadNutritionLog(), loadPhase()]);
+      results.push(buildNutritionProgress(log, getTargets(phase)));
     })(),
     (async () => {
       if (!enabledModules.has("reading")) return;

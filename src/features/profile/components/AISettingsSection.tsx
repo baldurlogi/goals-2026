@@ -57,6 +57,7 @@ export const AISettingsSection = memo(function AISettingsSection({
           </p>
           <textarea
             value={aiAboutMe}
+            placeholder="Example: 26-year-old software engineer, training 4x/week, trying to stay consistent with sleep, food, and deep work."
             onChange={(e) => onAiAboutMeChange(e.target.value)}
             rows={4}
             maxLength={600}
@@ -105,7 +106,9 @@ export const AISettingsSection = memo(function AISettingsSection({
 
         <div className="space-y-2">
           <label className="text-sm font-medium">What are you optimising for?</label>
+          <p className="text-xs text-muted-foreground">Examples: build muscle, improve sleep consistency, finish 12 books this year, reduce stress, stay on top of work tasks.</p>
           <textarea
+            placeholder="Examples: build muscle, improve sleep consistency, finish 12 books this year, reduce stress, stay on top of work tasks."
             value={aiGoalsSummary}
             onChange={(e) => onAiGoalsSummaryChange(e.target.value)}
             rows={3}
@@ -122,7 +125,9 @@ export const AISettingsSection = memo(function AISettingsSection({
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Lifestyle context</label>
+          <p className="text-xs text-muted-foreground">Examples: work 9–5, commute 3 days/week, train 4x/week, often busy on evenings, travel some weekends.</p>
           <textarea
+            placeholder="Examples: work 9–5, commute 3 days/week, train 4x/week, often busy on evenings, travel some weekends."
             value={aiLifestyleNotes}
             onChange={(e) => onAiLifestyleNotesChange(e.target.value)}
             rows={3}

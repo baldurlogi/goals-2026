@@ -1,26 +1,23 @@
 import { useCallback, useState } from 'react';
 import {
   loadTodos,
+  seedTodos,
   TODO_CHANGED_EVENT,
-  TODO_CACHE_KEY,
   type TodoItem,
 } from '@/features/todos/todoStorage';
-import { readCache, writeCache, loadWithWriteThrough, hasCache } from '@/lib/cache';
 import { useDashboardLoadSubscription } from '@/features/dashboard/hooks/useDashboardLoadSubscription';
 
 const PREVIEW_LIMIT = 5;
 const TODO_EVENTS = [TODO_CHANGED_EVENT] as const;
-const TODO_STORAGE_KEYS = [TODO_CACHE_KEY] as const;
 
 export function useTodoDashboard() {
-  const [todos, setTodos] = useState<TodoItem[]>(() => readCache(TODO_CACHE_KEY, []));
-  const [loading, setLoading] = useState(() => !hasCache(TODO_CACHE_KEY));
+  const seeded = seedTodos();
+  const [todos, setTodos] = useState<TodoItem[]>(seeded);
+  const [loading, setLoading] = useState(seeded.length === 0);
 
   const load = useCallback(async () => {
     try {
-      const fresh = await loadWithWriteThrough(loadTodos, (value) =>
-        writeCache(TODO_CACHE_KEY, value),
-      );
+      const fresh = await loadTodos();
       setTodos(fresh);
     } catch (e) {
       console.warn('todo dashboard load failed', e);
@@ -32,7 +29,7 @@ export function useTodoDashboard() {
   useDashboardLoadSubscription({
     load,
     events: TODO_EVENTS,
-    storageKeys: TODO_STORAGE_KEYS,
+    storageKeys: [],
   });
 
   const incomplete = todos.filter((t) => !t.done);

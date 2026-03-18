@@ -62,7 +62,7 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
     <div className="space-y-4">
       <div className="space-y-1">
         <h2 className="text-xl font-bold">Set your nutrition targets</h2>
-        <p className="text-sm text-muted-foreground">Choose AI suggestions or enter your own macros.</p>
+        <p className="text-sm text-muted-foreground">Type your own macros directly or generate suggestions once your body metrics are filled in.</p>
       </div>
 
       <div className="space-y-1.5">
@@ -98,7 +98,7 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
             !manualMode ? "bg-primary text-primary-foreground" : "text-muted-foreground",
           )}
         >
-          Use AI suggestions
+          Generate suggestions
         </button>
         <button
           type="button"
@@ -119,7 +119,7 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
 
       {!maintain || !cut ? (
         <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-          Add age, weight, and height to unlock AI suggestions, or switch to manual entry.
+          Add age, weight, and height to generate suggestions, or switch to manual entry right now.
         </div>
       ) : (
         <>

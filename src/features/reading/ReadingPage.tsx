@@ -102,7 +102,7 @@ export function ReadingPage() {
         if (nextSerialized === prevSerialized) return prev;
 
         const now = Date.now();
-        if (now - lastLocalWriteAtRef.current < 300) return prev;
+        if (now - lastLocalWriteAtRef.current < 800) return prev;
         return localSnapshot;
       });
     };
