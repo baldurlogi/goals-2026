@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,13 +9,8 @@ import { AddEditGoalModal } from './components/AddEditGoalModal';
 import { ImproveGoalModal } from './components/ImproveGoalModal';
 import { GoalsPageSkeleton } from '@/features/dashboard/skeletons';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
-import {
-  GoalRemotePersistenceError,
-  deleteUserGoal,
-  loadUserGoals,
-  saveUserGoal,
-  seedUserGoals,
-} from './userGoalStorage';
+import { GoalRemotePersistenceError } from './userGoalStorage';
+import { useDeleteGoalMutation, useGoalsQuery, useSaveGoalMutation } from './useGoalsQuery';
 import type { UserGoal } from './goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { AIContextNudge } from './components/AIContextNudge';
@@ -54,8 +49,9 @@ const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 export function GoalsPage() {
   const { state } = useGoalsStore();
-  const [goals, setGoals] = useState<UserGoal[]>(() => seedUserGoals());
-  const [loading, setLoading] = useState(goals.length === 0);
+  const { data: goals = [], isLoading: loading } = useGoalsQuery();
+  const deleteGoalMutation = useDeleteGoalMutation();
+  const saveGoalMutation = useSaveGoalMutation();
   const [sort, setSort] = useState<SortMode>('priority');
   const [localModal, setLocalModal] = useState<ModalState>(null);
   const [improvingGoal, setImprovingGoal] = useState<UserGoal | null>(null);
@@ -78,19 +74,6 @@ export function GoalsPage() {
       navigate(location.pathname, { replace: true, state: null });
     }
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    loadUserGoals().then((fresh) => {
-      if (!cancelled) {
-        setGoals(fresh);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const today = getLocalDateKey();
 
@@ -129,36 +112,22 @@ export function GoalsPage() {
   async function handleDelete(goalId: string) {
     if (!confirm("Delete this goal? This can't be undone.")) return;
 
-    const previousGoals = goals;
-    setGoals((prev) => prev.filter((g) => g.id !== goalId));
-
     try {
-      const status = await deleteUserGoal(goalId);
+      const status = await deleteGoalMutation.mutateAsync(goalId);
       if (!status.remoteSyncSucceeded) {
         toast.warning("Deleted locally, syncing failed. We'll retry.");
       }
     } catch (error) {
       if (error instanceof GoalRemotePersistenceError) {
-        setGoals(previousGoals);
         toast.error('Delete failed to sync. Goal was restored.');
         return;
       }
 
-      setGoals(previousGoals);
       toast.error('Delete failed. Please try again.');
     }
   }
 
-  function handleSaved(saved: UserGoal) {
-    setGoals((prev) => {
-      const idx = prev.findIndex((g) => g.id === saved.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = saved;
-        return next;
-      }
-      return [...prev, saved];
-    });
+  function handleSaved(_saved: UserGoal) {
     closeModal();
   }
 
@@ -282,7 +251,7 @@ export function GoalsPage() {
             handleSaved(updated);
             setImprovingGoal(null);
 
-            void saveUserGoal(updated)
+            void saveGoalMutation.mutateAsync(updated)
               .then((status) => {
                 if (status.remoteSyncSucceeded) {
                   toast.success('Goal steps improved ✨');

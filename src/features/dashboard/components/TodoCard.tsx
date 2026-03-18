@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTodoDashboard } from '../hooks/useTodoDashboard';
-import { addTodo, toggleTodo, deleteTodo } from '@/features/todos/todoStorage';
+import { useAddTodoMutation, useDeleteTodoMutation, useToggleTodoMutation } from '@/features/todos/useTodosQuery';
 import { TodoCardSkeleton } from '@/features/dashboard/skeletons';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
@@ -16,16 +16,19 @@ function TodoCardInner() {
 
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const addTodoMutation = useAddTodoMutation();
+  const toggleTodoMutation = useToggleTodoMutation();
+  const deleteTodoMutation = useDeleteTodoMutation();
 
   async function handleAdd() {
     if (!input.trim()) return;
     const nextInput = input;
-    const result = await addTodo(nextInput);
+    const result = await addTodoMutation.mutateAsync(nextInput);
     if (!result.ok) {
       toast.error(result.error ?? 'Could not add todo', {
         action: {
           label: 'Retry',
-          onClick: () => void addTodo(nextInput),
+          onClick: () => void addTodoMutation.mutate(nextInput),
         },
       });
       return;
@@ -71,12 +74,12 @@ function TodoCardInner() {
                 <Checkbox
                   checked={item.done}
                   onCheckedChange={() =>
-                    void toggleTodo(item.id).then((result) => {
+                    void toggleTodoMutation.mutateAsync(item.id).then((result) => {
                       if (!result.ok) {
                         toast.error(result.error ?? 'Could not update todo', {
                           action: {
                             label: 'Retry',
-                            onClick: () => void toggleTodo(item.id),
+                            onClick: () => void toggleTodoMutation.mutate(item.id),
                           },
                         });
                       }
@@ -94,12 +97,12 @@ function TodoCardInner() {
                 <button
                   type="button"
                   onClick={() =>
-                    void deleteTodo(item.id).then((result) => {
+                    void deleteTodoMutation.mutateAsync(item.id).then((result) => {
                       if (!result.ok) {
                         toast.error(result.error ?? 'Could not delete todo', {
                           action: {
                             label: 'Retry',
-                            onClick: () => void deleteTodo(item.id),
+                            onClick: () => void deleteTodoMutation.mutate(item.id),
                           },
                         });
                       }

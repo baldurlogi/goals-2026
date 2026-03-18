@@ -6,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   calculateMacros,
-  loadProfile,
-  saveProfile,
-  type UserProfile,
   WEEKDAY_ORDER,
   type WeekdayKey,
   type WeeklyScheduleValue,
 } from "@/features/onboarding/profileStorage";
+import { useProfileQuery, useSaveProfileMutation } from "@/features/onboarding/useProfileQuery";
 import { loadAIProfile, saveAIProfile, type PreferredTone } from "@/features/ai/aiUserProfile";
 import { toast } from "sonner";
 import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
@@ -42,12 +40,11 @@ const DAY_LABELS: Record<WeekdayKey, string> = {
 };
 
 export function ProfilePage() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const { data: profile, isLoading: loading, refetch } = useProfileQuery();
+  const saveProfileMutation = useSaveProfileMutation();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [form, setForm] = useState<ProfileForm | null>(null);
 
   const [aiSaving, setAiSaving] = useState(false);
@@ -58,19 +55,8 @@ export function ProfilePage() {
   const [aiFocusAreas, setAiFocusAreas] = useState<string[]>([]);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoading(true);
-      const p = await loadProfile();
-      if (!alive) return;
-      setProfile(p);
-      setForm(p ? profileToForm(p) : null);
-      setLoading(false);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+    setForm(profile ? profileToForm(profile) : null);
+  }, [profile]);
 
   useEffect(() => {
     loadAIProfile().then((ai) => {
@@ -119,22 +105,17 @@ export function ProfilePage() {
 
   const handleSave = useCallback(async () => {
     if (!patch || Object.keys(patch).length === 0) return;
-    setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      await saveProfile(patch);
-      const refreshed = await loadProfile();
-      setProfile(refreshed);
-      setForm(refreshed ? profileToForm(refreshed) : null);
+      await saveProfileMutation.mutateAsync(patch);
+      await refetch();
       setSaved(true);
     } catch (e) {
       console.error(e);
       setError("Could not save profile. Please try again.");
-    } finally {
-      setSaving(false);
     }
-  }, [patch]);
+  }, [patch, refetch, saveProfileMutation]);
 
   const handleSaveAI = useCallback(async () => {
     setAiSaving(true);
@@ -164,7 +145,7 @@ export function ProfilePage() {
         <h1 className="text-2xl font-bold">Profile settings</h1>
         <div className="flex items-center gap-2">
           {saved ? <div className="flex items-center gap-1 text-xs text-emerald-600"><Check className="h-4 w-4" /> Saved</div> : null}
-          <Button onClick={handleSave} disabled={!isDirty || saving} className="min-w-28">{saving ? "Saving…" : "Save changes"}</Button>
+          <Button onClick={handleSave} disabled={!isDirty || saveProfileMutation.isPending} className="min-w-28">{saveProfileMutation.isPending ? "Saving…" : "Save changes"}</Button>
         </div>
       </div>
 

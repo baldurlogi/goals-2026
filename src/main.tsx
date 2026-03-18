@@ -13,8 +13,27 @@ posthog.init(import.meta.env.VITE_PUBLIC_POSTHOG_TOKEN, {
   capture_pageview: true,
   capture_pageleave: true,
 });
-const queryClient = new QueryClient();
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 30,
+      retry: (failureCount, error) => {
+        const message = error instanceof Error ? error.message.toLowerCase() : "";
+        if (message.includes("not signed in") || message.includes("auth")) {
+          return false;
+        }
+        return failureCount < 1;
+      },
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -15,7 +15,7 @@ import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfile } from "../onboarding/useProfile";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
-import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
+import { useGoalsQuery } from "@/features/goals/useGoalsQuery";
 import { scheduleIdle } from "@/lib/scheduleIdle";
 
 import {
@@ -138,25 +138,11 @@ export default function DashboardPage() {
   const isPro = tierMeets(tier, "pro");
   const has = useCallback((id: string) => modules.has(id as never), [modules]);
 
-  const [goalCount, setGoalCount] = useState<number | null>(() => {
-    return seedUserGoals().length;
-  });
+  const { data: goals = [] } = useGoalsQuery();
+  const goalCount = goals.length;
 
   const showTopEnhancements = useDeferredMount(160);
   const showSecondaryEnhancements = useDeferredMount(380);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    loadUserGoals().then((fresh) => {
-      if (cancelled) return;
-      setGoalCount(fresh.length);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const showEmptyState = goalCount === 0;
 
