@@ -1,26 +1,17 @@
-import React from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { useAuth } from "@/features/auth/authContext";
-import {
-  getActiveUserId,
-  getScopedStorageItem,
-  legacyScopedKey,
-  scopedKey,
-} from "@/lib/activeUser";
-import { getLocalDateKey } from "@/hooks/useTodayDate";
-import {
-  GoalsStoreContext,
-  type Action,
-  type DoneState,
-  type GoalsState,
-} from "./goalStoreContext";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/features/auth/authContext';
+import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { getActiveUserId, getScopedStorageItem, legacyScopedKey, removeScopedStorageItem, writeScopedStorageItem } from '@/lib/activeUser';
+import { CACHE_KEYS } from '@/lib/cacheRegistry';
+import { queryKeys } from '@/lib/queryKeys';
+import { supabase } from '@/lib/supabaseClient';
 
-const CACHE_KEY = "cache:goals:v1";
-const LEGACY_WEEKLY_DONE_KEY = "goals:done:v1";
-const STEP_HISTORY_KEY = "goals:step-history:v1";
-const PERSIST_DEBOUNCE_MS = 300;
-const RETRY_BASE_DELAY_MS = 1000;
-const RETRY_MAX_DELAY_MS = 5000;
+export type DoneState = Record<string, Record<string, boolean>>;
+
+type GoalProgressRow = {
+  goal_id: string;
+  done: Record<string, boolean> | null;
+};
 
 type StepHistoryEntry = {
   goalId: string;
@@ -28,49 +19,106 @@ type StepHistoryEntry = {
   date: string;
 };
 
+type ToggleGoalStepVariables = {
+  goalId: string;
+  stepId: string;
+};
+
+type ResetGoalProgressVariables = {
+  goalId: string;
+};
+
+type MutationContext = {
+  previousDone: DoneState;
+};
+
+const GOAL_PROGRESS_CACHE_KEY = CACHE_KEYS.GOALS_DONE;
+const LEGACY_GOAL_PROGRESS_CACHE_KEY = 'cache:goals:v1';
+const STEP_HISTORY_KEY = CACHE_KEYS.GOALS_STEP_HISTORY;
+
 function cloneDoneState(done: DoneState): DoneState {
   return Object.fromEntries(
     Object.entries(done).map(([goalId, steps]) => [goalId, { ...steps }]),
   );
 }
 
-function readDoneCache(userId: string): DoneState {
+function normalizeDoneState(value: unknown): DoneState {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  const result: DoneState = {};
+
+  for (const [goalId, steps] of Object.entries(value)) {
+    if (!steps || typeof steps !== 'object' || Array.isArray(steps)) continue;
+
+    const normalizedSteps: Record<string, boolean> = {};
+    for (const [stepId, done] of Object.entries(steps)) {
+      if (typeof done === 'boolean') {
+        normalizedSteps[stepId] = done;
+      }
+    }
+
+    result[goalId] = normalizedSteps;
+  }
+
+  return result;
+}
+
+function extractDoneState(payload: unknown): DoneState {
+  const normalized = normalizeDoneState(payload);
+  if (Object.keys(normalized).length > 0) return normalized;
+
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const record = payload as Record<string, unknown>;
+    const nestedState = normalizeDoneState(record.done);
+    if (Object.keys(nestedState).length > 0) return nestedState;
+  }
+
+  return {};
+}
+
+function readGoalProgressSeed(userId: string): DoneState {
   try {
     const scopedRaw =
-      getScopedStorageItem(CACHE_KEY, userId) ??
-      getScopedStorageItem(LEGACY_WEEKLY_DONE_KEY, userId);
+      getScopedStorageItem(GOAL_PROGRESS_CACHE_KEY, userId) ??
+      getScopedStorageItem(LEGACY_GOAL_PROGRESS_CACHE_KEY, userId);
 
     if (scopedRaw) {
-      return JSON.parse(scopedRaw) as DoneState;
+      return extractDoneState(JSON.parse(scopedRaw));
     }
 
     if (getActiveUserId() !== userId) return {};
 
     const legacyRaw =
-      localStorage.getItem(CACHE_KEY) ??
-      localStorage.getItem(LEGACY_WEEKLY_DONE_KEY);
+      localStorage.getItem(GOAL_PROGRESS_CACHE_KEY) ??
+      localStorage.getItem(LEGACY_GOAL_PROGRESS_CACHE_KEY);
 
     if (!legacyRaw) return {};
 
-    const legacyDone = JSON.parse(legacyRaw) as DoneState;
-    writeDoneCache(userId, legacyDone);
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(LEGACY_WEEKLY_DONE_KEY);
-    return legacyDone;
+    const migrated = extractDoneState(JSON.parse(legacyRaw));
+    writeGoalProgressSeed(userId, migrated);
+    localStorage.removeItem(GOAL_PROGRESS_CACHE_KEY);
+    localStorage.removeItem(LEGACY_GOAL_PROGRESS_CACHE_KEY);
+    return migrated;
   } catch {
     return {};
   }
 }
 
-function writeDoneCache(userId: string, done: DoneState) {
+function writeGoalProgressSeed(userId: string, done: DoneState) {
   try {
-    const serialized = JSON.stringify(done);
-    localStorage.setItem(scopedKey(CACHE_KEY, userId), serialized);
-    localStorage.setItem(scopedKey(LEGACY_WEEKLY_DONE_KEY, userId), serialized);
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(LEGACY_WEEKLY_DONE_KEY);
-    localStorage.removeItem(legacyScopedKey(CACHE_KEY, userId));
-    localStorage.removeItem(legacyScopedKey(LEGACY_WEEKLY_DONE_KEY, userId));
+    writeScopedStorageItem(GOAL_PROGRESS_CACHE_KEY, userId, JSON.stringify(done));
+    localStorage.removeItem(LEGACY_GOAL_PROGRESS_CACHE_KEY);
+    localStorage.removeItem(legacyScopedKey(LEGACY_GOAL_PROGRESS_CACHE_KEY, userId));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function clearGoalProgressSeed(userId: string) {
+  try {
+    removeScopedStorageItem(GOAL_PROGRESS_CACHE_KEY, userId);
+    localStorage.removeItem(LEGACY_GOAL_PROGRESS_CACHE_KEY);
+    localStorage.removeItem(legacyScopedKey(LEGACY_GOAL_PROGRESS_CACHE_KEY, userId));
   } catch {
     // ignore quota / private mode
   }
@@ -86,10 +134,10 @@ function readStepHistory(userId: string): StepHistoryEntry[] {
     const legacyRaw = localStorage.getItem(STEP_HISTORY_KEY);
     if (!legacyRaw) return [];
 
-    const legacyHistory = JSON.parse(legacyRaw) as StepHistoryEntry[];
-    writeStepHistory(userId, legacyHistory);
+    const migrated = JSON.parse(legacyRaw) as StepHistoryEntry[];
+    writeStepHistory(userId, migrated);
     localStorage.removeItem(STEP_HISTORY_KEY);
-    return legacyHistory;
+    return migrated;
   } catch {
     return [];
   }
@@ -97,12 +145,7 @@ function readStepHistory(userId: string): StepHistoryEntry[] {
 
 function writeStepHistory(userId: string, entries: StepHistoryEntry[]) {
   try {
-    localStorage.setItem(
-      scopedKey(STEP_HISTORY_KEY, userId),
-      JSON.stringify(entries),
-    );
-    localStorage.removeItem(STEP_HISTORY_KEY);
-    localStorage.removeItem(legacyScopedKey(STEP_HISTORY_KEY, userId));
+    writeScopedStorageItem(STEP_HISTORY_KEY, userId, JSON.stringify(entries));
   } catch {
     // ignore quota / private mode
   }
@@ -111,33 +154,19 @@ function writeStepHistory(userId: string, entries: StepHistoryEntry[]) {
 function addStepHistory(userId: string, goalId: string, stepId: string) {
   const today = getLocalDateKey();
   const next = readStepHistory(userId).filter(
-    (entry) =>
-      !(
-        entry.goalId === goalId &&
-        entry.stepId === stepId &&
-        entry.date === today
-      ),
+    (entry) => !(entry.goalId === goalId && entry.stepId === stepId && entry.date === today),
   );
 
   next.push({ goalId, stepId, date: today });
   writeStepHistory(userId, next);
 }
 
-function removeStepHistoryForToday(
-  userId: string,
-  goalId: string,
-  stepId: string,
-) {
+function removeStepHistoryForToday(userId: string, goalId: string, stepId: string) {
   const today = getLocalDateKey();
   writeStepHistory(
     userId,
     readStepHistory(userId).filter(
-      (entry) =>
-        !(
-          entry.goalId === goalId &&
-          entry.stepId === stepId &&
-          entry.date === today
-        ),
+      (entry) => !(entry.goalId === goalId && entry.stepId === stepId && entry.date === today),
     ),
   );
 }
@@ -152,265 +181,176 @@ function clearGoalHistoryForToday(userId: string, goalId: string) {
   );
 }
 
-async function deleteGoalProgress(goalId: string) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+async function loadGoalProgress(userId: string | null): Promise<DoneState> {
+  if (!userId) return {};
 
-  if (!user) return;
+  const seeded = readGoalProgressSeed(userId);
 
-  await supabase
-    .from("goal_progress")
-    .delete()
-    .eq("user_id", user.id)
-    .eq("goal_id", goalId);
-}
+  const { data, error } = await supabase
+    .from('goal_progress')
+    .select('goal_id, done')
+    .eq('user_id', userId);
 
-function reducer(state: GoalsState, action: Action): GoalsState {
-  switch (action.type) {
-    case "hydrate":
-      return { ...state, done: action.done, loaded: true };
-
-    case "toggleStep": {
-      const { goalId, stepId } = action;
-      const goalDone = state.done[goalId] ?? {};
-      const nextDone = {
-        ...state.done,
-        [goalId]: { ...goalDone, [stepId]: !goalDone[stepId] },
-      };
-      return { ...state, done: nextDone };
-    }
-
-    case "resetGoal": {
-      const nextDone = { ...state.done };
-      delete nextDone[action.goalId];
-      return { ...state, done: nextDone };
-    }
-
-    default:
-      return state;
+  if (error) {
+    console.warn('loadGoalProgress error:', error);
+    return seeded;
   }
+
+  const done = (data ?? []).reduce<DoneState>((acc, row) => {
+    const goalRow = row as GoalProgressRow;
+    acc[goalRow.goal_id] = normalizeDoneState({ [goalRow.goal_id]: goalRow.done })[goalRow.goal_id] ?? {};
+    return acc;
+  }, {});
+
+  writeGoalProgressSeed(userId, done);
+  return done;
 }
 
-export function GoalStoreProvider({ children }: { children: React.ReactNode }) {
-  const { userId: authUserId } = useAuth();
-  const [state, rawDispatch] = React.useReducer(reducer, {
-    done: {},
-    loaded: false,
+async function persistGoalProgress(userId: string, goalId: string, goalDone: Record<string, boolean>) {
+  const hasAnyCompletedStep = Object.values(goalDone).some(Boolean);
+
+  if (!hasAnyCompletedStep) {
+    const { error } = await supabase
+      .from('goal_progress')
+      .delete()
+      .eq('user_id', userId)
+      .eq('goal_id', goalId);
+
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase
+    .from('goal_progress')
+    .upsert(
+      {
+        user_id: userId,
+        goal_id: goalId,
+        done: goalDone,
+      },
+      { onConflict: 'user_id,goal_id' },
+    );
+
+  if (error) throw error;
+}
+
+export function seedGoalProgressCache(userId: string | null): DoneState {
+  if (!userId) return {};
+  return readGoalProgressSeed(userId);
+}
+
+export function useGoalProgressQuery() {
+  const { userId, authReady } = useAuth();
+
+  return useQuery<DoneState>({
+    queryKey: queryKeys.goalProgress(userId),
+    queryFn: () => loadGoalProgress(userId),
+    enabled: authReady,
+    initialData: seedGoalProgressCache(userId),
   });
-  const [userId, setUserId] = React.useState<string | null>(null);
-  const debounceTimerRef = React.useRef<number | null>(null);
-  const retryTimerRef = React.useRef<number | null>(null);
-  const persistInFlightRef = React.useRef(false);
-  const queuedDoneRef = React.useRef<DoneState | null>(null);
-  const latestDoneRef = React.useRef<DoneState>(state.done);
-  const retryAttemptRef = React.useRef(0);
+}
 
-  React.useEffect(() => {
-    latestDoneRef.current = state.done;
-  }, [state.done]);
+export function useToggleGoalStepMutation() {
+  const { userId } = useAuth();
+  const queryClient = useQueryClient();
 
-  const persistDoneState = React.useCallback(async (done: DoneState) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  return useMutation<void, Error, ToggleGoalStepVariables, MutationContext>({
+    mutationFn: async ({ goalId }: ToggleGoalStepVariables) => {
+      if (!userId) return;
+      const nextDone = queryClient.getQueryData<DoneState>(queryKeys.goalProgress(userId)) ?? {};
+      await persistGoalProgress(userId, goalId, nextDone[goalId] ?? {});
+    },
+    onMutate: async ({ goalId, stepId }: ToggleGoalStepVariables) => {
+      if (!userId) return { previousDone: {} };
 
-    if (!user) {
-      retryAttemptRef.current = 0;
-      return;
-    }
+      await queryClient.cancelQueries({ queryKey: queryKeys.goalProgress(userId) });
 
-    const payload = Object.entries(done).map(([goalId, goalDone]) => ({
-      user_id: user.id,
-      goal_id: goalId,
-      done: goalDone,
-    }));
-
-    if (payload.length > 0) {
-      const { error } = await supabase
-        .from("goal_progress")
-        .upsert(payload, { onConflict: "user_id,goal_id" });
-
-      if (error) {
-        throw error;
-      }
-    }
-
-    retryAttemptRef.current = 0;
-  }, []);
-
-  const flushPersistQueue = React.useCallback(async () => {
-    if (persistInFlightRef.current) return;
-
-    const next = queuedDoneRef.current;
-    if (!next) return;
-
-    queuedDoneRef.current = null;
-    persistInFlightRef.current = true;
-
-    try {
-      await persistDoneState(next);
-    } catch (error) {
-      queuedDoneRef.current = cloneDoneState(latestDoneRef.current);
-      const retryDelay = Math.min(
-        RETRY_BASE_DELAY_MS * 2 ** retryAttemptRef.current,
-        RETRY_MAX_DELAY_MS,
+      const previousDone = cloneDoneState(
+        queryClient.getQueryData<DoneState>(queryKeys.goalProgress(userId)) ?? {},
       );
-      retryAttemptRef.current += 1;
+      const goalDone = previousDone[goalId] ?? {};
+      const nextValue = !goalDone[stepId];
+      const nextDone = {
+        ...previousDone,
+        [goalId]: {
+          ...goalDone,
+          [stepId]: nextValue,
+        },
+      };
 
-      if (retryTimerRef.current != null) {
-        window.clearTimeout(retryTimerRef.current);
-      }
+      queryClient.setQueryData(queryKeys.goalProgress(userId), nextDone);
+      writeGoalProgressSeed(userId, nextDone);
 
-      retryTimerRef.current = window.setTimeout(() => {
-        void flushPersistQueue();
-      }, retryDelay);
+      if (nextValue) addStepHistory(userId, goalId, stepId);
+      else removeStepHistoryForToday(userId, goalId, stepId);
 
-      console.error("Failed to persist goal progress. Retrying...", error);
-    } finally {
-      persistInFlightRef.current = false;
-
-      if (queuedDoneRef.current) {
-        void flushPersistQueue();
-      }
-    }
-  }, [persistDoneState]);
-
-  const dispatch = React.useCallback(
-    (action: Action) => {
-      if (action.type === "toggleStep" && userId) {
-        const wasDone = !!state.done[action.goalId]?.[action.stepId];
-
-        if (wasDone) {
-          removeStepHistoryForToday(userId, action.goalId, action.stepId);
-        } else {
-          addStepHistory(userId, action.goalId, action.stepId);
-        }
-      }
-
-      if (action.type === "resetGoal" && userId) {
-        clearGoalHistoryForToday(userId, action.goalId);
-        void deleteGoalProgress(action.goalId);
-      }
-
-      rawDispatch(action);
+      return { previousDone };
     },
-    [state.done, userId],
-  );
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          if (!cancelled) {
-            setUserId(null);
-            dispatch({ type: "hydrate", done: {} });
-          }
-          return;
-        }
-
-        const cached = readDoneCache(user.id);
-
-        if (!cancelled) {
-          setUserId(user.id);
-        }
-
-        const { data, error } = await supabase
-          .from("goal_progress")
-          .select("goal_id, done")
-          .eq("user_id", user.id);
-
-        if (error) {
-          console.warn("goalStore load error:", error);
-
-          if (!cancelled) {
-            dispatch({ type: "hydrate", done: cached });
-          }
-          return;
-        }
-
-        const done: DoneState = {};
-        for (const row of data ?? []) {
-          done[row.goal_id] = row.done;
-        }
-
-        const mergedDone: DoneState = {
-          ...done,
-          ...latestDoneRef.current,
-        };
-
-        if (!cancelled) {
-          dispatch({ type: "hydrate", done: mergedDone });
-          writeDoneCache(user.id, mergedDone);
-        }
-      } catch (error) {
-        console.warn("goalStore load exception:", error);
-
-        if (!cancelled) {
-          dispatch({ type: "hydrate", done: {} });
-        }
-      }
-    }
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authUserId, dispatch]);
-
-  React.useEffect(() => {
-    if (!state.loaded || !userId) return;
-
-    writeDoneCache(userId, state.done);
-    queuedDoneRef.current = cloneDoneState(state.done);
-
-    if (debounceTimerRef.current != null) {
-      window.clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = window.setTimeout(() => {
-      void flushPersistQueue();
-    }, PERSIST_DEBOUNCE_MS);
-  }, [flushPersistQueue, state.done, state.loaded, userId]);
-
-  React.useEffect(() => {
-    queuedDoneRef.current = null;
-    retryAttemptRef.current = 0;
-
-    if (debounceTimerRef.current != null) {
-      window.clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-
-    if (retryTimerRef.current != null) {
-      window.clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-  }, [userId]);
-
-  React.useEffect(
-    () => () => {
-      if (debounceTimerRef.current != null) {
-        window.clearTimeout(debounceTimerRef.current);
-      }
-
-      if (retryTimerRef.current != null) {
-        window.clearTimeout(retryTimerRef.current);
-      }
+    onError: (_error: Error, _variables: ToggleGoalStepVariables, context: MutationContext | undefined) => {
+      if (!userId || !context) return;
+      queryClient.setQueryData(queryKeys.goalProgress(userId), context.previousDone);
+      writeGoalProgressSeed(userId, context.previousDone);
     },
-    [],
-  );
+    onSuccess: async () => {
+      if (!userId) return;
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(userId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboardGoals(userId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboardLifeProgress(userId) }),
+      ]);
+    },
+  });
+}
 
-  return (
-    <GoalsStoreContext.Provider value={{ state, dispatch }}>
-      {children}
-    </GoalsStoreContext.Provider>
-  );
+export function useResetGoalProgressMutation() {
+  const { userId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, ResetGoalProgressVariables, MutationContext>({
+    mutationFn: async ({ goalId }: ResetGoalProgressVariables) => {
+      if (!userId) return;
+      const { error } = await supabase
+        .from('goal_progress')
+        .delete()
+        .eq('user_id', userId)
+        .eq('goal_id', goalId);
+
+      if (error) throw error;
+    },
+    onMutate: async ({ goalId }: ResetGoalProgressVariables) => {
+      if (!userId) return { previousDone: {} };
+
+      await queryClient.cancelQueries({ queryKey: queryKeys.goalProgress(userId) });
+
+      const previousDone = cloneDoneState(
+        queryClient.getQueryData<DoneState>(queryKeys.goalProgress(userId)) ?? {},
+      );
+      const nextDone = cloneDoneState(previousDone);
+      delete nextDone[goalId];
+
+      queryClient.setQueryData(queryKeys.goalProgress(userId), nextDone);
+      writeGoalProgressSeed(userId, nextDone);
+      clearGoalHistoryForToday(userId, goalId);
+
+      return { previousDone };
+    },
+    onError: (_error: Error, _variables: ResetGoalProgressVariables, context: MutationContext | undefined) => {
+      if (!userId || !context) return;
+      queryClient.setQueryData(queryKeys.goalProgress(userId), context.previousDone);
+      writeGoalProgressSeed(userId, context.previousDone);
+    },
+    onSuccess: async () => {
+      if (!userId) return;
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(userId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboardGoals(userId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboardLifeProgress(userId) }),
+      ]);
+    },
+  });
+}
+
+export function clearGoalProgressLocalSeed(userId: string | null) {
+  if (!userId) return;
+  clearGoalProgressSeed(userId);
 }
