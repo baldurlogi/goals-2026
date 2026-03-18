@@ -1,7 +1,12 @@
 import React from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/features/auth/authContext";
-import { getActiveUserId } from "@/lib/activeUser";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  legacyScopedKey,
+  scopedKey,
+} from "@/lib/activeUser";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import {
   GoalsStoreContext,
@@ -23,10 +28,6 @@ type StepHistoryEntry = {
   date: string;
 };
 
-function scopedKey(baseKey: string, userId: string) {
-  return `${baseKey}:${userId}`;
-}
-
 function cloneDoneState(done: DoneState): DoneState {
   return Object.fromEntries(
     Object.entries(done).map(([goalId, steps]) => [goalId, { ...steps }]),
@@ -35,12 +36,9 @@ function cloneDoneState(done: DoneState): DoneState {
 
 function readDoneCache(userId: string): DoneState {
   try {
-    const scopedCacheKey = scopedKey(CACHE_KEY, userId);
-    const scopedLegacyDoneKey = scopedKey(LEGACY_WEEKLY_DONE_KEY, userId);
-
     const scopedRaw =
-      localStorage.getItem(scopedCacheKey) ??
-      localStorage.getItem(scopedLegacyDoneKey);
+      getScopedStorageItem(CACHE_KEY, userId) ??
+      getScopedStorageItem(LEGACY_WEEKLY_DONE_KEY, userId);
 
     if (scopedRaw) {
       return JSON.parse(scopedRaw) as DoneState;
@@ -71,6 +69,8 @@ function writeDoneCache(userId: string, done: DoneState) {
     localStorage.setItem(scopedKey(LEGACY_WEEKLY_DONE_KEY, userId), serialized);
     localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem(LEGACY_WEEKLY_DONE_KEY);
+    localStorage.removeItem(legacyScopedKey(CACHE_KEY, userId));
+    localStorage.removeItem(legacyScopedKey(LEGACY_WEEKLY_DONE_KEY, userId));
   } catch {
     // ignore quota / private mode
   }
@@ -78,8 +78,7 @@ function writeDoneCache(userId: string, done: DoneState) {
 
 function readStepHistory(userId: string): StepHistoryEntry[] {
   try {
-    const scopedHistoryKey = scopedKey(STEP_HISTORY_KEY, userId);
-    const scopedRaw = localStorage.getItem(scopedHistoryKey);
+    const scopedRaw = getScopedStorageItem(STEP_HISTORY_KEY, userId);
     if (scopedRaw) return JSON.parse(scopedRaw) as StepHistoryEntry[];
 
     if (getActiveUserId() !== userId) return [];
@@ -98,8 +97,12 @@ function readStepHistory(userId: string): StepHistoryEntry[] {
 
 function writeStepHistory(userId: string, entries: StepHistoryEntry[]) {
   try {
-    localStorage.setItem(scopedKey(STEP_HISTORY_KEY, userId), JSON.stringify(entries));
+    localStorage.setItem(
+      scopedKey(STEP_HISTORY_KEY, userId),
+      JSON.stringify(entries),
+    );
     localStorage.removeItem(STEP_HISTORY_KEY);
+    localStorage.removeItem(legacyScopedKey(STEP_HISTORY_KEY, userId));
   } catch {
     // ignore quota / private mode
   }
@@ -120,7 +123,11 @@ function addStepHistory(userId: string, goalId: string, stepId: string) {
   writeStepHistory(userId, next);
 }
 
-function removeStepHistoryForToday(userId: string, goalId: string, stepId: string) {
+function removeStepHistoryForToday(
+  userId: string,
+  goalId: string,
+  stepId: string,
+) {
   const today = getLocalDateKey();
   writeStepHistory(
     userId,
@@ -185,11 +192,7 @@ function reducer(state: GoalsState, action: Action): GoalsState {
   }
 }
 
-export function GoalStoreProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function GoalStoreProvider({ children }: { children: React.ReactNode }) {
   const { userId: authUserId } = useAuth();
   const [state, rawDispatch] = React.useReducer(reducer, {
     done: {},
@@ -376,7 +379,6 @@ export function GoalStoreProvider({
       void flushPersistQueue();
     }, PERSIST_DEBOUNCE_MS);
   }, [flushPersistQueue, state.done, state.loaded, userId]);
-
 
   React.useEffect(() => {
     queuedDoneRef.current = null;

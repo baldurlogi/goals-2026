@@ -4,15 +4,14 @@ import {
   DEFAULT_SPLIT_LABELS,
   FITNESS_CHANGED_EVENT,
 } from "./constants";
-import {
-  diffDays,
-  isISOInCurrentWeek,
-  todayISO,
-  yesterdayISO,
-} from "./date";
+import { diffDays, isISOInCurrentWeek, todayISO, yesterdayISO } from "./date";
 import type { DayKey, DaySplit, WeeklySplitConfig } from "./types";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
-import { getActiveUserId, scopedKey } from "@/lib/activeUser";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  scopedKey,
+} from "@/lib/activeUser";
 
 const SPLIT_CACHE_KEY = CACHE_KEYS.FITNESS_SPLIT;
 
@@ -65,9 +64,11 @@ function splitCacheKey(userId: string | null = getActiveUserId()) {
   return scopedKey(SPLIT_CACHE_KEY, userId);
 }
 
-export function readSplitCache(userId: string | null = getActiveUserId()): WeeklySplitConfig {
+export function readSplitCache(
+  userId: string | null = getActiveUserId(),
+): WeeklySplitConfig {
   try {
-    const raw = localStorage.getItem(splitCacheKey(userId));
+    const raw = getScopedStorageItem(SPLIT_CACHE_KEY, userId);
     if (!raw) return makeDefaultSplit();
 
     return normalizeWeeklySplit(JSON.parse(raw) as WeeklySplitConfig);
@@ -76,7 +77,10 @@ export function readSplitCache(userId: string | null = getActiveUserId()): Weekl
   }
 }
 
-function writeSplitCache(cfg: WeeklySplitConfig, userId: string | null = getActiveUserId()): void {
+function writeSplitCache(
+  cfg: WeeklySplitConfig,
+  userId: string | null = getActiveUserId(),
+): void {
   try {
     const key = splitCacheKey(userId);
     assertRegisteredCacheWrite(key);
@@ -128,7 +132,10 @@ export async function saveWeeklySplit(cfg: WeeklySplitConfig): Promise<void> {
 
   const { error } = await supabase
     .from("fitness_weekly_split")
-    .upsert({ user_id: user.id, config: normalized }, { onConflict: "user_id" });
+    .upsert(
+      { user_id: user.id, config: normalized },
+      { onConflict: "user_id" },
+    );
 
   if (error) {
     console.warn("saveWeeklySplit error:", error);

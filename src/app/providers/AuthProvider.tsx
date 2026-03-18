@@ -5,13 +5,15 @@ import posthog from "posthog-js";
 import { supabase } from "@/lib/supabaseClient";
 import { AuthContext } from "@/features/auth/authContext";
 import { clearUserCache } from "@/lib/clearUserCache";
-import { setActiveUserId } from "@/lib/activeUser";
+import { getActiveUserId, setActiveUserId } from "@/lib/activeUser";
 import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
+import { clearUserBoundQueries } from "@/lib/queryClient";
 
 function hasCachedProfileMismatch(nextUserId: string | null): boolean {
   try {
+    const activeUserId = getActiveUserId();
     const legacyRaw = localStorage.getItem("cache:profile:v1");
-    if (legacyRaw) {
+    if (legacyRaw && activeUserId === nextUserId) {
       const parsed = JSON.parse(legacyRaw) as { id?: unknown };
       const legacyId = typeof parsed.id === "string" ? parsed.id : null;
 
@@ -27,9 +29,12 @@ function hasCachedProfileMismatch(nextUserId: string | null): boolean {
       const key = localStorage.key(i);
       if (!key) continue;
 
-      if (key.startsWith("cache:profile:v2:")) {
-        const cachedUserId = key.replace("cache:profile:v2:", "");
-        if (nextUserId === null || cachedUserId !== nextUserId) {
+      if (
+        key.startsWith("cache:profile:v2:") ||
+        key.startsWith("cache:profile:v2:v1:")
+      ) {
+        if (nextUserId === null) return true;
+        if (!key.endsWith(`:${nextUserId}`)) {
           return true;
         }
       }
@@ -63,8 +68,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ? hasCachedProfileMismatch(nextUserId)
       : false;
 
+    if (userChanged) {
+      clearUserBoundQueries(previousUserId ?? null);
+      if (nextUserId !== previousUserId) {
+        clearUserBoundQueries(nextUserId);
+      }
+    }
+
     if (userChanged || cachedMismatch) {
-      clearUserCache();
+      clearUserCache(previousUserId ?? nextUserId);
+      if (nextUserId && nextUserId !== previousUserId) {
+        clearUserCache(nextUserId);
+      }
     }
 
     if (nextUser) {
@@ -76,7 +91,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setActiveUserId(nextUserId);
-    window.dispatchEvent(new CustomEvent(AUTH_USER_CHANGED_EVENT, { detail: { userId: nextUserId, previousUserId } }));
+    window.dispatchEvent(
+      new CustomEvent(AUTH_USER_CHANGED_EVENT, {
+        detail: { userId: nextUserId, previousUserId },
+      }),
+    );
     previousUserIdRef.current = nextUserId;
     setSession(nextSession);
     setUser(nextUser);
@@ -105,9 +124,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function signOut() {
+    const currentUserId = user?.id ?? previousUserIdRef.current ?? null;
+    clearUserBoundQueries(currentUserId);
+    clearUserCache(currentUserId);
+    setLoading(true);
     await supabase.auth.signOut();
     setActiveUserId(null);
-    clearUserCache();
     posthog.reset();
   }
 
