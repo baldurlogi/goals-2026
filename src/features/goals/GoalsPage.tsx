@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { useGoalsStore } from '@/features/goals/goalStoreContext';
+import { useGoalProgressQuery } from '@/features/goals/goalStore';
 import { GoalCard } from './components/GoalCard';
 import { AddEditGoalModal } from './components/AddEditGoalModal';
 import { ImproveGoalModal } from './components/ImproveGoalModal';
@@ -11,7 +11,8 @@ import { GoalsPageSkeleton } from '@/features/dashboard/skeletons';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
 import { GoalRemotePersistenceError } from './userGoalStorage';
 import { useDeleteGoalMutation, useGoalsQuery, useSaveGoalMutation } from './useGoalsQuery';
-import type { UserGoal } from './goalTypes';
+import type { UserGoal, UserGoalStep } from './goalTypes';
+import type { GoalPersistenceStatus } from './userGoalStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { AIContextNudge } from './components/AIContextNudge';
 import type { ReactNode } from 'react';
@@ -48,7 +49,7 @@ type GoalRouteState = { openGoalModal?: 'new' | 'ai' } | null;
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 export function GoalsPage() {
-  const { state } = useGoalsStore();
+  const { data: done = {} } = useGoalProgressQuery();
   const { data: goals = [], isLoading: loading } = useGoalsQuery();
   const deleteGoalMutation = useDeleteGoalMutation();
   const saveGoalMutation = useSaveGoalMutation();
@@ -81,14 +82,14 @@ export function GoalsPage() {
     const counts: Record<string, number> = {};
     for (const goal of goals) {
       counts[goal.id] = goal.steps.filter(
-        (s) =>
+        (s: UserGoalStep) =>
           s.idealFinish &&
           s.idealFinish < today &&
-          !state.done[goal.id]?.[s.id],
+          !done[goal.id]?.[s.id],
       ).length;
     }
     return counts;
-  }, [goals, state.done, today]);
+  }, [done, goals, today]);
 
   const sorted = useMemo(() => {
     return [...goals].sort((a, b) => {
@@ -220,7 +221,7 @@ export function GoalsPage() {
             <GoalCard
               key={goal.id}
               goal={goal}
-              doneMap={state.done[goal.id]}
+              doneMap={done[goal.id]}
               overdueCount={overdueCountByGoal[goal.id] ?? 0}
               onEdit={() => setLocalModal(goal)}
               onDelete={() => handleDelete(goal.id)}
@@ -252,14 +253,14 @@ export function GoalsPage() {
             setImprovingGoal(null);
 
             void saveGoalMutation.mutateAsync(updated)
-              .then((status) => {
+              .then((status: GoalPersistenceStatus) => {
                 if (status.remoteSyncSucceeded) {
                   toast.success('Goal steps improved ✨');
                 } else {
                   toast.warning("Goal steps improved locally, syncing failed. We'll retry.");
                 }
               })
-              .catch((error) => {
+              .catch((error: unknown) => {
                 if (error instanceof GoalRemotePersistenceError && error.localCacheWriteSucceeded) {
                   toast.warning("Goal steps improved locally, syncing failed. We'll retry.");
                   return;

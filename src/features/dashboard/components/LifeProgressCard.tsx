@@ -52,7 +52,7 @@ type ModuleProgress = {
 
 type GoalDoneCache = Record<string, boolean | Record<string, boolean>>;
 
-const GOAL_DONE_CACHE_KEYS = ["cache:goals:v1", "cache:goal_steps_done:v1"] as const;
+const GOAL_DONE_CACHE_KEYS = ["goals:done:v1", "cache:goals:v1"] as const;
 const MODULE_ORDER = ["goals", "fitness", "nutrition", "reading", "todos", "schedule"];
 
 const MEAL_MACROS_BY_KEY = {
