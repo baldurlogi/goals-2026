@@ -9,16 +9,16 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { loadNutritionLog, loadPhase, seedNutritionLog } from "@/features/nutrition/nutritionStorage";
+import { loadNutritionLog, loadPhase, seedNutritionCache } from "@/features/nutrition/nutritionStorage";
 import { getTargets, meals } from "@/features/nutrition/nutritionData";
-import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
+import { loadUserGoals, seedGoalCache } from "@/features/goals/userGoalStorage";
 import {
   loadReadingInputs,
-  seedReadingInputs,
+  seedReadingCache,
   READING_CHANGED_EVENT,
   getTodayReadingProgress,
 } from "@/features/reading/readingStorage";
-import { listTodos, seedTodos } from "@/features/todos/todoStorage";
+import { loadTodos, seedTodoCache } from "@/features/todos/todoStorage";
 import {
   loadScheduleLog,
   loadScheduleTemplates,
@@ -303,7 +303,7 @@ function buildReadingProgress(inputs: Awaited<ReturnType<typeof loadReadingInput
   };
 }
 
-function buildTodosProgress(todos: Awaited<ReturnType<typeof listTodos>>): ModuleProgress {
+function buildTodosProgress(todos: Awaited<ReturnType<typeof loadTodos>>): ModuleProgress {
   const done = todos.filter((t) => t.done).length;
   const total = todos.length;
   const pct = total === 0 ? 100 : clampPct((done / total) * 100);
@@ -348,12 +348,12 @@ function sortModules(results: ModuleProgress[]): ModuleProgress[] {
   return results.sort((a, b) => MODULE_ORDER.indexOf(a.id) - MODULE_ORDER.indexOf(b.id));
 }
 
-function seedProgress(enabledModules: Set<string>): ModuleProgress[] {
+function seedProgress(enabledModules: Set<string>, activeUserId: string | null): ModuleProgress[] {
   const results: ModuleProgress[] = [];
 
   try {
     if (enabledModules.has("goals")) {
-      results.push(buildGoalsProgress(seedUserGoals()));
+      results.push(buildGoalsProgress(seedGoalCache(activeUserId)));
     }
 
     if (enabledModules.has("fitness")) {
@@ -361,20 +361,20 @@ function seedProgress(enabledModules: Set<string>): ModuleProgress[] {
     }
 
     if (enabledModules.has("nutrition")) {
-      results.push(buildNutritionProgress(seedNutritionLog(), getTargets("maintain")));
+      results.push(buildNutritionProgress(seedNutritionCache(activeUserId), getTargets("maintain")));
     }
 
     if (enabledModules.has("reading")) {
-      results.push(buildReadingProgress(seedReadingInputs()));
+      results.push(buildReadingProgress(seedReadingCache(activeUserId)));
     }
 
     if (enabledModules.has("todos")) {
-      results.push(buildTodosProgress(seedTodos()));
+      results.push(buildTodosProgress(seedTodoCache(activeUserId)));
     }
 
     if (enabledModules.has("schedule")) {
-      const log = seedScheduleLog();
-      const templates = seedScheduleTemplates();
+      const log = seedScheduleLog(activeUserId);
+      const templates = seedScheduleTemplates(activeUserId);
       results.push(buildScheduleProgress(log, templates));
     }
   } catch {
@@ -384,7 +384,7 @@ function seedProgress(enabledModules: Set<string>): ModuleProgress[] {
   return sortModules(results);
 }
 
-async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgress[]> {
+async function fetchProgress(enabledModules: Set<string>, activeUserId: string | null): Promise<ModuleProgress[]> {
   if (enabledModules.size === 0) return [];
 
   const results: ModuleProgress[] = [];
@@ -392,28 +392,28 @@ async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgres
   await Promise.allSettled([
     (async () => {
       if (!enabledModules.has("goals")) return;
-      results.push(buildGoalsProgress(await loadUserGoals()));
+      results.push(buildGoalsProgress(await loadUserGoals(activeUserId)));
     })(),
     (async () => {
       if (!enabledModules.has("fitness")) return;
-      results.push(buildFitnessProgress(await loadWeeklySplit()));
+      results.push(buildFitnessProgress(await loadWeeklySplit(activeUserId)));
     })(),
     (async () => {
       if (!enabledModules.has("nutrition")) return;
-      const [log, phase] = await Promise.all([loadNutritionLog(), loadPhase()]);
+      const [log, phase] = await Promise.all([loadNutritionLog(activeUserId), loadPhase(activeUserId)]);
       results.push(buildNutritionProgress(log, getTargets(phase)));
     })(),
     (async () => {
       if (!enabledModules.has("reading")) return;
-      results.push(buildReadingProgress(await loadReadingInputs()));
+      results.push(buildReadingProgress(await loadReadingInputs(activeUserId)));
     })(),
     (async () => {
       if (!enabledModules.has("todos")) return;
-      results.push(buildTodosProgress(await listTodos()));
+      results.push(buildTodosProgress(await loadTodos(activeUserId)));
     })(),
     (async () => {
       if (!enabledModules.has("schedule")) return;
-      const [log, templates] = await Promise.all([loadScheduleLog(), loadScheduleTemplates()]);
+      const [log, templates] = await Promise.all([loadScheduleLog(activeUserId), loadScheduleTemplates(activeUserId)]);
       results.push(buildScheduleProgress(log, templates));
     })(),
   ]);
@@ -528,8 +528,9 @@ function OverallRing({ modules }: { modules: ModuleProgress[] }) {
 function LifeProgressCardInner() {
   const { modules: enabledModules } = useEnabledModules();
 
-  const [progress, setProgress] = useState<ModuleProgress[]>(() => seedProgress(enabledModules));
-  const [loading, setLoading] = useState(() => seedProgress(enabledModules).length === 0);
+  const activeUserId = getActiveUserId();
+  const [progress, setProgress] = useState<ModuleProgress[]>(() => seedProgress(enabledModules, activeUserId));
+  const [loading, setLoading] = useState(() => seedProgress(enabledModules, activeUserId).length === 0);
 
   useEffect(() => {
     if (enabledModules.size === 0) return;
@@ -537,7 +538,7 @@ function LifeProgressCardInner() {
     let cancelled = false;
 
     async function refresh() {
-      const data = await fetchProgress(enabledModules);
+      const data = await fetchProgress(enabledModules, activeUserId);
       if (cancelled) return;
       setProgress(data);
       setLoading(false);
@@ -565,7 +566,7 @@ function LifeProgressCardInner() {
       cancelled = true;
       events.forEach((eventName) => window.removeEventListener(eventName, handleChange));
     };
-  }, [enabledModules]);
+  }, [activeUserId, enabledModules]);
 
   const skeletonCount = Math.max(enabledModules.size, 3);
 

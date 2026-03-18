@@ -2,9 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/authContext";
 import {
   loadProfile,
-  normalizeUserProfile,
-  readProfileCache,
   saveProfile,
+  seedProfileCache,
   type UserProfile,
 } from "@/features/onboarding/profileStorage";
 import { queryKeys } from "@/lib/queryKeys";
@@ -14,10 +13,10 @@ export function useProfileQuery() {
 
   return useQuery<UserProfile | null>({
     queryKey: queryKeys.profile(userId),
-    queryFn: () => loadProfile(),
+    queryFn: () => loadProfile(userId),
     enabled: authReady,
     staleTime: 1000 * 60 * 5,
-    initialData: userId ? readProfileCache(userId) : null,
+    initialData: seedProfileCache(userId),
   });
 }
 
@@ -42,9 +41,7 @@ export function useSaveProfileMutation() {
 
   return useMutation({
     mutationFn: async (patch: Partial<Omit<UserProfile, "id">>) => {
-      await saveProfile(patch);
-      const cached = userId ? readProfileCache(userId) : null;
-      return cached ? normalizeUserProfile(cached) : null;
+      return saveProfile(userId, patch);
     },
     onSuccess: async (nextProfile) => {
       if (userId && nextProfile) {

@@ -5,8 +5,8 @@ import {
   addTodo,
   clearCompleted,
   deleteTodo,
-  listTodos,
-  seedTodos,
+  loadTodos,
+  seedTodoCache,
   toggleTodo,
   type TodoItem,
 } from "./todoStorage";
@@ -16,9 +16,9 @@ export function useTodosQuery() {
 
   return useQuery<TodoItem[]>({
     queryKey: queryKeys.todos(userId),
-    queryFn: () => listTodos(),
+    queryFn: () => loadTodos(userId),
     enabled: authReady,
-    initialData: userId ? seedTodos() : [],
+    initialData: seedTodoCache(userId),
   });
 }
 
@@ -36,18 +36,22 @@ function useTodosInvalidation() {
 }
 
 export function useAddTodoMutation() {
+  const { userId } = useAuth();
   const invalidate = useTodosInvalidation();
-  return useMutation({ mutationFn: addTodo, onSuccess: invalidate });
+  return useMutation({ mutationFn: (text: string) => addTodo(userId, text), onSuccess: invalidate });
 }
 export function useToggleTodoMutation() {
+  const { userId } = useAuth();
   const invalidate = useTodosInvalidation();
-  return useMutation({ mutationFn: toggleTodo, onSuccess: invalidate });
+  return useMutation({ mutationFn: (id: string) => toggleTodo(userId, id), onSuccess: invalidate });
 }
 export function useDeleteTodoMutation() {
+  const { userId } = useAuth();
   const invalidate = useTodosInvalidation();
-  return useMutation({ mutationFn: deleteTodo, onSuccess: invalidate });
+  return useMutation({ mutationFn: (id: string) => deleteTodo(userId, id), onSuccess: invalidate });
 }
 export function useClearCompletedMutation() {
+  const { userId } = useAuth();
   const invalidate = useTodosInvalidation();
-  return useMutation({ mutationFn: clearCompleted, onSuccess: invalidate });
+  return useMutation({ mutationFn: () => clearCompleted(userId), onSuccess: invalidate });
 }

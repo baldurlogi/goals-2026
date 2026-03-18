@@ -66,7 +66,7 @@ export type TodayReadingProgress = {
   pct: number;
 };
 
-function clearAISignalsCache(userId: string | null = getActiveUserId()) {
+function clearAISignalsCache(userId: string | null) {
   try {
     localStorage.removeItem(aiSignalsKey(userId));
   } catch {
@@ -314,8 +314,9 @@ function syncTodayReadingProgress(
 
 export function getTodayReadingProgress(
   inputs: ReadingInputs,
+  userId: string | null = getActiveUserId(),
 ): TodayReadingProgress {
-  return syncTodayReadingProgress(inputs);
+  return syncTodayReadingProgress(inputs, undefined, userId);
 }
 
 // helper: merge partial into defaults safely
@@ -341,7 +342,7 @@ function normalizeReadingInputs(
 }
 
 async function loadPreviousInputs(
-  userId: string | null = getActiveUserId(),
+  userId: string | null,
 ): Promise<ReadingInputs | null> {
   try {
     const raw = getScopedStorageItem(STORAGE_KEY, userId);
@@ -358,25 +359,21 @@ async function loadPreviousInputs(
  *  - Supabase errors
  *  - no row exists yet
  */
-export async function loadReadingInputs(): Promise<ReadingInputs> {
+export async function loadReadingInputs(userId: string | null = getActiveUserId()): Promise<ReadingInputs> {
   try {
-    const { data: auth, error: authErr } = await supabase.auth.getUser();
-    if (authErr) throw authErr;
-    const user = auth?.user;
-
-    if (!user) {
-      const raw = getScopedStorageItem(STORAGE_KEY, getActiveUserId());
+    if (!userId) {
+      const raw = getScopedStorageItem(STORAGE_KEY, null);
       const inputs = raw
         ? normalizeReadingInputs(JSON.parse(raw))
         : DEFAULT_READING_INPUTS;
-      syncTodayReadingProgress(inputs, undefined, null);
+      syncTodayReadingProgress(inputs, undefined, userId);
       return inputs;
     }
 
     const { data, error } = await supabase
       .from("reading_state")
       .select("state")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (error) throw error;
@@ -384,37 +381,37 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
     const state = (data?.state ?? null) as Partial<ReadingInputs> | null;
     if (!state) {
       try {
-        localStorage.removeItem(readingKey(user.id));
+        localStorage.removeItem(readingKey(userId));
       } catch {
         // ignore
       }
 
-      syncTodayReadingProgress(DEFAULT_READING_INPUTS, undefined, user.id);
+      syncTodayReadingProgress(DEFAULT_READING_INPUTS, undefined, userId);
       return DEFAULT_READING_INPUTS;
     }
 
     const inputs = normalizeReadingInputs(state);
 
     try {
-      const key = readingKey(user.id);
+      const key = readingKey(userId);
       assertRegisteredCacheWrite(key);
       localStorage.setItem(key, JSON.stringify(inputs));
     } catch {
       // ignore
     }
 
-    syncTodayReadingProgress(inputs, undefined, user.id);
+    syncTodayReadingProgress(inputs, undefined, userId);
     return inputs;
   } catch (error) {
     console.warn(
       "loadReadingInputs failed, falling back to defaults/local:",
       error,
     );
-    const raw = getScopedStorageItem(STORAGE_KEY, getActiveUserId());
+    const raw = getScopedStorageItem(STORAGE_KEY, userId);
     const inputs = raw
       ? normalizeReadingInputs(JSON.parse(raw))
       : DEFAULT_READING_INPUTS;
-    syncTodayReadingProgress(inputs);
+    syncTodayReadingProgress(inputs, undefined, userId);
     return inputs;
   }
 }
@@ -423,31 +420,28 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
  * Save reading to Supabase (reading_state).
  * Also mirrors to localStorage for offline-ish resilience.
  */
-export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth?.user;
-  const scopedUserId = user?.id ?? null;
-  const previousInputs = await loadPreviousInputs(scopedUserId);
+export async function saveReadingInputs(userId: string | null, value: ReadingInputs): Promise<ReadingInputs> {
+  const previousInputs = await loadPreviousInputs(userId);
 
   try {
-    const key = readingKey(scopedUserId);
+    const key = readingKey(userId);
     assertRegisteredCacheWrite(key);
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // ignore
   }
 
-  syncTodayReadingProgress(value, previousInputs, scopedUserId);
+  syncTodayReadingProgress(value, previousInputs, userId);
 
-  if (!user) {
+  if (!userId) {
     clearAISignalsCache(null);
     emitReadingChanged();
-    return;
+    return value;
   }
 
   const { error } = await supabase.from("reading_state").upsert(
     {
-      user_id: user.id,
+      user_id: userId,
       state: value,
       updated_at: new Date().toISOString(),
     },
@@ -456,27 +450,28 @@ export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
 
   if (error) throw error;
 
-  clearAISignalsCache(user.id);
+  clearAISignalsCache(userId);
   emitReadingChanged();
+  return value;
 }
 
-export async function resetReadingInputs(): Promise<ReadingInputs> {
-  clearDailyProgressCache(getActiveUserId());
-  await saveReadingInputs(DEFAULT_READING_INPUTS);
+export async function resetReadingInputs(userId: string | null): Promise<ReadingInputs> {
+  clearDailyProgressCache(userId);
+  await saveReadingInputs(userId, DEFAULT_READING_INPUTS);
   return DEFAULT_READING_INPUTS;
 }
 
 /** Synchronous seed — reads from localStorage mirror. Zero network. */
-export function seedReadingInputs(): ReadingInputs {
+export function seedReadingCache(userId: string | null): ReadingInputs {
   try {
-    const raw = getScopedStorageItem(STORAGE_KEY, getActiveUserId());
+    const raw = getScopedStorageItem(STORAGE_KEY, userId);
     const inputs = raw
       ? normalizeReadingInputs(JSON.parse(raw))
       : DEFAULT_READING_INPUTS;
-    syncTodayReadingProgress(inputs);
+    syncTodayReadingProgress(inputs, undefined, userId);
     return inputs;
   } catch {
-    syncTodayReadingProgress(DEFAULT_READING_INPUTS);
+    syncTodayReadingProgress(DEFAULT_READING_INPUTS, undefined, userId);
     return DEFAULT_READING_INPUTS;
   }
 }
@@ -516,3 +511,5 @@ export function getWeeklyReadingSummary(
           : "unknown",
   };
 }
+
+export const seedReadingInputs = seedReadingCache;

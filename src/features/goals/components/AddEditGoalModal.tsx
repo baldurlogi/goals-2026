@@ -10,7 +10,7 @@ import {
   createBlankStep,
   GoalRemotePersistenceError,
   saveUserGoal,
-  seedUserGoals,
+  seedGoalCache,
 } from "../userGoalStorage";
 import type { UserGoal, UserGoalStep } from "../goalTypes";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
@@ -76,7 +76,7 @@ export function AddEditGoalModal({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const creationStartTrackedRef = useRef(false);
-  const initialGoalCountRef = useRef<number>(isEdit ? 1 : seedUserGoals().length);
+  const initialGoalCountRef = useRef<number>(isEdit ? 1 : seedGoalCache(userId).length);
 
   useEffect(() => {
     if (mode === "manual") titleRef.current?.focus();
@@ -97,7 +97,7 @@ export function AddEditGoalModal({
   }, [isEdit, startWithAI, userId]);
 
   function cacheLooksLikeFirstGoal(goalId: string): boolean {
-    const goals = seedUserGoals();
+    const goals = seedGoalCache(userId);
     return goals.length === 1 && goals[0]?.id === goalId;
   }
 
@@ -155,7 +155,7 @@ export function AddEditGoalModal({
     setSaving(true);
 
     try {
-      const status = await saveUserGoal(trimmedGoal);
+      const status = await saveUserGoal(userId, trimmedGoal);
 
       if (!isEdit) {
         queueAIContextNudge();

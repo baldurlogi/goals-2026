@@ -115,16 +115,12 @@ function patchCompleted(
   return completed.filter((i) => i !== index);
 }
 
-async function persistLog(log: ScheduleLog): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return;
+async function persistLog(userId: string | null = getActiveUserId(), log: ScheduleLog): Promise<void> {
+  if (!userId) return;
 
   const { error } = await supabase.from("schedule_logs").upsert(
     {
-      user_id: user.id,
+      user_id: userId,
       log_date: log.date,
       view: log.view,
       completed: log.completed,
@@ -147,27 +143,24 @@ function commitLogOptimistically(log: ScheduleLog): ScheduleLog {
 }
 
 /** Synchronous seed — returns today's schedule log from cache. Zero network. */
-export function seedScheduleLog(): ScheduleLog {
-  return readLogCache() ?? { ...DEFAULT_SCHEDULE_LOG, date: getLocalDateKey() };
+export function seedScheduleLog(userId: string | null = getActiveUserId()): ScheduleLog {
+  return readLogCache(userId) ?? { ...DEFAULT_SCHEDULE_LOG, date: getLocalDateKey() };
 }
 
-export async function loadScheduleLog(): Promise<ScheduleLog> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function loadScheduleLog(userId: string | null = getActiveUserId()): Promise<ScheduleLog> {
 
   const date = todayKey();
   const empty: ScheduleLog = { ...DEFAULT_SCHEDULE_LOG, date };
 
-  if (!user) return empty;
+  if (!userId) return empty;
 
-  const cached = readLogCache(user.id);
+  const cached = readLogCache(userId);
   if (cached) return cached;
 
   const { data, error } = await supabase
     .from("schedule_logs")
     .select("log_date, view, completed")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("log_date", date)
     .maybeSingle();
 
@@ -180,7 +173,7 @@ export async function loadScheduleLog(): Promise<ScheduleLog> {
     const { data: profile } = await supabase
       .from("profiles")
       .select("default_schedule_view, weekly_schedule")
-      .eq("id", user.id)
+       .eq("id", userId)
       .single();
 
     const weeklySchedule = normalizeWeeklySchedule(
@@ -195,11 +188,11 @@ export async function loadScheduleLog(): Promise<ScheduleLog> {
 
     const next: ScheduleLog = { ...empty, view: defaultView };
 
-    writeLogCache(next);
+    writeLogCache(next, userId);
 
     void supabase.from("schedule_logs").upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         log_date: date,
         view: defaultView,
         completed: [],
@@ -216,7 +209,7 @@ export async function loadScheduleLog(): Promise<ScheduleLog> {
     completed: normalizeCompleted(data.completed ?? []),
   };
 
-  writeLogCache(result);
+  writeLogCache(result, userId);
   return result;
 }
 
@@ -241,12 +234,17 @@ export function applyToggleToLog(
   };
 }
 
-export async function setTodayView(view: ScheduleView): Promise<ScheduleLog> {
-  const current = await loadScheduleLog();
+export async function setTodayView(
+  userIdOrView: string | ScheduleView | null = getActiveUserId(),
+  maybeView?: ScheduleView,
+): Promise<ScheduleLog> {
+  const userId = maybeView === undefined ? getActiveUserId() : userIdOrView as string | null;
+  const view = (maybeView === undefined ? userIdOrView : maybeView) as ScheduleView;
+  const current = await loadScheduleLog(userId);
   const next = commitLogOptimistically(applyViewToLog(current, view));
 
   try {
-    await persistLog(next);
+    await persistLog(userId, next);
   } catch (error) {
     console.warn("setTodayView persist failed:", error);
     throw error;
@@ -256,14 +254,18 @@ export async function setTodayView(view: ScheduleView): Promise<ScheduleLog> {
 }
 
 export async function toggleBlock(
-  index: number,
-  done: boolean,
+  userIdOrIndex: string | number | null = getActiveUserId(),
+  indexOrDone?: number | boolean,
+  maybeDone?: boolean,
 ): Promise<ScheduleLog> {
-  const current = await loadScheduleLog();
+  const userId = maybeDone === undefined ? getActiveUserId() : userIdOrIndex as string | null;
+  const index = (maybeDone === undefined ? userIdOrIndex : indexOrDone) as number;
+  const done = (maybeDone === undefined ? indexOrDone : maybeDone) as boolean;
+  const current = await loadScheduleLog(userId);
   const next = commitLogOptimistically(applyToggleToLog(current, index, done));
 
   try {
-    await persistLog(next);
+    await persistLog(userId, next);
   } catch (error) {
     console.warn("toggleBlock persist failed:", error);
     throw error;
@@ -313,33 +315,30 @@ function writeTemplateCache(
   }
 }
 
-export function seedScheduleTemplates(): UserScheduleTemplates {
-  return readTemplateCache() ?? DEFAULT_USER_SCHEDULE;
+export function seedScheduleTemplates(userId: string | null = getActiveUserId()): UserScheduleTemplates {
+  return readTemplateCache(userId) ?? DEFAULT_USER_SCHEDULE;
 }
 
-export async function loadScheduleTemplates(): Promise<UserScheduleTemplates> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return DEFAULT_USER_SCHEDULE;
+export async function loadScheduleTemplates(userId: string | null = getActiveUserId()): Promise<UserScheduleTemplates> {
+  if (!userId) return DEFAULT_USER_SCHEDULE;
 
   const { data, error } = await supabase
     .from("schedule_templates")
     .select("wfh, office, weekend")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error || !data) {
     await supabase.from("schedule_templates").upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         wfh: DEFAULT_USER_SCHEDULE.wfh,
         office: DEFAULT_USER_SCHEDULE.office,
         weekend: DEFAULT_USER_SCHEDULE.weekend,
       },
       { onConflict: "user_id" },
     );
-    writeTemplateCache(DEFAULT_USER_SCHEDULE);
+    writeTemplateCache(DEFAULT_USER_SCHEDULE, userId);
     return DEFAULT_USER_SCHEDULE;
   }
 
@@ -349,21 +348,19 @@ export async function loadScheduleTemplates(): Promise<UserScheduleTemplates> {
     weekend: (data.weekend as TimelineItem[]) ?? DEFAULT_USER_SCHEDULE.weekend,
   };
 
-  writeTemplateCache(templates, user.id);
+  writeTemplateCache(templates, userId);
   return templates;
 }
 
 export async function saveScheduleTemplates(
+  userId: string | null = getActiveUserId(),
   templates: UserScheduleTemplates,
 ): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!userId) return;
 
   const { error } = await supabase.from("schedule_templates").upsert(
     {
-      user_id: user.id,
+      user_id: userId,
       wfh: templates.wfh,
       office: templates.office,
       weekend: templates.weekend,
@@ -373,14 +370,18 @@ export async function saveScheduleTemplates(
 
   if (error) throw error;
 
-  writeTemplateCache(templates, user.id);
+  writeTemplateCache(templates, userId);
   emit(SCHEDULE_TEMPLATE_EVENT);
 }
 
 export async function saveViewBlocks(
-  view: ScheduleView,
-  blocks: TimelineItem[],
+  userIdOrView: string | ScheduleView | null = getActiveUserId(),
+  viewOrBlocks?: ScheduleView | TimelineItem[],
+  maybeBlocks?: TimelineItem[],
 ): Promise<void> {
-  const current = await loadScheduleTemplates();
-  await saveScheduleTemplates({ ...current, [view]: blocks });
+  const userId = maybeBlocks === undefined ? getActiveUserId() : userIdOrView as string | null;
+  const view = (maybeBlocks === undefined ? userIdOrView : viewOrBlocks) as ScheduleView;
+  const blocks = (maybeBlocks === undefined ? viewOrBlocks : maybeBlocks) as TimelineItem[];
+  const current = await loadScheduleTemplates(userId);
+  await saveScheduleTemplates(userId, { ...current, [view]: blocks });
 }
