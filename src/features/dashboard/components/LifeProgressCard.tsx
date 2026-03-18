@@ -266,7 +266,7 @@ function buildNutritionProgress(
     icon: <Apple className="h-3.5 w-3.5" />,
     pct,
     primaryStat: `${inRange}/4 macros in range`,
-    secondaryStat: inRange === 4 ? 'Green across calories, protein, carbs, and fat' : 'Score is based on macro target ranges, not meal count',
+    secondaryStat: inRange === 4 ? 'Green across calories, protein, carbs, and fat' : 'Score is based on macro target hit',
     color: "orange",
     accentClass: "bg-orange-500",
   };
