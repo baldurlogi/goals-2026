@@ -354,13 +354,26 @@ export async function loadReadingInputs(): Promise<ReadingInputs> {
 
     const state = (data?.state ?? null) as Partial<ReadingInputs> | null;
     if (!state) {
-      const raw = localStorage.getItem(readingKey(getActiveUserId()));
-      const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
-      syncTodayReadingProgress(inputs, undefined, user.id);
-      return inputs;
+      try {
+        localStorage.removeItem(readingKey(user.id));
+      } catch {
+        // ignore
+      }
+
+      syncTodayReadingProgress(DEFAULT_READING_INPUTS, undefined, user.id);
+      return DEFAULT_READING_INPUTS;
     }
 
     const inputs = normalizeReadingInputs(state);
+
+    try {
+      const key = readingKey(user.id);
+      assertRegisteredCacheWrite(key);
+      localStorage.setItem(key, JSON.stringify(inputs));
+    } catch {
+      // ignore
+    }
+
     syncTodayReadingProgress(inputs, undefined, user.id);
     return inputs;
   } catch (error) {

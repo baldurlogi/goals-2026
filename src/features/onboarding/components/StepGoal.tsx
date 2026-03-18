@@ -16,7 +16,7 @@ export const StepGoal = memo(function StepGoal({ data, onChange }: Props) {
           onChange={(e) => onChange({ main_goal: e.target.value })}
           placeholder="Example: Run a half marathon in under 2 hours"
         />
-        <p className="text-xs text-muted-foreground">Keep it specific so AI can build a better plan.</p>
+        <p className="text-xs text-muted-foreground">Be specific about the outcome. Example: “Run a half marathon in under 2 hours” or “Read 24 books this year.”</p>
       </div>
       <div className="space-y-1.5">
         <label className="text-sm font-medium">Why this matters (optional)</label>

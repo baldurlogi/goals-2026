@@ -88,7 +88,7 @@ export const StepProfile = memo(function StepProfile({ data, onChange }: Props) 
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Use metric units: weight in kilograms (kg) and height in centimeters (cm).
+          Use metric units: weight in kilograms (kg) and height in centimeters (cm). Example: 72.5 kg and 178 cm.
         </p>
       </div>
     </div>

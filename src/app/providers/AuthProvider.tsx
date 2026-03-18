@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { AuthContext } from "@/features/auth/authContext";
 import { clearUserCache } from "@/lib/clearUserCache";
 import { setActiveUserId } from "@/lib/activeUser";
+import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
 
 function hasCachedProfileMismatch(nextUserId: string | null): boolean {
   try {
@@ -75,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setActiveUserId(nextUserId);
+    window.dispatchEvent(new CustomEvent(AUTH_USER_CHANGED_EVENT, { detail: { userId: nextUserId, previousUserId } }));
     previousUserIdRef.current = nextUserId;
     setSession(nextSession);
     setUser(nextUser);

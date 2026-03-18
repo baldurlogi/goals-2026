@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, Trophy } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -249,7 +249,7 @@ export function ProfilePage() {
       <Link to="/app/achievements">
         <Card className="mb-6 cursor-pointer rounded-2xl border-amber-500/20 bg-amber-500/5 transition-all hover:bg-amber-500/10">
           <CardContent className="flex items-center gap-4 py-5">
-            <Trophy className="h-5 w-5 text-amber-500" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-xl">🏆</div>
             <div className="flex-1">Achievements</div>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
           </CardContent>

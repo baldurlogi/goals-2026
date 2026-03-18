@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/features/auth/authContext";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import {
   GoalsStoreContext,
@@ -184,6 +185,7 @@ export function GoalStoreProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { userId: authUserId } = useAuth();
   const [state, rawDispatch] = React.useReducer(reducer, {
     done: {},
     loaded: false,
@@ -330,9 +332,14 @@ export function GoalStoreProvider({
           done[row.goal_id] = row.done;
         }
 
+        const mergedDone: DoneState = {
+          ...done,
+          ...latestDoneRef.current,
+        };
+
         if (!cancelled) {
-          dispatch({ type: "hydrate", done });
-          writeDoneCache(user.id, done);
+          dispatch({ type: "hydrate", done: mergedDone });
+          writeDoneCache(user.id, mergedDone);
         }
       } catch (error) {
         console.warn("goalStore load exception:", error);
@@ -348,7 +355,7 @@ export function GoalStoreProvider({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authUserId, dispatch]);
 
   React.useEffect(() => {
     if (!state.loaded || !userId) return;
