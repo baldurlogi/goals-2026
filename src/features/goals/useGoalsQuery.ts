@@ -5,7 +5,7 @@ import {
   deleteUserGoal,
   loadUserGoals,
   saveUserGoal,
-  seedUserGoals,
+  seedGoalCache,
 } from "./userGoalStorage";
 import type { UserGoal } from "./goalTypes";
 
@@ -14,9 +14,9 @@ export function useGoalsQuery() {
 
   return useQuery<UserGoal[]>({
     queryKey: queryKeys.goals(userId),
-    queryFn: () => loadUserGoals(),
+    queryFn: () => loadUserGoals(userId),
     enabled: authReady,
-    initialData: userId ? seedUserGoals() : [],
+    initialData: seedGoalCache(userId),
   });
 }
 
@@ -25,7 +25,7 @@ export function useSaveGoalMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: saveUserGoal,
+    mutationFn: (goal: UserGoal) => saveUserGoal(userId, goal),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.goals(userId) }),
@@ -42,7 +42,7 @@ export function useDeleteGoalMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: deleteUserGoal,
+    mutationFn: (goalId: string) => deleteUserGoal(userId, goalId),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.goals(userId) }),

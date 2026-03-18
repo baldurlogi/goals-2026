@@ -117,24 +117,20 @@ function writePhaseCache(
   }
 }
 
-export function seedNutritionLog(): NutritionLog {
-  return readLogCache() ?? emptyLog();
+export function seedNutritionCache(userId: string | null = getActiveUserId()): NutritionLog {
+  return readLogCache(userId) ?? emptyLog();
 }
 
-export async function loadPhase(): Promise<NutritionPhase> {
-  const cached = readPhaseCache();
+export async function loadPhase(userId: string | null = getActiveUserId()): Promise<NutritionPhase> {
+  const cached = readPhaseCache(userId);
   if (cached) return cached;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return "maintain";
+  if (!userId) return "maintain";
 
   const { data, error } = await supabase
     .from("nutrition_phase")
     .select("phase")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) {
@@ -145,53 +141,52 @@ export async function loadPhase(): Promise<NutritionPhase> {
   if (!data) {
     await supabase
       .from("nutrition_phase")
-      .insert({ user_id: user.id, phase: "maintain" });
+      .insert({ user_id: userId, phase: "maintain" });
 
-    writePhaseCache("maintain", user.id);
+    writePhaseCache("maintain", userId);
     return "maintain";
   }
 
   const phase = (data.phase as NutritionPhase) ?? "maintain";
-  writePhaseCache(phase, user.id);
+  writePhaseCache(phase, userId);
   return phase;
 }
 
-export async function savePhase(phase: NutritionPhase): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function savePhase(
+  userIdOrPhase: string | NutritionPhase | null = getActiveUserId(),
+  maybePhase?: NutritionPhase,
+): Promise<void> {
+  const userId = maybePhase === undefined ? getActiveUserId() : userIdOrPhase as string | null;
+  const phase = (maybePhase === undefined ? userIdOrPhase : maybePhase) as NutritionPhase;
 
-  if (!user) {
+  if (!userId) {
     emit();
     return;
   }
 
-  writePhaseCache(phase, user.id);
+  writePhaseCache(phase, userId);
 
   await supabase
     .from("nutrition_phase")
-    .upsert({ user_id: user.id, phase }, { onConflict: "user_id" });
+    .upsert({ user_id: userId, phase }, { onConflict: "user_id" });
 
   emit();
 }
 
 export async function loadNutritionLog(
+  userId: string | null = getActiveUserId(),
   date = todayKey(),
 ): Promise<NutritionLog> {
-  const cached = date === todayKey() ? readLogCache() : null;
+  const cached = date === todayKey() ? readLogCache(userId) : null;
   if (cached) return cached;
 
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return cached ?? emptyLog(date);
+    if (!userId) return cached ?? emptyLog(date);
 
     const { data, error } = await supabase
       .from("nutrition_logs")
       .select("log_date, eaten, custom_entries")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("log_date", date)
       .maybeSingle();
 
@@ -202,7 +197,7 @@ export async function loadNutritionLog(
 
     if (!data) {
       const created = {
-        user_id: user.id,
+        user_id: userId,
         log_date: date,
         eaten: {},
         custom_entries: [],
@@ -236,22 +231,18 @@ export async function loadNutritionLog(
   }
 }
 
-async function saveLog(log: NutritionLog): Promise<void> {
-  if (log.date === todayKey()) writeLogCache(log);
+async function saveNutritionLog(userId: string | null = getActiveUserId(), log: NutritionLog): Promise<void> {
+  if (log.date === todayKey()) writeLogCache(log, userId);
 
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!userId) {
       emit();
       return;
     }
 
     const { error } = await supabase.from("nutrition_logs").upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         log_date: log.date,
         eaten: log.eaten ?? {},
         custom_entries: log.customEntries ?? [],
@@ -270,18 +261,29 @@ async function saveLog(log: NutritionLog): Promise<void> {
   }
 }
 
-export async function toggleMeal(key: MealKey, eaten: boolean): Promise<void> {
-  const log = await loadNutritionLog();
+export async function toggleMeal(
+  userIdOrKey: string | MealKey | null = getActiveUserId(),
+  keyOrEaten?: MealKey | boolean,
+  maybeEaten?: boolean,
+): Promise<void> {
+  const userId = maybeEaten === undefined ? getActiveUserId() : userIdOrKey as string | null;
+  const key = (maybeEaten === undefined ? userIdOrKey : keyOrEaten) as MealKey;
+  const eaten = (maybeEaten === undefined ? keyOrEaten : maybeEaten) as boolean;
+  const log = await loadNutritionLog(userId);
   log.eaten = log.eaten ?? {};
   log.eaten[key] = eaten;
-  await saveLog(log);
+  await saveNutritionLog(userId, log);
 }
 
 export async function addCustomEntry(
-  name: string,
-  macros: Macros,
+  userIdOrName: string | null = getActiveUserId(),
+  nameOrMacros?: string | Macros,
+  maybeMacros?: Macros,
 ): Promise<void> {
-  const log = await loadNutritionLog();
+  const userId = maybeMacros === undefined ? getActiveUserId() : userIdOrName as string | null;
+  const name = (maybeMacros === undefined ? userIdOrName : nameOrMacros) as string;
+  const macros = (maybeMacros === undefined ? nameOrMacros : maybeMacros) as Macros;
+  const log = await loadNutritionLog(userId);
   log.customEntries = log.customEntries ?? [];
   log.customEntries.push({
     id: crypto.randomUUID(),
@@ -289,13 +291,18 @@ export async function addCustomEntry(
     macros,
     loggedAt: Date.now(),
   });
-  await saveLog(log);
+  await saveNutritionLog(userId, log);
 }
 
-export async function removeCustomEntry(id: string): Promise<void> {
-  const log = await loadNutritionLog();
+export async function removeCustomEntry(
+  userIdOrId: string | null = getActiveUserId(),
+  maybeId?: string,
+): Promise<void> {
+  const userId = maybeId === undefined ? getActiveUserId() : userIdOrId as string | null;
+  const id = (maybeId === undefined ? userIdOrId : maybeId) as string;
+  const log = await loadNutritionLog(userId);
   log.customEntries = (log.customEntries ?? []).filter((e) => e.id !== id);
-  await saveLog(log);
+  await saveNutritionLog(userId, log);
 }
 
 export async function loadSavedMeals(): Promise<SavedMeal[]> {
@@ -347,8 +354,13 @@ export async function deleteSavedMeal(id: string): Promise<void> {
   emit();
 }
 
-export async function logSavedMeal(meal: SavedMeal): Promise<void> {
-  await addCustomEntry(meal.name, meal.macros);
+export async function logSavedMeal(
+  userIdOrMeal: string | SavedMeal | null = getActiveUserId(),
+  maybeMeal?: SavedMeal,
+): Promise<void> {
+  const userId = maybeMeal === undefined ? getActiveUserId() : userIdOrMeal as string | null;
+  const meal = (maybeMeal === undefined ? userIdOrMeal : maybeMeal) as SavedMeal;
+  await addCustomEntry(userId, meal.name, meal.macros);
 }
 
 const MEAL_MACROS: Record<MealKey, Macros> = {
@@ -396,3 +408,5 @@ export function getLoggedMacros(log: NutritionLog | null | undefined): Macros {
     fat: fromMeals.fat + fromCustom.fat,
   };
 }
+
+export const seedNutritionLog = seedNutritionCache;

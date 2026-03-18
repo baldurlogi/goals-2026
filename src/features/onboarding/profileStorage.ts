@@ -1,8 +1,9 @@
 import { supabase } from "@/lib/supabaseClient";
 import {
+  getActiveUserId,
   getScopedStorageItem,
   legacyScopedKey,
-  scopedKey,
+  writeScopedStorageItem,
 } from "@/lib/activeUser";
 import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import type { ModuleId } from "@/features/modules/modules";
@@ -74,9 +75,6 @@ export type UserProfile = {
 const LEGACY_CACHE_KEY = "cache:profile:v1";
 const PROFILE_CACHE_KEY = CACHE_KEYS.PROFILE;
 
-function profileCacheKey(userId: string) {
-  return scopedKey(PROFILE_CACHE_KEY, userId);
-}
 
 export function mapLegacyScheduleToWeekly(
   legacy: LegacyScheduleView | null | undefined,
@@ -266,8 +264,9 @@ export function clearProfileState(): void {
 
 function writeProfileCache(profile: UserProfile) {
   try {
-    localStorage.setItem(
-      profileCacheKey(profile.id),
+    writeScopedStorageItem(
+      PROFILE_CACHE_KEY,
+      profile.id,
       JSON.stringify(normalizeUserProfile(profile)),
     );
     localStorage.removeItem(legacyScopedKey(PROFILE_CACHE_KEY, profile.id));
@@ -277,22 +276,22 @@ function writeProfileCache(profile: UserProfile) {
   }
 }
 
-export async function loadProfile(): Promise<UserProfile | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export function seedProfileCache(userId: string | null): UserProfile | null {
+  return readProfileCache(userId);
+}
 
-  if (!user) {
+export async function loadProfile(userId: string | null = getActiveUserId()): Promise<UserProfile | null> {
+  if (!userId) {
     clearProfileState();
     return null;
   }
 
-  const cached = readProfileCache(user.id);
+  const cached = readProfileCache(userId);
   if (cached) {
     return cached;
   }
 
-  const inFlight = inFlightProfileLoads.get(user.id);
+  const inFlight = inFlightProfileLoads.get(userId);
   if (inFlight) {
     return inFlight;
   }
@@ -301,7 +300,7 @@ export async function loadProfile(): Promise<UserProfile | null> {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+       .eq("id", userId)
       .single();
 
     if (error || !data) return null;
@@ -311,23 +310,20 @@ export async function loadProfile(): Promise<UserProfile | null> {
     return profile;
   })();
 
-  inFlightProfileLoads.set(user.id, loadPromise);
+  inFlightProfileLoads.set(userId, loadPromise);
 
   try {
     return await loadPromise;
   } finally {
-    inFlightProfileLoads.delete(user.id);
+    inFlightProfileLoads.delete(userId);
   }
 }
 
 export async function saveProfile(
+  userId: string | null,
   patch: Partial<Omit<UserProfile, "id">>,
-): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return;
+): Promise<UserProfile | null> {
+  if (!userId) return null;
 
   const normalizedPatch = { ...patch };
   if (normalizedPatch.weekly_schedule) {
@@ -342,20 +338,21 @@ export async function saveProfile(
 
   const { error } = await supabase
     .from("profiles")
-    .upsert({ id: user.id, ...normalizedPatch }, { onConflict: "id" });
+    .upsert({ id: userId, ...normalizedPatch }, { onConflict: "id" });
 
   if (error) throw error;
 
-  const cached = readProfileCache(user.id);
+  const cached = readProfileCache(userId);
   const next = normalizeUserProfile(
     cached
       ? ({ ...cached, ...normalizedPatch } as UserProfile)
-      : ({ ...defaultProfile(user.id), ...normalizedPatch } as UserProfile),
+      : ({ ...defaultProfile(userId), ...normalizedPatch } as UserProfile),
   );
 
   writeProfileCache(next);
-  inFlightProfileLoads.delete(user.id);
+  inFlightProfileLoads.delete(userId);
   emitProfileChanged();
+  return next;
 }
 
 export async function completeOnboarding(
@@ -368,7 +365,9 @@ export async function completeOnboarding(
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return;
+  const userId = user?.id ?? null;
+
+  if (!userId) return;
 
   const macros =
     profile.weight_kg && profile.height_cm && profile.age && profile.sex
@@ -381,7 +380,7 @@ export async function completeOnboarding(
         )
       : null;
 
-  await saveProfile({
+  await saveProfile(userId, {
     ...profile,
     macro_maintain: macros?.maintain ?? null,
     macro_cut: macros?.cut ?? null,

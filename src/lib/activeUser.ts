@@ -120,6 +120,29 @@ export function getScopedStorageItem(
   }
 }
 
+export function writeScopedStorageItem(
+  baseKey: string,
+  userId: string | null,
+  value: string,
+): void {
+  try {
+    const storage = getStorage();
+    if (!storage) return;
+
+    storage.setItem(scopedKey(baseKey, userId), value);
+
+    if (userId) {
+      storage.removeItem(legacyScopedKey(baseKey, userId));
+    }
+
+    if (userId || baseKey !== scopedKey(baseKey, userId)) {
+      storage.removeItem(baseKey);
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
 export function removeScopedStorageItem(
   baseKey: string,
   userId: string | null,

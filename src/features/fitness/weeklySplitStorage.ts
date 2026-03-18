@@ -90,17 +90,13 @@ function writeSplitCache(
   }
 }
 
-export async function loadWeeklySplit(): Promise<WeeklySplitConfig> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return readSplitCache();
+export async function loadWeeklySplit(userId: string | null = getActiveUserId()): Promise<WeeklySplitConfig> {
+  if (!userId) return readSplitCache();
 
   const { data, error } = await supabase
     .from("fitness_weekly_split")
     .select("config")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) {
@@ -110,22 +106,18 @@ export async function loadWeeklySplit(): Promise<WeeklySplitConfig> {
 
   if (data?.config) {
     const cfg = normalizeWeeklySplit(data.config as WeeklySplitConfig);
-    writeSplitCache(cfg);
+    writeSplitCache(cfg, userId);
     return cfg;
   }
 
   return readSplitCache();
 }
 
-export async function saveWeeklySplit(cfg: WeeklySplitConfig): Promise<void> {
+export async function saveWeeklySplit(userId: string | null = getActiveUserId(), cfg: WeeklySplitConfig): Promise<void> {
   const normalized = normalizeWeeklySplit(cfg);
-  writeSplitCache(normalized);
+  writeSplitCache(normalized, userId);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!userId) {
     emit();
     return;
   }
@@ -133,7 +125,7 @@ export async function saveWeeklySplit(cfg: WeeklySplitConfig): Promise<void> {
   const { error } = await supabase
     .from("fitness_weekly_split")
     .upsert(
-      { user_id: user.id, config: normalized },
+      { user_id: userId, config: normalized },
       { onConflict: "user_id" },
     );
 
@@ -148,6 +140,7 @@ export async function saveWeeklySplit(cfg: WeeklySplitConfig): Promise<void> {
 export async function toggleDayCompletion(
   cfg: WeeklySplitConfig,
   day: DayKey,
+  userId: string | null = getActiveUserId(),
 ): Promise<WeeklySplitConfig> {
   const normalizedCfg = normalizeWeeklySplit(cfg);
   const today = todayISO();
@@ -186,7 +179,7 @@ export async function toggleDayCompletion(
     lastStreakDate,
   };
 
-  await saveWeeklySplit(next);
+  await saveWeeklySplit(userId, next);
   return next;
 }
 
@@ -194,6 +187,7 @@ export async function updateDayLabel(
   cfg: WeeklySplitConfig,
   day: DayKey,
   label: string,
+  userId: string | null = getActiveUserId(),
 ): Promise<WeeklySplitConfig> {
   const normalizedCfg = normalizeWeeklySplit(cfg);
 
@@ -208,6 +202,6 @@ export async function updateDayLabel(
     },
   };
 
-  await saveWeeklySplit(next);
+  await saveWeeklySplit(userId, next);
   return next;
 }

@@ -146,26 +146,23 @@ function recordTodoCompletion(
   writeTodoCompletionHistory(entries, userId);
 }
 
-/** Synchronous seed — returns todos from cache. Zero network. */
-export function seedTodos(): Todo[] {
-  return readTodoCache() ?? [];
+/** Synchronous seed — returns todos from the query seed mirror. Zero network. */
+export function seedTodoCache(userId: string | null): Todo[] {
+  return readTodoCache(userId) ?? [];
 }
 
-export async function listTodos(): Promise<Todo[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return readTodoCache(null) ?? [];
+export async function loadTodos(userId: string | null = getActiveUserId()): Promise<Todo[]> {
+  if (!userId) return readTodoCache(null) ?? [];
 
-  const cached = readTodoCache(user.id);
+  const cached = readTodoCache(userId);
   if (cached) {
     supabase
       .from("todos")
       .select("id,text,done,created_at")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .then(({ data }) => {
-        if (data) writeTodoCache(data as Todo[], user.id);
+        if (data) writeTodoCache(data as Todo[], userId);
       });
     return cached;
   }
@@ -173,7 +170,7 @@ export async function listTodos(): Promise<Todo[]> {
   const { data, error } = await supabase
     .from("todos")
     .select("id,text,done,created_at")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -182,15 +179,12 @@ export async function listTodos(): Promise<Todo[]> {
   }
 
   const todos = (data ?? []) as Todo[];
-  writeTodoCache(todos, user.id);
+  writeTodoCache(todos, userId);
   return todos;
 }
 
-export async function addTodo(text: string): Promise<StorageMutationResult> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+export async function addTodo(userId: string | null, text: string): Promise<StorageMutationResult> {
+  if (!userId) {
     markPendingSync("add", { text }, null);
     return { ok: false, error: "Not signed in. Unable to save todo." };
   }
@@ -200,26 +194,26 @@ export async function addTodo(text: string): Promise<StorageMutationResult> {
 
   const { data, error } = await supabase
     .from("todos")
-    .insert({ user_id: user.id, text: trimmed, done: false })
+    .insert({ user_id: userId, text: trimmed, done: false })
     .select("id,text,done,created_at")
     .single();
 
   if (error) {
-    markPendingSync("add", { text: trimmed }, user.id);
+    markPendingSync("add", { text: trimmed }, userId);
     const result = storageError(error);
     console.error(`${LOG_TAG} add failed`, {
       error: result.error,
-      userId: user.id,
+      userId,
     });
     emit();
     return result;
   }
 
-  writeTodoCache([data as Todo, ...(readTodoCache(user.id) ?? [])], user.id);
-  clearPendingSync(user.id);
+  writeTodoCache([data as Todo, ...(readTodoCache(userId) ?? [])], userId);
+  clearPendingSync(userId);
   console.debug(`${LOG_TAG} add success`, {
     todoId: data?.id,
-    userId: user.id,
+    userId,
   });
 
   emit();
@@ -227,23 +221,21 @@ export async function addTodo(text: string): Promise<StorageMutationResult> {
 }
 
 export async function setTodoDone(
+  userId: string | null,
   id: string,
   done: boolean,
 ): Promise<StorageMutationResult> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
+  if (!userId)
     return { ok: false, error: "Not signed in. Unable to update todo." };
 
   const { error } = await supabase
     .from("todos")
     .update({ done })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", userId);
 
   if (error) {
-    markPendingSync("setDone", { id, done }, user.id);
+    markPendingSync("setDone", { id, done }, userId);
     const result = storageError(error);
     console.error(`${LOG_TAG} set done failed`, {
       id,
@@ -253,80 +245,74 @@ export async function setTodoDone(
     return result;
   }
 
-  recordTodoCompletion(id, done, user.id);
+  recordTodoCompletion(id, done, userId);
 
-  const cached = readTodoCache(user.id);
+  const cached = readTodoCache(userId);
   if (cached) {
     writeTodoCache(
       cached.map((todo) => (todo.id === id ? { ...todo, done } : todo)),
-      user.id,
+      userId,
     );
   }
-  clearPendingSync(user.id);
+  clearPendingSync(userId);
   emit();
   return storageOk();
 }
 
-export async function deleteTodo(id: string): Promise<StorageMutationResult> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
+export async function deleteTodo(userId: string | null, id: string): Promise<StorageMutationResult> {
+  if (!userId)
     return { ok: false, error: "Not signed in. Unable to delete todo." };
 
   const { error } = await supabase
     .from("todos")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", userId);
 
   if (error) {
-    markPendingSync("delete", { id }, user.id);
+    markPendingSync("delete", { id }, userId);
     const result = storageError(error);
     console.error(`${LOG_TAG} delete failed`, { id, error: result.error });
     return result;
   }
 
-  const cached = readTodoCache(user.id);
+  const cached = readTodoCache(userId);
   if (cached) {
     writeTodoCache(
       cached.filter((todo) => todo.id !== id),
-      user.id,
+      userId,
     );
   }
-  clearPendingSync(user.id);
+  clearPendingSync(userId);
   emit();
   return storageOk();
 }
 
-export async function clearCompleted(): Promise<StorageMutationResult> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
+export async function clearCompleted(userId: string | null): Promise<StorageMutationResult> {
+  if (!userId)
     return { ok: false, error: "Not signed in. Unable to clear todos." };
 
   const { error } = await supabase
     .from("todos")
     .delete()
     .eq("done", true)
-    .eq("user_id", user.id);
+    .eq("user_id", userId);
 
   if (error) {
-    markPendingSync("clearCompleted", { done: true }, user.id);
+    markPendingSync("clearCompleted", { done: true }, userId);
     const result = storageError(error);
     console.error(`${LOG_TAG} clear completed failed`, { error: result.error });
     return result;
   }
 
-  const cached = readTodoCache(user.id);
+  const cached = readTodoCache(userId);
   if (cached) {
     writeTodoCache(
       cached.filter((todo) => !todo.done),
-      user.id,
+      userId,
     );
   }
-  clearPendingSync(user.id);
+  clearPendingSync(userId);
   emit();
   return storageOk();
 }
@@ -372,18 +358,15 @@ export function getTodoWeeklySummary(
 
 export type TodoItem = Todo;
 
-export async function toggleTodo(id: string): Promise<StorageMutationResult> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
+export async function toggleTodo(userId: string | null, id: string): Promise<StorageMutationResult> {
+  if (!userId)
     return { ok: false, error: "Not signed in. Unable to update todo." };
 
   const { data, error } = await supabase
     .from("todos")
     .select("done")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .single();
 
   if (error) {
@@ -401,10 +384,10 @@ export async function toggleTodo(id: string): Promise<StorageMutationResult> {
     .from("todos")
     .update({ done: nextDone })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", userId);
 
   if (updateError) {
-    markPendingSync("toggle", { id }, user.id);
+    markPendingSync("toggle", { id }, userId);
     const result = storageError(updateError);
     console.error(`${LOG_TAG} toggle update failed`, {
       id,
@@ -413,20 +396,22 @@ export async function toggleTodo(id: string): Promise<StorageMutationResult> {
     return result;
   }
 
-  recordTodoCompletion(id, nextDone, user.id);
+  recordTodoCompletion(id, nextDone, userId);
 
-  const cached = readTodoCache(user.id);
+  const cached = readTodoCache(userId);
   if (cached) {
     writeTodoCache(
       cached.map((todo) =>
         todo.id === id ? { ...todo, done: nextDone } : todo,
       ),
-      user.id,
+      userId,
     );
   }
-  clearPendingSync(user.id);
+  clearPendingSync(userId);
   emit();
   return storageOk();
 }
 
-export const loadTodos = listTodos;
+
+export const listTodos = loadTodos;
+export const seedTodos = seedTodoCache;
