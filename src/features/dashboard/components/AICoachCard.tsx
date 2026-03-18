@@ -10,6 +10,7 @@ import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
+import { TODO_CHANGED_EVENT } from "@/features/todos/todoStorage";
 import { useAuth } from "@/features/auth/authContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -264,7 +265,10 @@ function buildStarterSuggestion(
     };
   }
 
-  if (signals.modules.includes("todos") && signals.todos?.totalToday === 0) {
+  if (
+    signals.modules.includes("todos") &&
+    (!signals.todos || signals.todos.totalCount === 0)
+  ) {
     return {
       action: "Add one small to-do",
       reason: "Even one task gives your coach a concrete place to start.",
@@ -438,17 +442,19 @@ function AICoachCardInner() {
       void loadStatic(userId, cached === null);
     }, cached ? 180 : 40);
 
-    const handleReadingChanged = () => {
+    const handleSignalsChanged = () => {
       clearCache(userId);
       void loadStatic(userId, false);
     };
 
-    window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+    window.addEventListener(READING_CHANGED_EVENT, handleSignalsChanged);
+    window.addEventListener(TODO_CHANGED_EVENT, handleSignalsChanged);
 
     return () => {
       cancelled = true;
       cancelIdleLoad();
-      window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+      window.removeEventListener(READING_CHANGED_EVENT, handleSignalsChanged);
+      window.removeEventListener(TODO_CHANGED_EVENT, handleSignalsChanged);
     };
   }, [userId, loadStatic]);
 

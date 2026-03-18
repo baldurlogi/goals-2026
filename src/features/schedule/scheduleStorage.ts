@@ -16,6 +16,7 @@ import {
   getActiveUserId,
   getScopedStorageItem,
   scopedKey,
+  writeScopedStorageItem,
 } from "@/lib/activeUser";
 
 export const SCHEDULE_CHANGED_EVENT = "schedule:changed";
@@ -49,8 +50,6 @@ function scheduleValueToView(value: WeeklySchedule[WeekdayKey]): ScheduleView {
   return "weekend";
 }
 
-// ── Schedule log (daily check-off) ───────────────────────────────────────
-
 export type ScheduleLog = {
   date: string;
   view: ScheduleView;
@@ -62,8 +61,6 @@ export const DEFAULT_SCHEDULE_LOG: ScheduleLog = {
   view: "wfh",
   completed: [],
 };
-
-// ── Schedule log cache ────────────────────────────────────────────────────
 
 export const SCHEDULE_LOG_CACHE_KEY = CACHE_KEYS.SCHEDULE_LOG;
 
@@ -90,10 +87,12 @@ function writeLogCache(
   log: ScheduleLog,
   userId: string | null = getActiveUserId(),
 ): void {
+  if (!userId) return;
+
   try {
     const key = scheduleLogKey(userId);
     assertRegisteredCacheWrite(key);
-    localStorage.setItem(key, JSON.stringify(log));
+    writeScopedStorageItem(SCHEDULE_LOG_CACHE_KEY, userId, JSON.stringify(log));
   } catch {
     // ignore
   }
@@ -115,7 +114,10 @@ function patchCompleted(
   return completed.filter((i) => i !== index);
 }
 
-async function persistLog(userId: string | null = getActiveUserId(), log: ScheduleLog): Promise<void> {
+async function persistLog(
+  userId: string | null = getActiveUserId(),
+  log: ScheduleLog,
+): Promise<void> {
   if (!userId) return;
 
   const { error } = await supabase.from("schedule_logs").upsert(
@@ -131,24 +133,29 @@ async function persistLog(userId: string | null = getActiveUserId(), log: Schedu
   if (error) throw error;
 }
 
-function commitLogOptimistically(log: ScheduleLog): ScheduleLog {
+function commitLogOptimistically(
+  log: ScheduleLog,
+  userId: string | null = getActiveUserId(),
+): ScheduleLog {
   const next: ScheduleLog = {
     ...log,
     completed: normalizeCompleted(log.completed),
   };
 
-  writeLogCache(next);
+  writeLogCache(next, userId);
   emit(SCHEDULE_CHANGED_EVENT);
   return next;
 }
 
-/** Synchronous seed — returns today's schedule log from cache. Zero network. */
-export function seedScheduleLog(userId: string | null = getActiveUserId()): ScheduleLog {
+export function seedScheduleLog(
+  userId: string | null = getActiveUserId(),
+): ScheduleLog {
   return readLogCache(userId) ?? { ...DEFAULT_SCHEDULE_LOG, date: getLocalDateKey() };
 }
 
-export async function loadScheduleLog(userId: string | null = getActiveUserId()): Promise<ScheduleLog> {
-
+export async function loadScheduleLog(
+  userId: string | null = getActiveUserId(),
+): Promise<ScheduleLog> {
   const date = todayKey();
   const empty: ScheduleLog = { ...DEFAULT_SCHEDULE_LOG, date };
 
@@ -173,19 +180,15 @@ export async function loadScheduleLog(userId: string | null = getActiveUserId())
     const { data: profile } = await supabase
       .from("profiles")
       .select("default_schedule_view, weekly_schedule")
-       .eq("id", userId)
+      .eq("id", userId)
       .single();
 
     const weeklySchedule = normalizeWeeklySchedule(
       (profile?.weekly_schedule as WeeklySchedule | null | undefined) ?? null,
-      (profile?.default_schedule_view as ScheduleView | null | undefined) ??
-        null,
+      (profile?.default_schedule_view as ScheduleView | null | undefined) ?? null,
     );
 
-    const defaultView = scheduleValueToView(
-      weeklySchedule[currentWeekdayKey()],
-    );
-
+    const defaultView = scheduleValueToView(weeklySchedule[currentWeekdayKey()]);
     const next: ScheduleLog = { ...empty, view: defaultView };
 
     writeLogCache(next, userId);
@@ -238,10 +241,12 @@ export async function setTodayView(
   userIdOrView: string | ScheduleView | null = getActiveUserId(),
   maybeView?: ScheduleView,
 ): Promise<ScheduleLog> {
-  const userId = maybeView === undefined ? getActiveUserId() : userIdOrView as string | null;
+  const userId =
+    maybeView === undefined ? getActiveUserId() : (userIdOrView as string | null);
   const view = (maybeView === undefined ? userIdOrView : maybeView) as ScheduleView;
+
   const current = await loadScheduleLog(userId);
-  const next = commitLogOptimistically(applyViewToLog(current, view));
+  const next = commitLogOptimistically(applyViewToLog(current, view), userId);
 
   try {
     await persistLog(userId, next);
@@ -258,11 +263,16 @@ export async function toggleBlock(
   indexOrDone?: number | boolean,
   maybeDone?: boolean,
 ): Promise<ScheduleLog> {
-  const userId = maybeDone === undefined ? getActiveUserId() : userIdOrIndex as string | null;
+  const userId =
+    maybeDone === undefined ? getActiveUserId() : (userIdOrIndex as string | null);
   const index = (maybeDone === undefined ? userIdOrIndex : indexOrDone) as number;
   const done = (maybeDone === undefined ? indexOrDone : maybeDone) as boolean;
+
   const current = await loadScheduleLog(userId);
-  const next = commitLogOptimistically(applyToggleToLog(current, index, done));
+  const next = commitLogOptimistically(
+    applyToggleToLog(current, index, done),
+    userId,
+  );
 
   try {
     await persistLog(userId, next);
@@ -283,8 +293,6 @@ export function getScheduleSummary(log: ScheduleLog, total: number) {
   };
 }
 
-// ── User schedule templates (editable blocks) ────────────────────────────
-
 const TEMPLATE_CACHE_KEY = CACHE_KEYS.SCHEDULE_TEMPLATES;
 
 function scheduleTemplateKey(userId: string | null = getActiveUserId()) {
@@ -296,30 +304,36 @@ function readTemplateCache(
 ): UserScheduleTemplates | null {
   try {
     const raw = getScopedStorageItem(TEMPLATE_CACHE_KEY, userId);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? (JSON.parse(raw) as UserScheduleTemplates) : null;
   } catch {
     return null;
   }
 }
 
 function writeTemplateCache(
-  t: UserScheduleTemplates,
+  templates: UserScheduleTemplates,
   userId: string | null = getActiveUserId(),
 ) {
+  if (!userId) return;
+
   try {
     const key = scheduleTemplateKey(userId);
     assertRegisteredCacheWrite(key);
-    localStorage.setItem(key, JSON.stringify(t));
+    writeScopedStorageItem(TEMPLATE_CACHE_KEY, userId, JSON.stringify(templates));
   } catch {
-    return;
+    // ignore
   }
 }
 
-export function seedScheduleTemplates(userId: string | null = getActiveUserId()): UserScheduleTemplates {
+export function seedScheduleTemplates(
+  userId: string | null = getActiveUserId(),
+): UserScheduleTemplates {
   return readTemplateCache(userId) ?? DEFAULT_USER_SCHEDULE;
 }
 
-export async function loadScheduleTemplates(userId: string | null = getActiveUserId()): Promise<UserScheduleTemplates> {
+export async function loadScheduleTemplates(
+  userId: string | null = getActiveUserId(),
+): Promise<UserScheduleTemplates> {
   if (!userId) return DEFAULT_USER_SCHEDULE;
 
   const { data, error } = await supabase
@@ -338,6 +352,7 @@ export async function loadScheduleTemplates(userId: string | null = getActiveUse
       },
       { onConflict: "user_id" },
     );
+
     writeTemplateCache(DEFAULT_USER_SCHEDULE, userId);
     return DEFAULT_USER_SCHEDULE;
   }
@@ -379,9 +394,11 @@ export async function saveViewBlocks(
   viewOrBlocks?: ScheduleView | TimelineItem[],
   maybeBlocks?: TimelineItem[],
 ): Promise<void> {
-  const userId = maybeBlocks === undefined ? getActiveUserId() : userIdOrView as string | null;
+  const userId =
+    maybeBlocks === undefined ? getActiveUserId() : (userIdOrView as string | null);
   const view = (maybeBlocks === undefined ? userIdOrView : viewOrBlocks) as ScheduleView;
   const blocks = (maybeBlocks === undefined ? viewOrBlocks : maybeBlocks) as TimelineItem[];
+
   const current = await loadScheduleTemplates(userId);
   await saveScheduleTemplates(userId, { ...current, [view]: blocks });
 }

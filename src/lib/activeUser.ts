@@ -93,7 +93,7 @@ export function getScopedStorageItem(
 ): string | null {
   try {
     const storage = getStorage();
-    if (!storage) return null;
+    if (!storage || !userId) return null;
 
     const namespacedKey = scopedKey(baseKey, userId);
     const namespacedValue = storage.getItem(namespacedKey);
@@ -127,17 +127,11 @@ export function writeScopedStorageItem(
 ): void {
   try {
     const storage = getStorage();
-    if (!storage) return;
+    if (!storage || !userId) return;
 
     storage.setItem(scopedKey(baseKey, userId), value);
-
-    if (userId) {
-      storage.removeItem(legacyScopedKey(baseKey, userId));
-    }
-
-    if (userId || baseKey !== scopedKey(baseKey, userId)) {
-      storage.removeItem(baseKey);
-    }
+    storage.removeItem(legacyScopedKey(baseKey, userId));
+    storage.removeItem(baseKey);
   } catch {
     // ignore storage failures
   }
@@ -149,13 +143,10 @@ export function removeScopedStorageItem(
 ): void {
   try {
     const storage = getStorage();
-    if (!storage) return;
+    if (!storage || !userId) return;
 
     storage.removeItem(scopedKey(baseKey, userId));
-
-    if (userId) {
-      storage.removeItem(legacyScopedKey(baseKey, userId));
-    }
+    storage.removeItem(legacyScopedKey(baseKey, userId));
   } catch {
     // ignore storage failures
   }

@@ -3,8 +3,10 @@ import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 import {
   getActiveUserId,
   getScopedStorageItem,
-  scopedKey,
+  removeScopedStorageItem,
+  writeScopedStorageItem,
 } from "@/lib/activeUser";
+import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
 import type { Tier } from "./useTier";
 
 export type AIUsageSnapshot = {
@@ -26,18 +28,45 @@ type UsageLike = {
 };
 
 const STORAGE_KEY = CACHE_KEYS.AI_USAGE;
-
-function getStorageKey() {
-  return scopedKey(STORAGE_KEY, getActiveUserId());
-}
 export const AI_USAGE_EVENT = "ai-usage-updated";
 
 function getMonthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function coerceTier(value: unknown): Tier {
-  return value === "pro" || value === "pro_max" ? value : "free";
+function coerceTier(value: unknown): Tier | null {
+  if (value === "pro" || value === "pro_max" || value === "free") {
+    return value;
+  }
+
+  return null;
+}
+
+function inferTierFromMonthlyLimit(monthlyLimit: number | null): Tier | null {
+  if (monthlyLimit === null) return null;
+  if (monthlyLimit >= 1000) return "pro_max";
+  if (monthlyLimit >= 200) return "pro";
+  if (monthlyLimit >= 1) return "free";
+  return null;
+}
+
+function resolveTier(
+  input: UsageLike,
+  existingSnapshot: AIUsageSnapshot | null,
+  fallbackTier?: Tier,
+): Tier {
+  return (
+    coerceTier(input.tier) ??
+    inferTierFromMonthlyLimit(
+      typeof (input.monthlyLimit ?? input.monthly_limit) === "number" &&
+        Number.isFinite(input.monthlyLimit ?? input.monthly_limit)
+        ? Math.max(1, Number(input.monthlyLimit ?? input.monthly_limit))
+        : null,
+    ) ??
+    existingSnapshot?.tier ??
+    fallbackTier ??
+    "free"
+  );
 }
 
 export function defaultMonthlyLimitForTier(tier: Tier): number {
@@ -55,29 +84,37 @@ function emitUsageUpdated() {
 export function readAIUsageCache(): AIUsageSnapshot | null {
   if (typeof window === "undefined") return null;
 
+  const userId = getActiveUserId();
+  if (!userId) return null;
+
   try {
-    const key = getStorageKey();
-    const raw = getScopedStorageItem(STORAGE_KEY, getActiveUserId());
+    const raw = getScopedStorageItem(STORAGE_KEY, userId);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as Partial<AIUsageSnapshot>;
     const currentMonth = getMonthKey();
 
     if (parsed.monthKey !== currentMonth) {
-      localStorage.removeItem(key);
+      removeScopedStorageItem(STORAGE_KEY, userId);
       return null;
     }
 
-    const tier = coerceTier(parsed.tier);
+    const parsedTier =
+      coerceTier(parsed.tier) ??
+      inferTierFromMonthlyLimit(
+        typeof parsed.monthlyLimit === "number" && Number.isFinite(parsed.monthlyLimit)
+          ? Math.max(1, parsed.monthlyLimit)
+          : null,
+      ) ??
+      "free";
+
     const monthlyLimit =
-      typeof parsed.monthlyLimit === "number" &&
-      Number.isFinite(parsed.monthlyLimit)
+      typeof parsed.monthlyLimit === "number" && Number.isFinite(parsed.monthlyLimit)
         ? Math.max(1, parsed.monthlyLimit)
-        : defaultMonthlyLimitForTier(tier);
+        : defaultMonthlyLimitForTier(parsedTier);
 
     const promptsUsed =
-      typeof parsed.promptsUsed === "number" &&
-      Number.isFinite(parsed.promptsUsed)
+      typeof parsed.promptsUsed === "number" && Number.isFinite(parsed.promptsUsed)
         ? Math.max(0, parsed.promptsUsed)
         : 0;
 
@@ -88,13 +125,12 @@ export function readAIUsageCache(): AIUsageSnapshot | null {
 
     return {
       monthKey: currentMonth,
-      tier,
+      tier: parsedTier,
       monthlyLimit,
       promptsUsed,
       remaining,
       updatedAt:
-        typeof parsed.updatedAt === "number" &&
-        Number.isFinite(parsed.updatedAt)
+        typeof parsed.updatedAt === "number" && Number.isFinite(parsed.updatedAt)
           ? parsed.updatedAt
           : Date.now(),
     };
@@ -103,8 +139,16 @@ export function readAIUsageCache(): AIUsageSnapshot | null {
   }
 }
 
-export function writeAIUsageCache(input: UsageLike): AIUsageSnapshot {
-  const tier = coerceTier(input.tier);
+export function writeAIUsageCache(
+  input: UsageLike,
+  fallbackTier?: Tier,
+): AIUsageSnapshot | null {
+  const userId = getActiveUserId();
+  if (!userId) return null;
+
+  const existingSnapshot = readAIUsageCache();
+  const tier = resolveTier(input, existingSnapshot, fallbackTier);
+
   const monthlyLimitRaw = input.monthlyLimit ?? input.monthly_limit;
   const promptsUsedRaw = input.promptsUsed ?? input.prompts_used;
   const remainingRaw = input.remaining;
@@ -112,14 +156,14 @@ export function writeAIUsageCache(input: UsageLike): AIUsageSnapshot {
   const monthlyLimit =
     typeof monthlyLimitRaw === "number" && Number.isFinite(monthlyLimitRaw)
       ? Math.max(1, monthlyLimitRaw)
-      : defaultMonthlyLimitForTier(tier);
+      : existingSnapshot?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
 
   const promptsUsed =
     typeof promptsUsedRaw === "number" && Number.isFinite(promptsUsedRaw)
       ? Math.max(0, promptsUsedRaw)
       : typeof remainingRaw === "number" && Number.isFinite(remainingRaw)
         ? Math.max(0, monthlyLimit - remainingRaw)
-        : 0;
+        : existingSnapshot?.promptsUsed ?? 0;
 
   const remaining =
     typeof remainingRaw === "number" && Number.isFinite(remainingRaw)
@@ -136,9 +180,8 @@ export function writeAIUsageCache(input: UsageLike): AIUsageSnapshot {
   };
 
   try {
-    const key = getStorageKey();
-    assertRegisteredCacheWrite(key);
-    localStorage.setItem(key, JSON.stringify(snapshot));
+    assertRegisteredCacheWrite(`${STORAGE_KEY}:${userId}`);
+    writeScopedStorageItem(STORAGE_KEY, userId, JSON.stringify(snapshot));
   } catch {
     // ignore storage failures
   }
@@ -147,27 +190,53 @@ export function writeAIUsageCache(input: UsageLike): AIUsageSnapshot {
   return snapshot;
 }
 
-export function markAIUsageLimitReached(input: UsageLike): AIUsageSnapshot {
-  const tier = coerceTier(input.tier);
+export function bumpAIUsageCache(fallbackTier?: Tier): AIUsageSnapshot | null {
+  const existing = readAIUsageCache();
+  const tier = existing?.tier ?? fallbackTier ?? "free";
+  const monthlyLimit = existing?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
+  const promptsUsed = Math.min(monthlyLimit, (existing?.promptsUsed ?? 0) + 1);
+  const remaining = Math.max(0, monthlyLimit - promptsUsed);
+
+  return writeAIUsageCache(
+    {
+      tier,
+      monthlyLimit,
+      promptsUsed,
+      remaining,
+    },
+    tier,
+  );
+}
+
+export function markAIUsageLimitReached(
+  input: UsageLike,
+  fallbackTier?: Tier,
+): AIUsageSnapshot | null {
+  const existingSnapshot = readAIUsageCache();
+  const tier = resolveTier(input, existingSnapshot, fallbackTier);
+
   const monthlyLimitRaw = input.monthlyLimit ?? input.monthly_limit;
   const promptsUsedRaw = input.promptsUsed ?? input.prompts_used;
 
   const monthlyLimit =
     typeof monthlyLimitRaw === "number" && Number.isFinite(monthlyLimitRaw)
       ? Math.max(1, monthlyLimitRaw)
-      : defaultMonthlyLimitForTier(tier);
+      : existingSnapshot?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
 
   const promptsUsed =
     typeof promptsUsedRaw === "number" && Number.isFinite(promptsUsedRaw)
       ? Math.max(0, promptsUsedRaw)
       : monthlyLimit;
 
-  return writeAIUsageCache({
+  return writeAIUsageCache(
+    {
+      tier,
+      monthlyLimit,
+      promptsUsed,
+      remaining: 0,
+    },
     tier,
-    monthlyLimit,
-    promptsUsed,
-    remaining: 0,
-  });
+  );
 }
 
 export function useAIUsageSnapshot(expectedTier?: Tier) {
@@ -183,10 +252,15 @@ export function useAIUsageSnapshot(expectedTier?: Tier) {
 
     window.addEventListener("storage", refresh);
     window.addEventListener(AI_USAGE_EVENT, refresh as EventListener);
+    window.addEventListener(AUTH_USER_CHANGED_EVENT, refresh as EventListener);
 
     return () => {
       window.removeEventListener("storage", refresh);
       window.removeEventListener(AI_USAGE_EVENT, refresh as EventListener);
+      window.removeEventListener(
+        AUTH_USER_CHANGED_EVENT,
+        refresh as EventListener,
+      );
     };
   }, []);
 

@@ -1,4 +1,3 @@
-// src/features/reading/readingStorage.ts
 import type { ReadingInputs } from "./readingTypes";
 import { supabase } from "@/lib/supabaseClient";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
@@ -6,14 +5,14 @@ import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
 import {
   getActiveUserId,
   getScopedStorageItem,
+  removeScopedStorageItem,
   scopedKey,
+  writeScopedStorageItem,
 } from "@/lib/activeUser";
 
-// Local key only used for optional legacy fallback + migration safety
 const STORAGE_KEY = CACHE_KEYS.READING;
 const READING_DAILY_PROGRESS_KEY = CACHE_KEYS.READING_DAILY_PROGRESS;
 const AI_SIGNALS_CACHE_KEY = CACHE_KEYS.AI_SIGNALS;
-
 const READING_HISTORY_KEY = CACHE_KEYS.READING_HISTORY;
 
 function readingKey(userId: string | null = getActiveUserId()) {
@@ -26,10 +25,6 @@ function dailyProgressKey(userId: string | null = getActiveUserId()) {
 
 function readingHistoryKey(userId: string | null = getActiveUserId()) {
   return scopedKey(READING_HISTORY_KEY, userId);
-}
-
-function aiSignalsKey(userId: string | null = getActiveUserId()) {
-  return scopedKey(AI_SIGNALS_CACHE_KEY, userId);
 }
 
 export type ReadingHistoryEntry = {
@@ -67,11 +62,7 @@ export type TodayReadingProgress = {
 };
 
 function clearAISignalsCache(userId: string | null) {
-  try {
-    localStorage.removeItem(aiSignalsKey(userId));
-  } catch {
-    // ignore
-  }
+  removeScopedStorageItem(AI_SIGNALS_CACHE_KEY, userId);
 }
 
 export const READING_CHANGED_EVENT = "daily-life:reading:changed";
@@ -134,21 +125,24 @@ function writeDailyProgressCache(
   cache: ReadingDailyProgressCache,
   userId: string | null = getActiveUserId(),
 ) {
+  if (!userId) return;
+
   try {
     const key = dailyProgressKey(userId);
     assertRegisteredCacheWrite(key);
-    localStorage.setItem(key, JSON.stringify(cache));
+    writeScopedStorageItem(
+      READING_DAILY_PROGRESS_KEY,
+      userId,
+      JSON.stringify(cache),
+    );
   } catch {
     // ignore
   }
 }
 
 function clearDailyProgressCache(userId: string | null = getActiveUserId()) {
-  try {
-    localStorage.removeItem(dailyProgressKey(userId));
-  } catch {
-    // ignore
-  }
+  if (!userId) return;
+  removeScopedStorageItem(READING_DAILY_PROGRESS_KEY, userId);
 }
 
 function readReadingHistoryCache(
@@ -166,10 +160,12 @@ function writeReadingHistoryCache(
   entries: ReadingHistoryEntry[],
   userId: string | null = getActiveUserId(),
 ) {
+  if (!userId) return;
+
   try {
     const key = readingHistoryKey(userId);
     assertRegisteredCacheWrite(key);
-    localStorage.setItem(key, JSON.stringify(entries));
+    writeScopedStorageItem(READING_HISTORY_KEY, userId, JSON.stringify(entries));
   } catch {
     // ignore
   }
@@ -245,8 +241,6 @@ function syncTodayReadingProgress(
 
   let nextCache: ReadingDailyProgressCache;
 
-  // First reading snapshot of the day for this book:
-  // treat the current absolute page as the baseline, not as "pages read today".
   if (!cached || cached.bookKey !== bookKey) {
     nextCache = createProgressSnapshot(today, bookKey, currentPage);
   } else {
@@ -258,16 +252,12 @@ function syncTodayReadingProgress(
       (!hasPreviousPage || previousPage === 0);
 
     if (firstMeaningfulPageSet) {
-      // Example:
-      // user starts tracking a book and enters "103" as current page.
-      // That should establish today's baseline at 103, not count as 103 pages read today.
       nextCache = createProgressSnapshot(today, bookKey, currentPage);
     } else if (
       hasPreviousPage &&
       previousPage > 0 &&
       currentPage >= previousPage
     ) {
-      // Normal forward progress during the day.
       nextCache = {
         ...cached,
         latestPage: currentPage,
@@ -277,15 +267,11 @@ function syncTodayReadingProgress(
       previousPage > 0 &&
       currentPage < previousPage
     ) {
-      // Manual correction downward:
-      // keep the original day's baseline, but update latest to the corrected page.
       nextCache = {
         ...cached,
         latestPage: currentPage,
       };
     } else {
-      // Read-only calls / hydration / no usable previous page:
-      // preserve baseline and make sure latest reflects current state.
       nextCache = {
         ...cached,
         latestPage: currentPage,
@@ -319,7 +305,6 @@ export function getTodayReadingProgress(
   return syncTodayReadingProgress(inputs, undefined, userId);
 }
 
-// helper: merge partial into defaults safely
 function normalizeReadingInputs(
   parsed: Partial<ReadingInputs> | null | undefined,
 ): ReadingInputs {
@@ -344,6 +329,8 @@ function normalizeReadingInputs(
 async function loadPreviousInputs(
   userId: string | null,
 ): Promise<ReadingInputs | null> {
+  if (!userId) return null;
+
   try {
     const raw = getScopedStorageItem(STORAGE_KEY, userId);
     return raw ? normalizeReadingInputs(JSON.parse(raw)) : null;
@@ -352,24 +339,12 @@ async function loadPreviousInputs(
   }
 }
 
-/**
- * Load reading from Supabase (reading_state).
- * Falls back to localStorage if:
- *  - not logged in
- *  - Supabase errors
- *  - no row exists yet
- */
-export async function loadReadingInputs(userId: string | null = getActiveUserId()): Promise<ReadingInputs> {
-  try {
-    if (!userId) {
-      const raw = getScopedStorageItem(STORAGE_KEY, null);
-      const inputs = raw
-        ? normalizeReadingInputs(JSON.parse(raw))
-        : DEFAULT_READING_INPUTS;
-      syncTodayReadingProgress(inputs, undefined, userId);
-      return inputs;
-    }
+export async function loadReadingInputs(
+  userId: string | null = getActiveUserId(),
+): Promise<ReadingInputs> {
+  if (!userId) return DEFAULT_READING_INPUTS;
 
+  try {
     const { data, error } = await supabase
       .from("reading_state")
       .select("state")
@@ -379,14 +354,10 @@ export async function loadReadingInputs(userId: string | null = getActiveUserId(
     if (error) throw error;
 
     const state = (data?.state ?? null) as Partial<ReadingInputs> | null;
-    if (!state) {
-      try {
-        localStorage.removeItem(readingKey(userId));
-      } catch {
-        // ignore
-      }
 
-      syncTodayReadingProgress(DEFAULT_READING_INPUTS, undefined, userId);
+    if (!state) {
+      removeScopedStorageItem(STORAGE_KEY, userId);
+      clearDailyProgressCache(userId);
       return DEFAULT_READING_INPUTS;
     }
 
@@ -395,49 +366,42 @@ export async function loadReadingInputs(userId: string | null = getActiveUserId(
     try {
       const key = readingKey(userId);
       assertRegisteredCacheWrite(key);
-      localStorage.setItem(key, JSON.stringify(inputs));
+      writeScopedStorageItem(STORAGE_KEY, userId, JSON.stringify(inputs));
     } catch {
       // ignore
     }
 
-    syncTodayReadingProgress(inputs, undefined, userId);
     return inputs;
   } catch (error) {
     console.warn(
-      "loadReadingInputs failed, falling back to defaults/local:",
+      "loadReadingInputs failed, falling back to scoped local cache:",
       error,
     );
+
     const raw = getScopedStorageItem(STORAGE_KEY, userId);
-    const inputs = raw
+    return raw
       ? normalizeReadingInputs(JSON.parse(raw))
       : DEFAULT_READING_INPUTS;
-    syncTodayReadingProgress(inputs, undefined, userId);
-    return inputs;
   }
 }
 
-/**
- * Save reading to Supabase (reading_state).
- * Also mirrors to localStorage for offline-ish resilience.
- */
-export async function saveReadingInputs(userId: string | null, value: ReadingInputs): Promise<ReadingInputs> {
+export async function saveReadingInputs(
+  userId: string | null,
+  value: ReadingInputs,
+): Promise<ReadingInputs> {
+  if (!userId) return value;
+
   const previousInputs = await loadPreviousInputs(userId);
 
   try {
     const key = readingKey(userId);
     assertRegisteredCacheWrite(key);
-    localStorage.setItem(key, JSON.stringify(value));
+    writeScopedStorageItem(STORAGE_KEY, userId, JSON.stringify(value));
   } catch {
     // ignore
   }
 
   syncTodayReadingProgress(value, previousInputs, userId);
-
-  if (!userId) {
-    clearAISignalsCache(null);
-    emitReadingChanged();
-    return value;
-  }
 
   const { error } = await supabase.from("reading_state").upsert(
     {
@@ -455,23 +419,23 @@ export async function saveReadingInputs(userId: string | null, value: ReadingInp
   return value;
 }
 
-export async function resetReadingInputs(userId: string | null): Promise<ReadingInputs> {
+export async function resetReadingInputs(
+  userId: string | null,
+): Promise<ReadingInputs> {
   clearDailyProgressCache(userId);
   await saveReadingInputs(userId, DEFAULT_READING_INPUTS);
   return DEFAULT_READING_INPUTS;
 }
 
-/** Synchronous seed — reads from localStorage mirror. Zero network. */
 export function seedReadingCache(userId: string | null): ReadingInputs {
+  if (!userId) return DEFAULT_READING_INPUTS;
+
   try {
     const raw = getScopedStorageItem(STORAGE_KEY, userId);
-    const inputs = raw
+    return raw
       ? normalizeReadingInputs(JSON.parse(raw))
       : DEFAULT_READING_INPUTS;
-    syncTodayReadingProgress(inputs, undefined, userId);
-    return inputs;
   } catch {
-    syncTodayReadingProgress(DEFAULT_READING_INPUTS, undefined, userId);
     return DEFAULT_READING_INPUTS;
   }
 }

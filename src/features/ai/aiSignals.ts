@@ -46,6 +46,13 @@ type ReadingState = {
   targetPages: number;
 };
 
+type TodoSignal = {
+  doneToday: number;
+  totalToday: number;
+  totalCount: number;
+  openCount: number;
+};
+
 export type AISignals = {
   builtAt: string;
   modules: ModuleId[];
@@ -86,10 +93,7 @@ export type AISignals = {
     strongestLift: string | null;
     weakestLift: string | null;
   };
-  todos: {
-    doneToday: number;
-    totalToday: number;
-  } | null;
+  todos: TodoSignal | null;
   schedule: {
     completedBlocks: number;
     totalBlocks: number;
@@ -392,6 +396,8 @@ function readTodosSignal(): AISignals["todos"] {
     return {
       totalToday: todayTodos.length,
       doneToday: todayTodos.filter((todo) => Boolean(todo.done)).length,
+      totalCount: todos.length,
+      openCount: todos.filter((todo) => !todo.done).length,
     };
   } catch {
     return null;

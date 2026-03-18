@@ -1,10 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/features/auth/authContext';
-import { getLocalDateKey } from '@/hooks/useTodayDate';
-import { getActiveUserId, getScopedStorageItem, legacyScopedKey, removeScopedStorageItem, writeScopedStorageItem } from '@/lib/activeUser';
-import { CACHE_KEYS } from '@/lib/cacheRegistry';
-import { queryKeys } from '@/lib/queryKeys';
-import { supabase } from '@/lib/supabaseClient';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/features/auth/authContext";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  legacyScopedKey,
+  removeScopedStorageItem,
+  writeScopedStorageItem,
+} from "@/lib/activeUser";
+import { CACHE_KEYS } from "@/lib/cacheRegistry";
+import { queryKeys } from "@/lib/queryKeys";
+import { supabase } from "@/lib/supabaseClient";
 
 export type DoneState = Record<string, Record<string, boolean>>;
 
@@ -33,7 +39,7 @@ type MutationContext = {
 };
 
 const GOAL_PROGRESS_CACHE_KEY = CACHE_KEYS.GOALS_DONE;
-const LEGACY_GOAL_PROGRESS_CACHE_KEY = 'cache:goals:v1';
+const LEGACY_GOAL_PROGRESS_CACHE_KEY = "cache:goals:v1";
 const STEP_HISTORY_KEY = CACHE_KEYS.GOALS_STEP_HISTORY;
 
 function cloneDoneState(done: DoneState): DoneState {
@@ -43,16 +49,16 @@ function cloneDoneState(done: DoneState): DoneState {
 }
 
 function normalizeDoneState(value: unknown): DoneState {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
 
   const result: DoneState = {};
 
   for (const [goalId, steps] of Object.entries(value)) {
-    if (!steps || typeof steps !== 'object' || Array.isArray(steps)) continue;
+    if (!steps || typeof steps !== "object" || Array.isArray(steps)) continue;
 
     const normalizedSteps: Record<string, boolean> = {};
     for (const [stepId, done] of Object.entries(steps)) {
-      if (typeof done === 'boolean') {
+      if (typeof done === "boolean") {
         normalizedSteps[stepId] = done;
       }
     }
@@ -67,13 +73,31 @@ function extractDoneState(payload: unknown): DoneState {
   const normalized = normalizeDoneState(payload);
   if (Object.keys(normalized).length > 0) return normalized;
 
-  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
     const record = payload as Record<string, unknown>;
     const nestedState = normalizeDoneState(record.done);
     if (Object.keys(nestedState).length > 0) return nestedState;
   }
 
   return {};
+}
+
+function mergeDoneState(server: DoneState, seeded: DoneState): DoneState {
+  const merged = cloneDoneState(server);
+
+  for (const [goalId, steps] of Object.entries(seeded)) {
+    const existing = merged[goalId] ?? {};
+    const next: Record<string, boolean> = { ...existing };
+
+    for (const [stepId, done] of Object.entries(steps)) {
+      if (done) next[stepId] = true;
+      else if (!(stepId in next)) next[stepId] = false;
+    }
+
+    merged[goalId] = next;
+  }
+
+  return merged;
 }
 
 function readGoalProgressSeed(userId: string): DoneState {
@@ -106,7 +130,11 @@ function readGoalProgressSeed(userId: string): DoneState {
 
 function writeGoalProgressSeed(userId: string, done: DoneState) {
   try {
-    writeScopedStorageItem(GOAL_PROGRESS_CACHE_KEY, userId, JSON.stringify(done));
+    writeScopedStorageItem(
+      GOAL_PROGRESS_CACHE_KEY,
+      userId,
+      JSON.stringify(done),
+    );
     localStorage.removeItem(LEGACY_GOAL_PROGRESS_CACHE_KEY);
     localStorage.removeItem(legacyScopedKey(LEGACY_GOAL_PROGRESS_CACHE_KEY, userId));
   } catch {
@@ -154,7 +182,8 @@ function writeStepHistory(userId: string, entries: StepHistoryEntry[]) {
 function addStepHistory(userId: string, goalId: string, stepId: string) {
   const today = getLocalDateKey();
   const next = readStepHistory(userId).filter(
-    (entry) => !(entry.goalId === goalId && entry.stepId === stepId && entry.date === today),
+    (entry) =>
+      !(entry.goalId === goalId && entry.stepId === stepId && entry.date === today),
   );
 
   next.push({ goalId, stepId, date: today });
@@ -166,7 +195,8 @@ function removeStepHistoryForToday(userId: string, goalId: string, stepId: strin
   writeStepHistory(
     userId,
     readStepHistory(userId).filter(
-      (entry) => !(entry.goalId === goalId && entry.stepId === stepId && entry.date === today),
+      (entry) =>
+        !(entry.goalId === goalId && entry.stepId === stepId && entry.date === today),
     ),
   );
 }
@@ -187,49 +217,54 @@ async function loadGoalProgress(userId: string | null): Promise<DoneState> {
   const seeded = readGoalProgressSeed(userId);
 
   const { data, error } = await supabase
-    .from('goal_progress')
-    .select('goal_id, done')
-    .eq('user_id', userId);
+    .from("goal_progress")
+    .select("goal_id, done")
+    .eq("user_id", userId);
 
   if (error) {
-    console.warn('loadGoalProgress error:', error);
+    console.warn("loadGoalProgress error:", error);
     return seeded;
   }
 
-  const done = (data ?? []).reduce<DoneState>((acc, row) => {
+  const serverDone = (data ?? []).reduce<DoneState>((acc, row) => {
     const goalRow = row as GoalProgressRow;
-    acc[goalRow.goal_id] = normalizeDoneState({ [goalRow.goal_id]: goalRow.done })[goalRow.goal_id] ?? {};
+    acc[goalRow.goal_id] =
+      normalizeDoneState({ [goalRow.goal_id]: goalRow.done })[goalRow.goal_id] ??
+      {};
     return acc;
   }, {});
 
-  writeGoalProgressSeed(userId, done);
-  return done;
+  const merged = mergeDoneState(serverDone, seeded);
+  writeGoalProgressSeed(userId, merged);
+  return merged;
 }
 
-async function persistGoalProgress(userId: string, goalId: string, goalDone: Record<string, boolean>) {
+async function persistGoalProgress(
+  userId: string,
+  goalId: string,
+  goalDone: Record<string, boolean>,
+) {
   const hasAnyCompletedStep = Object.values(goalDone).some(Boolean);
 
   if (!hasAnyCompletedStep) {
     const { error } = await supabase
-      .from('goal_progress')
+      .from("goal_progress")
       .delete()
-      .eq('user_id', userId)
-      .eq('goal_id', goalId);
+      .eq("user_id", userId)
+      .eq("goal_id", goalId);
 
     if (error) throw error;
     return;
   }
 
-  const { error } = await supabase
-    .from('goal_progress')
-    .upsert(
-      {
-        user_id: userId,
-        goal_id: goalId,
-        done: goalDone,
-      },
-      { onConflict: 'user_id,goal_id' },
-    );
+  const { error } = await supabase.from("goal_progress").upsert(
+    {
+      user_id: userId,
+      goal_id: goalId,
+      done: goalDone,
+    },
+    { onConflict: "user_id,goal_id" },
+  );
 
   if (error) throw error;
 }
@@ -245,8 +280,8 @@ export function useGoalProgressQuery() {
   return useQuery<DoneState>({
     queryKey: queryKeys.goalProgress(userId),
     queryFn: () => loadGoalProgress(userId),
-    enabled: authReady,
-    initialData: seedGoalProgressCache(userId),
+    enabled: authReady && Boolean(userId),
+    initialData: userId ? seedGoalProgressCache(userId) : {},
   });
 }
 
@@ -257,7 +292,9 @@ export function useToggleGoalStepMutation() {
   return useMutation<void, Error, ToggleGoalStepVariables, MutationContext>({
     mutationFn: async ({ goalId }: ToggleGoalStepVariables) => {
       if (!userId) return;
-      const nextDone = queryClient.getQueryData<DoneState>(queryKeys.goalProgress(userId)) ?? {};
+      const nextDone =
+        queryClient.getQueryData<DoneState>(queryKeys.goalProgress(userId)) ?? {};
+
       await persistGoalProgress(userId, goalId, nextDone[goalId] ?? {});
     },
     onMutate: async ({ goalId, stepId }: ToggleGoalStepVariables) => {
@@ -268,6 +305,7 @@ export function useToggleGoalStepMutation() {
       const previousDone = cloneDoneState(
         queryClient.getQueryData<DoneState>(queryKeys.goalProgress(userId)) ?? {},
       );
+
       const goalDone = previousDone[goalId] ?? {};
       const nextValue = !goalDone[stepId];
       const nextDone = {
@@ -286,17 +324,19 @@ export function useToggleGoalStepMutation() {
 
       return { previousDone };
     },
-    onError: (_error: Error, _variables: ToggleGoalStepVariables, context: MutationContext | undefined) => {
+    onError: (_error, _variables, context) => {
       if (!userId || !context) return;
       queryClient.setQueryData(queryKeys.goalProgress(userId), context.previousDone);
       writeGoalProgressSeed(userId, context.previousDone);
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       if (!userId) return;
+
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(userId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboardGoals(userId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboardLifeProgress(userId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.dashboardLifeProgress(userId),
+        }),
       ]);
     },
   });
@@ -309,11 +349,12 @@ export function useResetGoalProgressMutation() {
   return useMutation<void, Error, ResetGoalProgressVariables, MutationContext>({
     mutationFn: async ({ goalId }: ResetGoalProgressVariables) => {
       if (!userId) return;
+
       const { error } = await supabase
-        .from('goal_progress')
+        .from("goal_progress")
         .delete()
-        .eq('user_id', userId)
-        .eq('goal_id', goalId);
+        .eq("user_id", userId)
+        .eq("goal_id", goalId);
 
       if (error) throw error;
     },
@@ -325,6 +366,7 @@ export function useResetGoalProgressMutation() {
       const previousDone = cloneDoneState(
         queryClient.getQueryData<DoneState>(queryKeys.goalProgress(userId)) ?? {},
       );
+
       const nextDone = cloneDoneState(previousDone);
       delete nextDone[goalId];
 
@@ -334,17 +376,19 @@ export function useResetGoalProgressMutation() {
 
       return { previousDone };
     },
-    onError: (_error: Error, _variables: ResetGoalProgressVariables, context: MutationContext | undefined) => {
+    onError: (_error, _variables, context) => {
       if (!userId || !context) return;
       queryClient.setQueryData(queryKeys.goalProgress(userId), context.previousDone);
       writeGoalProgressSeed(userId, context.previousDone);
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       if (!userId) return;
+
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(userId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboardGoals(userId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboardLifeProgress(userId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.dashboardLifeProgress(userId),
+        }),
       ]);
     },
   });
