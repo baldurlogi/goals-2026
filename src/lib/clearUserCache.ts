@@ -1,52 +1,51 @@
-export function clearUserCache() {
+import {
+  LEGACY_USER_SCOPED_EXACT_KEYS,
+  LEGACY_USER_SCOPED_PREFIXES,
+  USER_SCOPED_CACHE_KEYS,
+  USER_SCOPED_CACHE_PREFIXES,
+} from "@/lib/cacheRegistry";
+import {
+  getActiveUserId,
+  getUserCacheNamespace,
+  legacyScopedKey,
+} from "@/lib/activeUser";
+
+export function clearUserCache(userId: string | null = getActiveUserId()) {
   try {
-    const keysToRemove: string[] = [];
+    const namespace = getUserCacheNamespace(userId);
+    const keysToRemove = new Set<string>();
+
+    for (const key of USER_SCOPED_CACHE_KEYS) {
+      if (namespace) {
+        keysToRemove.add(`${key}:${namespace}`);
+      }
+    }
+
+    for (const key of LEGACY_USER_SCOPED_EXACT_KEYS) {
+      keysToRemove.add(key);
+    }
+
+    if (userId) {
+      for (const key of USER_SCOPED_CACHE_KEYS) {
+        keysToRemove.add(legacyScopedKey(key, userId));
+      }
+    }
 
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
       if (!key) continue;
 
-      if (
-        key === "cache:active-user:v1" ||
-        key === "cache:profile:v1" ||
-        key === "cache:ai-coach:v1" ||
-        key === "cache:ai-coach:last-module" ||
-        key === "cache:ai-coach:last-session:v1" ||
-        key === "cache:ai-signals:v1" ||
-        key === "cache:weekly-report:latest:v1" ||
-        key === "cache:user-tier:v1" ||
-        key === "cache:user_goals:v1" ||
-        key === "cache:goals:v1" ||
-        key === "goals:done:v1" ||
-        key === "goals:step-history:v1" ||
-        key.startsWith("cache:profile:v2:") ||
-        key.startsWith("cache:ai-coach:v2:") ||
-        key.startsWith("cache:ai-coach:last-module:v2:") ||
-        key.startsWith("cache:ai-coach:last-session:v2:") ||
-        key.startsWith("cache:ai-signals:v1:") ||
-        key.startsWith("cache:weekly-report:latest:v1:") ||
-        key.startsWith("cache:user_goals:v1:") ||
-        key.startsWith("cache:goals:v1:") ||
-        key.startsWith("goals:done:v1:") ||
-        key.startsWith("goals:step-history:v1:") ||
-        key.startsWith("cache:todos:v1:") ||
-        key.startsWith("cache:todos:completion-history:v1:") ||
-        key.startsWith("cache:todos:pending-sync:v1:") ||
-        key.startsWith("cache:nutrition_log:v1:") ||
-        key.startsWith("cache:nutrition_phase:v1:") ||
-        key.startsWith("cache:schedule_log:v1:") ||
-        key.startsWith("cache:schedule:templates:v1:") ||
-        key.startsWith("cache:fitness_prs:v1:") ||
-        key.startsWith("cache:fitness_split:v1:") ||
-        key.startsWith("cache:reading:today-progress:v1:") ||
-        key.startsWith("cache:reading:history:v1:") ||
-        key.startsWith("daily-life:reading:v2:") ||
-        key.startsWith("cache:ai-usage:v1:") ||
-        key.startsWith("cache:user-tier:v1:") ||
-        key.startsWith("cache:achievements:v1:") ||
-        key.startsWith("cache:water:")
-      ) {
-        keysToRemove.push(key);
+      const isNamespacedMatch = namespace
+        ? USER_SCOPED_CACHE_PREFIXES.some((prefix) =>
+            key.startsWith(`${prefix}${namespace}:`),
+          )
+        : false;
+      const isLegacyPrefixMatch = LEGACY_USER_SCOPED_PREFIXES.some((prefix) =>
+        key.startsWith(prefix),
+      );
+
+      if (isNamespacedMatch || isLegacyPrefixMatch) {
+        keysToRemove.add(key);
       }
     }
 

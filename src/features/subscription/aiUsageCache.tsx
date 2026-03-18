@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
-import { getActiveUserId, scopedKey } from "@/lib/activeUser";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  scopedKey,
+} from "@/lib/activeUser";
 import type { Tier } from "./useTier";
 
 export type AIUsageSnapshot = {
@@ -53,7 +57,7 @@ export function readAIUsageCache(): AIUsageSnapshot | null {
 
   try {
     const key = getStorageKey();
-    const raw = localStorage.getItem(key);
+    const raw = getScopedStorageItem(STORAGE_KEY, getActiveUserId());
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as Partial<AIUsageSnapshot>;
@@ -66,12 +70,14 @@ export function readAIUsageCache(): AIUsageSnapshot | null {
 
     const tier = coerceTier(parsed.tier);
     const monthlyLimit =
-      typeof parsed.monthlyLimit === "number" && Number.isFinite(parsed.monthlyLimit)
+      typeof parsed.monthlyLimit === "number" &&
+      Number.isFinite(parsed.monthlyLimit)
         ? Math.max(1, parsed.monthlyLimit)
         : defaultMonthlyLimitForTier(tier);
 
     const promptsUsed =
-      typeof parsed.promptsUsed === "number" && Number.isFinite(parsed.promptsUsed)
+      typeof parsed.promptsUsed === "number" &&
+      Number.isFinite(parsed.promptsUsed)
         ? Math.max(0, parsed.promptsUsed)
         : 0;
 
@@ -87,7 +93,8 @@ export function readAIUsageCache(): AIUsageSnapshot | null {
       promptsUsed,
       remaining,
       updatedAt:
-        typeof parsed.updatedAt === "number" && Number.isFinite(parsed.updatedAt)
+        typeof parsed.updatedAt === "number" &&
+        Number.isFinite(parsed.updatedAt)
           ? parsed.updatedAt
           : Date.now(),
     };
@@ -111,8 +118,8 @@ export function writeAIUsageCache(input: UsageLike): AIUsageSnapshot {
     typeof promptsUsedRaw === "number" && Number.isFinite(promptsUsedRaw)
       ? Math.max(0, promptsUsedRaw)
       : typeof remainingRaw === "number" && Number.isFinite(remainingRaw)
-      ? Math.max(0, monthlyLimit - remainingRaw)
-      : 0;
+        ? Math.max(0, monthlyLimit - remainingRaw)
+        : 0;
 
   const remaining =
     typeof remainingRaw === "number" && Number.isFinite(remainingRaw)

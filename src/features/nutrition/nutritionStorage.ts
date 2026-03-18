@@ -1,10 +1,14 @@
-import { supabase } from '@/lib/supabaseClient';
-import type { NutritionPhase } from '@/features/nutrition/nutritionData';
-import type { Macros } from '@/features/nutrition/nutritionTypes';
-import { meals } from '@/features/nutrition/nutritionData';
-import { getLocalDateKey } from '@/hooks/useTodayDate';
-import { CACHE_KEYS, assertRegisteredCacheWrite } from '@/lib/cacheRegistry';
-import { getActiveUserId, scopedKey } from '@/lib/activeUser';
+import { supabase } from "@/lib/supabaseClient";
+import type { NutritionPhase } from "@/features/nutrition/nutritionData";
+import type { Macros } from "@/features/nutrition/nutritionTypes";
+import { meals } from "@/features/nutrition/nutritionData";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  scopedKey,
+} from "@/lib/activeUser";
 
 export const NUTRITION_CHANGED_EVENT = "nutrition:changed";
 
@@ -60,9 +64,11 @@ function emptyLog(date = todayKey()): NutritionLog {
   return { date, eaten: {}, customEntries: [] };
 }
 
-function readLogCache(userId: string | null = getActiveUserId()): NutritionLog | null {
+function readLogCache(
+  userId: string | null = getActiveUserId(),
+): NutritionLog | null {
   try {
-    const raw = localStorage.getItem(logCacheKey(userId));
+    const raw = getScopedStorageItem(NUTRITION_LOG_CACHE_KEY, userId);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as NutritionLog;
@@ -74,7 +80,10 @@ function readLogCache(userId: string | null = getActiveUserId()): NutritionLog |
   }
 }
 
-function writeLogCache(log: NutritionLog, userId: string | null = getActiveUserId()): void {
+function writeLogCache(
+  log: NutritionLog,
+  userId: string | null = getActiveUserId(),
+): void {
   try {
     const key = logCacheKey(userId);
     assertRegisteredCacheWrite(key);
@@ -84,16 +93,21 @@ function writeLogCache(log: NutritionLog, userId: string | null = getActiveUserI
   }
 }
 
-function readPhaseCache(userId: string | null = getActiveUserId()): NutritionPhase | null {
+function readPhaseCache(
+  userId: string | null = getActiveUserId(),
+): NutritionPhase | null {
   try {
-    const raw = localStorage.getItem(phaseCacheKey(userId));
-    return raw === 'cut' || raw === 'maintain' ? raw : null;
+    const raw = getScopedStorageItem(NUTRITION_PHASE_CACHE_KEY, userId);
+    return raw === "cut" || raw === "maintain" ? raw : null;
   } catch {
     return null;
   }
 }
 
-function writePhaseCache(phase: NutritionPhase, userId: string | null = getActiveUserId()): void {
+function writePhaseCache(
+  phase: NutritionPhase,
+  userId: string | null = getActiveUserId(),
+): void {
   try {
     const key = phaseCacheKey(userId);
     assertRegisteredCacheWrite(key);
@@ -210,7 +224,8 @@ export async function loadNutritionLog(
     const log: NutritionLog = {
       date: data.log_date,
       eaten: (data.eaten ?? {}) as NutritionLog["eaten"],
-      customEntries: (data.custom_entries ?? []) as NutritionLog["customEntries"],
+      customEntries: (data.custom_entries ??
+        []) as NutritionLog["customEntries"],
     };
 
     if (date === todayKey()) writeLogCache(log);

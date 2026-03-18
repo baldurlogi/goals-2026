@@ -1,4 +1,10 @@
 import { supabase } from "@/lib/supabaseClient";
+import {
+  getScopedStorageItem,
+  legacyScopedKey,
+  scopedKey,
+} from "@/lib/activeUser";
+import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import type { ModuleId } from "@/features/modules/modules";
 
 export type Sex = "male" | "female";
@@ -66,9 +72,10 @@ export type UserProfile = {
 };
 
 const LEGACY_CACHE_KEY = "cache:profile:v1";
+const PROFILE_CACHE_KEY = CACHE_KEYS.PROFILE;
 
 function profileCacheKey(userId: string) {
-  return `cache:profile:v2:${userId}`;
+  return scopedKey(PROFILE_CACHE_KEY, userId);
 }
 
 export function mapLegacyScheduleToWeekly(
@@ -139,7 +146,8 @@ export function deriveLegacyScheduleView(
 
 export function normalizeUserProfile(raw: UserProfile): UserProfile {
   const weeklySchedule = normalizeWeeklySchedule(
-    (raw as UserProfile & { weekly_schedule?: WeeklySchedule | null }).weekly_schedule,
+    (raw as UserProfile & { weekly_schedule?: WeeklySchedule | null })
+      .weekly_schedule,
     raw.default_schedule_view,
   );
 
@@ -242,7 +250,7 @@ export function readProfileCache(userId?: string | null): UserProfile | null {
   if (!userId) return null;
 
   try {
-    const raw = localStorage.getItem(profileCacheKey(userId));
+    const raw = getScopedStorageItem(PROFILE_CACHE_KEY, userId);
     if (!raw) return null;
 
     const parsed = normalizeUserProfile(JSON.parse(raw) as UserProfile);
@@ -262,6 +270,7 @@ function writeProfileCache(profile: UserProfile) {
       profileCacheKey(profile.id),
       JSON.stringify(normalizeUserProfile(profile)),
     );
+    localStorage.removeItem(legacyScopedKey(PROFILE_CACHE_KEY, profile.id));
     localStorage.removeItem(LEGACY_CACHE_KEY);
   } catch (e) {
     console.warn("write cache failed", e);
@@ -350,7 +359,10 @@ export async function saveProfile(
 }
 
 export async function completeOnboarding(
-  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier" | "default_schedule_view">,
+  profile: Omit<
+    UserProfile,
+    "id" | "onboarding_done" | "tier" | "default_schedule_view"
+  >,
 ): Promise<void> {
   const {
     data: { user },
