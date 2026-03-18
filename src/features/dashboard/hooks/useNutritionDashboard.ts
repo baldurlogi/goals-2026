@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   loadNutritionLog,
   loadPhase,
@@ -13,7 +13,7 @@ import {
   type NutritionPhase,
 } from '@/features/nutrition/nutritionData';
 import { useTodayDate } from '@/hooks/useTodayDate';
-import { PROFILE_CHANGED_EVENT } from '@/features/onboarding/profileStorage';
+import { useProfile } from '@/features/onboarding/useProfile';
 import {
   hasDateAwareCache,
   readDateAwareCache,
@@ -44,6 +44,7 @@ function normalizePhase(raw: string): NutritionPhase {
 
 export function useNutritionDashboard() {
   const today = useTodayDate();
+  const profile = useProfile();
 
   const [log, setLog] = useState<NutritionLog>(() =>
     readDateAwareCache(NUTRITION_LOG_CACHE_KEY, today, {
@@ -84,18 +85,7 @@ export function useNutritionDashboard() {
     storageKeys: NUTRITION_STORAGE_KEYS,
   });
 
-  const [profileVersion, setProfileVersion] = useState(0);
-
-  useEffect(() => {
-    const bump = () => setProfileVersion((v) => v + 1);
-    window.addEventListener(PROFILE_CHANGED_EVENT, bump);
-    return () => window.removeEventListener(PROFILE_CHANGED_EVENT, bump);
-  }, []);
-
-  const target = useMemo(() => {
-    void profileVersion;
-    return getTargets(phase);
-  }, [phase, profileVersion]);
+  const target = useMemo(() => getTargets(phase, profile), [phase, profile]);
   const logged = useMemo(() => getLoggedMacros(log), [log]);
   const calPct = pct(logged.cal, target.cal);
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/features/auth/authContext";
+import { getActiveUserId } from "@/lib/activeUser";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import {
   GoalsStoreContext,
@@ -45,6 +46,8 @@ function readDoneCache(userId: string): DoneState {
       return JSON.parse(scopedRaw) as DoneState;
     }
 
+    if (getActiveUserId() !== userId) return {};
+
     const legacyRaw =
       localStorage.getItem(CACHE_KEY) ??
       localStorage.getItem(LEGACY_WEEKLY_DONE_KEY);
@@ -78,6 +81,8 @@ function readStepHistory(userId: string): StepHistoryEntry[] {
     const scopedHistoryKey = scopedKey(STEP_HISTORY_KEY, userId);
     const scopedRaw = localStorage.getItem(scopedHistoryKey);
     if (scopedRaw) return JSON.parse(scopedRaw) as StepHistoryEntry[];
+
+    if (getActiveUserId() !== userId) return [];
 
     const legacyRaw = localStorage.getItem(STEP_HISTORY_KEY);
     if (!legacyRaw) return [];
