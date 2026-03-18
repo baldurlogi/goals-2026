@@ -1,37 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { CheckSquare, ChevronDown, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { PageHeader, PageScaffold } from "@/components/PageScaffold";
+import { type TodoItem } from "@/features/todos/todoStorage";
 import {
-  loadTodos,
-  addTodo,
-  toggleTodo,
-  deleteTodo,
-  clearCompleted,
-  TODO_CHANGED_EVENT,
-  type TodoItem,
-} from "@/features/todos/todoStorage";
+  useAddTodoMutation,
+  useClearCompletedMutation,
+  useDeleteTodoMutation,
+  useTodosQuery,
+  useToggleTodoMutation,
+} from "@/features/todos/useTodosQuery";
 import type { StorageMutationResult } from "@/lib/storageResult";
 
 export function TodosPage() {
-  const [todos, setTodos]           = useState<TodoItem[]>([]);
+  const { data: todos = [] } = useTodosQuery();
+  const addTodoMutation = useAddTodoMutation();
+  const toggleTodoMutation = useToggleTodoMutation();
+  const deleteTodoMutation = useDeleteTodoMutation();
+  const clearCompletedMutation = useClearCompletedMutation();
   const [input, setInput]           = useState("");
   const [showDone, setShowDone]     = useState(false);
   const inputRef                    = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const sync = async () => setTodos(await loadTodos());
-    sync(); // initial load
-    window.addEventListener(TODO_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(TODO_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
 
   async function handleMutationWithToast(
     mutation: () => Promise<StorageMutationResult>,
@@ -56,8 +48,8 @@ export function TodosPage() {
     if (!input.trim()) return;
     const nextInput = input;
     void handleMutationWithToast(
-      () => addTodo(nextInput),
-      () => void addTodo(nextInput),
+      () => addTodoMutation.mutateAsync(nextInput),
+      () => void addTodoMutation.mutate(nextInput),
       "Task added",
     );
     setInput("");
@@ -82,8 +74,8 @@ export function TodosPage() {
             className="h-7 gap-1 text-xs text-muted-foreground"
             onClick={() =>
               void handleMutationWithToast(
-                () => clearCompleted(),
-                () => void clearCompleted(),
+                () => clearCompletedMutation.mutateAsync(undefined),
+                () => void clearCompletedMutation.mutate(undefined),
               )
             }
           >
@@ -116,7 +108,7 @@ export function TodosPage() {
       ) : (
         <div className="divide-y divide-border/50 rounded-xl border bg-card">
           {incomplete.map((item) => (
-            <TodoRow key={item.id} item={item} onMutate={handleMutationWithToast} />
+            <TodoRow key={item.id} item={item} onMutate={handleMutationWithToast} toggleTodoMutation={toggleTodoMutation} deleteTodoMutation={deleteTodoMutation} />
           ))}
         </div>
       )}
@@ -138,7 +130,7 @@ export function TodosPage() {
           {showDone && (
             <div className="mt-2 divide-y divide-border/50 rounded-xl border bg-card opacity-70">
               {done.map((item) => (
-                <TodoRow key={item.id} item={item} onMutate={handleMutationWithToast} />
+                <TodoRow key={item.id} item={item} onMutate={handleMutationWithToast} toggleTodoMutation={toggleTodoMutation} deleteTodoMutation={deleteTodoMutation} />
               ))}
             </div>
           )}
@@ -151,6 +143,8 @@ export function TodosPage() {
 function TodoRow({
   item,
   onMutate,
+  toggleTodoMutation,
+  deleteTodoMutation,
 }: {
   item: TodoItem;
   onMutate: (
@@ -158,6 +152,8 @@ function TodoRow({
     retry: () => void,
     successMessage?: string,
   ) => Promise<void>;
+  toggleTodoMutation: { mutateAsync: (id: string) => Promise<StorageMutationResult>; mutate: (id: string) => void };
+  deleteTodoMutation: { mutateAsync: (id: string) => Promise<StorageMutationResult>; mutate: (id: string) => void };
 }) {
   return (
     <div className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
@@ -165,8 +161,8 @@ function TodoRow({
         checked={item.done}
         onCheckedChange={() =>
           void onMutate(
-            () => toggleTodo(item.id),
-            () => void toggleTodo(item.id),
+            () => toggleTodoMutation.mutateAsync(item.id),
+            () => void toggleTodoMutation.mutate(item.id),
           )
         }
         className="shrink-0"
@@ -182,8 +178,8 @@ function TodoRow({
         type="button"
         onClick={() =>
           void onMutate(
-            () => deleteTodo(item.id),
-            () => void deleteTodo(item.id),
+            () => deleteTodoMutation.mutateAsync(item.id),
+            () => void deleteTodoMutation.mutate(item.id),
           )
         }
         className="invisible shrink-0 text-muted-foreground/40 hover:text-muted-foreground group-hover:visible"

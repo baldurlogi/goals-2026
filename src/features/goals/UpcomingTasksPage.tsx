@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useGoalsStore } from '@/features/goals/goalStoreContext';
-import { loadUserGoals, seedUserGoals } from './userGoalStorage';
+import { useGoalsQuery } from './useGoalsQuery';
 import type { UserGoal } from './goalTypes';
 import type { UpcomingItem } from '@/features/dashboard/hooks/useGoalsDashboard';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
@@ -45,22 +45,9 @@ function getUpcomingItems(
 
 export function UpcomingTasksPage() {
   const { state, dispatch } = useGoalsStore();
-  const [goals, setGoals] = useState<UserGoal[]>(() => seedUserGoals());
-  const [loading, setLoading] = useState(goals.length === 0);
+  const { data: goals = [], isLoading: loading } = useGoalsQuery();
   const [horizonDays, setHorizonDays] = useState<7 | 14>(14);
 
-  useEffect(() => {
-    let cancelled = false;
-    loadUserGoals().then((g) => {
-      if (!cancelled) {
-        setGoals(g);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const items = useMemo(
     () => getUpcomingItems(goals, state.done, horizonDays),

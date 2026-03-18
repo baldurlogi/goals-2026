@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { ReadingFieldPath, ReadingInputs } from "./readingTypes";
 import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan, updateReadingStreak } from "./readingUtils";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
@@ -6,13 +6,8 @@ import { Flame, BookOpen } from "lucide-react";
 import { ReadingNowCard } from "./components/ReadingNowCard";
 import { ReadingNextCard } from "./components/ReadingNextCard";
 import { ReadingInputsCard } from "./components/ReadingInputsCard";
-import {
-  loadReadingInputs,
-  saveReadingInputs,
-  seedReadingInputs,
-  DEFAULT_READING_INPUTS,
-  READING_CHANGED_EVENT,
-} from "./readingStorage";
+import { DEFAULT_READING_INPUTS } from "./readingStorage";
+import { useReadingQuery, useSaveReadingMutation } from "./useReadingQuery";
 import { Card, CardContent } from "@/components/ui/card";
 import type { CompletedBook } from "./readingTypes";
 
@@ -81,48 +76,8 @@ function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
 }
 
 export function ReadingPage() {
-  const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
-  const lastLocalWriteAtRef = useRef(0);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const sync = async () => {
-      const next = await Promise.resolve(loadReadingInputs());
-      if (!cancelled) setInputs(next);
-    };
-
-    sync();
-
-    const syncFromLocalMirror = () => {
-      const localSnapshot = seedReadingInputs();
-      setInputs((prev) => {
-        const nextSerialized = JSON.stringify(localSnapshot);
-        const prevSerialized = JSON.stringify(prev);
-        if (nextSerialized === prevSerialized) return prev;
-
-        const now = Date.now();
-        if (now - lastLocalWriteAtRef.current < 800) return prev;
-        return localSnapshot;
-      });
-    };
-
-    const handleReadingChanged: EventListener = () => {
-      syncFromLocalMirror();
-    };
-    const handleStorageChange = () => {
-      syncFromLocalMirror();
-    };
-
-    window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
-    window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, []);
+  const { data: inputs = DEFAULT_READING_INPUTS } = useReadingQuery();
+  const saveReadingMutation = useSaveReadingMutation();
 
   const stats = useMemo(() => {
     const plan = inputsToPlan(inputs);
@@ -130,12 +85,8 @@ export function ReadingPage() {
   }, [inputs]);
 
   function setAndPersist(updater: (prev: ReadingInputs) => ReadingInputs) {
-    setInputs((prev) => {
-      const next = updater(prev);
-      lastLocalWriteAtRef.current = Date.now();
-      void Promise.resolve(saveReadingInputs(next));
-      return next;
-    });
+    const next = updater(inputs);
+    void saveReadingMutation.mutateAsync(next);
   }
 
   function updateField(path: ReadingFieldPath, value: string) {
@@ -205,8 +156,7 @@ export function ReadingPage() {
   }
 
   function resetAll() {
-    setInputs(DEFAULT_READING_INPUTS);
-    void Promise.resolve(saveReadingInputs(DEFAULT_READING_INPUTS));
+    void saveReadingMutation.mutateAsync(DEFAULT_READING_INPUTS);
   }
 
   return (

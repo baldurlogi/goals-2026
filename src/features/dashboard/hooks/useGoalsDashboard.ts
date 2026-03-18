@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useGoalsStore } from '@/features/goals/goalStoreContext';
-import { loadUserGoals, seedUserGoals } from '@/features/goals/userGoalStorage';
+import { useGoalsQuery } from '@/features/goals/useGoalsQuery';
 import type { UserGoal } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 
@@ -61,22 +61,7 @@ function getUpcomingItems(
 
 export function useGoalsDashboard() {
   const { state: goalsState } = useGoalsStore();
-  const seed = seedUserGoals();
-  const [goals, setGoals] = useState<UserGoal[]>(seed);
-  const [loading, setLoading] = useState(seed.length === 0);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadUserGoals().then((g) => {
-      if (!cancelled) {
-        setGoals(g);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: goals = [], isLoading: loading } = useGoalsQuery();
 
   const upcomingItems = useMemo<UpcomingItem[]>(
     () => getUpcomingItems(goals, goalsState.done, HORIZON),

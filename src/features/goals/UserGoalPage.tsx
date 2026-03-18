@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Pencil, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,11 +11,8 @@ import { ImproveGoalModal } from '@/features/goals/components/ImproveGoalModal';
 import { UpgradeBanner } from '@/features/subscription/UpgradeBanner';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
 import { useAuth } from '@/features/auth/authContext';
-import {
-  GoalRemotePersistenceError,
-  loadUserGoals,
-  saveUserGoal,
-} from '@/features/goals/userGoalStorage';
+import { GoalRemotePersistenceError } from '@/features/goals/userGoalStorage';
+import { useGoalsQuery, useSaveGoalMutation } from '@/features/goals/useGoalsQuery';
 import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { captureOnce } from '@/lib/analytics';
@@ -73,25 +70,14 @@ export function UserGoalPage() {
   const { state, dispatch } = useGoalsStore();
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const [goal, setGoal] = useState<UserGoal | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: goals = [], isLoading: loading } = useGoalsQuery();
+  const saveGoalMutation = useSaveGoalMutation();
   const [editing, setEditing] = useState(false);
   const [improving, setImproving] = useState(false);
   const tier = useTier();
   const isPro = tierMeets(tier, 'pro');
 
-  useEffect(() => {
-    let cancelled = false;
-    loadUserGoals().then((goals) => {
-      if (!cancelled) {
-        setGoal(goals.find((g) => g.id === goalId) ?? null);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [goalId]);
+  const goal = useMemo(() => goals.find((item) => item.id === goalId) ?? null, [goalId, goals]);
 
   if (loading) {
     return (
@@ -266,9 +252,10 @@ export function UserGoalPage() {
         <AddEditGoalModal
           initial={activeGoal}
           onSave={(updated) => {
-            setGoal(updated);
             clearAISignalsCache();
-            setEditing(false);
+            void saveGoalMutation.mutateAsync(updated).then(() => {
+              setEditing(false);
+            });
           }}
           onClose={() => setEditing(false)}
         />
@@ -283,11 +270,10 @@ export function UserGoalPage() {
               steps: newSteps,
               updatedAt: getLocalDateKey(),
             };
-            setGoal(updated);
             clearAISignalsCache();
             setImproving(false);
 
-            void saveUserGoal(updated)
+            void saveGoalMutation.mutateAsync(updated)
               .then((status) => {
                 if (status.remoteSyncSucceeded) {
                   toast.success('Goal steps improved ✨');
