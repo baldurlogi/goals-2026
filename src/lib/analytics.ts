@@ -19,6 +19,14 @@ function safeWrite(key: string, value: string): void {
   }
 }
 
+function safeRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore private mode / quota issues
+  }
+}
+
 function onceKey(userId: string, event: string): string {
   return `${ONCE_PREFIX}:${userId}:${event}`;
 }
@@ -41,11 +49,15 @@ function getDayDifference(fromDateKey: string, toDateKey: string): number {
   return Math.round((to.getTime() - from.getTime()) / msPerDay);
 }
 
-export function capture(event: string, properties?: Record<string, unknown>): void {
+export function capture(
+  event: string,
+  properties?: Record<string, unknown>,
+): boolean {
   try {
     posthog.capture(event, properties);
+    return true;
   } catch {
-    // analytics must never break UX
+    return false;
   }
 }
 
@@ -59,8 +71,18 @@ export function captureOnce(
   const key = onceKey(userId, event);
   if (safeRead(key)) return;
 
-  capture(event, properties);
-  safeWrite(key, "1");
+  const captured = capture(event, properties);
+  if (captured) {
+    safeWrite(key, "1");
+  }
+}
+
+export function resetCaptureOnce(
+  event: string,
+  userId: string | null | undefined,
+): void {
+  if (!userId) return;
+  safeRemove(onceKey(userId, event));
 }
 
 export function captureReturnedNextDay(userId: string | null | undefined): void {
