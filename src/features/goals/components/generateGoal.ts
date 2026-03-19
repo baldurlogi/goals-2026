@@ -1,12 +1,8 @@
 import { supabase } from '@/lib/supabaseClient';
+import { writeAIUsageCache } from '@/features/subscription/aiUsageCache';
 import { getAISystemContext } from '@/features/ai/buildAIContext';
-import {
-  markAIUsageLimitReached,
-  writeAIUsageCache,
-} from '@/features/subscription/aiUsageCache';
 import { createBlankGoal, createBlankStep } from '../userGoalStorage';
-import type { UserGoal } from '../goalTypes';
-
+import { type UserGoal } from '@/features/goals/goalTypes';
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export type AIUsage = {
@@ -35,7 +31,6 @@ type AILimitPayload = {
 export class AILimitError extends Error {
   tier: string;
   limit: number;
-
   constructor(payload: AILimitPayload) {
     super(payload.message);
     this.name = 'AILimitError';
@@ -67,14 +62,9 @@ function isPriority(value: unknown): value is UserGoal['priority'] {
 }
 
 async function getSession() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token)
     throw new Error('You must be signed in.');
-  }
-
   return session;
 }
 
@@ -112,7 +102,7 @@ export async function getClarifyingQuestions(
 
   if (!res.ok) throw new Error('Clarification failed');
 
-  const data = (await res.json()) as { questions?: ClarifyingQuestion[] };
+  const data = await res.json() as { questions?: ClarifyingQuestion[] };
   return Array.isArray(data.questions) ? data.questions : [];
 }
 
@@ -124,15 +114,6 @@ export async function generateGoalFromPrompt(
 ): Promise<{ goal: UserGoal; usage: AIUsage }> {
   if (USE_MOCK_AI) {
     const blank = createBlankGoal();
-    const usage: AIUsage = {
-      prompts_used: 1,
-      monthly_limit: 10,
-      remaining: 9,
-      tier: 'free',
-    };
-
-    writeAIUsageCache(usage);
-
     return {
       goal: {
         ...blank,
@@ -142,25 +123,24 @@ export async function generateGoalFromPrompt(
         priority: 'high',
         steps: Array.from({ length: 10 }, (_, i) => ({
           ...createBlankStep(i),
-          label:
-            ([
-              'Choose a marathon race and register',
-              'Assess current fitness baseline',
-              'Build base mileage to 30km/week',
-              'Add weekly long run',
-              'Improve pacing and recovery',
-              'Practice fueling strategy',
-              'Run a half-marathon benchmark',
-              'Peak training block',
-              'Start taper plan',
-              'Run the marathon',
-            ][i] ?? `Complete milestone ${i + 1}`),
+          label: ([
+            'Choose a marathon race and register',
+            'Assess current fitness baseline',
+            'Build base mileage to 30km/week',
+            'Add weekly long run',
+            'Improve pacing and recovery',
+            'Practice fueling strategy',
+            'Run a half-marathon benchmark',
+            'Peak training block',
+            'Start taper plan',
+            'Run the marathon',
+          ][i] ?? `Complete milestone ${i + 1}`),
           notes: 'Done when: this step is fully completed as described.',
           idealFinish: null,
           estimatedTime: '1-2 hours',
         })),
       },
-      usage,
+      usage: { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: 'free' },
     };
   }
 
@@ -173,6 +153,7 @@ export async function generateGoalFromPrompt(
     /* non-fatal */
   }
 
+  // Build answers block — only include non-empty answers
   const answersBlock = Object.values(answers).some((v) => v.trim())
     ? '\n\nUser context from follow-up questions:\n' +
       Object.entries(answers)
@@ -199,10 +180,7 @@ export async function generateGoalFromPrompt(
   if (response.status === 429) {
     try {
       const payload = JSON.parse(raw) as AILimitPayload;
-      if (payload.error === 'monthly_limit_reached') {
-        markAIUsageLimitReached(payload);
-        throw new AILimitError(payload);
-      }
+      if (payload.error === 'monthly_limit_reached') throw new AILimitError(payload);
     } catch (e) {
       if (e instanceof AILimitError) throw e;
     }
@@ -211,11 +189,7 @@ export async function generateGoalFromPrompt(
   if (!response.ok) {
     let message = `Edge function failed (${response.status})`;
     try {
-      const e = JSON.parse(raw) as {
-        error?: string;
-        details?: string;
-        raw_text?: string;
-      };
+      const e = JSON.parse(raw) as { error?: string; details?: string; raw_text?: string };
       if (e.error) {
         message = e.error;
         if (e.details) message += `: ${e.details}`;
@@ -269,6 +243,7 @@ export async function generateGoalFromPrompt(
       : [],
   };
 
+  // Keep usage cache in sync so pill/details card update immediately
   writeAIUsageCache(usage);
 
   return { goal, usage };

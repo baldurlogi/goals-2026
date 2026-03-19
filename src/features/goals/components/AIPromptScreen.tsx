@@ -223,7 +223,7 @@ export function AIPromptScreen({
               Claude is breaking this into concrete, actionable steps
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              This can take around 10–20 seconds.
+              This can take around 15-30 seconds.
             </p>
           </div>
         </div>
@@ -295,7 +295,7 @@ export function AIPromptScreen({
 
       <div className="mt-6 space-y-2 border-t pt-4">
         <p className="text-right text-xs text-muted-foreground">
-          Generating usually takes around 10–20 seconds.
+          Generating usually takes around 15-30 seconds.
         </p>
         <div className="flex items-center justify-between gap-2">
           <Button
@@ -424,7 +424,7 @@ export function AIPromptScreen({
 
       <div className="mt-6 space-y-2 border-t pt-4">
         <p className="text-right text-xs text-muted-foreground">
-          Generating usually takes around 10–20 seconds.
+          Generating usually takes around 15-30 seconds.
         </p>
         <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5">

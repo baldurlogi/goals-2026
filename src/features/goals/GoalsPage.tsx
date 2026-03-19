@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,8 @@ import type { UserGoal, UserGoalStep } from './goalTypes';
 import type { GoalPersistenceStatus } from './userGoalStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { AIContextNudge } from './components/AIContextNudge';
+import { useAuth } from '@/features/auth/authContext';
+import { queryKeys } from '@/lib/queryKeys';
 import type { ReactNode } from 'react';
 
 function SortButton({
@@ -41,7 +44,6 @@ function SortButton({
   );
 }
 
-
 type SortMode = 'priority' | 'overdue';
 type ModalState = UserGoal | 'new' | 'ai' | null;
 type GoalRouteState = { openGoalModal?: 'new' | 'ai' } | null;
@@ -49,6 +51,9 @@ type GoalRouteState = { openGoalModal?: 'new' | 'ai' } | null;
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 export function GoalsPage() {
+  const { userId } = useAuth();
+  const queryClient = useQueryClient();
+
   const { data: done = {} } = useGoalProgressQuery();
   const { data: goals = [], isLoading: loading } = useGoalsQuery();
   const deleteGoalMutation = useDeleteGoalMutation();
@@ -74,6 +79,29 @@ export function GoalsPage() {
     if (routeModal) {
       navigate(location.pathname, { replace: true, state: null });
     }
+  }
+
+  function upsertGoalInCache(saved: UserGoal) {
+    queryClient.setQueryData<UserGoal[]>(queryKeys.goals(userId), (previous = []) => {
+      const index = previous.findIndex((goal) => goal.id === saved.id);
+
+      if (index === -1) {
+        return [...previous, saved];
+      }
+
+      const next = [...previous];
+      next[index] = saved;
+      return next;
+    });
+
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals(userId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(userId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardGoals(userId) }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboardLifeProgress(userId),
+      }),
+    ]);
   }
 
   const today = getLocalDateKey();
@@ -128,7 +156,8 @@ export function GoalsPage() {
     }
   }
 
-  function handleSaved(_saved: UserGoal) {
+  function handleSaved(saved: UserGoal) {
+    upsertGoalInCache(saved);
     closeModal();
   }
 
