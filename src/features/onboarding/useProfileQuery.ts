@@ -14,24 +14,33 @@ export function useProfileQuery() {
   return useQuery<UserProfile | null>({
     queryKey: queryKeys.profile(userId),
     queryFn: () => loadProfile(userId),
-    enabled: authReady,
+    enabled: authReady && Boolean(userId),
     staleTime: 1000 * 60 * 5,
-    initialData: seedProfileCache(userId),
+    initialData: userId ? seedProfileCache(userId) : undefined,
   });
 }
 
 export function useProfileState() {
-  const { authReady } = useAuth();
+  const { authReady, userId } = useAuth();
   const query = useProfileQuery();
+
+  const isWaitingForUserId = authReady && !userId;
+  const hasUserId = Boolean(userId);
 
   return {
     ...query,
     profile: query.data ?? null,
     authReady,
     isAuthLoading: !authReady,
-    isProfileLoading: authReady && query.isLoading && !query.data,
-    isRefreshingProfile: authReady && query.isFetching && !!query.data,
-    isMissingProfile: authReady && !query.isLoading && !query.data && !query.error,
+    isProfileLoading:
+      isWaitingForUserId || (hasUserId && query.isLoading && !query.data),
+    isRefreshingProfile: hasUserId && query.isFetching && !!query.data,
+    isMissingProfile:
+      hasUserId &&
+      !isWaitingForUserId &&
+      !query.isLoading &&
+      !query.data &&
+      !query.error,
   };
 }
 

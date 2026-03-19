@@ -35,7 +35,7 @@ function isUserBoundQueryKey(
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 2,
+      staleTime: 1000 * 60,
       gcTime: 1000 * 60 * 30,
       retry: (failureCount, error) => {
         const message =
@@ -45,8 +45,9 @@ export const queryClient = new QueryClient({
         }
         return failureCount < 1;
       },
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
       refetchOnReconnect: true,
+      refetchOnMount: true,
     },
     mutations: {
       retry: 0,
@@ -60,6 +61,7 @@ export function clearUserBoundQueries(userId: string | null): void {
       predicate: (query) => isUserBoundQueryKey(query.queryKey, userId),
     })
     .catch(() => undefined);
+
   queryClient.removeQueries({
     predicate: (query) => isUserBoundQueryKey(query.queryKey, userId),
   });

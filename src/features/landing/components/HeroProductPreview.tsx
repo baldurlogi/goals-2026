@@ -80,7 +80,7 @@ export function HeroProductPreview({
                   Run 4 km after work
                 </div>
                 <div className="text-xs" style={{ color: t.muted }}>
-                  30 minutes · keeps your marathon plan on track
+                  30 minutes · one step that keeps your bigger goal alive
                 </div>
               </div>
             </div>
@@ -190,7 +190,7 @@ export function HeroProductPreview({
                 minHeight: 52,
               }}
             >
-              I want to run a marathon by October
+              I want to stop restarting and finally train for my marathon
             </div>
 
             <div className="mb-4 flex min-h-[36px] flex-wrap gap-2">
@@ -226,7 +226,7 @@ export function HeroProductPreview({
                     Marathon by October
                   </div>
                   <div className="text-xs" style={{ color: t.muted }}>
-                    AI plan generated · review before saving
+                    AI plan generated · broken into clear next steps
                   </div>
                 </div>
               </div>
@@ -296,7 +296,7 @@ export function HeroProductPreview({
                   Run 4 km after work
                 </div>
                 <div className="text-xs" style={{ color: t.muted }}>
-                  30 minutes · keeps your marathon plan on track
+                  30 minutes · one step that keeps your bigger goal alive
                 </div>
               </div>
             </div>
@@ -359,14 +359,14 @@ export function HeroProductPreview({
                 className="mb-3 font-mono text-[11px] tracking-[0.08em]"
                 style={{ color: t.faint }}
               >
-                WHY PEOPLE STAY
+                WHY IT STICKS
               </div>
 
               <div className="grid flex-1 gap-2">
                 {[
-                  "You know what to do next",
+                  "You stop wondering where to start",
                   "You can see your momentum",
-                  "Your daily actions feel connected",
+                  "Your days feel connected to your future",
                 ].map((line) => (
                   <div key={line} className="flex items-start gap-2 text-sm">
                     <span style={{ color: t.primary }}>●</span>

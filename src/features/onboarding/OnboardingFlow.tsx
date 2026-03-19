@@ -1,51 +1,42 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode, useEffect } from "react";
 import {
   Check,
   ChevronRight,
   ChevronLeft,
   Loader2,
-  Sparkles,
   User,
   Dumbbell,
   CalendarDays,
   BookOpen,
   LayoutGrid,
-  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
-import { completeOnboarding, calculateMacros } from "./profileStorage";
-import { AddEditGoalModal } from "@/features/goals/components/AddEditGoalModal";
+import { completeOnboarding } from "./profileStorage";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { StepProfile } from "./components/StepProfile";
 import { StepModules } from "./components/StepModules";
-import { StepGoal } from "./components/StepGoal";
 import { StepMacros } from "./components/StepMacros";
 import { StepSchedule } from "./components/StepSchedule";
 import { StepReading } from "./components/StepReading";
 import {
-  buildInitialAIPrompt,
   INITIAL_ONBOARDING_DATA,
   type OnboardingData,
 } from "./components/types";
 
-type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
+type OnboardingStep = 0 | 1 | 2 | 3 | 4;
 
 const STEP_ICONS: Record<OnboardingStep, typeof User> = {
   0: User,
   1: LayoutGrid,
-  2: Target,
-  3: Dumbbell,
-  4: CalendarDays,
-  5: BookOpen,
+  2: Dumbbell,
+  3: CalendarDays,
+  4: BookOpen,
 };
 
 const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> =
@@ -60,23 +51,28 @@ const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> 
         "Pick only the parts of the app you actually want to use right now.",
     },
     2: {
-      label: "Goals",
-      subtitle: "Clear goals turn intentions into a plan you can follow.",
-    },
-    3: {
       label: "Nutrition",
       subtitle:
-        "Set activity and macros using AI suggestions or manual targets.",
+        "Enter your own targets or answer a few questions to get a smarter suggestion.",
     },
-    4: {
+    3: {
       label: "Schedule",
       subtitle: "Set your weekly defaults once so daily planning matches real life.",
     },
-    5: {
+    4: {
       label: "Reading",
       subtitle: "A daily reading target helps you build a consistent learning habit.",
     },
   };
+
+function hasValidNutritionTarget(data: OnboardingData) {
+  return Boolean(
+    data.macro_maintain &&
+      data.macro_maintain.cal > 0 &&
+      data.macro_maintain.protein > 0 &&
+      data.macro_maintain.fat > 0,
+  );
+}
 
 export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const { userId } = useAuth();
@@ -84,8 +80,13 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const [data, setData] = useState<OnboardingData>(INITIAL_ONBOARDING_DATA);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [phase, setPhase] = useState<"setup" | "goal">("setup");
-  const [showGoalSkipConfirm, setShowGoalSkipConfirm] = useState(false);
+
+  useEffect(() => {
+    captureOnce("onboarding_started", userId, {
+      source: "onboarding_flow",
+      route: "/app",
+    });
+  }, [userId]);
 
   function update(patch: Partial<OnboardingData>) {
     setError(null);
@@ -94,10 +95,10 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
   const visibleSteps = useMemo(
     () =>
-      ([0, 1, 2, 3, 4, 5] as OnboardingStep[]).filter((s) => {
-        if (s === 3) return data.enabled_modules.includes("nutrition");
-        if (s === 4) return data.enabled_modules.includes("schedule");
-        if (s === 5) return data.enabled_modules.includes("reading");
+      ([0, 1, 2, 3, 4] as OnboardingStep[]).filter((s) => {
+        if (s === 2) return data.enabled_modules.includes("nutrition");
+        if (s === 3) return data.enabled_modules.includes("schedule");
+        if (s === 4) return data.enabled_modules.includes("reading");
         return true;
       }),
     [data.enabled_modules],
@@ -106,11 +107,11 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const currentIndex = visibleSteps.indexOf(step);
   const isLastStep = currentIndex === visibleSteps.length - 1;
   const currentStepContent = STEP_CONTENT[step];
-  const hasGoalIntent = Boolean(data.main_goal.trim());
 
   function canAdvance(): boolean {
     if (step === 0) return !!data.display_name.trim();
     if (step === 1) return data.enabled_modules.length > 0;
+    if (step === 2) return hasValidNutritionTarget(data);
     return true;
   }
 
@@ -129,17 +130,6 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     setError(null);
 
     try {
-      const calculated =
-        data.weight_kg && data.height_cm && data.age
-          ? calculateMacros(
-              Number(data.weight_kg),
-              Number(data.height_cm),
-              Number(data.age),
-              data.sex,
-              data.activity_level,
-            )
-          : null;
-
       await completeOnboarding({
         display_name: data.display_name.trim(),
         sex: data.sex,
@@ -147,8 +137,8 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
         weight_kg: data.weight_kg ? Number(data.weight_kg) : null,
         height_cm: data.height_cm ? Number(data.height_cm) : null,
         activity_level: data.activity_level,
-        macro_maintain: data.macro_maintain ?? calculated?.maintain ?? null,
-        macro_cut: data.macro_cut ?? calculated?.cut ?? null,
+        macro_maintain: hasValidNutritionTarget(data) ? data.macro_maintain : null,
+        macro_cut: data.macro_cut ?? null,
         weekly_schedule: data.weekly_schedule,
         daily_reading_goal: Number(data.daily_reading_goal) || 20,
         enabled_modules: data.enabled_modules,
@@ -156,20 +146,16 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
       captureOnce("onboarding_completed", userId, {
         enabled_modules_count: data.enabled_modules.length,
-        has_main_goal_intent: hasGoalIntent,
+        has_nutrition_target: hasValidNutritionTarget(data),
+        nutrition_setup_mode: data.macro_setup_mode,
         source: "onboarding_flow",
         route: "/app",
       });
 
-      if (hasGoalIntent) {
-        setPhase("goal");
-        return;
-      }
-
       onComplete();
     } catch (e) {
       setError(
-        "We couldn’t finish setup yet. Please retry — your answers are still here.",
+        "We couldn't finish setup yet. Please retry — your answers are still here.",
       );
       console.error(e);
     } finally {
@@ -177,69 +163,12 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     }
   }
 
-  if (phase === "goal") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        {showGoalSkipConfirm ? (
-          <Card className="w-full max-w-sm rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-base">Skip goal setup for now?</CardTitle>
-              <CardDescription>
-                Your onboarding details are already saved. You can always create
-                or edit goals later from the Goals tab in your dashboard.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowGoalSkipConfirm(false)}
-              >
-                Continue setup
-              </Button>
-              <Button type="button" onClick={onComplete}>
-                Open dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="w-full max-w-3xl space-y-4">
-            <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-sm">
-              <CardHeader className="gap-3 sm:flex sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Onboarding saved. Next up: goal setup.
-                  </CardTitle>
-                  <CardDescription>
-                    We’ll use your goal idea to draft a stronger starting point.
-                    You can still skip this and finish inside the dashboard.
-                  </CardDescription>
-                </div>
-                <div className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
-                  Step 2 of 2
-                </div>
-              </CardHeader>
-            </Card>
-            <AddEditGoalModal
-              onSave={() => onComplete()}
-              onClose={() => setShowGoalSkipConfirm(true)}
-              startWithAI
-              initialAIPrompt={buildInitialAIPrompt(data.main_goal, data.goal_why)}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const stepComponents: Record<OnboardingStep, ReactNode> = {
     0: <StepProfile data={data} onChange={update} />,
     1: <StepModules data={data} onChange={update} />,
-    2: <StepGoal data={data} onChange={update} />,
-    3: <StepMacros data={data} onChange={update} />,
-    4: <StepSchedule data={data} onChange={update} />,
-    5: <StepReading data={data} onChange={update} />,
+    2: <StepMacros data={data} onChange={update} />,
+    3: <StepSchedule data={data} onChange={update} />,
+    4: <StepReading data={data} onChange={update} />,
   };
 
   return (
@@ -325,10 +254,9 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
               </span>
             </div>
             <p className="text-muted-foreground">
-              After setup, your dashboard will open with your goals and profile
-              ready. You can review or edit everything later in{" "}
-              <span className="font-medium text-foreground">Goals</span> and{" "}
-              <span className="font-medium text-foreground">Profile</span>.
+              After setup, your dashboard will open with your profile and selected
+              modules ready. Your first goal can be created from the dashboard when
+              you are ready.
             </p>
             {error ? (
               <p className="text-sm font-medium text-destructive">{error}</p>
@@ -359,11 +287,6 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Saving…
-                </>
-              ) : hasGoalIntent ? (
-                <>
-                  Continue to goal setup
-                  <Sparkles className="h-4 w-4" />
                 </>
               ) : (
                 <>

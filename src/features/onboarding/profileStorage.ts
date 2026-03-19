@@ -75,7 +75,6 @@ export type UserProfile = {
 const LEGACY_CACHE_KEY = "cache:profile:v1";
 const PROFILE_CACHE_KEY = CACHE_KEYS.PROFILE;
 
-
 export function mapLegacyScheduleToWeekly(
   legacy: LegacyScheduleView | null | undefined,
 ): WeeklySchedule {
@@ -144,8 +143,7 @@ export function deriveLegacyScheduleView(
 
 export function normalizeUserProfile(raw: UserProfile): UserProfile {
   const weeklySchedule = normalizeWeeklySchedule(
-    (raw as UserProfile & { weekly_schedule?: WeeklySchedule | null })
-      .weekly_schedule,
+    (raw as UserProfile & { weekly_schedule?: WeeklySchedule | null }).weekly_schedule,
     raw.default_schedule_view,
   );
 
@@ -219,8 +217,7 @@ export function calculateMacros(
 }
 
 export const PROFILE_CHANGED_EVENT = "profile:changed";
-const emitProfileChanged = () =>
-  window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
+const emitProfileChanged = () => window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
 
 const inFlightProfileLoads = new Map<string, Promise<UserProfile | null>>();
 
@@ -280,7 +277,9 @@ export function seedProfileCache(userId: string | null): UserProfile | null {
   return readProfileCache(userId);
 }
 
-export async function loadProfile(userId: string | null = getActiveUserId()): Promise<UserProfile | null> {
+export async function loadProfile(
+  userId: string | null = getActiveUserId(),
+): Promise<UserProfile | null> {
   if (!userId) {
     clearProfileState();
     return null;
@@ -300,10 +299,16 @@ export async function loadProfile(userId: string | null = getActiveUserId()): Pr
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-       .eq("id", userId)
-      .single();
+      .eq("id", userId)
+      .maybeSingle();
 
-    if (error || !data) return null;
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return defaultProfile(userId);
+    }
 
     const profile = normalizeUserProfile(data as UserProfile);
     writeProfileCache(profile);
@@ -356,10 +361,7 @@ export async function saveProfile(
 }
 
 export async function completeOnboarding(
-  profile: Omit<
-    UserProfile,
-    "id" | "onboarding_done" | "tier" | "default_schedule_view"
-  >,
+  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier" | "default_schedule_view">,
 ): Promise<void> {
   const {
     data: { user },
@@ -369,21 +371,10 @@ export async function completeOnboarding(
 
   if (!userId) return;
 
-  const macros =
-    profile.weight_kg && profile.height_cm && profile.age && profile.sex
-      ? calculateMacros(
-          profile.weight_kg,
-          profile.height_cm,
-          profile.age,
-          profile.sex,
-          profile.activity_level,
-        )
-      : null;
-
   await saveProfile(userId, {
     ...profile,
-    macro_maintain: macros?.maintain ?? null,
-    macro_cut: macros?.cut ?? null,
+    macro_maintain: profile.macro_maintain ?? null,
+    macro_cut: profile.macro_cut ?? null,
     onboarding_done: true,
   });
 }

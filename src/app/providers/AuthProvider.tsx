@@ -125,12 +125,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     const currentUserId = user?.id ?? previousUserIdRef.current ?? null;
+
     clearUserBoundQueries(currentUserId);
     clearUserCache(currentUserId);
+
     setLoading(true);
-    await supabase.auth.signOut();
-    setActiveUserId(null);
-    posthog.reset();
+
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      const previousUserId = previousUserIdRef.current ?? currentUserId ?? null;
+
+      setActiveUserId(null);
+      previousUserIdRef.current = null;
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+      posthog.reset();
+
+      window.dispatchEvent(
+        new CustomEvent(AUTH_USER_CHANGED_EVENT, {
+          detail: { userId: null, previousUserId },
+        }),
+      );
+
+      window.location.replace("/");
+    }
   }
 
   return (

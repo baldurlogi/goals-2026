@@ -20,6 +20,10 @@ const LoginPage = lazy(async () => ({
   default: (await import("@/features/auth/LoginPage")).LoginPage,
 }));
 
+const SignupPage = lazy(async () => ({
+  default: (await import("@/features/auth/SignupPage")).SignupPage,
+}));
+
 const AuthCallbackPage = lazy(async () => ({
   default: (await import("@/features/auth/AuthCallbackPage")).AuthCallbackPage,
 }));
@@ -143,7 +147,6 @@ function AppRouteFallback() {
 }
 
 export default function App() {
-
   return (
     <BrowserRouter>
       <Analytics />
@@ -160,8 +163,14 @@ export default function App() {
               </Suspense>
             }
           />
+
           <Route
             path="/auth"
+            element={<Navigate to="/login" replace />}
+          />
+
+          <Route
+            path="/login"
             element={
               <Suspense fallback={<RouteFallback />}>
                 <RedirectIfAuth>
@@ -170,6 +179,18 @@ export default function App() {
               </Suspense>
             }
           />
+
+          <Route
+            path="/signup"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <RedirectIfAuth>
+                  <SignupPage />
+                </RedirectIfAuth>
+              </Suspense>
+            }
+          />
+
           <Route
             path="/auth/callback"
             element={
@@ -178,6 +199,7 @@ export default function App() {
               </Suspense>
             }
           />
+
           <Route
             path="/privacy"
             element={
@@ -186,6 +208,7 @@ export default function App() {
               </Suspense>
             }
           />
+
           <Route
             path="/terms"
             element={
