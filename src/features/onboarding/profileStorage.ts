@@ -285,17 +285,14 @@ export async function loadProfile(
     return null;
   }
 
-  const cached = readProfileCache(userId);
-  if (cached) {
-    return cached;
-  }
-
   const inFlight = inFlightProfileLoads.get(userId);
   if (inFlight) {
     return inFlight;
   }
 
   const loadPromise = (async () => {
+    const cached = readProfileCache(userId);
+
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -303,11 +300,14 @@ export async function loadProfile(
       .maybeSingle();
 
     if (error) {
+      if (cached) {
+        return cached;
+      }
       throw error;
     }
 
     if (!data) {
-      return defaultProfile(userId);
+      return null;
     }
 
     const profile = normalizeUserProfile(data as UserProfile);
