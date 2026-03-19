@@ -10,8 +10,8 @@ import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { useAIUsage } from "@/features/subscription/useAIUsage";
+import { writeAIUsageCache } from "@/features/subscription/aiUsageCache";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
@@ -80,7 +80,10 @@ function readLastSession(): LastSession | null {
 // ── Fetch from edge function ──────────────────────────────────────────────────
 
 async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   if (!session?.access_token) throw new Error("Not signed in");
 
   const { systemContext } = await buildAIContext();
@@ -90,15 +93,23 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ action: "coach", userContext: systemContext, lastSuggestedModule }),
+    body: JSON.stringify({
+      action: "coach",
+      userContext: systemContext,
+      lastSuggestedModule,
+    }),
   });
 
   if (res.status === 429) {
     const data = await res.json().catch(() => ({}));
-    if (data.error === "rate_limit_exceeded") throw new Error(data.message ?? "Too many requests. Please wait a moment.");
-    throw new AIUsageLimitError(data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions.");
+    if (data.error === "rate_limit_exceeded") {
+      throw new Error(data.message ?? "Too many requests. Please wait a moment.");
+    }
+    throw new AIUsageLimitError(
+      data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions.",
+    );
   }
 
   if (!res.ok) {
@@ -107,11 +118,14 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   }
 
   const data = await res.json();
+
+  if (data.usage) {
+    writeAIUsageCache(data.usage);
+  }
+
   const s = data.suggestion as CoachSuggestion;
   if (!s?.action || !s?.href) throw new Error("Invalid suggestion shape");
 
-  // Signal to usage hook that a prompt was used
-  window.dispatchEvent(new Event("ai:prompt-used"));
   return s;
 }
 
@@ -264,8 +278,7 @@ function AICoachCardInner() {
 
   function handleRefresh() {
     clearCache();
-    if (isAI) void loadStatic();
-    else void loadAI();
+    void loadAI();
   }
 
   return (
