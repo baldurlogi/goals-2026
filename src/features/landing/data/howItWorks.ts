@@ -4,7 +4,7 @@ export const HOW_IT_WORKS: HowItWorksItem[] = [
   {
     step: "01",
     title: "Start with one big goal",
-    body: "Type something real you want to achieve, like getting fitter, reading more, saving money, or launching something meaningful.",
+    body: "Type something real you want to achieve, getting your dream body, go on that trip, reading more, saving money, or launching something meaningful.",
   },
   {
     step: "02",

@@ -2,7 +2,6 @@ import { ProfileStateCard } from "./components/ProfileStateCard";
 import { OnboardingFlow } from "./OnboardingFlow";
 import { useProfileState } from "@/features/onboarding/useProfileQuery";
 
-
 type Props = {
   children: React.ReactNode;
 };
@@ -12,7 +11,6 @@ export function RequireOnboarding({ children }: Props) {
     profile,
     isAuthLoading,
     isProfileLoading,
-    isMissingProfile,
     error,
     isFetching,
     refetch,
@@ -32,7 +30,7 @@ export function RequireOnboarding({ children }: Props) {
     return (
       <ProfileStateCard
         title="Loading your setup"
-        description="Your saved profile is still loading. If this takes a moment, we'll keep waiting instead of treating it like missing data."
+        description="Your saved profile is still loading. If this takes a moment, we'll keep waiting."
         status="loading"
       />
     );
@@ -42,7 +40,7 @@ export function RequireOnboarding({ children }: Props) {
     return (
       <ProfileStateCard
         title="We couldn't load your setup"
-        description="This usually means the profile request timed out or hit a temporary error. Retry to keep your existing onboarding state intact."
+        description="This usually means the profile request hit a temporary error. Retry to continue."
         status="error"
         actionLabel="Retry"
         onAction={() => void refetch()}
@@ -51,20 +49,7 @@ export function RequireOnboarding({ children }: Props) {
     );
   }
 
-  if (isMissingProfile) {
-    return (
-      <ProfileStateCard
-        title="We couldn't find a saved profile yet"
-        description="We'll open onboarding so you can finish your setup. If you expected an existing profile, you can retry first."
-        status="empty"
-        actionLabel="Retry lookup"
-        onAction={() => void refetch()}
-        busy={isFetching}
-      />
-    );
-  }
-
-  if (!profile?.onboarding_done) {
+  if (!profile || !profile.onboarding_done) {
     return <OnboardingFlow onComplete={() => void refetch()} />;
   }
 

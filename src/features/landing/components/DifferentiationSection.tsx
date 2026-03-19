@@ -49,21 +49,32 @@ export function DifferentiationSection({
                 textAlign: "center",
               }}
             >
-              WHY IT FEELS DIFFERENT
+              WHY PEOPLE STAY
             </div>
 
             <h2
-              className="mb-8 text-center text-[clamp(24px,3vw,36px)] leading-[1.1] tracking-[-0.03em]"
+              className="mb-4 text-center text-[clamp(24px,3vw,36px)] leading-[1.1] tracking-[-0.03em]"
               style={{
                 fontFamily: "'Instrument Serif', serif",
                 fontWeight: 400,
                 color: t.text,
               }}
             >
-              Less scattered tracking.
+              Not another place to plan.
               <br />
-              <em style={{ color: t.primary }}>More visible follow-through.</em>
+              <em style={{ color: t.primary }}>
+                A system that helps you follow through.
+              </em>
             </h2>
+
+            <p
+              className="mx-auto mb-8 max-w-2xl text-center text-sm leading-8 sm:text-[15px]"
+              style={{ color: t.faint }}
+            >
+              Most tools help you capture intentions. This one is built to help you
+              act on them consistently, see your momentum, and stay connected to
+              the future you are trying to build.
+            </p>
 
             <div
               style={{

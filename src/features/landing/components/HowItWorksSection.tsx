@@ -42,10 +42,10 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
             color: t.text,
           }}
         >
-          From overwhelming ambition
+          Turn “someday”
           <br />
           <em style={{ color: t.primary }}>
-            to clear daily momentum.
+            into today.
           </em>
         </h2>
 
@@ -53,8 +53,9 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
           className="mx-auto max-w-2xl text-sm leading-8 sm:text-[15px]"
           style={{ color: t.faint }}
         >
-          The product is designed around one feeling: helping users stop
-          wondering where to start and start making visible progress.
+          Most people do not need more motivation. They need a system that turns
+          big intentions into today’s next step — and makes progress feel real
+          before another month drifts by.
         </p>
       </div>
 

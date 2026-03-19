@@ -31,7 +31,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
           className="mb-4 font-mono text-[11px] tracking-[0.12em]"
           style={{ color: t.faint }}
         >
-          WHY IT WORKS
+          WHY IT STICKS
         </div>
 
         <h2
@@ -42,12 +42,20 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
             color: t.text,
           }}
         >
-          Built to make progress feel
+          Built for people who are tired of
           <br />
           <em style={{ color: t.primary }}>
-            clearer, calmer, and easier to follow.
+            starting over every Monday.
           </em>
         </h2>
+
+        <p
+          className="mx-auto mt-4 max-w-2xl text-sm leading-8 sm:text-[15px]"
+          style={{ color: t.faint }}
+        >
+          The product is designed to reduce drift, make your next move obvious,
+          and help your daily actions feel connected to the life you say you want.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -7,12 +7,14 @@ import { HeroProductPreview } from "./HeroProductPreview";
 type HeroSectionProps = {
   theme: ThemeMode;
   onGetStarted: () => void;
+  onLogIn: () => void;
   onSeeHowItWorks: () => void;
 };
 
 export function HeroSection({
   theme,
   onGetStarted,
+  onLogIn,
   onSeeHowItWorks,
 }: HeroSectionProps) {
   const t = TOKENS[theme];
@@ -42,7 +44,7 @@ export function HeroSection({
               style={{ background: t.primary }}
             />
             <span className="font-mono text-[11px] tracking-[0.08em]">
-              AI LIFE SYSTEM
+              FUTURE SELF, BUILT DAILY
             </span>
           </div>
 
@@ -54,10 +56,10 @@ export function HeroSection({
               color: t.text,
             }}
           >
-            Turn big life goals
+            Stop postponing the person
             <br />
             <em style={{ color: t.primary, fontStyle: "italic" }}>
-              into daily progress.
+              you want to become.
             </em>
           </h1>
 
@@ -65,18 +67,18 @@ export function HeroSection({
             className="mb-3 max-w-2xl text-[15px] leading-7 sm:text-[clamp(16px,2vw,19px)] sm:leading-8"
             style={{ color: t.muted }}
           >
-            An AI-powered life system that turns one goal into a clear plan,
-            shows your next best action, and makes progress visible across your
-            real life.
+            Daily Life Progress helps you turn goals, habits, health, and routines
+            into visible daily progress — before “someday” turns into another year
+            of waiting.
           </p>
 
           <p
             className="mb-6 max-w-2xl text-sm leading-7 sm:mb-7 sm:text-[15px] sm:leading-8"
             style={{ color: t.faint }}
           >
-            Replace overwhelm with one connected system for goals, habits,
-            health, learning, routines, and momentum — so you stop guessing and
-            start moving.
+            You do not need perfect timing. You need one connected system that
+            shows what matters today, keeps your momentum visible, and helps you
+            follow through when motivation fades.
           </p>
 
           <div className="mb-6 flex min-h-[64px] flex-wrap gap-3">
@@ -95,6 +97,20 @@ export function HeroSection({
             <Button
               type="button"
               variant="ghost"
+              onClick={onLogIn}
+              className="rounded-xl border px-5 py-6 text-sm font-semibold"
+              style={{
+                background: "transparent",
+                borderColor: t.borderStrong,
+                color: t.textSoft,
+              }}
+            >
+              Log in
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
               onClick={onSeeHowItWorks}
               className="rounded-xl border px-5 py-6 text-sm font-semibold"
               style={{
@@ -103,7 +119,7 @@ export function HeroSection({
                 color: t.textSoft,
               }}
             >
-              See the flow
+              See how it works
             </Button>
           </div>
 

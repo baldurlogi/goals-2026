@@ -123,13 +123,14 @@ export function LandingPage() {
       <LandingNavbar
         theme={theme}
         onToggleTheme={toggleTheme}
-        onSignIn={() => navigate("/auth")}
-        onGetStarted={() => navigate("/auth")}
+        onSignIn={() => navigate("/login")}
+        onGetStarted={() => navigate("/signup")}
       />
 
       <HeroSection
         theme={theme}
-        onGetStarted={() => navigate("/auth")}
+        onGetStarted={() => navigate("/signup")}
+        onLogIn={() => navigate("/login")}
         onSeeHowItWorks={() =>
           document
             .getElementById("how-it-works")
@@ -166,7 +167,7 @@ export function LandingPage() {
           theme={theme}
           billing={billing}
           setBilling={setBilling}
-          onChoosePlan={() => navigate("/auth")}
+          onChoosePlan={() => navigate("/signup")}
         />
       </DeferredSection>
 
@@ -176,7 +177,7 @@ export function LandingPage() {
       >
         <FinalCtaSection
           theme={theme}
-          onGetStarted={() => navigate("/auth")}
+          onGetStarted={() => navigate("/signup")}
           onSeePricing={() =>
             document
               .getElementById("pricing")

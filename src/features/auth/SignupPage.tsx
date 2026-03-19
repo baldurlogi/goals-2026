@@ -1,11 +1,18 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { capture } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-export function LoginPage() {
+export function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
@@ -19,12 +26,27 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
 
+    capture("signup_started", {
+      method: "google",
+      source: "signup_page",
+      route: "/signup",
+    });
+
+    const redirectTo = `${window.location.origin}/auth/callback?intent=signup`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?intent=login` },
+      options: { redirectTo },
     });
 
     if (error) {
+      capture("signup_failed", {
+        method: "google",
+        source: "signup_page",
+        route: "/signup",
+        error_message: error.message,
+      });
+
       setError(error.message);
       setLoading(false);
     }
@@ -35,9 +57,9 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center pb-4">
           <div className="mx-auto mb-3 text-4xl">📊</div>
-          <CardTitle className="text-xl">Daily Life Progress</CardTitle>
+          <CardTitle className="text-xl">Create your account</CardTitle>
           <CardDescription>
-            Your personal dashboard for fitness, habits and goals.
+            Start tracking your goals, habits, fitness and daily progress.
           </CardDescription>
         </CardHeader>
 
@@ -128,6 +150,13 @@ export function LoginPage() {
               {error}
             </p>
           )}
+
+          <p className="text-center text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link to="/login" className="font-medium text-violet-400 hover:underline">
+              Log in
+            </Link>
+          </p>
 
           <p className="text-center text-[11px] text-muted-foreground">
             Your data is private and only visible to you.

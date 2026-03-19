@@ -54,7 +54,7 @@ export function PricingSection({
           Start free.
           <br />
           <em style={{ color: t.primary }}>
-            Upgrade to Pro when you want more AI guidance.
+            Upgrade when you want more support staying consistent.
           </em>
         </h2>
 
@@ -62,8 +62,9 @@ export function PricingSection({
           className="mx-auto mb-6 max-w-2xl text-sm leading-8 sm:text-[15px]"
           style={{ color: t.faint }}
         >
-          Keep using the core system for free, or unlock more prompts, better AI
-          planning, and stronger daily guidance with Pro.
+          Use the core system for free, or unlock more AI prompts, stronger
+          planning, and better day-to-day guidance when you want extra help
+          following through.
         </p>
 
         <BillingToggle
@@ -77,10 +78,10 @@ export function PricingSection({
           style={{ color: t.primary }}
         >
           {billing === "yearly" ? (
-            "Yearly is billed once upfront. The monthly number shown is the lower equivalent."
+            "Yearly is billed once upfront."
           ) : (
             <span style={{ visibility: "hidden" }}>
-              Yearly is billed once upfront. The monthly number shown is the lower equivalent.
+              Yearly is billed once upfront.
             </span>
           )}
         </div>
@@ -102,7 +103,7 @@ export function PricingSection({
         className="mx-auto mt-6 max-w-3xl text-center text-sm"
         style={{ color: t.faint }}
       >
-        Pro Max is coming soon. For now, we’re focused on making Pro excellent.
+        Pro Max is coming soon. Right now, we make focus on making your goal journey the easiest it can be.
       </div>
     </section>
   );

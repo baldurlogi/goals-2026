@@ -103,7 +103,7 @@ export function LandingNavbar({
             className="px-3 py-2 text-sm transition-opacity"
             style={{ color: t.muted }}
           >
-            Why it works
+            Why it sticks
           </button>
 
           <button
@@ -146,7 +146,7 @@ export function LandingNavbar({
               color: t.textSoft,
             }}
           >
-            Sign in
+            Log in
           </Button>
 
           <Button
@@ -186,7 +186,7 @@ export function LandingNavbar({
             className="w-full rounded-xl px-3 py-2 text-left text-sm"
             style={{ color: t.textSoft }}
           >
-            Why it works
+            Why it sticks
           </button>
           <button
             type="button"
@@ -202,7 +202,7 @@ export function LandingNavbar({
             className="w-full rounded-xl px-3 py-2 text-left text-sm"
             style={{ color: t.textSoft }}
           >
-            Sign in
+            Log in
           </button>
         </div>
       ) : null}

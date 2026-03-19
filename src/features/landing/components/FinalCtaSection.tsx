@@ -44,10 +44,10 @@ export function FinalCtaSection({
             color: t.text,
           }}
         >
-          Big goals feel lighter
+          Start now,
           <br />
           <em style={{ color: t.primary }}>
-            when the next step is clear.
+            so future you has something to thank you for.
           </em>
         </h2>
 
@@ -55,8 +55,8 @@ export function FinalCtaSection({
           className="mx-auto mb-8 max-w-2xl text-sm leading-8 sm:text-[15px]"
           style={{ color: t.faint }}
         >
-          Start with one goal. Let AI build the plan. See your next move and your
-          progress in one place.
+          Track your goals, habits, health, and daily progress in one place — and
+          turn “I should” into visible follow-through.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
