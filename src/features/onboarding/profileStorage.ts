@@ -1,4 +1,11 @@
 import { supabase } from "@/lib/supabaseClient";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  legacyScopedKey,
+  writeScopedStorageItem,
+} from "@/lib/activeUser";
+import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import type { ModuleId } from "@/features/modules/modules";
 
 export type Sex = "male" | "female";
@@ -8,7 +15,37 @@ export type ActivityLevel =
   | "moderate"
   | "active"
   | "very_active";
-export type ScheduleView = "wfh" | "office" | "weekend";
+export type LegacyScheduleView = "wfh" | "office" | "weekend";
+export type WeeklyScheduleValue = "office" | "wfh" | "hybrid" | "off";
+export type WeekdayKey =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+export type WeeklySchedule = Record<WeekdayKey, WeeklyScheduleValue>;
+
+export const WEEKDAY_ORDER: WeekdayKey[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
+
+export const DEFAULT_WEEKLY_SCHEDULE: WeeklySchedule = {
+  monday: "office",
+  tuesday: "office",
+  wednesday: "office",
+  thursday: "office",
+  friday: "office",
+  saturday: "off",
+  sunday: "off",
+};
 
 export type MacroTargets = {
   cal: number;
@@ -28,16 +65,95 @@ export type UserProfile = {
   onboarding_done: boolean;
   macro_maintain: MacroTargets | null;
   macro_cut: MacroTargets | null;
-  default_schedule_view: ScheduleView;
+  default_schedule_view: LegacyScheduleView;
+  weekly_schedule: WeeklySchedule;
   daily_reading_goal: number;
   enabled_modules: ModuleId[] | null;
   tier: "free" | "pro" | "pro_max";
 };
 
 const LEGACY_CACHE_KEY = "cache:profile:v1";
+const PROFILE_CACHE_KEY = CACHE_KEYS.PROFILE;
 
-function profileCacheKey(userId: string) {
-  return `cache:profile:v2:${userId}`;
+
+export function mapLegacyScheduleToWeekly(
+  legacy: LegacyScheduleView | null | undefined,
+): WeeklySchedule {
+  if (legacy === "wfh") {
+    return {
+      monday: "wfh",
+      tuesday: "wfh",
+      wednesday: "wfh",
+      thursday: "wfh",
+      friday: "wfh",
+      saturday: "off",
+      sunday: "off",
+    };
+  }
+
+  if (legacy === "weekend") {
+    return {
+      monday: "hybrid",
+      tuesday: "hybrid",
+      wednesday: "hybrid",
+      thursday: "hybrid",
+      friday: "hybrid",
+      saturday: "off",
+      sunday: "off",
+    };
+  }
+
+  return { ...DEFAULT_WEEKLY_SCHEDULE };
+}
+
+export function normalizeWeeklySchedule(
+  weekly: Partial<Record<WeekdayKey, unknown>> | null | undefined,
+  legacy: LegacyScheduleView | null | undefined,
+): WeeklySchedule {
+  const fallback = mapLegacyScheduleToWeekly(legacy);
+  const next = { ...fallback } as WeeklySchedule;
+
+  for (const day of WEEKDAY_ORDER) {
+    const value = weekly?.[day];
+    if (
+      value === "office" ||
+      value === "wfh" ||
+      value === "hybrid" ||
+      value === "off"
+    ) {
+      next[day] = value;
+    }
+  }
+
+  return next;
+}
+
+export function deriveLegacyScheduleView(
+  weekly: WeeklySchedule | null | undefined,
+): LegacyScheduleView {
+  if (!weekly) return "office";
+
+  const weekdayValues = WEEKDAY_ORDER.slice(0, 5).map((day) => weekly[day]);
+  const officeCount = weekdayValues.filter((v) => v === "office").length;
+  const wfhCount = weekdayValues.filter((v) => v === "wfh").length;
+
+  if (officeCount >= 3) return "office";
+  if (wfhCount >= 3) return "wfh";
+  return "weekend";
+}
+
+export function normalizeUserProfile(raw: UserProfile): UserProfile {
+  const weeklySchedule = normalizeWeeklySchedule(
+    (raw as UserProfile & { weekly_schedule?: WeeklySchedule | null })
+      .weekly_schedule,
+    raw.default_schedule_view,
+  );
+
+  return {
+    ...raw,
+    weekly_schedule: weeklySchedule,
+    default_schedule_view: deriveLegacyScheduleView(weeklySchedule),
+  };
 }
 
 export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
@@ -120,7 +236,8 @@ function defaultProfile(id: string): UserProfile {
     onboarding_done: false,
     macro_maintain: null,
     macro_cut: null,
-    default_schedule_view: "wfh",
+    default_schedule_view: "office",
+    weekly_schedule: { ...DEFAULT_WEEKLY_SCHEDULE },
     daily_reading_goal: 20,
     enabled_modules: null,
     tier: "free",
@@ -131,10 +248,10 @@ export function readProfileCache(userId?: string | null): UserProfile | null {
   if (!userId) return null;
 
   try {
-    const raw = localStorage.getItem(profileCacheKey(userId));
+    const raw = getScopedStorageItem(PROFILE_CACHE_KEY, userId);
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as UserProfile;
+    const parsed = normalizeUserProfile(JSON.parse(raw) as UserProfile);
     return parsed.id === userId ? parsed : null;
   } catch {
     return null;
@@ -147,32 +264,34 @@ export function clearProfileState(): void {
 
 function writeProfileCache(profile: UserProfile) {
   try {
-    localStorage.setItem(
-      profileCacheKey(profile.id),
-      JSON.stringify(profile),
+    writeScopedStorageItem(
+      PROFILE_CACHE_KEY,
+      profile.id,
+      JSON.stringify(normalizeUserProfile(profile)),
     );
+    localStorage.removeItem(legacyScopedKey(PROFILE_CACHE_KEY, profile.id));
     localStorage.removeItem(LEGACY_CACHE_KEY);
   } catch (e) {
     console.warn("write cache failed", e);
   }
 }
 
-export async function loadProfile(): Promise<UserProfile | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export function seedProfileCache(userId: string | null): UserProfile | null {
+  return readProfileCache(userId);
+}
 
-  if (!user) {
+export async function loadProfile(userId: string | null = getActiveUserId()): Promise<UserProfile | null> {
+  if (!userId) {
     clearProfileState();
     return null;
   }
 
-  const cached = readProfileCache(user.id);
+  const cached = readProfileCache(userId);
   if (cached) {
     return cached;
   }
 
-  const inFlight = inFlightProfileLoads.get(user.id);
+  const inFlight = inFlightProfileLoads.get(userId);
   if (inFlight) {
     return inFlight;
   }
@@ -181,58 +300,74 @@ export async function loadProfile(): Promise<UserProfile | null> {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+       .eq("id", userId)
       .single();
 
     if (error || !data) return null;
 
-    const profile = data as UserProfile;
+    const profile = normalizeUserProfile(data as UserProfile);
     writeProfileCache(profile);
     return profile;
   })();
 
-  inFlightProfileLoads.set(user.id, loadPromise);
+  inFlightProfileLoads.set(userId, loadPromise);
 
   try {
     return await loadPromise;
   } finally {
-    inFlightProfileLoads.delete(user.id);
+    inFlightProfileLoads.delete(userId);
   }
 }
 
 export async function saveProfile(
+  userId: string | null,
   patch: Partial<Omit<UserProfile, "id">>,
-): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+): Promise<UserProfile | null> {
+  if (!userId) return null;
 
-  if (!user) return;
+  const normalizedPatch = { ...patch };
+  if (normalizedPatch.weekly_schedule) {
+    normalizedPatch.weekly_schedule = normalizeWeeklySchedule(
+      normalizedPatch.weekly_schedule,
+      normalizedPatch.default_schedule_view,
+    );
+    normalizedPatch.default_schedule_view = deriveLegacyScheduleView(
+      normalizedPatch.weekly_schedule,
+    );
+  }
 
   const { error } = await supabase
     .from("profiles")
-    .upsert({ id: user.id, ...patch }, { onConflict: "id" });
+    .upsert({ id: userId, ...normalizedPatch }, { onConflict: "id" });
 
   if (error) throw error;
 
-  const cached = readProfileCache(user.id);
-  const next = cached
-    ? ({ ...cached, ...patch } as UserProfile)
-    : ({ ...defaultProfile(user.id), ...patch } as UserProfile);
+  const cached = readProfileCache(userId);
+  const next = normalizeUserProfile(
+    cached
+      ? ({ ...cached, ...normalizedPatch } as UserProfile)
+      : ({ ...defaultProfile(userId), ...normalizedPatch } as UserProfile),
+  );
 
   writeProfileCache(next);
-  inFlightProfileLoads.delete(user.id);
+  inFlightProfileLoads.delete(userId);
   emitProfileChanged();
+  return next;
 }
 
 export async function completeOnboarding(
-  profile: Omit<UserProfile, "id" | "onboarding_done" | "tier">,
+  profile: Omit<
+    UserProfile,
+    "id" | "onboarding_done" | "tier" | "default_schedule_view"
+  >,
 ): Promise<void> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return;
+  const userId = user?.id ?? null;
+
+  if (!userId) return;
 
   const macros =
     profile.weight_kg && profile.height_cm && profile.age && profile.sex
@@ -245,7 +380,7 @@ export async function completeOnboarding(
         )
       : null;
 
-  await saveProfile({
+  await saveProfile(userId, {
     ...profile,
     macro_maintain: macros?.maintain ?? null,
     macro_cut: macros?.cut ?? null,

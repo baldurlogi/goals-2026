@@ -1,31 +1,16 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { TIER_LABELS, useTier } from "@/features/subscription/useTier";
 import {
-  AI_USAGE_EVENT,
   defaultMonthlyLimitForTier,
-  readAIUsageCache,
+  useAIUsageSnapshot,
 } from "@/features/subscription/aiUsageCache";
 
 export function AIUsagePill({ className = "" }: { className?: string }) {
   const tier = useTier();
-  const [snapshot, setSnapshot] = useState(() => readAIUsageCache());
+  const snapshot = useAIUsageSnapshot(tier);
 
-  useEffect(() => {
-    const refresh = () => setSnapshot(readAIUsageCache());
-
-    refresh();
-    window.addEventListener("storage", refresh);
-    window.addEventListener(AI_USAGE_EVENT, refresh as EventListener);
-
-    return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener(AI_USAGE_EVENT, refresh as EventListener);
-    };
-  }, []);
-
-  const usage = snapshot?.tier === tier ? snapshot : null;
+  const usage = snapshot ?? null;
   const monthlyLimit = usage?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
   const promptsUsed = usage?.promptsUsed ?? null;
   const remaining = usage?.remaining ?? null;
@@ -39,8 +24,8 @@ export function AIUsagePill({ className = "" }: { className?: string }) {
   const shellTone = exhausted
     ? "border-amber-500/25 bg-amber-500/8"
     : low
-    ? "border-violet-500/25 bg-violet-500/8"
-    : "border-border bg-card";
+      ? "border-violet-500/25 bg-violet-500/8"
+      : "border-border bg-card";
 
   const iconTone = exhausted
     ? "bg-amber-500/15 text-amber-500"

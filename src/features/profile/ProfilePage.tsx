@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, Trophy } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import {
   calculateMacros,
-  loadProfile,
-  saveProfile,
-  type UserProfile,
-  type ScheduleView,
+  WEEKDAY_ORDER,
+  type WeekdayKey,
+  type WeeklyScheduleValue,
 } from "@/features/onboarding/profileStorage";
+import { useProfileState, useSaveProfileMutation } from "@/features/onboarding/useProfileQuery";
 import { loadAIProfile, saveAIProfile, type PreferredTone } from "@/features/ai/aiUserProfile";
 import { toast } from "sonner";
 import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
+import { ProfileStateCard } from "@/features/onboarding/components/ProfileStateCard";
 import { BodyMetricsSection } from "./components/BodyMetricsSection";
 import { IdentitySection } from "./components/IdentitySection";
 import { ModulesSection } from "./components/ModulesSection";
@@ -29,13 +29,29 @@ import {
   type ProfileForm,
 } from "./utils/profileForm";
 
+const DAY_LABELS: Record<WeekdayKey, string> = {
+  monday: "Monday",
+  tuesday: "Tuesday",
+  wednesday: "Wednesday",
+  thursday: "Thursday",
+  friday: "Friday",
+  saturday: "Saturday",
+  sunday: "Sunday",
+};
+
+const SCHEDULE_OPTIONS: { value: WeeklyScheduleValue; label: string; description: string }[] = [
+  { value: "office", label: "Office", description: "Mostly in person" },
+  { value: "wfh", label: "WFH", description: "Mostly remote" },
+  { value: "hybrid", label: "Hybrid", description: "Mixed day" },
+  { value: "off", label: "Off", description: "Day off" },
+];
+
 export function ProfilePage() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const { profile, isAuthLoading, isProfileLoading, isMissingProfile, error: loadError, isFetching, refetch } = useProfileState();
+  const saveProfileMutation = useSaveProfileMutation();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [form, setForm] = useState<ProfileForm | null>(null);
 
   const [aiSaving, setAiSaving] = useState(false);
@@ -46,19 +62,8 @@ export function ProfilePage() {
   const [aiFocusAreas, setAiFocusAreas] = useState<string[]>([]);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoading(true);
-      const p = await loadProfile();
-      if (!alive) return;
-      setProfile(p);
-      setForm(p ? profileToForm(p) : null);
-      setLoading(false);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+    setForm(profile ? profileToForm(profile) : null);
+  }, [profile]);
 
   useEffect(() => {
     loadAIProfile().then((ai) => {
@@ -83,7 +88,7 @@ export function ProfilePage() {
       onboarding_done: profile.onboarding_done,
       macro_maintain: profile.macro_maintain,
       macro_cut: profile.macro_cut,
-      default_schedule_view: profile.default_schedule_view,
+      weekly_schedule: profile.weekly_schedule,
       daily_reading_goal: profile.daily_reading_goal,
       enabled_modules: normalizeEnabledModules(profile.enabled_modules),
     };
@@ -96,6 +101,7 @@ export function ProfilePage() {
 
   const update = useCallback((p: Partial<ProfileForm>) => {
     setSaved(false);
+    setError(null);
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
   }, []);
 
@@ -107,22 +113,17 @@ export function ProfilePage() {
 
   const handleSave = useCallback(async () => {
     if (!patch || Object.keys(patch).length === 0) return;
-    setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      await saveProfile(patch);
-      const refreshed = await loadProfile();
-      setProfile(refreshed);
-      setForm(refreshed ? profileToForm(refreshed) : null);
+      await saveProfileMutation.mutateAsync(patch);
       setSaved(true);
+      void refetch();
     } catch (e) {
       console.error(e);
-      setError("Could not save profile. Please try again.");
-    } finally {
-      setSaving(false);
+      setError("Could not save profile. Your previous saved values are still intact.");
     }
-  }, [patch]);
+  }, [patch, refetch, saveProfileMutation]);
 
   const handleSaveAI = useCallback(async () => {
     setAiSaving(true);
@@ -143,24 +144,98 @@ export function ProfilePage() {
     }
   }, [aiAboutMe, aiFocusAreas, aiGoalsSummary, aiLifestyleNotes, aiTone]);
 
-  if (loading) return <div className="mx-auto max-w-3xl p-6 text-sm text-muted-foreground">Loading profile…</div>;
-  if (!profile || !form) return <div className="mx-auto max-w-3xl p-6">No profile found.</div>;
+  if (isAuthLoading) {
+    return (
+      <ProfileStateCard
+        title="Checking your account"
+        description="We're confirming your session before loading profile settings."
+        status="loading"
+      />
+    );
+  }
+
+  if (isProfileLoading) {
+    return (
+      <ProfileStateCard
+        title="Loading profile settings"
+        description="Your saved profile is still loading, so we'll wait instead of showing an empty state too early."
+        status="loading"
+      />
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ProfileStateCard
+        title="We couldn't load profile settings"
+        description="This looks like a temporary fetch problem. Retry to keep working from your saved profile once it's available."
+        status="error"
+        actionLabel="Retry"
+        onAction={() => void refetch()}
+        busy={isFetching}
+      />
+    );
+  }
+
+  if (isMissingProfile || !profile || !form) {
+    return (
+      <ProfileStateCard
+        title="No profile record found"
+        description="Your account is available, but we couldn't find a saved profile yet. Retry first, then rerun onboarding if needed."
+        status="empty"
+        actionLabel="Retry lookup"
+        onAction={() => void refetch()}
+        busy={isFetching}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 lg:p-8">
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="text-2xl font-bold">Profile settings</h1>
-        <div className="flex items-center gap-2">
-          {saved ? <div className="flex items-center gap-1 text-xs text-emerald-600"><Check className="h-4 w-4" /> Saved</div> : null}
-          <Button onClick={handleSave} disabled={!isDirty || saving} className="min-w-28">{saving ? "Saving…" : "Save changes"}</Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold">Profile settings</h1>
+          <p className="text-sm text-muted-foreground">
+            Update the same saved profile used by onboarding, dashboard defaults, and goal setup.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 self-start">
+          {saved ? (
+            <div className="flex items-center gap-1 text-xs text-emerald-600"><Check className="h-4 w-4" /> Saved</div>
+          ) : null}
+          <Button onClick={() => void handleSave()} disabled={!isDirty || saveProfileMutation.isPending} className="min-w-28 gap-2">
+            {saveProfileMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {saveProfileMutation.isPending ? "Saving…" : "Save changes"}
+          </Button>
         </div>
       </div>
 
-      {error ? <div className="text-sm text-destructive">{error}</div> : null}
+      <Card className="rounded-2xl border-dashed bg-muted/20 py-4 shadow-none">
+        <CardContent className="space-y-2 pt-0 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium text-foreground">Save status</p>
+            <span className="text-xs text-muted-foreground">
+              {saveProfileMutation.isPending
+                ? "Saving updates to your profile…"
+                : isDirty
+                  ? "You have unsaved changes."
+                  : "All changes are synced with your saved profile."}
+            </span>
+          </div>
+          <p className="text-muted-foreground">
+            Changes here update the same normalized profile data used during onboarding, so dashboard defaults stay aligned right away.
+          </p>
+          {error ? <p className="font-medium text-destructive">{error}</p> : null}
+        </CardContent>
+      </Card>
+
       <AIUsageDetailsCard />
 
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-base">👤 Profile</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">👤 Profile</CardTitle>
+          <CardDescription>Basic identity and body metrics used for personalization and nutrition targets.</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-5">
           <IdentitySection
             displayName={form.display_name}
@@ -181,10 +256,22 @@ export function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">🧩 Modules</CardTitle></CardHeader><CardContent><ModulesSection value={form.enabled_modules} onChange={(next) => update({ enabled_modules: next })} /></CardContent></Card>
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">🧩 Modules</CardTitle>
+          <CardDescription>Keep dashboard modules aligned with the workspace you actually want to use.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ModulesSection value={form.enabled_modules} onChange={(next) => update({ enabled_modules: next })} />
+        </CardContent>
+      </Card>
 
       <Card className="rounded-2xl">
-        <CardContent className="space-y-5 pt-6">
+        <CardHeader>
+          <CardTitle className="text-base">🥗 Macros</CardTitle>
+          <CardDescription>Adjust your saved nutrition targets or recalculate them from your current metrics.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
           <MacrosSection
             macroMaintain={form.macro_maintain}
             macroCut={form.macro_cut}
@@ -200,20 +287,47 @@ export function ProfilePage() {
       </Card>
 
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-base">📅 Schedule</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {([
-            { value: "wfh", label: "Work from home", sub: "Mon / Tue — no commute", icon: "🏠" },
-            { value: "office", label: "Office day", sub: "Wed / Thu / Fri — commute", icon: "🏢" },
-            { value: "weekend", label: "Weekend", sub: "Sat / Sun — flexible", icon: "☀️" },
-          ] as { value: ScheduleView; label: string; sub: string; icon: string }[]).map((opt) => (
-            <button key={opt.value} type="button" onClick={() => update({ default_schedule_view: opt.value })} className={cn("w-full rounded-xl border px-4 py-4 text-left transition-all", form.default_schedule_view === opt.value ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border hover:border-primary/40")}>{opt.label}</button>
+        <CardHeader>
+          <CardTitle className="text-base">📅 Schedule</CardTitle>
+          <CardDescription>Use the same card-style defaults from onboarding so weekly planning stays predictable.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {WEEKDAY_ORDER.map((day) => (
+            <div key={day} className="grid grid-cols-[minmax(0,1fr),auto] items-center gap-3 rounded-xl border bg-background px-3 py-3">
+              <div>
+                <p className="text-sm font-medium">{DAY_LABELS[day] ?? day}</p>
+                <p className="text-xs text-muted-foreground">
+                  {SCHEDULE_OPTIONS.find((option) => option.value === form.weekly_schedule[day])?.description}
+                </p>
+              </div>
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={form.weekly_schedule[day]}
+                onChange={(e) =>
+                  update({
+                    weekly_schedule: {
+                      ...form.weekly_schedule,
+                      [day]: e.target.value as WeeklyScheduleValue,
+                    },
+                  })
+                }
+              >
+                {SCHEDULE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           ))}
         </CardContent>
       </Card>
 
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-base">📖 Reading</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">📖 Reading</CardTitle>
+          <CardDescription>Set a clear daily pages target that matches your reading routine.</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-4">
           <Input type="number" min="1" max="200" className="w-40" value={form.daily_reading_goal} onChange={(e) => update({ daily_reading_goal: e.target.value })} />
         </CardContent>
@@ -222,8 +336,8 @@ export function ProfilePage() {
       <Link to="/app/achievements">
         <Card className="mb-6 cursor-pointer rounded-2xl border-amber-500/20 bg-amber-500/5 transition-all hover:bg-amber-500/10">
           <CardContent className="flex items-center gap-4 py-5">
-            <Trophy className="h-5 w-5 text-amber-500" />
-            <div className="flex-1">🏆 Achievements</div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-xl">🏆</div>
+            <div className="flex-1">Achievements</div>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
           </CardContent>
         </Card>

@@ -1,10 +1,11 @@
 import type {
   ActivityLevel,
   MacroTargets,
-  ScheduleView,
+  WeeklySchedule,
   Sex,
 } from "@/features/onboarding/profileStorage";
-import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
+import { DEFAULT_WEEKLY_SCHEDULE } from "@/features/onboarding/profileStorage";
+import type { ModuleId } from "@/features/modules/modules";
 
 export type OnboardingData = {
   display_name: string;
@@ -15,7 +16,7 @@ export type OnboardingData = {
   activity_level: ActivityLevel;
   macro_maintain: MacroTargets | null;
   macro_cut: MacroTargets | null;
-  default_schedule_view: ScheduleView;
+  weekly_schedule: WeeklySchedule;
   daily_reading_goal: string;
   enabled_modules: ModuleId[];
   main_goal: string;
@@ -31,9 +32,9 @@ export const INITIAL_ONBOARDING_DATA: OnboardingData = {
   activity_level: "active",
   macro_maintain: null,
   macro_cut: null,
-  default_schedule_view: "wfh",
+  weekly_schedule: { ...DEFAULT_WEEKLY_SCHEDULE },
   daily_reading_goal: "20",
-  enabled_modules: DEFAULT_MODULES,
+  enabled_modules: ["goals"],
   main_goal: "",
   goal_why: "",
 };

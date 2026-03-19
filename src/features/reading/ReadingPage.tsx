@@ -1,26 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ReadingFieldPath, ReadingInputs } from "./readingTypes";
-import { canAcceptDigitsOrBlank, getReadingStats, inputsToPlan, updateReadingStreak } from "./readingUtils";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CompletedBook, ReadingFieldPath, ReadingInputs } from "./readingTypes";
+import {
+  canAcceptDigitsOrBlank,
+  getReadingStats,
+  inputsToPlan,
+  updateReadingStreak,
+} from "./readingUtils";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { Flame, BookOpen } from "lucide-react";
 import { ReadingNowCard } from "./components/ReadingNowCard";
 import { ReadingNextCard } from "./components/ReadingNextCard";
 import { ReadingInputsCard } from "./components/ReadingInputsCard";
-import {
-  loadReadingInputs,
-  saveReadingInputs,
-  DEFAULT_READING_INPUTS,
-  READING_CHANGED_EVENT,
-} from "./readingStorage";
+import { DEFAULT_READING_INPUTS } from "./readingStorage";
+import { useReadingQuery, useSaveReadingMutation } from "./useReadingQuery";
 import { Card, CardContent } from "@/components/ui/card";
-import type { CompletedBook } from "./readingTypes";
 
 function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
   if (books.length === 0) return null;
 
   return (
     <div className="space-y-3">
-      {/* Header */}
       <div className="flex items-center gap-2">
         <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/15">
           <BookOpen className="h-3.5 w-3.5 text-amber-500" />
@@ -33,20 +32,21 @@ function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
         </span>
       </div>
 
-      {/* Book cards */}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
         {books.map((b, idx) => {
           const date = new Date(b.finishedAt);
-          const monthYear = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
-          // Pick a medal for the most recent books
-          const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "📖";
+          const monthYear = date.toLocaleDateString("en-GB", {
+            month: "short",
+            year: "numeric",
+          });
+          const medal =
+            idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "📖";
 
           return (
             <div
               key={`${b.finishedAt}-${idx}`}
               className="group relative overflow-hidden rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-3 transition-colors hover:bg-amber-500/10"
             >
-              {/* Subtle glow on the most recent */}
               {idx === 0 && (
                 <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-amber-500/20" />
               )}
@@ -64,7 +64,9 @@ function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
                     <span className="text-[10px] text-muted-foreground/60">
                       {b.totalPages} pages
                     </span>
-                    <span className="text-[10px] text-muted-foreground/40">·</span>
+                    <span className="text-[10px] text-muted-foreground/40">
+                      ·
+                    </span>
                     <span className="text-[10px] font-medium text-amber-500/80">
                       {monthYear}
                     </span>
@@ -80,46 +82,59 @@ function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
 }
 
 export function ReadingPage() {
-  const [inputs, setInputs] = useState<ReadingInputs>(DEFAULT_READING_INPUTS);
+  const { data: remoteInputs = DEFAULT_READING_INPUTS } = useReadingQuery();
+  const saveReadingMutation = useSaveReadingMutation();
+
+  const [draft, setDraft] = useState<ReadingInputs>(remoteInputs);
+  const draftRef = useRef(draft);
+  const isDirtyRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    draftRef.current = draft;
+  }, [draft]);
 
-    const sync = async () => {
-      const next = await Promise.resolve(loadReadingInputs());
-      if (!cancelled) setInputs(next);
-    };
+  useEffect(() => {
+    if (!isDirtyRef.current) {
+      setDraft(remoteInputs);
+      draftRef.current = remoteInputs;
+    }
+  }, [remoteInputs]);
 
-    sync();
+  useEffect(() => {
+    const remoteJson = JSON.stringify(remoteInputs);
+    const draftJson = JSON.stringify(draft);
 
-    const handleReadingChanged: EventListener = () => {
-      void sync();
-    };
-    const handleStorageChange = () => {
-      void sync();
-    };
+    if (remoteJson === draftJson) return;
 
-    window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
-    window.addEventListener("storage", handleStorageChange);
+    const submittedJson = draftJson;
+    const timeoutId = window.setTimeout(() => {
+      saveReadingMutation.mutate(draft, {
+        onSettled: () => {
+          if (JSON.stringify(draftRef.current) === submittedJson) {
+            isDirtyRef.current = false;
+          }
+        },
+      });
+    }, 250);
 
-    return () => {
-      cancelled = true;
-      window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, []);
+    return () => window.clearTimeout(timeoutId);
+  }, [draft, remoteInputs, saveReadingMutation]);
 
   const stats = useMemo(() => {
-    const plan = inputsToPlan(inputs);
+    const plan = inputsToPlan(draft);
     return getReadingStats(plan);
-  }, [inputs]);
+  }, [draft]);
 
-  function setAndPersist(updater: (prev: ReadingInputs) => ReadingInputs) {
-    setInputs((prev) => {
-      const next = updater(prev);
-      void Promise.resolve(saveReadingInputs(next));
-      return next;
-    });
+  function updateDraft(updater: (prev: ReadingInputs) => ReadingInputs) {
+    isDirtyRef.current = true;
+    setDraft((prev) => updater(prev));
+  }
+
+  function commitNow(next: ReadingInputs) {
+    isDirtyRef.current = false;
+    setDraft(next);
+    draftRef.current = next;
+    saveReadingMutation.mutate(next);
   }
 
   function updateField(path: ReadingFieldPath, value: string) {
@@ -128,98 +143,132 @@ export function ReadingPage() {
       "current.totalPages",
       "dailyGoalPages",
     ];
+
     if (digitOnlyPaths.includes(path) && !canAcceptDigitsOrBlank(value)) return;
 
-    setAndPersist((prev) => {
-      if (path === "current.title")       return { ...prev, current: { ...prev.current, title: value } };
-      if (path === "current.author")      return { ...prev, current: { ...prev.current, author: value } };
+    updateDraft((prev) => {
+      if (path === "current.title") {
+        return { ...prev, current: { ...prev.current, title: value } };
+      }
+
+      if (path === "current.author") {
+        return { ...prev, current: { ...prev.current, author: value } };
+      }
+
       if (path === "current.currentPage") {
-        const updated = { ...prev, current: { ...prev.current, currentPage: value } };
+        const updated = {
+          ...prev,
+          current: { ...prev.current, currentPage: value },
+        };
+
         if (value.trim() && Number(value) > 0) {
           const streakUpdate = updateReadingStreak(prev, getLocalDateKey());
           return { ...updated, ...streakUpdate };
         }
+
         return updated;
       }
-      if (path === "current.totalPages")  return { ...prev, current: { ...prev.current, totalPages: value } };
-      if (path === "dailyGoalPages")      return { ...prev, dailyGoalPages: value };
+
+      if (path === "current.totalPages") {
+        return { ...prev, current: { ...prev.current, totalPages: value } };
+      }
+
+      if (path === "dailyGoalPages") {
+        return { ...prev, dailyGoalPages: value };
+      }
+
       return prev;
     });
   }
 
   function addToQueue(book: { title: string; author: string; totalPages: string }) {
-    setAndPersist((prev) => ({ ...prev, upNext: [...prev.upNext, book] }));
+    updateDraft((prev) => ({ ...prev, upNext: [...prev.upNext, book] }));
   }
 
   function removeFromQueue(index: number) {
-    setAndPersist((prev) => ({
+    updateDraft((prev) => ({
       ...prev,
       upNext: prev.upNext.filter((_, i) => i !== index),
     }));
   }
 
   function reorderQueue(newQueue: ReadingInputs["upNext"]) {
-    setAndPersist((prev) => ({ ...prev, upNext: newQueue }));
+    updateDraft((prev) => ({ ...prev, upNext: newQueue }));
   }
 
   function markCurrentCompleted() {
-    setAndPersist((prev) => {
+    const next = (() => {
       const finishedAt = new Date().toISOString();
-      const totalPagesNum = Math.max(1, parseInt(prev.current.totalPages || "0", 10) || 0);
+      const totalPagesNum = Math.max(
+        1,
+        parseInt(draft.current.totalPages || "0", 10) || 0,
+      );
 
       const completedBook = {
-        title: prev.current.title,
-        author: prev.current.author,
+        title: draft.current.title,
+        author: draft.current.author,
         totalPages: totalPagesNum,
         finishedAt,
       };
 
-      const [next, ...rest] = prev.upNext;
-      const nextCurrent = next
-        ? { title: next.title, author: next.author, currentPage: "0", totalPages: next.totalPages }
+      const [upNextBook, ...rest] = draft.upNext;
+      const nextCurrent = upNextBook
+        ? {
+            title: upNextBook.title,
+            author: upNextBook.author,
+            currentPage: "0",
+            totalPages: upNextBook.totalPages,
+          }
         : { title: "", author: "", currentPage: "", totalPages: "" };
 
       return {
-        ...prev,
+        ...draft,
         current: nextCurrent,
         upNext: rest,
-        completed: [completedBook, ...prev.completed],
+        completed: [completedBook, ...draft.completed],
       };
-    });
+    })();
+
+    commitNow(next);
   }
 
   function resetAll() {
-    setInputs(DEFAULT_READING_INPUTS);
-    void Promise.resolve(saveReadingInputs(DEFAULT_READING_INPUTS));
+    commitNow(DEFAULT_READING_INPUTS);
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {/* ── Left column: inputs + streak ── */}
       <div className="space-y-4">
-        <ReadingInputsCard value={inputs} onChange={updateField} />
+        <ReadingInputsCard value={draft} onChange={updateField} />
 
-        {/* Streak card */}
         <Card>
           <CardContent className="flex items-center gap-4 py-4">
-            <div className={[
-              "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-              (inputs.streak ?? 0) > 0 ? "bg-orange-500/15" : "bg-muted",
-            ].join(" ")}>
-              <Flame className={[
-                "h-6 w-6",
-                (inputs.streak ?? 0) > 0 ? "text-orange-500" : "text-muted-foreground",
-              ].join(" ")} />
+            <div
+              className={[
+                "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
+                (draft.streak ?? 0) > 0 ? "bg-orange-500/15" : "bg-muted",
+              ].join(" ")}
+            >
+              <Flame
+                className={[
+                  "h-6 w-6",
+                  (draft.streak ?? 0) > 0
+                    ? "text-orange-500"
+                    : "text-muted-foreground",
+                ].join(" ")}
+              />
             </div>
             <div>
               <p className="text-2xl font-bold tabular-nums">
-                {inputs.streak ?? 0}
-                <span className="ml-1 text-sm font-normal text-muted-foreground">day streak</span>
+                {draft.streak ?? 0}
+                <span className="ml-1 text-sm font-normal text-muted-foreground">
+                  day streak
+                </span>
               </p>
               <p className="text-xs text-muted-foreground">
-                {(inputs.streak ?? 0) === 0
+                {(draft.streak ?? 0) === 0
                   ? "Update your page count to start a streak"
-                  : inputs.lastReadDate === getLocalDateKey()
+                  : draft.lastReadDate === getLocalDateKey()
                     ? "You read today — keep it up! 🔥"
                     : "Update today's pages to keep your streak"}
               </p>
@@ -227,13 +276,11 @@ export function ReadingPage() {
           </CardContent>
         </Card>
 
-        {/* Completed books — visible on mobile here, hidden on desktop */}
         <div className="lg:hidden">
-          <CompletedBooksSection books={inputs.completed} />
+          <CompletedBooksSection books={draft.completed} />
         </div>
       </div>
 
-      {/* ── Right column: now reading + completed + queue ── */}
       <div className="space-y-4">
         <ReadingNowCard
           stats={stats}
@@ -241,13 +288,12 @@ export function ReadingPage() {
           onReset={resetAll}
         />
 
-        {/* Completed books — visible on desktop here */}
         <div className="hidden lg:block">
-          <CompletedBooksSection books={inputs.completed} />
+          <CompletedBooksSection books={draft.completed} />
         </div>
 
         <ReadingNextCard
-          queue={inputs.upNext}
+          queue={draft.upNext}
           onRemove={removeFromQueue}
           onReorder={reorderQueue}
           onAdd={addToQueue}

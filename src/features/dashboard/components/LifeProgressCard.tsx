@@ -9,15 +9,16 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { loadNutritionLog, seedNutritionLog } from "@/features/nutrition/nutritionStorage";
-import { loadUserGoals, seedUserGoals } from "@/features/goals/userGoalStorage";
+import { loadNutritionLog, loadPhase, seedNutritionCache } from "@/features/nutrition/nutritionStorage";
+import { getTargets, meals } from "@/features/nutrition/nutritionData";
+import { loadUserGoals, seedGoalCache } from "@/features/goals/userGoalStorage";
 import {
   loadReadingInputs,
-  seedReadingInputs,
+  seedReadingCache,
   READING_CHANGED_EVENT,
   getTodayReadingProgress,
 } from "@/features/reading/readingStorage";
-import { listTodos, seedTodos } from "@/features/todos/todoStorage";
+import { loadTodos, seedTodoCache } from "@/features/todos/todoStorage";
 import {
   loadScheduleLog,
   loadScheduleTemplates,
@@ -34,6 +35,7 @@ import {
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { getActiveUserId, scopedKey } from "@/lib/activeUser";
 
 type ModuleProgress = {
   id: string;
@@ -50,8 +52,19 @@ type ModuleProgress = {
 
 type GoalDoneCache = Record<string, boolean | Record<string, boolean>>;
 
-const GOAL_DONE_CACHE_KEYS = ["cache:goals:v1", "cache:goal_steps_done:v1"] as const;
+const GOAL_DONE_CACHE_KEYS = ["goals:done:v1", "cache:goals:v1"] as const;
 const MODULE_ORDER = ["goals", "fitness", "nutrition", "reading", "todos", "schedule"];
+
+const MEAL_MACROS_BY_KEY = {
+  breakfast1: meals.breakfast.option1.macros,
+  breakfast2: meals.breakfast.option2.macros,
+  lunchWfh: meals.lunch.wfh.macros,
+  lunchOffice: meals.lunch.office.macros,
+  afternoonSnack: meals.afternoonSnack.macros,
+  postWorkout: meals.postWorkout.macros,
+  dinner: meals.dinner.macros,
+} as const;
+
 
 function clampPct(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -63,8 +76,14 @@ function pluralize(count: number, singular: string, plural = `${singular}s`): st
 }
 
 function readDoneCache(): GoalDoneCache {
+  const userId = getActiveUserId();
+
   try {
-    for (const key of GOAL_DONE_CACHE_KEYS) {
+    const scopedKeys = userId
+      ? GOAL_DONE_CACHE_KEYS.map((key) => scopedKey(key, userId))
+      : GOAL_DONE_CACHE_KEYS;
+
+    for (const key of scopedKeys) {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       const parsed = JSON.parse(raw) as unknown;
@@ -188,11 +207,57 @@ function buildFitnessProgress(
   };
 }
 
-function buildNutritionProgress(log: Awaited<ReturnType<typeof loadNutritionLog>>): ModuleProgress {
-  const mealsLogged = Object.values(log.eaten ?? {}).filter(Boolean).length;
-  const customCount = (log.customEntries ?? []).length;
-  const itemsLogged = mealsLogged + customCount;
-  const pct = clampPct((itemsLogged / 4) * 100);
+function getMacroScore(log: Awaited<ReturnType<typeof loadNutritionLog>>, targets: { cal: number; protein: number; carbs: number; fat: number; }) {
+  const totals = ["calories", "protein", "carbs", "fat"].reduce<Record<string, number>>((acc, key) => {
+    acc[key] = 0;
+    return acc;
+  }, {});
+
+  for (const [mealKey, eaten] of Object.entries(log.eaten ?? {})) {
+    if (!eaten) continue;
+    const meal = MEAL_MACROS_BY_KEY[mealKey as keyof typeof MEAL_MACROS_BY_KEY];
+    if (!meal) continue;
+    totals.calories += meal.cal;
+    totals.protein += meal.protein;
+    totals.carbs += meal.carbs;
+    totals.fat += meal.fat;
+  }
+
+  for (const entry of log.customEntries ?? []) {
+    totals.calories += entry.macros.cal;
+    totals.protein += entry.macros.protein;
+    totals.carbs += entry.macros.carbs;
+    totals.fat += entry.macros.fat;
+  }
+
+  const targetMap = {
+    calories: targets.cal,
+    protein: targets.protein,
+    carbs: targets.carbs,
+    fat: targets.fat,
+  };
+
+  const keys = ["calories", "protein", "carbs", "fat"] as const;
+  let inRange = 0;
+
+  for (const key of keys) {
+    const target = targetMap[key];
+    if (!target || target <= 0) continue;
+    const value = totals[key];
+    const min = target * 0.9;
+    const max = target * 1.1;
+    if (value >= min && value <= max) inRange += 1;
+  }
+
+  return { inRange, totals };
+}
+
+function buildNutritionProgress(
+  log: Awaited<ReturnType<typeof loadNutritionLog>>,
+  targets: { cal: number; protein: number; carbs: number; fat: number },
+): ModuleProgress {
+  const { inRange } = getMacroScore(log, targets);
+  const pct = clampPct((inRange / 4) * 100);
 
   return {
     id: "nutrition",
@@ -200,11 +265,8 @@ function buildNutritionProgress(log: Awaited<ReturnType<typeof loadNutritionLog>
     href: "/app/nutrition",
     icon: <Apple className="h-3.5 w-3.5" />,
     pct,
-    primaryStat: `${pluralize(itemsLogged, "meal", "meals")} logged`,
-    secondaryStat:
-      customCount > 0
-        ? `${pluralize(customCount, "custom entry", "custom entries")}`
-        : undefined,
+    primaryStat: `${inRange}/4 macros in range`,
+    secondaryStat: inRange === 4 ? 'Green across calories, protein, carbs, and fat' : 'Score is based on macro target hit',
     color: "orange",
     accentClass: "bg-orange-500",
   };
@@ -241,7 +303,7 @@ function buildReadingProgress(inputs: Awaited<ReturnType<typeof loadReadingInput
   };
 }
 
-function buildTodosProgress(todos: Awaited<ReturnType<typeof listTodos>>): ModuleProgress {
+function buildTodosProgress(todos: Awaited<ReturnType<typeof loadTodos>>): ModuleProgress {
   const done = todos.filter((t) => t.done).length;
   const total = todos.length;
   const pct = total === 0 ? 100 : clampPct((done / total) * 100);
@@ -286,12 +348,12 @@ function sortModules(results: ModuleProgress[]): ModuleProgress[] {
   return results.sort((a, b) => MODULE_ORDER.indexOf(a.id) - MODULE_ORDER.indexOf(b.id));
 }
 
-function seedProgress(enabledModules: Set<string>): ModuleProgress[] {
+function seedProgress(enabledModules: Set<string>, activeUserId: string | null): ModuleProgress[] {
   const results: ModuleProgress[] = [];
 
   try {
     if (enabledModules.has("goals")) {
-      results.push(buildGoalsProgress(seedUserGoals()));
+      results.push(buildGoalsProgress(seedGoalCache(activeUserId)));
     }
 
     if (enabledModules.has("fitness")) {
@@ -299,20 +361,20 @@ function seedProgress(enabledModules: Set<string>): ModuleProgress[] {
     }
 
     if (enabledModules.has("nutrition")) {
-      results.push(buildNutritionProgress(seedNutritionLog()));
+      results.push(buildNutritionProgress(seedNutritionCache(activeUserId), getTargets("maintain")));
     }
 
     if (enabledModules.has("reading")) {
-      results.push(buildReadingProgress(seedReadingInputs()));
+      results.push(buildReadingProgress(seedReadingCache(activeUserId)));
     }
 
     if (enabledModules.has("todos")) {
-      results.push(buildTodosProgress(seedTodos()));
+      results.push(buildTodosProgress(seedTodoCache(activeUserId)));
     }
 
     if (enabledModules.has("schedule")) {
-      const log = seedScheduleLog();
-      const templates = seedScheduleTemplates();
+      const log = seedScheduleLog(activeUserId);
+      const templates = seedScheduleTemplates(activeUserId);
       results.push(buildScheduleProgress(log, templates));
     }
   } catch {
@@ -322,7 +384,7 @@ function seedProgress(enabledModules: Set<string>): ModuleProgress[] {
   return sortModules(results);
 }
 
-async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgress[]> {
+async function fetchProgress(enabledModules: Set<string>, activeUserId: string | null): Promise<ModuleProgress[]> {
   if (enabledModules.size === 0) return [];
 
   const results: ModuleProgress[] = [];
@@ -330,27 +392,28 @@ async function fetchProgress(enabledModules: Set<string>): Promise<ModuleProgres
   await Promise.allSettled([
     (async () => {
       if (!enabledModules.has("goals")) return;
-      results.push(buildGoalsProgress(await loadUserGoals()));
+      results.push(buildGoalsProgress(await loadUserGoals(activeUserId)));
     })(),
     (async () => {
       if (!enabledModules.has("fitness")) return;
-      results.push(buildFitnessProgress(await loadWeeklySplit()));
+      results.push(buildFitnessProgress(await loadWeeklySplit(activeUserId)));
     })(),
     (async () => {
       if (!enabledModules.has("nutrition")) return;
-      results.push(buildNutritionProgress(await loadNutritionLog()));
+      const [log, phase] = await Promise.all([loadNutritionLog(activeUserId), loadPhase(activeUserId)]);
+      results.push(buildNutritionProgress(log, getTargets(phase)));
     })(),
     (async () => {
       if (!enabledModules.has("reading")) return;
-      results.push(buildReadingProgress(await loadReadingInputs()));
+      results.push(buildReadingProgress(await loadReadingInputs(activeUserId)));
     })(),
     (async () => {
       if (!enabledModules.has("todos")) return;
-      results.push(buildTodosProgress(await listTodos()));
+      results.push(buildTodosProgress(await loadTodos(activeUserId)));
     })(),
     (async () => {
       if (!enabledModules.has("schedule")) return;
-      const [log, templates] = await Promise.all([loadScheduleLog(), loadScheduleTemplates()]);
+      const [log, templates] = await Promise.all([loadScheduleLog(activeUserId), loadScheduleTemplates(activeUserId)]);
       results.push(buildScheduleProgress(log, templates));
     })(),
   ]);
@@ -465,8 +528,9 @@ function OverallRing({ modules }: { modules: ModuleProgress[] }) {
 function LifeProgressCardInner() {
   const { modules: enabledModules } = useEnabledModules();
 
-  const [progress, setProgress] = useState<ModuleProgress[]>(() => seedProgress(enabledModules));
-  const [loading, setLoading] = useState(() => seedProgress(enabledModules).length === 0);
+  const activeUserId = getActiveUserId();
+  const [progress, setProgress] = useState<ModuleProgress[]>(() => seedProgress(enabledModules, activeUserId));
+  const [loading, setLoading] = useState(() => seedProgress(enabledModules, activeUserId).length === 0);
 
   useEffect(() => {
     if (enabledModules.size === 0) return;
@@ -474,7 +538,7 @@ function LifeProgressCardInner() {
     let cancelled = false;
 
     async function refresh() {
-      const data = await fetchProgress(enabledModules);
+      const data = await fetchProgress(enabledModules, activeUserId);
       if (cancelled) return;
       setProgress(data);
       setLoading(false);
@@ -502,7 +566,7 @@ function LifeProgressCardInner() {
       cancelled = true;
       events.forEach((eventName) => window.removeEventListener(eventName, handleChange));
     };
-  }, [enabledModules]);
+  }, [activeUserId, enabledModules]);
 
   const skeletonCount = Math.max(enabledModules.size, 3);
 

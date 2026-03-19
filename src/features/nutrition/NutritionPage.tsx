@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X, Trash2, BookMarked, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,9 +24,14 @@ import {
 } from "./nutritionStorage";
 import type { Macros } from "./nutritionTypes";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
-import { PROFILE_CHANGED_EVENT } from "@/features/onboarding/profileStorage";
+import { useProfile } from "@/features/onboarding/useProfile";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function sanitizeNumericInput(value: string) {
+  if (!value) return "";
+  return /^\d*(?:\.\d{0,1})?$/.test(value) ? value : null;
+}
 
 function MacroInputRow({
   label, value, unit, onChange,
@@ -40,12 +45,16 @@ function MacroInputRow({
       </label>
       <div className="flex items-center gap-1">
         <input
-          type="number"
-          min={0}
+          type="text"
+          inputMode="decimal"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const next = sanitizeNumericInput(e.target.value.trim());
+            if (next !== null) onChange(next);
+          }}
           className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="0"
+          aria-label={`${label} in ${unit}`}
         />
         <span className="shrink-0 text-xs text-muted-foreground">{unit}</span>
       </div>
@@ -197,33 +206,31 @@ export function NutritionPage() {
   const [savedMeals,  setSavedMeals]  = useState<SavedMeal[]>([]);
   const [showManual,  setShowManual]  = useState(false);
   const [showLibrary, setShowLibrary] = useState(true);
+  const profile = useProfile();
+
+  const reloadNutritionState = useCallback(async () => {
+    const [freshLog, freshPhase, freshMeals] = await Promise.all([
+      loadNutritionLog(), loadPhase(), loadSavedMeals(),
+    ]);
+    setLog(freshLog);
+    setPhase(freshPhase);
+    setSavedMeals(freshMeals);
+  }, []);
 
   useEffect(() => {
-    async function init() {
-      const [freshLog, freshPhase, freshMeals] = await Promise.all([
-        loadNutritionLog(), loadPhase(), loadSavedMeals(),
-      ]);
-      setLog(freshLog);
-      setPhase(freshPhase);
-      setSavedMeals(freshMeals);
-    }
-    init();
+    void reloadNutritionState();
 
-    const sync = async () => {
-      const [freshLog, freshPhase, freshMeals] = await Promise.all([
-        loadNutritionLog(), loadPhase(), loadSavedMeals(),
-      ]);
-      setLog(freshLog);
-      setPhase(freshPhase);
-      setSavedMeals(freshMeals);
+    const sync = () => {
+      void reloadNutritionState();
     };
+
     window.addEventListener("nutrition:changed", sync);
     window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener("nutrition:changed", sync);
       window.removeEventListener("storage", sync);
     };
-  }, []);
+  }, [reloadNutritionState]);
 
   const handlePhaseToggle = async () => {
     const next: NutritionPhase = phase === "maintain" ? "cut" : "maintain";
@@ -234,43 +241,34 @@ export function NutritionPage() {
 
   const handleManualAdd = async (name: string, macros: Macros) => {
     await addCustomEntry(name, macros);
-    setLog(await loadNutritionLog());
+    await reloadNutritionState();
     toast.success(`${name} added`);
   };
 
   const handleSaveAndAdd = async (name: string, macros: Macros, emoji: string) => {
     saveNewMeal(name, macros, emoji);
     await addCustomEntry(name, macros);
-    setLog(await loadNutritionLog());
-    setSavedMeals(await loadSavedMeals());
+    await reloadNutritionState();
     toast.success(`${name} saved to meals`);
   };
 
   const handleQuickAdd = async (meal: SavedMeal) => {
     await logSavedMeal(meal);
-    setLog(await loadNutritionLog());
+    await reloadNutritionState();
     toast.success(`${meal.name} logged`);
   };
 
   const handleRemoveCustom = async (id: string) => {
     await removeCustomEntry(id);
-    setLog(await loadNutritionLog());
+    await reloadNutritionState();
   };
 
   const handleDeleteSaved = async (id: string) => {
     await deleteSavedMeal(id);
-    setSavedMeals(await loadSavedMeals());
+    await reloadNutritionState();
   };
 
-  // Re-read macro targets whenever user saves new profile macros
-  const [profileVersion, setProfileVersion] = useState(0);
-  useEffect(() => {
-    const bump = () => setProfileVersion((v) => v + 1);
-    window.addEventListener(PROFILE_CHANGED_EVENT, bump);
-    return () => window.removeEventListener(PROFILE_CHANGED_EVENT, bump);
-  }, []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const targets = useMemo(() => getTargets(phase), [phase, profileVersion]);
+  const targets = useMemo(() => getTargets(phase, profile), [phase, profile]);
   const logged       = useMemo(() => getLoggedMacros(log), [log]);
   const totalEntries = log.customEntries.length;
 

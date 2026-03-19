@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SchedulePicker } from "./components/SchedulePicker";
 import { TimelineList } from "./components/TimelineList";
+import { useAuth } from "@/features/auth/authContext";
 import {
   applyToggleToLog,
   applyViewToLog,
@@ -23,8 +24,6 @@ import {
   SCHEDULE_CHANGED_EVENT,
   SCHEDULE_TEMPLATE_EVENT,
 } from "./scheduleStorage";
-
-// ── Helpers ───────────────────────────────────────────────────────────────
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10);
@@ -53,8 +52,6 @@ const EMOJI_SUGGESTIONS = [
   "🏠",
   "📅",
 ];
-
-// ── Block editor modal ────────────────────────────────────────────────────
 
 type BlockFormState = Omit<TimelineItem, "id">;
 
@@ -193,8 +190,6 @@ function BlockModal({
   );
 }
 
-// ── Editable block list ───────────────────────────────────────────────────
-
 function EditableBlockList({
   blocks,
   onUpdate,
@@ -317,20 +312,26 @@ function EditableBlockList({
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────
-
 export function SchedulePage() {
-  const [log, setLog] = useState(() => seedScheduleLog());
-  const [templates, setTemplates] = useState(() => seedScheduleTemplates());
+  const { userId, authReady } = useAuth();
+
+  const [log, setLog] = useState(() =>
+    authReady && userId ? seedScheduleLog(userId) : seedScheduleLog(null),
+  );
+  const [templates, setTemplates] = useState(() =>
+    authReady && userId ? seedScheduleTemplates(userId) : seedScheduleTemplates(null),
+  );
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pendingBlocks, setPendingBlocks] = useState<TimelineItem[]>([]);
 
   useEffect(() => {
+    if (!authReady) return;
+
     let cancelled = false;
 
     const sync = async () => {
-      const next = await loadScheduleLog();
+      const next = await loadScheduleLog(userId);
       if (!cancelled) setLog(next);
     };
 
@@ -341,13 +342,15 @@ export function SchedulePage() {
       cancelled = true;
       window.removeEventListener(SCHEDULE_CHANGED_EVENT, sync);
     };
-  }, []);
+  }, [authReady, userId]);
 
   useEffect(() => {
+    if (!authReady) return;
+
     let cancelled = false;
 
     const sync = async () => {
-      const next = await loadScheduleTemplates();
+      const next = await loadScheduleTemplates(userId);
       if (!cancelled) setTemplates(next);
     };
 
@@ -358,7 +361,7 @@ export function SchedulePage() {
       cancelled = true;
       window.removeEventListener(SCHEDULE_TEMPLATE_EVENT, sync);
     };
-  }, []);
+  }, [authReady, userId]);
 
   const view: ScheduleView = log.view;
   const config = SCHEDULE_CONFIG[view];
@@ -366,7 +369,7 @@ export function SchedulePage() {
 
   const summary = useMemo(
     () => getScheduleSummary(log, blocks.length),
-    [log, blocks.length],
+    [blocks.length, log],
   );
 
   const completedSet = useMemo(
@@ -379,7 +382,7 @@ export function SchedulePage() {
     const optimistic = applyViewToLog(log, v);
     setLog(optimistic);
 
-    void setTodayView(v).catch(() => {
+    void setTodayView(userId, v).catch(() => {
       setLog(previous);
       toast.error("Couldn't switch schedule view");
     });
@@ -390,7 +393,7 @@ export function SchedulePage() {
     const optimistic = applyToggleToLog(log, index, done);
     setLog(optimistic);
 
-    void toggleBlock(index, done).catch(() => {
+    void toggleBlock(userId, index, done).catch(() => {
       setLog(previous);
       toast.error("Couldn't update schedule");
     });
@@ -409,8 +412,8 @@ export function SchedulePage() {
   async function saveEdit() {
     setSaving(true);
     try {
-      await saveViewBlocks(view, pendingBlocks);
-      const next = await loadScheduleTemplates();
+      await saveViewBlocks(userId, view, pendingBlocks);
+      const next = await loadScheduleTemplates(userId);
       setTemplates(next);
       toast.success("Schedule updated");
       setEditMode(false);
@@ -485,10 +488,7 @@ export function SchedulePage() {
 
         <CardContent className="px-3 pb-4">
           {editMode ? (
-            <EditableBlockList
-              blocks={pendingBlocks}
-              onUpdate={setPendingBlocks}
-            />
+            <EditableBlockList blocks={pendingBlocks} onUpdate={setPendingBlocks} />
           ) : blocks.length === 0 ? (
             <div className="rounded-lg bg-muted/40 px-3 py-6 text-center">
               <p className="text-sm font-medium">No blocks yet</p>

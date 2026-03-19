@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
-import { GoalStoreProvider } from "@/features/goals/goalStore";
 import { AuthProvider } from "./providers/AuthProvider";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
@@ -144,6 +143,7 @@ function AppRouteFallback() {
 }
 
 export default function App() {
+
   return (
     <BrowserRouter>
       <Analytics />
@@ -200,11 +200,9 @@ export default function App() {
             element={
               <RequireAuth>
                 <RequireOnboarding>
-                  <GoalStoreProvider>
-                    <Suspense fallback={<RouteFallback />}>
-                      <AppLayout />
-                    </Suspense>
-                  </GoalStoreProvider>
+                  <Suspense fallback={<RouteFallback />}>
+                    <AppLayout />
+                  </Suspense>
                 </RequireOnboarding>
               </RequireAuth>
             }

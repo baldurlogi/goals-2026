@@ -1,15 +1,31 @@
-// src/features/reading/readingStorage.ts
 import type { ReadingInputs } from "./readingTypes";
 import { supabase } from "@/lib/supabaseClient";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  removeScopedStorageItem,
+  scopedKey,
+  writeScopedStorageItem,
+} from "@/lib/activeUser";
 
-// Local key only used for optional legacy fallback + migration safety
 const STORAGE_KEY = CACHE_KEYS.READING;
 const READING_DAILY_PROGRESS_KEY = CACHE_KEYS.READING_DAILY_PROGRESS;
 const AI_SIGNALS_CACHE_KEY = CACHE_KEYS.AI_SIGNALS;
-
 const READING_HISTORY_KEY = CACHE_KEYS.READING_HISTORY;
+
+function readingKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(STORAGE_KEY, userId);
+}
+
+function dailyProgressKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(READING_DAILY_PROGRESS_KEY, userId);
+}
+
+function readingHistoryKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(READING_HISTORY_KEY, userId);
+}
 
 export type ReadingHistoryEntry = {
   date: string;
@@ -45,16 +61,11 @@ export type TodayReadingProgress = {
   pct: number;
 };
 
-function clearAISignalsCache() {
-  try {
-    localStorage.removeItem(AI_SIGNALS_CACHE_KEY);
-  } catch {
-    // ignore
-  }
+function clearAISignalsCache(userId: string | null) {
+  removeScopedStorageItem(AI_SIGNALS_CACHE_KEY, userId);
 }
 
 export const READING_CHANGED_EVENT = "daily-life:reading:changed";
-
 
 function emitReadingChanged() {
   if (typeof window !== "undefined") {
@@ -88,9 +99,11 @@ function getBookKey(inputs: ReadingInputs): string {
   return [title, author, totalPages].join("::");
 }
 
-function readDailyProgressCache(): ReadingDailyProgressCache | null {
+function readDailyProgressCache(
+  userId: string | null = getActiveUserId(),
+): ReadingDailyProgressCache | null {
   try {
-    const raw = localStorage.getItem(READING_DAILY_PROGRESS_KEY);
+    const raw = getScopedStorageItem(READING_DAILY_PROGRESS_KEY, userId);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as ReadingDailyProgressCache;
@@ -108,36 +121,51 @@ function readDailyProgressCache(): ReadingDailyProgressCache | null {
   }
 }
 
-function writeDailyProgressCache(cache: ReadingDailyProgressCache) {
+function writeDailyProgressCache(
+  cache: ReadingDailyProgressCache,
+  userId: string | null = getActiveUserId(),
+) {
+  if (!userId) return;
+
   try {
-    assertRegisteredCacheWrite(READING_DAILY_PROGRESS_KEY);
-    localStorage.setItem(READING_DAILY_PROGRESS_KEY, JSON.stringify(cache));
+    const key = dailyProgressKey(userId);
+    assertRegisteredCacheWrite(key);
+    writeScopedStorageItem(
+      READING_DAILY_PROGRESS_KEY,
+      userId,
+      JSON.stringify(cache),
+    );
   } catch {
     // ignore
   }
 }
 
-function clearDailyProgressCache() {
-  try {
-    localStorage.removeItem(READING_DAILY_PROGRESS_KEY);
-  } catch {
-    // ignore
-  }
+function clearDailyProgressCache(userId: string | null = getActiveUserId()) {
+  if (!userId) return;
+  removeScopedStorageItem(READING_DAILY_PROGRESS_KEY, userId);
 }
 
-function readReadingHistoryCache(): ReadingHistoryEntry[] {
+function readReadingHistoryCache(
+  userId: string | null = getActiveUserId(),
+): ReadingHistoryEntry[] {
   try {
-    const raw = localStorage.getItem(READING_HISTORY_KEY);
+    const raw = getScopedStorageItem(READING_HISTORY_KEY, userId);
     return raw ? (JSON.parse(raw) as ReadingHistoryEntry[]) : [];
   } catch {
     return [];
   }
 }
 
-function writeReadingHistoryCache(entries: ReadingHistoryEntry[]) {
+function writeReadingHistoryCache(
+  entries: ReadingHistoryEntry[],
+  userId: string | null = getActiveUserId(),
+) {
+  if (!userId) return;
+
   try {
-    assertRegisteredCacheWrite(READING_HISTORY_KEY);
-    localStorage.setItem(READING_HISTORY_KEY, JSON.stringify(entries));
+    const key = readingHistoryKey(userId);
+    assertRegisteredCacheWrite(key);
+    writeScopedStorageItem(READING_HISTORY_KEY, userId, JSON.stringify(entries));
   } catch {
     // ignore
   }
@@ -147,6 +175,7 @@ function upsertReadingHistoryEntry(
   inputs: ReadingInputs,
   cache: ReadingDailyProgressCache,
   goalPages: number,
+  userId: string | null = getActiveUserId(),
 ) {
   const title = inputs.current.title.trim();
   const author = inputs.current.author.trim();
@@ -167,12 +196,12 @@ function upsertReadingHistoryEntry(
     updatedAt: new Date().toISOString(),
   };
 
-  const existing = readReadingHistoryCache().filter(
+  const existing = readReadingHistoryCache(userId).filter(
     (item) => !(item.date === entry.date && item.bookKey === entry.bookKey),
   );
 
   existing.push(entry);
-  writeReadingHistoryCache(existing);
+  writeReadingHistoryCache(existing, userId);
 }
 
 function createProgressSnapshot(
@@ -191,18 +220,19 @@ function createProgressSnapshot(
 function syncTodayReadingProgress(
   nextInputs: ReadingInputs,
   previousInputs?: ReadingInputs | null,
+  userId: string | null = getActiveUserId(),
 ): TodayReadingProgress {
   const bookKey = getBookKey(nextInputs);
   const currentPage = parsePage(nextInputs.current.currentPage);
   const goalPages = parseGoalPages(nextInputs.dailyGoalPages);
 
   if (!bookKey.trim()) {
-    clearDailyProgressCache();
+    clearDailyProgressCache(userId);
     return { hasBook: false, goalPages, pagesRead: 0, pct: 0 };
   }
 
   const today = getLocalDateKey();
-  const cached = readDailyProgressCache();
+  const cached = readDailyProgressCache(userId);
 
   const previousPage =
     previousInputs && getBookKey(previousInputs) === bookKey
@@ -211,8 +241,6 @@ function syncTodayReadingProgress(
 
   let nextCache: ReadingDailyProgressCache;
 
-  // First reading snapshot of the day for this book:
-  // treat the current absolute page as the baseline, not as "pages read today".
   if (!cached || cached.bookKey !== bookKey) {
     nextCache = createProgressSnapshot(today, bookKey, currentPage);
   } else {
@@ -224,26 +252,26 @@ function syncTodayReadingProgress(
       (!hasPreviousPage || previousPage === 0);
 
     if (firstMeaningfulPageSet) {
-      // Example:
-      // user starts tracking a book and enters "103" as current page.
-      // That should establish today's baseline at 103, not count as 103 pages read today.
       nextCache = createProgressSnapshot(today, bookKey, currentPage);
-    } else if (hasPreviousPage && previousPage > 0 && currentPage >= previousPage) {
-      // Normal forward progress during the day.
+    } else if (
+      hasPreviousPage &&
+      previousPage > 0 &&
+      currentPage >= previousPage
+    ) {
       nextCache = {
         ...cached,
         latestPage: currentPage,
       };
-    } else if (hasPreviousPage && previousPage > 0 && currentPage < previousPage) {
-      // Manual correction downward:
-      // keep the original day's baseline, but update latest to the corrected page.
+    } else if (
+      hasPreviousPage &&
+      previousPage > 0 &&
+      currentPage < previousPage
+    ) {
       nextCache = {
         ...cached,
         latestPage: currentPage,
       };
     } else {
-      // Read-only calls / hydration / no usable previous page:
-      // preserve baseline and make sure latest reflects current state.
       nextCache = {
         ...cached,
         latestPage: currentPage,
@@ -251,8 +279,8 @@ function syncTodayReadingProgress(
     }
   }
 
-  writeDailyProgressCache(nextCache);
-  upsertReadingHistoryEntry(nextInputs, nextCache, goalPages);
+  writeDailyProgressCache(nextCache, userId);
+  upsertReadingHistoryEntry(nextInputs, nextCache, goalPages, userId);
 
   const pagesRead = Math.max(nextCache.latestPage - nextCache.baselinePage, 0);
   const pct =
@@ -270,12 +298,16 @@ function syncTodayReadingProgress(
   };
 }
 
-export function getTodayReadingProgress(inputs: ReadingInputs): TodayReadingProgress {
-  return syncTodayReadingProgress(inputs);
+export function getTodayReadingProgress(
+  inputs: ReadingInputs,
+  userId: string | null = getActiveUserId(),
+): TodayReadingProgress {
+  return syncTodayReadingProgress(inputs, undefined, userId);
 }
 
-// helper: merge partial into defaults safely
-function normalizeReadingInputs(parsed: Partial<ReadingInputs> | null | undefined): ReadingInputs {
+function normalizeReadingInputs(
+  parsed: Partial<ReadingInputs> | null | undefined,
+): ReadingInputs {
   const p = parsed ?? {};
   const dailyGoalPages =
     typeof p.dailyGoalPages === "string"
@@ -294,120 +326,116 @@ function normalizeReadingInputs(parsed: Partial<ReadingInputs> | null | undefine
   };
 }
 
-async function loadPreviousInputs(): Promise<ReadingInputs | null> {
+async function loadPreviousInputs(
+  userId: string | null,
+): Promise<ReadingInputs | null> {
+  if (!userId) return null;
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = getScopedStorageItem(STORAGE_KEY, userId);
     return raw ? normalizeReadingInputs(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
 }
 
-/**
- * Load reading from Supabase (reading_state).
- * Falls back to localStorage if:
- *  - not logged in
- *  - Supabase errors
- *  - no row exists yet
- */
-export async function loadReadingInputs(): Promise<ReadingInputs> {
+export async function loadReadingInputs(
+  userId: string | null = getActiveUserId(),
+): Promise<ReadingInputs> {
+  if (!userId) return DEFAULT_READING_INPUTS;
+
   try {
-    const { data: auth, error: authErr } = await supabase.auth.getUser();
-    if (authErr) throw authErr;
-    const user = auth?.user;
-
-    if (!user) {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
-      syncTodayReadingProgress(inputs);
-      return inputs;
-    }
-
     const { data, error } = await supabase
       .from("reading_state")
       .select("state")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (error) throw error;
 
     const state = (data?.state ?? null) as Partial<ReadingInputs> | null;
+
     if (!state) {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
-      syncTodayReadingProgress(inputs);
-      return inputs;
+      removeScopedStorageItem(STORAGE_KEY, userId);
+      clearDailyProgressCache(userId);
+      return DEFAULT_READING_INPUTS;
     }
 
     const inputs = normalizeReadingInputs(state);
-    syncTodayReadingProgress(inputs);
+
+    try {
+      const key = readingKey(userId);
+      assertRegisteredCacheWrite(key);
+      writeScopedStorageItem(STORAGE_KEY, userId, JSON.stringify(inputs));
+    } catch {
+      // ignore
+    }
+
     return inputs;
   } catch (error) {
-    console.warn("loadReadingInputs failed, falling back to defaults/local:", error);
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
-    syncTodayReadingProgress(inputs);
-    return inputs;
+    console.warn(
+      "loadReadingInputs failed, falling back to scoped local cache:",
+      error,
+    );
+
+    const raw = getScopedStorageItem(STORAGE_KEY, userId);
+    return raw
+      ? normalizeReadingInputs(JSON.parse(raw))
+      : DEFAULT_READING_INPUTS;
   }
 }
 
-/**
- * Save reading to Supabase (reading_state).
- * Also mirrors to localStorage for offline-ish resilience.
- */
-export async function saveReadingInputs(value: ReadingInputs): Promise<void> {
-  const previousInputs = await loadPreviousInputs();
+export async function saveReadingInputs(
+  userId: string | null,
+  value: ReadingInputs,
+): Promise<ReadingInputs> {
+  if (!userId) return value;
+
+  const previousInputs = await loadPreviousInputs(userId);
 
   try {
-    assertRegisteredCacheWrite(STORAGE_KEY);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    const key = readingKey(userId);
+    assertRegisteredCacheWrite(key);
+    writeScopedStorageItem(STORAGE_KEY, userId, JSON.stringify(value));
   } catch {
     // ignore
   }
 
-  syncTodayReadingProgress(value, previousInputs);
+  syncTodayReadingProgress(value, previousInputs, userId);
 
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth?.user;
-
-  if (!user) {
-    clearAISignalsCache();
-    emitReadingChanged();
-    return;
-  }
-
-  const { error } = await supabase
-    .from("reading_state")
-    .upsert(
-      {
-        user_id: user.id,
-        state: value,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
+  const { error } = await supabase.from("reading_state").upsert(
+    {
+      user_id: userId,
+      state: value,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
 
   if (error) throw error;
 
-  clearAISignalsCache();
+  clearAISignalsCache(userId);
   emitReadingChanged();
+  return value;
 }
 
-export async function resetReadingInputs(): Promise<ReadingInputs> {
-  clearDailyProgressCache();
-  await saveReadingInputs(DEFAULT_READING_INPUTS);
+export async function resetReadingInputs(
+  userId: string | null,
+): Promise<ReadingInputs> {
+  clearDailyProgressCache(userId);
+  await saveReadingInputs(userId, DEFAULT_READING_INPUTS);
   return DEFAULT_READING_INPUTS;
 }
 
-/** Synchronous seed — reads from localStorage mirror. Zero network. */
-export function seedReadingInputs(): ReadingInputs {
+export function seedReadingCache(userId: string | null): ReadingInputs {
+  if (!userId) return DEFAULT_READING_INPUTS;
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const inputs = raw ? normalizeReadingInputs(JSON.parse(raw)) : DEFAULT_READING_INPUTS;
-    syncTodayReadingProgress(inputs);
-    return inputs;
+    const raw = getScopedStorageItem(STORAGE_KEY, userId);
+    return raw
+      ? normalizeReadingInputs(JSON.parse(raw))
+      : DEFAULT_READING_INPUTS;
   } catch {
-    syncTodayReadingProgress(DEFAULT_READING_INPUTS);
     return DEFAULT_READING_INPUTS;
   }
 }
@@ -417,7 +445,7 @@ export function getWeeklyReadingSummary(
   weekStart: string,
   weekEnd: string,
 ): WeeklyReadingSummary {
-  const history = readReadingHistoryCache()
+  const history = readReadingHistoryCache(getActiveUserId())
     .filter((entry) => entry.date >= weekStart && entry.date <= weekEnd)
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -433,10 +461,19 @@ export function getWeeklyReadingSummary(
   const goalPages = parseGoalPages(inputs.dailyGoalPages);
 
   return {
-    pagesRead: entries.reduce((sum, entry) => sum + Math.max(entry.pagesRead, 0), 0),
+    pagesRead: entries.reduce(
+      (sum, entry) => sum + Math.max(entry.pagesRead, 0),
+      0,
+    ),
     goalPages,
     daysRead: entries.length,
     dataCompleteness:
-      entries.length >= 5 ? "complete" : entries.length > 0 ? "partial" : "unknown",
+      entries.length >= 5
+        ? "complete"
+        : entries.length > 0
+          ? "partial"
+          : "unknown",
   };
 }
+
+export const seedReadingInputs = seedReadingCache;

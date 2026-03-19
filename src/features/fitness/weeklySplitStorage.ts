@@ -4,14 +4,14 @@ import {
   DEFAULT_SPLIT_LABELS,
   FITNESS_CHANGED_EVENT,
 } from "./constants";
-import {
-  diffDays,
-  isISOInCurrentWeek,
-  todayISO,
-  yesterdayISO,
-} from "./date";
+import { diffDays, isISOInCurrentWeek, todayISO, yesterdayISO } from "./date";
 import type { DayKey, DaySplit, WeeklySplitConfig } from "./types";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  scopedKey,
+} from "@/lib/activeUser";
 
 const SPLIT_CACHE_KEY = CACHE_KEYS.FITNESS_SPLIT;
 
@@ -60,9 +60,15 @@ export function todayDayKey(): DayKey {
   return map[new Date().getDay()];
 }
 
-export function readSplitCache(): WeeklySplitConfig {
+function splitCacheKey(userId: string | null = getActiveUserId()) {
+  return scopedKey(SPLIT_CACHE_KEY, userId);
+}
+
+export function readSplitCache(
+  userId: string | null = getActiveUserId(),
+): WeeklySplitConfig {
   try {
-    const raw = localStorage.getItem(SPLIT_CACHE_KEY);
+    const raw = getScopedStorageItem(SPLIT_CACHE_KEY, userId);
     if (!raw) return makeDefaultSplit();
 
     return normalizeWeeklySplit(JSON.parse(raw) as WeeklySplitConfig);
@@ -71,26 +77,26 @@ export function readSplitCache(): WeeklySplitConfig {
   }
 }
 
-function writeSplitCache(cfg: WeeklySplitConfig): void {
+function writeSplitCache(
+  cfg: WeeklySplitConfig,
+  userId: string | null = getActiveUserId(),
+): void {
   try {
-    assertRegisteredCacheWrite(SPLIT_CACHE_KEY);
-    localStorage.setItem(SPLIT_CACHE_KEY, JSON.stringify(cfg));
+    const key = splitCacheKey(userId);
+    assertRegisteredCacheWrite(key);
+    localStorage.setItem(key, JSON.stringify(cfg));
   } catch {
     // ignore
   }
 }
 
-export async function loadWeeklySplit(): Promise<WeeklySplitConfig> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return readSplitCache();
+export async function loadWeeklySplit(userId: string | null = getActiveUserId()): Promise<WeeklySplitConfig> {
+  if (!userId) return readSplitCache();
 
   const { data, error } = await supabase
     .from("fitness_weekly_split")
     .select("config")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) {
@@ -100,29 +106,28 @@ export async function loadWeeklySplit(): Promise<WeeklySplitConfig> {
 
   if (data?.config) {
     const cfg = normalizeWeeklySplit(data.config as WeeklySplitConfig);
-    writeSplitCache(cfg);
+    writeSplitCache(cfg, userId);
     return cfg;
   }
 
   return readSplitCache();
 }
 
-export async function saveWeeklySplit(cfg: WeeklySplitConfig): Promise<void> {
+export async function saveWeeklySplit(userId: string | null = getActiveUserId(), cfg: WeeklySplitConfig): Promise<void> {
   const normalized = normalizeWeeklySplit(cfg);
-  writeSplitCache(normalized);
+  writeSplitCache(normalized, userId);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!userId) {
     emit();
     return;
   }
 
   const { error } = await supabase
     .from("fitness_weekly_split")
-    .upsert({ user_id: user.id, config: normalized }, { onConflict: "user_id" });
+    .upsert(
+      { user_id: userId, config: normalized },
+      { onConflict: "user_id" },
+    );
 
   if (error) {
     console.warn("saveWeeklySplit error:", error);
@@ -135,6 +140,7 @@ export async function saveWeeklySplit(cfg: WeeklySplitConfig): Promise<void> {
 export async function toggleDayCompletion(
   cfg: WeeklySplitConfig,
   day: DayKey,
+  userId: string | null = getActiveUserId(),
 ): Promise<WeeklySplitConfig> {
   const normalizedCfg = normalizeWeeklySplit(cfg);
   const today = todayISO();
@@ -173,7 +179,7 @@ export async function toggleDayCompletion(
     lastStreakDate,
   };
 
-  await saveWeeklySplit(next);
+  await saveWeeklySplit(userId, next);
   return next;
 }
 
@@ -181,6 +187,7 @@ export async function updateDayLabel(
   cfg: WeeklySplitConfig,
   day: DayKey,
   label: string,
+  userId: string | null = getActiveUserId(),
 ): Promise<WeeklySplitConfig> {
   const normalizedCfg = normalizeWeeklySplit(cfg);
 
@@ -195,6 +202,6 @@ export async function updateDayLabel(
     },
   };
 
-  await saveWeeklySplit(next);
+  await saveWeeklySplit(userId, next);
   return next;
 }

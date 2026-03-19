@@ -3,6 +3,8 @@ import {
   Check,
   ChevronRight,
   ChevronLeft,
+  Loader2,
+  Sparkles,
   User,
   Dumbbell,
   CalendarDays,
@@ -16,6 +18,13 @@ import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
 import { completeOnboarding, calculateMacros } from "./profileStorage";
 import { AddEditGoalModal } from "@/features/goals/components/AddEditGoalModal";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { StepProfile } from "./components/StepProfile";
 import { StepModules } from "./components/StepModules";
 import { StepGoal } from "./components/StepGoal";
@@ -39,32 +48,35 @@ const STEP_ICONS: Record<OnboardingStep, typeof User> = {
   5: BookOpen,
 };
 
-const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> = {
-  0: {
-    label: "Profile",
-    subtitle: "This helps us personalize recommendations right from the start.",
-  },
-  1: {
-    label: "Modules",
-    subtitle: "Picking modules keeps your workspace focused on what you care about.",
-  },
-  2: {
-    label: "Goals",
-    subtitle: "Clear goals turn intentions into a plan you can follow.",
-  },
-  3: {
-    label: "Nutrition",
-    subtitle: "Nutrition targets make healthy progress easier to measure.",
-  },
-  4: {
-    label: "Schedule",
-    subtitle: "A default schedule view reduces friction in daily planning.",
-  },
-  5: {
-    label: "Reading",
-    subtitle: "A daily reading target helps you build a consistent learning habit.",
-  },
-};
+const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> =
+  {
+    0: {
+      label: "Profile",
+      subtitle: "This helps us personalize recommendations right from the start.",
+    },
+    1: {
+      label: "Modules",
+      subtitle:
+        "Pick only the parts of the app you actually want to use right now.",
+    },
+    2: {
+      label: "Goals",
+      subtitle: "Clear goals turn intentions into a plan you can follow.",
+    },
+    3: {
+      label: "Nutrition",
+      subtitle:
+        "Set activity and macros using AI suggestions or manual targets.",
+    },
+    4: {
+      label: "Schedule",
+      subtitle: "Set your weekly defaults once so daily planning matches real life.",
+    },
+    5: {
+      label: "Reading",
+      subtitle: "A daily reading target helps you build a consistent learning habit.",
+    },
+  };
 
 export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const { userId } = useAuth();
@@ -76,6 +88,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const [showGoalSkipConfirm, setShowGoalSkipConfirm] = useState(false);
 
   function update(patch: Partial<OnboardingData>) {
+    setError(null);
     setData((prev) => ({ ...prev, ...patch }));
   }
 
@@ -93,6 +106,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const currentIndex = visibleSteps.indexOf(step);
   const isLastStep = currentIndex === visibleSteps.length - 1;
   const currentStepContent = STEP_CONTENT[step];
+  const hasGoalIntent = Boolean(data.main_goal.trim());
 
   function canAdvance(): boolean {
     if (step === 0) return !!data.display_name.trim();
@@ -135,26 +149,28 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
         activity_level: data.activity_level,
         macro_maintain: data.macro_maintain ?? calculated?.maintain ?? null,
         macro_cut: data.macro_cut ?? calculated?.cut ?? null,
-        default_schedule_view: data.default_schedule_view,
+        weekly_schedule: data.weekly_schedule,
         daily_reading_goal: Number(data.daily_reading_goal) || 20,
         enabled_modules: data.enabled_modules,
       });
 
       captureOnce("onboarding_completed", userId, {
         enabled_modules_count: data.enabled_modules.length,
-        has_main_goal_intent: Boolean(data.main_goal.trim()),
+        has_main_goal_intent: hasGoalIntent,
         source: "onboarding_flow",
         route: "/app",
       });
 
-      if (data.main_goal.trim()) {
+      if (hasGoalIntent) {
         setPhase("goal");
         return;
       }
 
       onComplete();
     } catch (e) {
-      setError("Something went wrong saving your profile. Please try again.");
+      setError(
+        "We couldn’t finish setup yet. Please retry — your answers are still here.",
+      );
       console.error(e);
     } finally {
       setSaving(false);
@@ -165,30 +181,53 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         {showGoalSkipConfirm ? (
-          <div className="w-full max-w-sm space-y-4 rounded-2xl border bg-card p-5 shadow-xl">
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold">Skip goal setup for now?</h2>
-              <p className="text-sm text-muted-foreground">
-                You can always create or edit goals later from your dashboard.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={() => setShowGoalSkipConfirm(false)}>
+          <Card className="w-full max-w-sm rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-base">Skip goal setup for now?</CardTitle>
+              <CardDescription>
+                Your onboarding details are already saved. You can always create
+                or edit goals later from the Goals tab in your dashboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowGoalSkipConfirm(false)}
+              >
                 Continue setup
               </Button>
               <Button type="button" onClick={onComplete}>
-                Skip for now
+                Open dashboard
               </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         ) : (
-          <AddEditGoalModal
-            onSave={() => onComplete()}
-            onClose={() => setShowGoalSkipConfirm(true)}
-            startWithAI
-            initialAIPrompt={buildInitialAIPrompt(data.main_goal, data.goal_why)}
-          />
+          <div className="w-full max-w-3xl space-y-4">
+            <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-sm">
+              <CardHeader className="gap-3 sm:flex sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Onboarding saved. Next up: goal setup.
+                  </CardTitle>
+                  <CardDescription>
+                    We’ll use your goal idea to draft a stronger starting point.
+                    You can still skip this and finish inside the dashboard.
+                  </CardDescription>
+                </div>
+                <div className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                  Step 2 of 2
+                </div>
+              </CardHeader>
+            </Card>
+            <AddEditGoalModal
+              onSave={() => onComplete()}
+              onClose={() => setShowGoalSkipConfirm(true)}
+              startWithAI
+              initialAIPrompt={buildInitialAIPrompt(data.main_goal, data.goal_why)}
+            />
+          </div>
         )}
       </div>
     );
@@ -205,9 +244,9 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-lg space-y-8">
-        <div className="flex justify-center">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      <div className="w-full max-w-2xl space-y-6">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {visibleSteps.map((s, i) => {
               const Icon = STEP_ICONS[s];
               const done = i < currentIndex;
@@ -215,50 +254,131 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
               const stepContent = STEP_CONTENT[s];
 
               return (
-                <div key={s} className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 rounded-full border border-transparent px-2 py-1">
-                    <div
-                      className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
-                        done && "border-primary bg-primary text-primary-foreground",
-                        active && "border-primary bg-primary/10 text-primary",
-                        !done && !active && "border-muted-foreground/30 text-muted-foreground",
-                      )}
-                    >
-                      {done ? <Check className="h-4 w-4" /> : <Icon className="h-3.5 w-3.5" />}
-                    </div>
-                    <div className={cn("text-xs font-medium", active ? "text-foreground" : "text-muted-foreground")}>{stepContent.label}</div>
+                <div
+                  key={s}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full border px-3 py-2 transition-all",
+                    active
+                      ? "border-primary bg-primary/5"
+                      : "border-border bg-card",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
+                      done && "border-primary bg-primary text-primary-foreground",
+                      active && "border-primary bg-primary/10 text-primary",
+                      !done &&
+                        !active &&
+                        "border-muted-foreground/30 text-muted-foreground",
+                    )}
+                  >
+                    {done ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Icon className="h-3.5 w-3.5" />
+                    )}
+                  </div>
+                  <div
+                    className={cn(
+                      "text-xs font-medium",
+                      active ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {stepContent.label}
                   </div>
                 </div>
               );
             })}
           </div>
+
+          <div className="space-y-2 text-center">
+            <p className="text-sm font-medium text-muted-foreground">
+              Step {currentIndex + 1} of {visibleSteps.length}:{" "}
+              {currentStepContent.label}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {currentStepContent.subtitle}
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-1 text-center">
-          <p className="text-sm font-medium text-muted-foreground">
-            Step {currentIndex + 1} of {visibleSteps.length}: {currentStepContent.label}
-          </p>
-          <p className="text-sm text-muted-foreground">{currentStepContent.subtitle}</p>
-        </div>
+        <Card className="rounded-2xl">
+          <CardContent className="space-y-4 p-6 sm:p-7">
+            {stepComponents[step]}
+          </CardContent>
+        </Card>
 
-        <div className="rounded-2xl border bg-card p-6 shadow-sm">{stepComponents[step]}</div>
-
-        {error ? <div className="text-sm text-destructive">{error}</div> : null}
+        <Card className="rounded-2xl border-dashed bg-muted/20 py-4 shadow-none">
+          <CardContent className="space-y-2 pt-0 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium text-foreground">Save status</p>
+              <span
+                className={cn(
+                  "text-xs",
+                  saving ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                {saving
+                  ? "Saving your onboarding details…"
+                  : "Everything is saved together when you finish setup."}
+              </span>
+            </div>
+            <p className="text-muted-foreground">
+              After setup, your dashboard will open with your goals and profile
+              ready. You can review or edit everything later in{" "}
+              <span className="font-medium text-foreground">Goals</span> and{" "}
+              <span className="font-medium text-foreground">Profile</span>.
+            </p>
+            {error ? (
+              <p className="text-sm font-medium text-destructive">{error}</p>
+            ) : null}
+          </CardContent>
+        </Card>
 
         <div className="flex items-center justify-between gap-3">
-          <Button type="button" variant="outline" onClick={goBack} disabled={currentIndex <= 0 || saving} className="gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={goBack}
+            disabled={currentIndex <= 0 || saving}
+            className="gap-2"
+          >
             <ChevronLeft className="h-4 w-4" />
             Back
           </Button>
 
           {isLastStep ? (
-            <Button type="button" onClick={() => void handleFinish()} disabled={!canAdvance() || saving} className="gap-2">
-              {saving ? "Saving…" : data.main_goal.trim() ? "Continue with AI" : "Finish"}
-              <ChevronRight className="h-4 w-4" />
+            <Button
+              type="button"
+              onClick={() => void handleFinish()}
+              disabled={!canAdvance() || saving}
+              className="gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : hasGoalIntent ? (
+                <>
+                  Continue to goal setup
+                  <Sparkles className="h-4 w-4" />
+                </>
+              ) : (
+                <>
+                  Finish to dashboard
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
           ) : (
-            <Button type="button" onClick={goNext} disabled={!canAdvance() || saving} className="gap-2">
+            <Button
+              type="button"
+              onClick={goNext}
+              disabled={!canAdvance() || saving}
+              className="gap-2"
+            >
               Next
               <ChevronRight className="h-4 w-4" />
             </Button>

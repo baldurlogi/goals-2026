@@ -1,78 +1,71 @@
-import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/features/auth/authContext";
-import {
-  loadProfile,
-  readProfileCache,
-  type UserProfile,
-} from "@/features/onboarding/profileStorage";
+import { ProfileStateCard } from "./components/ProfileStateCard";
 import { OnboardingFlow } from "./OnboardingFlow";
+import { useProfileState } from "@/features/onboarding/useProfileQuery";
+
 
 type Props = {
   children: React.ReactNode;
 };
 
-type ProfileLoadState = {
-  userId: string | null;
-  profile: UserProfile | null | undefined;
-};
-
 export function RequireOnboarding({ children }: Props) {
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
+  const {
+    profile,
+    isAuthLoading,
+    isProfileLoading,
+    isMissingProfile,
+    error,
+    isFetching,
+    refetch,
+  } = useProfileState();
 
-  const [loadState, setLoadState] = useState<ProfileLoadState>({
-    userId,
-    profile: undefined,
-  });
-
-  const cachedProfile = useMemo(() => {
-    if (!userId) return null;
-    return readProfileCache(userId);
-  }, [userId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!userId) return;
-
-    void loadProfile().then((fresh) => {
-      if (cancelled) return;
-      setLoadState({
-        userId,
-        profile: fresh ?? null,
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  const loadedProfile = loadState.userId === userId ? loadState.profile : undefined;
-  const profile = userId ? loadedProfile ?? cachedProfile ?? null : null;
-  const checking = Boolean(userId) && loadedProfile === undefined && !cachedProfile;
-
-  if (checking) {
+  if (isAuthLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
-        <div className="animate-pulse text-sm text-muted-foreground">Loading your setup…</div>
-      </div>
+      <ProfileStateCard
+        title="Checking your account"
+        description="We're confirming your session before deciding whether to open onboarding or your dashboard."
+        status="loading"
+      />
+    );
+  }
+
+  if (isProfileLoading) {
+    return (
+      <ProfileStateCard
+        title="Loading your setup"
+        description="Your saved profile is still loading. If this takes a moment, we'll keep waiting instead of treating it like missing data."
+        status="loading"
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <ProfileStateCard
+        title="We couldn't load your setup"
+        description="This usually means the profile request timed out or hit a temporary error. Retry to keep your existing onboarding state intact."
+        status="error"
+        actionLabel="Retry"
+        onAction={() => void refetch()}
+        busy={isFetching}
+      />
+    );
+  }
+
+  if (isMissingProfile) {
+    return (
+      <ProfileStateCard
+        title="We couldn't find a saved profile yet"
+        description="We'll open onboarding so you can finish your setup. If you expected an existing profile, you can retry first."
+        status="empty"
+        actionLabel="Retry lookup"
+        onAction={() => void refetch()}
+        busy={isFetching}
+      />
     );
   }
 
   if (!profile?.onboarding_done) {
-    return (
-      <OnboardingFlow
-        onComplete={() => {
-          void loadProfile().then((fresh) => {
-            setLoadState({
-              userId,
-              profile: fresh ?? null,
-            });
-          });
-        }}
-      />
-    );
+    return <OnboardingFlow onComplete={() => void refetch()} />;
   }
 
   return <>{children}</>;

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useGoalsStore } from '@/features/goals/goalStoreContext';
-import { loadUserGoals, seedUserGoals } from './userGoalStorage';
+import { useGoalProgressQuery, useToggleGoalStepMutation } from '@/features/goals/goalStore';
+import { useGoalsQuery } from './useGoalsQuery';
 import type { UserGoal } from './goalTypes';
 import type { UpcomingItem } from '@/features/dashboard/hooks/useGoalsDashboard';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
@@ -44,27 +44,15 @@ function getUpcomingItems(
 }
 
 export function UpcomingTasksPage() {
-  const { state, dispatch } = useGoalsStore();
-  const [goals, setGoals] = useState<UserGoal[]>(() => seedUserGoals());
-  const [loading, setLoading] = useState(goals.length === 0);
+  const { data: done = {} } = useGoalProgressQuery();
+  const toggleGoalStepMutation = useToggleGoalStepMutation();
+  const { data: goals = [], isLoading: loading } = useGoalsQuery();
   const [horizonDays, setHorizonDays] = useState<7 | 14>(14);
 
-  useEffect(() => {
-    let cancelled = false;
-    loadUserGoals().then((g) => {
-      if (!cancelled) {
-        setGoals(g);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const items = useMemo(
-    () => getUpcomingItems(goals, state.done, horizonDays),
-    [goals, state.done, horizonDays],
+    () => getUpcomingItems(goals, done, horizonDays),
+    [done, goals, horizonDays],
   );
 
   const grouped = useMemo(() => {
@@ -183,10 +171,9 @@ export function UpcomingTasksPage() {
                             <input
                               type="checkbox"
                               className="mt-1"
-                              checked={!!state.done[it.goalId]?.[it.step.id]}
+                              checked={!!done[it.goalId]?.[it.step.id]}
                               onChange={() => {
-                                dispatch({
-                                  type: 'toggleStep',
+                                toggleGoalStepMutation.mutate({
                                   goalId: it.goalId,
                                   stepId: it.step.id,
                                 });
@@ -195,8 +182,7 @@ export function UpcomingTasksPage() {
                                   action: {
                                     label: 'Undo',
                                     onClick: () =>
-                                      dispatch({
-                                        type: 'toggleStep',
+                                      toggleGoalStepMutation.mutate({
                                         goalId: it.goalId,
                                         stepId: it.step.id,
                                       }),

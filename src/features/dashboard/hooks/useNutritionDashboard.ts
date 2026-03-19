@@ -1,34 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   loadNutritionLog,
   loadPhase,
   getLoggedMacros,
+  seedNutritionCache,
   NUTRITION_CHANGED_EVENT,
-  NUTRITION_LOG_CACHE_KEY,
-  NUTRITION_PHASE_CACHE_KEY,
   type NutritionLog,
-} from '@/features/nutrition/nutritionStorage';
+} from "@/features/nutrition/nutritionStorage";
 import {
   getTargets,
   type NutritionPhase,
-} from '@/features/nutrition/nutritionData';
-import { useTodayDate } from '@/hooks/useTodayDate';
-import { PROFILE_CHANGED_EVENT } from '@/features/onboarding/profileStorage';
-import {
-  hasDateAwareCache,
-  readDateAwareCache,
-  readStringCache,
-  writeDateAwareCache,
-  writeStringCache,
-} from '@/lib/cache';
-import { useDashboardLoadSubscription } from '@/features/dashboard/hooks/useDashboardLoadSubscription';
+} from "@/features/nutrition/nutritionData";
+import { useTodayDate } from "@/hooks/useTodayDate";
+import { useProfile } from "@/features/onboarding/useProfile";
+import { useAuth } from "@/features/auth/authContext";
 
-const EMPTY_LOG: NutritionLog = { date: '', eaten: {}, customEntries: [] };
-const PHASE_EVENTS = [NUTRITION_CHANGED_EVENT] as const;
-const NUTRITION_STORAGE_KEYS = [
-  NUTRITION_LOG_CACHE_KEY,
-  NUTRITION_PHASE_CACHE_KEY,
-] as const;
+const EMPTY_LOG: NutritionLog = { date: "", eaten: {}, customEntries: [] };
 
 function clamp(v: number, lo = 0, hi = 100) {
   return Math.min(Math.max(v, lo), hi);
@@ -39,63 +26,96 @@ function pct(value: number, target: number) {
 }
 
 function normalizePhase(raw: string): NutritionPhase {
-  return raw === 'cut' || raw === 'maintain' ? raw : 'maintain';
+  return raw === "cut" || raw === "maintain" ? raw : "maintain";
+}
+
+function ensureTodayLog(log: NutritionLog, today: string): NutritionLog {
+  return {
+    ...log,
+    date: today,
+  };
 }
 
 export function useNutritionDashboard() {
   const today = useTodayDate();
+  const profile = useProfile();
+  const { userId, authReady } = useAuth();
+
+  const emptyLog = useMemo<NutritionLog>(
+    () => ({ ...EMPTY_LOG, date: today }),
+    [today],
+  );
 
   const [log, setLog] = useState<NutritionLog>(() =>
-    readDateAwareCache(NUTRITION_LOG_CACHE_KEY, today, {
-      ...EMPTY_LOG,
-      date: today,
-    }),
+    authReady && userId ? ensureTodayLog(seedNutritionCache(userId), today) : emptyLog,
   );
-  const [phase, setPhase] = useState<NutritionPhase>(() =>
-    normalizePhase(readStringCache(NUTRITION_PHASE_CACHE_KEY, 'maintain')),
+  const [phase, setPhase] = useState<NutritionPhase>("maintain");
+  const [loading, setLoading] = useState(() =>
+    authReady ? Boolean(userId) : true,
   );
-  const [loading, setLoading] = useState(() => {
-    const hasLog = hasDateAwareCache(NUTRITION_LOG_CACHE_KEY, today);
-    const hasPhase = readStringCache(NUTRITION_PHASE_CACHE_KEY, '') !== '';
-    return !(hasLog && hasPhase);
-  });
+
+  useEffect(() => {
+    if (!authReady) {
+      setLoading(true);
+      return;
+    }
+
+    if (!userId) {
+      setLog(emptyLog);
+      setPhase("maintain");
+      setLoading(false);
+      return;
+    }
+
+    setLog(ensureTodayLog(seedNutritionCache(userId), today));
+    setPhase("maintain");
+    setLoading(true);
+  }, [authReady, emptyLog, today, userId]);
 
   const load = useCallback(async () => {
+    if (!authReady) return;
+
+    if (!userId) {
+      setLog(emptyLog);
+      setPhase("maintain");
+      setLoading(false);
+      return;
+    }
+
     try {
       const [freshLog, freshPhase] = await Promise.all([
-        loadNutritionLog(),
-        loadPhase(),
+        loadNutritionLog(userId),
+        loadPhase(userId),
       ]);
 
-      setLog(freshLog);
-      setPhase(freshPhase);
-      writeDateAwareCache(NUTRITION_LOG_CACHE_KEY, freshLog);
-      writeStringCache(NUTRITION_PHASE_CACHE_KEY, freshPhase);
+      setLog(ensureTodayLog(freshLog, today));
+      setPhase(normalizePhase(freshPhase));
     } catch (e) {
-      console.warn('nutrition dashboard load failed', e);
+      console.warn("nutrition dashboard load failed", e);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useDashboardLoadSubscription({
-    load,
-    events: PHASE_EVENTS,
-    storageKeys: NUTRITION_STORAGE_KEYS,
-  });
-
-  const [profileVersion, setProfileVersion] = useState(0);
+  }, [authReady, emptyLog, today, userId]);
 
   useEffect(() => {
-    const bump = () => setProfileVersion((v) => v + 1);
-    window.addEventListener(PROFILE_CHANGED_EVENT, bump);
-    return () => window.removeEventListener(PROFILE_CHANGED_EVENT, bump);
-  }, []);
+    void load();
+  }, [load]);
 
-  const target = useMemo(() => {
-    void profileVersion;
-    return getTargets(phase);
-  }, [phase, profileVersion]);
+  useEffect(() => {
+    if (!authReady) return;
+
+    const handleChange = () => {
+      void load();
+    };
+
+    window.addEventListener(NUTRITION_CHANGED_EVENT, handleChange);
+
+    return () => {
+      window.removeEventListener(NUTRITION_CHANGED_EVENT, handleChange);
+    };
+  }, [authReady, load]);
+
+  const target = useMemo(() => getTargets(phase, profile), [phase, profile]);
   const logged = useMemo(() => getLoggedMacros(log), [log]);
   const calPct = pct(logged.cal, target.cal);
 

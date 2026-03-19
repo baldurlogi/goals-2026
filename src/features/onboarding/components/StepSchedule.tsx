@@ -1,39 +1,67 @@
 import { memo } from "react";
-import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { ScheduleView } from "@/features/onboarding/profileStorage";
+import {
+  WEEKDAY_ORDER,
+  type WeekdayKey,
+  type WeeklyScheduleValue,
+} from "@/features/onboarding/profileStorage";
 import type { OnboardingData } from "./types";
 
 type Props = { data: OnboardingData; onChange: (p: Partial<OnboardingData>) => void };
 
-const OPTIONS: { value: ScheduleView; label: string; sub: string; icon: string }[] = [
-  { value: "wfh", label: "Work from home", sub: "No commute", icon: "🏠" },
-  { value: "office", label: "Office day", sub: "Commute included", icon: "🏢" },
-  { value: "weekend", label: "Weekend", sub: "Flexible", icon: "☀️" },
+const DAY_LABELS: Record<WeekdayKey, string> = {
+  monday: "Monday",
+  tuesday: "Tuesday",
+  wednesday: "Wednesday",
+  thursday: "Thursday",
+  friday: "Friday",
+  saturday: "Saturday",
+  sunday: "Sunday",
+};
+
+const OPTIONS: { value: WeeklyScheduleValue; label: string; description: string }[] = [
+  { value: "office", label: "Office", description: "Mostly in person" },
+  { value: "wfh", label: "WFH", description: "Mostly remote" },
+  { value: "hybrid", label: "Hybrid", description: "Mixed day" },
+  { value: "off", label: "Off", description: "Day off" },
 ];
 
 export const StepSchedule = memo(function StepSchedule({ data, onChange }: Props) {
   return (
     <div className="space-y-3">
-      {OPTIONS.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange({ default_schedule_view: opt.value })}
-          className={cn(
-            "w-full rounded-xl border px-4 py-4 text-left transition-all",
-            data.default_schedule_view === opt.value
-              ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-              : "border-border hover:border-primary/40",
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <span>{opt.icon}</span>
-            <span>{opt.label}</span>
-            {data.default_schedule_view === opt.value ? <Check className="ml-auto h-4 w-4 text-primary" /> : null}
+      <div className="space-y-1">
+        <h2 className="text-xl font-bold">What does a normal week look like for you?</h2>
+        <p className="text-sm text-muted-foreground">Set a default schedule for each weekday. You can edit this later in Profile.</p>
+      </div>
+      <div className="space-y-2">
+        {WEEKDAY_ORDER.map((day) => (
+          <div key={day} className="grid grid-cols-[minmax(0,1fr),auto] items-center gap-3 rounded-xl border bg-card px-3 py-3">
+            <div>
+              <p className="text-sm font-medium">{DAY_LABELS[day]}</p>
+              <p className="text-xs text-muted-foreground">
+                {OPTIONS.find((option) => option.value === data.weekly_schedule[day])?.description}
+              </p>
+            </div>
+            <select
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+              value={data.weekly_schedule[day]}
+              onChange={(e) =>
+                onChange({
+                  weekly_schedule: {
+                    ...data.weekly_schedule,
+                    [day]: e.target.value as WeeklyScheduleValue,
+                  },
+                })
+              }
+            >
+              {OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
-        </button>
-      ))}
+        ))}
+      </div>
     </div>
   );
 });
