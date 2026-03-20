@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useGoalProgressQuery } from '@/features/goals/goalStore';
-import { useGoalsQuery } from '@/features/goals/useGoalsQuery';
+import { useGoalsState } from '@/features/goals/useGoalsQuery';
 import type { UserGoal } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 
@@ -61,7 +61,7 @@ function getUpcomingItems(
 
 export function useGoalsDashboard() {
   const { data: goalProgress = {} } = useGoalProgressQuery();
-  const { data: goals = [], isLoading: loading } = useGoalsQuery();
+  const { goals, isGoalsLoading: loading } = useGoalsState();
 
   const upcomingItems = useMemo<UpcomingItem[]>(
     () => getUpcomingItems(goals, goalProgress, HORIZON),

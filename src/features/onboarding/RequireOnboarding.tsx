@@ -1,18 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, LogOut, RefreshCw } from "lucide-react";
 import { ProfileStateCard } from "./components/ProfileStateCard";
 import { OnboardingFlow } from "./OnboardingFlow";
 import { useProfileState } from "@/features/onboarding/useProfileQuery";
 import { useAuth } from "@/features/auth/authContext";
+import {
+  clearCancelledOnboarding,
+  clearStoredPostLoginRedirect,
+  markOnboardingCancelled,
+} from "@/features/auth/authRedirect";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 type Props = {
   children: React.ReactNode;
 };
-
-const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
 
 export function RequireOnboarding({ children }: Props) {
   const navigate = useNavigate();
@@ -30,10 +33,24 @@ export function RequireOnboarding({ children }: Props) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
+  useEffect(() => {
+    if (profile?.onboarding_done) {
+      clearCancelledOnboarding();
+    }
+  }, [profile?.onboarding_done]);
+
+  function handleCancelOnboarding() {
+    clearStoredPostLoginRedirect();
+    markOnboardingCancelled();
+    setShowOnboarding(false);
+    navigate("/", { replace: true });
+  }
+
   async function handleUseAnotherAccount() {
     try {
       setSigningOut(true);
-      sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+      clearStoredPostLoginRedirect();
+      clearCancelledOnboarding();
       await signOut();
       navigate("/login", { replace: true });
     } finally {
@@ -75,7 +92,15 @@ export function RequireOnboarding({ children }: Props) {
   }
 
   if (isMissingProfile) {
-    return <OnboardingFlow onComplete={() => void refetch()} />;
+    return (
+      <OnboardingFlow
+        onComplete={() => {
+          clearCancelledOnboarding();
+          void refetch();
+        }}
+        onCancel={handleCancelOnboarding}
+      />
+    );
   }
 
 
@@ -114,7 +139,16 @@ export function RequireOnboarding({ children }: Props) {
                 )}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancelOnboarding}
+                  disabled={signingOut}
+                >
+                  Back for now
+                </Button>
+
                 <Button
                   type="button"
                   variant="outline"
@@ -154,7 +188,15 @@ export function RequireOnboarding({ children }: Props) {
       );
     }
 
-    return <OnboardingFlow onComplete={() => void refetch()} />;
+    return (
+      <OnboardingFlow
+        onComplete={() => {
+          clearCancelledOnboarding();
+          void refetch();
+        }}
+        onCancel={handleCancelOnboarding}
+      />
+    );
   }
 
   return <>{children}</>;

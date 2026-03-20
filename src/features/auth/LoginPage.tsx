@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
-import { buildAuthCallbackRedirect, readStoredPostLoginRedirect } from "./authRedirect";
+import { readStoredPostLoginRedirect, startGoogleAuth } from "./authRedirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -21,19 +20,15 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const redirectTo = buildAuthCallbackRedirect("login");
+    const { error, redirectTo, forcedAccountSelection } = await startGoogleAuth("login");
 
     if (import.meta.env.DEV) {
       console.debug("[auth] starting login", {
         redirectTo,
         storedNext: readStoredPostLoginRedirect(),
+        forcedAccountSelection,
       });
     }
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
 
     if (error) {
       setError(error.message);
@@ -51,7 +46,7 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center pb-4">
           <div className="mx-auto mb-3 text-4xl">📊</div>
-          <CardTitle className="text-xl">Daily Life Progress</CardTitle>
+          <CardTitle className="text-xl">Kairo</CardTitle>
           <CardDescription>
             Your personal dashboard for fitness, habits and goals.
           </CardDescription>

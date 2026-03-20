@@ -7,6 +7,7 @@ import {
   Library,
   Salad,
   Utensils,
+  GlassWater,
   Dumbbell,
   Activity,
   CheckSquare,
@@ -66,6 +67,23 @@ function getNutritionSuggestion(
     reason: `${meals} of 4 meals logged today.`,
     href: "/app/nutrition",
     icon: meals === 0 ? Salad : Utensils,
+  };
+}
+
+function getWaterSuggestion(
+  signals: AISignals,
+): SuggestionCandidate | null {
+  if (signals.water.goalHit) return null;
+
+  const amount = signals.water.remainingMl >= 500 ? 500 : 250;
+
+  return {
+    module: "nutrition",
+    priority: 66,
+    action: `Drink ${amount}ml of water`,
+    reason: `${signals.water.remainingMl}ml left to hit today's hydration target.`,
+    href: "/app/nutrition",
+    icon: GlassWater,
   };
 }
 
@@ -195,6 +213,9 @@ export function buildSuggestionCandidates(
   }
 
   if (hasModule(signals, "nutrition")) {
+    const waterSuggestion = getWaterSuggestion(signals);
+    if (waterSuggestion) items.push(waterSuggestion);
+
     const nutritionSuggestion = getNutritionSuggestion(signals);
     if (nutritionSuggestion) items.push(nutritionSuggestion);
   }

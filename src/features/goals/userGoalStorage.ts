@@ -74,6 +74,13 @@ export class GoalRemotePersistenceError extends Error {
   }
 }
 
+export class GoalSaveAuthError extends Error {
+  constructor() {
+    super("Not signed in");
+    this.name = "GoalSaveAuthError";
+  }
+}
+
 // -- Load all goals for the current user ------------------------------
 
 export async function loadUserGoals(userId: string | null = getActiveUserId()): Promise<UserGoal[]> {
@@ -113,11 +120,7 @@ export function seedGoalCache(userId: string | null): UserGoal[] {
 
 export async function saveUserGoal(userId: string | null, goal: UserGoal): Promise<GoalPersistenceStatus> {
   if (!userId) {
-    return {
-      localCacheWriteSucceeded: false,
-      remoteSyncSucceeded: false,
-      isFirstGoalCreated: false,
-    } satisfies GoalPersistenceStatus;
+    throw new GoalSaveAuthError();
   }
 
   const cached = readCache(userId);

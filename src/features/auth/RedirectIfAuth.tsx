@@ -1,14 +1,11 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./authContext";
-
-const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
-
-function resolvePostLoginPath(value: unknown) {
-  if (typeof value !== "string") return null;
-  if (!value.startsWith("/")) return null;
-  if (value.startsWith("//") || value.startsWith("/auth")) return null;
-  return value;
-}
+import {
+  clearStoredPostLoginRedirect,
+  hasCancelledOnboarding,
+  readStoredPostLoginRedirect,
+  resolvePostLoginPath,
+} from "./authRedirect";
 
 export function RedirectIfAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -30,6 +27,13 @@ export function RedirectIfAuth({ children }: { children: React.ReactNode }) {
       return <>{children}</>;
     }
 
+    if (
+      hasCancelledOnboarding() &&
+      (location.pathname === "/login" || location.pathname === "/signup")
+    ) {
+      return <>{children}</>;
+    }
+
     const state = location.state as {
       from?: { pathname?: string; search?: string; hash?: string };
     } | null;
@@ -38,13 +42,13 @@ export function RedirectIfAuth({ children }: { children: React.ReactNode }) {
       ? `${state.from.pathname ?? ""}${state.from.search ?? ""}${state.from.hash ?? ""}`
       : null;
 
-    const persistedPath = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
+    const persistedPath = readStoredPostLoginRedirect();
     const destination =
       resolvePostLoginPath(statePath) ??
       resolvePostLoginPath(persistedPath) ??
       "/app";
 
-    sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+    clearStoredPostLoginRedirect();
     return <Navigate to={destination} replace />;
   }
 

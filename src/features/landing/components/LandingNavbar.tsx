@@ -84,7 +84,7 @@ export function LandingNavbar({
           className="font-mono text-sm tracking-[0.06em]"
           style={{ color: t.text }}
         >
-          DAILY<span style={{ color: t.primary }}> LIFE</span> PROGRESS
+          <span style={{ color: t.primary }}>KAIRO</span>
         </button>
 
         <div className="hidden items-center gap-2 md:flex">

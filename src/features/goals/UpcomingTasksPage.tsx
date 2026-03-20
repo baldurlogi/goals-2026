@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useGoalProgressQuery, useToggleGoalStepMutation } from '@/features/goals/goalStore';
-import { useGoalsQuery } from './useGoalsQuery';
+import { useGoalsState } from './useGoalsQuery';
 import type { UserGoal } from './goalTypes';
 import type { UpcomingItem } from '@/features/dashboard/hooks/useGoalsDashboard';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
@@ -46,7 +46,7 @@ function getUpcomingItems(
 export function UpcomingTasksPage() {
   const { data: done = {} } = useGoalProgressQuery();
   const toggleGoalStepMutation = useToggleGoalStepMutation();
-  const { data: goals = [], isLoading: loading } = useGoalsQuery();
+  const { goals, isGoalsLoading: loading } = useGoalsState();
   const [horizonDays, setHorizonDays] = useState<7 | 14>(14);
 
 

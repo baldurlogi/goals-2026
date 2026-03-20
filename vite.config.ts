@@ -10,10 +10,16 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icons/icon-16.png", "icons/icon-32.png", "icons/icon-180.png"],
+      includeAssets: [
+        "icons/icon-16.png",
+        "icons/icon-32.png",
+        "icons/icon-180.png",
+        "icons/icon-192.png",
+        "icons/icon-512.png",
+      ],
       manifest: {
-        name: "Daily Life Progress",
-        short_name: "Daily Life",
+        name: "Kairo",
+        short_name: "Kairo",
         description: "Your personal daily habits, nutrition, fitness and goals dashboard.",
         theme_color: "#0f172a",
         background_color: "#0f172a",

@@ -1,4 +1,8 @@
+import { supabase } from "@/lib/supabaseClient";
+
 const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
+const CANCELLED_ONBOARDING_KEY = "cancelled_onboarding";
+export type AuthIntent = "login" | "signup";
 
 export function resolvePostLoginPath(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -23,7 +27,31 @@ export function clearStoredPostLoginRedirect(): void {
   }
 }
 
-export function buildAuthCallbackRedirect(intent: "login" | "signup"): string {
+export function hasCancelledOnboarding(): boolean {
+  try {
+    return sessionStorage.getItem(CANCELLED_ONBOARDING_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markOnboardingCancelled(): void {
+  try {
+    sessionStorage.setItem(CANCELLED_ONBOARDING_KEY, "1");
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function clearCancelledOnboarding(): void {
+  try {
+    sessionStorage.removeItem(CANCELLED_ONBOARDING_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function buildAuthCallbackRedirect(intent: AuthIntent): string {
   const callbackUrl = new URL("/auth/callback", window.location.origin);
   callbackUrl.searchParams.set("intent", intent);
 
@@ -33,4 +61,40 @@ export function buildAuthCallbackRedirect(intent: "login" | "signup"): string {
   }
 
   return callbackUrl.toString();
+}
+
+export async function startGoogleAuth(intent: AuthIntent): Promise<{
+  error: Error | null;
+  redirectTo: string;
+  forcedAccountSelection: boolean;
+}> {
+  const redirectTo = buildAuthCallbackRedirect(intent);
+  const forcedAccountSelection = hasCancelledOnboarding();
+
+  if (forcedAccountSelection) {
+    const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+    if (signOutError) {
+      return {
+        error: signOutError,
+        redirectTo,
+        forcedAccountSelection,
+      };
+    }
+  }
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+      queryParams: forcedAccountSelection
+        ? { prompt: "select_account" }
+        : undefined,
+    },
+  });
+
+  return {
+    error,
+    redirectTo,
+    forcedAccountSelection,
+  };
 }

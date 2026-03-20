@@ -28,8 +28,28 @@ export function useGoalsQuery() {
     queryKey: queryKeys.goals(userId),
     queryFn: () => loadUserGoals(userId),
     enabled: authReady && Boolean(userId),
-    initialData: userId ? seedGoalCache(userId) : [],
+    placeholderData: userId ? seedGoalCache(userId) : undefined,
   });
+}
+
+export function useGoalsState() {
+  const { authReady, userId } = useAuth();
+  const query = useGoalsQuery();
+
+  const goals = query.data ?? [];
+  const isWaitingForUserId = authReady && !userId;
+  const hasUserId = Boolean(userId);
+  const hasSeededGoals = goals.length > 0;
+
+  return {
+    ...query,
+    goals,
+    isGoalsLoading:
+      isWaitingForUserId ||
+      (hasUserId &&
+        !hasSeededGoals &&
+        ((query.isLoading && !query.data) || query.isPlaceholderData)),
+  };
 }
 
 export function useSaveGoalMutation() {

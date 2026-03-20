@@ -74,7 +74,13 @@ function hasValidNutritionTarget(data: OnboardingData) {
   );
 }
 
-export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
+export function OnboardingFlow({
+  onComplete,
+  onCancel,
+}: {
+  onComplete: () => void;
+  onCancel?: () => void;
+}) {
   const { userId } = useAuth();
   const [step, setStep] = useState<OnboardingStep>(0);
   const [data, setData] = useState<OnboardingData>(INITIAL_ONBOARDING_DATA);
@@ -105,6 +111,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   );
 
   const currentIndex = visibleSteps.indexOf(step);
+  const isFirstStep = currentIndex <= 0;
   const isLastStep = currentIndex === visibleSteps.length - 1;
   const currentStepContent = STEP_CONTENT[step];
 
@@ -268,8 +275,8 @@ export function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
           <Button
             type="button"
             variant="outline"
-            onClick={goBack}
-            disabled={currentIndex <= 0 || saving}
+            onClick={isFirstStep && onCancel ? onCancel : goBack}
+            disabled={(isFirstStep && !onCancel) || saving}
             className="gap-2"
           >
             <ChevronLeft className="h-4 w-4" />

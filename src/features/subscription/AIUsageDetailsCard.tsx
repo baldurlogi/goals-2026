@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   defaultMonthlyLimitForTier,
   getAIUsageResetLabel,
-  useAIUsageSnapshot,
+  useAIUsageSnapshotState,
 } from "@/features/subscription/aiUsageCache";
 import { TIER_BADGE, TIER_LABELS, useTier } from "@/features/subscription/useTier";
 
@@ -20,16 +20,17 @@ function clampPercent(value: number) {
 
 export function AIUsageDetailsCard({ className }: Props) {
   const tier = useTier();
-  const snapshot = useAIUsageSnapshot(tier);
+  const { snapshot, hydrating } = useAIUsageSnapshotState(tier);
 
   const known = Boolean(snapshot);
   const monthlyLimit = snapshot?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
-  const promptsUsed = snapshot?.promptsUsed ?? 0;
-  const remaining = snapshot?.remaining ?? monthlyLimit;
-  const fillPct = clampPercent((promptsUsed / monthlyLimit) * 100);
+  const promptsUsed = snapshot?.promptsUsed ?? null;
+  const remaining = snapshot?.remaining ?? null;
+  const fillPct = clampPercent((((promptsUsed ?? 0) / monthlyLimit) * 100));
   const exhausted = known && remaining === 0;
   const low =
     known &&
+    remaining !== null &&
     remaining > 0 &&
     remaining <= Math.max(1, Math.ceil(monthlyLimit * 0.1));
 
@@ -66,17 +67,19 @@ export function AIUsageDetailsCard({ className }: Props) {
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
               Used
             </div>
-            <div className="mt-1 text-2xl font-bold">{promptsUsed}</div>
-            <div className="text-xs text-muted-foreground">prompts this month</div>
+            <div className="mt-1 text-2xl font-bold">{promptsUsed ?? "—"}</div>
+            <div className="text-xs text-muted-foreground">
+              {known ? "prompts this month" : hydrating ? "syncing your usage" : "usage unavailable"}
+            </div>
           </div>
 
           <div className="rounded-xl border bg-background/70 p-3">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
               Remaining
             </div>
-            <div className="mt-1 text-2xl font-bold">{remaining}</div>
+            <div className="mt-1 text-2xl font-bold">{remaining ?? "—"}</div>
             <div className="text-xs text-muted-foreground">
-              {exhausted ? "limit reached" : "still available"}
+              {known ? (exhausted ? "limit reached" : "still available") : hydrating ? "checking current month" : "couldn't sync yet"}
             </div>
           </div>
 
@@ -93,7 +96,7 @@ export function AIUsageDetailsCard({ className }: Props) {
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="font-medium text-foreground">This month</span>
             <span className="text-muted-foreground">
-              {promptsUsed}/{monthlyLimit} used · {Math.round(fillPct)}%
+              {known ? `${promptsUsed}/${monthlyLimit} used · ${Math.round(fillPct)}%` : `—/${monthlyLimit} used`}
             </span>
           </div>
 
@@ -116,7 +119,9 @@ export function AIUsageDetailsCard({ className }: Props) {
               ? exhausted
                 ? "You've used all available prompts for this month. Non-AI features still work normally."
                 : `${remaining} prompts are still available this month.`
-              : "Usage appears here after your first AI action this month."}
+              : hydrating
+                ? "Syncing your current month's AI usage."
+                : "Current usage could not be synced yet. It will update after the next successful AI action."}
           </p>
         </div>
 

@@ -9,6 +9,10 @@ import { getActiveUserId, setActiveUserId } from "@/lib/activeUser";
 import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
 import { clearUserBoundQueries } from "@/lib/queryClient";
 import { clearProfileState } from "@/features/onboarding/profileStorage";
+import {
+  clearCancelledOnboarding,
+  clearStoredPostLoginRedirect,
+} from "@/features/auth/authRedirect";
 
 function hasCachedProfileMismatch(nextUserId: string | null): boolean {
   try {
@@ -87,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (userChanged) {
+      clearCancelledOnboarding();
       clearProfileState();
       clearUserBoundQueries(previousUserId ?? null);
       if (nextUserId !== previousUserId) {
@@ -95,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if ((event === "SIGNED_OUT" || nextUserId === null) && previousUserId !== undefined) {
+      clearCancelledOnboarding();
       clearProfileState();
     }
 
@@ -154,7 +160,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearUserCache(currentUserId);
 
     try {
-      sessionStorage.removeItem("post_login_redirect");
+      clearStoredPostLoginRedirect();
+      clearCancelledOnboarding();
     } catch {
       // ignore
     }

@@ -30,7 +30,7 @@ export function PWAInstallBanner() {
               Add to Home Screen
             </p>
             <p className="text-xs text-slate-400 mt-0.5 truncate">
-              Open Daily Life instantly — no browser needed
+              Open Kairo instantly — no browser needed
             </p>
           </div>
 

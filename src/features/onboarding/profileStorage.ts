@@ -432,7 +432,9 @@ export async function completeOnboarding(
 
   const userId = user?.id ?? null;
 
-  if (!userId) return;
+  if (!userId) {
+    throw new Error("Not signed in");
+  }
 
   await saveProfile(userId, {
     ...profile,
