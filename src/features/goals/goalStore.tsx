@@ -281,8 +281,28 @@ export function useGoalProgressQuery() {
     queryKey: queryKeys.goalProgress(userId),
     queryFn: () => loadGoalProgress(userId),
     enabled: authReady && Boolean(userId),
-    initialData: userId ? seedGoalProgressCache(userId) : {},
+    placeholderData: userId ? seedGoalProgressCache(userId) : undefined,
   });
+}
+
+export function useGoalProgressState() {
+  const { authReady, userId } = useAuth();
+  const query = useGoalProgressQuery();
+
+  const doneState = query.data ?? {};
+  const isWaitingForUserId = authReady && !userId;
+  const hasUserId = Boolean(userId);
+  const hasSeededProgress = Object.keys(doneState).length > 0;
+
+  return {
+    ...query,
+    doneState,
+    isGoalProgressLoading:
+      isWaitingForUserId ||
+      (hasUserId &&
+        !hasSeededProgress &&
+        ((query.isLoading && !query.data) || query.isPlaceholderData)),
+  };
 }
 
 export function useToggleGoalStepMutation() {
@@ -333,6 +353,7 @@ export function useToggleGoalStepMutation() {
       if (!userId) return;
 
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(userId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboardGoals(userId) }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.dashboardLifeProgress(userId),
@@ -385,6 +406,7 @@ export function useResetGoalProgressMutation() {
       if (!userId) return;
 
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(userId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboardGoals(userId) }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.dashboardLifeProgress(userId),

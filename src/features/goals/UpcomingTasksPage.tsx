@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useGoalProgressQuery, useToggleGoalStepMutation } from '@/features/goals/goalStore';
+import { useGoalProgressState, useToggleGoalStepMutation } from '@/features/goals/goalStore';
 import { useGoalsState } from './useGoalsQuery';
 import type { UserGoal } from './goalTypes';
 import type { UpcomingItem } from '@/features/dashboard/hooks/useGoalsDashboard';
@@ -44,10 +44,11 @@ function getUpcomingItems(
 }
 
 export function UpcomingTasksPage() {
-  const { data: done = {} } = useGoalProgressQuery();
+  const { doneState: done, isGoalProgressLoading } = useGoalProgressState();
   const toggleGoalStepMutation = useToggleGoalStepMutation();
-  const { goals, isGoalsLoading: loading } = useGoalsState();
+  const { goals, isGoalsLoading } = useGoalsState();
   const [horizonDays, setHorizonDays] = useState<7 | 14>(14);
+  const loading = isGoalsLoading || isGoalProgressLoading;
 
 
   const items = useMemo(

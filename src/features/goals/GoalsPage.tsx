@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { useGoalProgressQuery } from '@/features/goals/goalStore';
+import { useGoalProgressState } from '@/features/goals/goalStore';
 import { GoalCard } from './components/GoalCard';
 import { AddEditGoalModal } from './components/AddEditGoalModal';
 import { ImproveGoalModal } from './components/ImproveGoalModal';
@@ -54,8 +54,8 @@ export function GoalsPage() {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: done = {} } = useGoalProgressQuery();
-  const { goals, isGoalsLoading: loading } = useGoalsState();
+  const { doneState: done, isGoalProgressLoading } = useGoalProgressState();
+  const { goals, isGoalsLoading } = useGoalsState();
   const deleteGoalMutation = useDeleteGoalMutation();
   const saveGoalMutation = useSaveGoalMutation();
   const [sort, setSort] = useState<SortMode>('priority');
@@ -63,6 +63,7 @@ export function GoalsPage() {
   const [improvingGoal, setImprovingGoal] = useState<UserGoal | null>(null);
   const tier = useTier();
   const isPro = tierMeets(tier, 'pro');
+  const loading = isGoalsLoading || isGoalProgressLoading;
   const location = useLocation();
   const navigate = useNavigate();
 
