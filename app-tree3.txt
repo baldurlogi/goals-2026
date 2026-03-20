@@ -7,8 +7,6 @@
 │   └── settings.json
 ├── AGENTS.md
 ├── README.md
-├── app-tree.txt
-├── app-tree2.txt
 ├── app-tree3.txt
 ├── components.json
 ├── eslint.config.js
@@ -360,4 +358,4 @@
 ├── tsconfig.node.json
 └── vite.config.ts
 
-67 directories, 294 files
+67 directories, 292 files

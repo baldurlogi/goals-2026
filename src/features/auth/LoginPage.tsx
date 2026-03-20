@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,11 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm space-y-4">
+      <Link to="/" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back to home
+      </Link>
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center pb-4">
           <div className="mx-auto mb-3 text-4xl">📊</div>
@@ -134,6 +140,7 @@ export function LoginPage() {
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
