@@ -12,6 +12,7 @@ import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { useAIUsage } from "@/features/subscription/useAIUsage";
 import { writeAIUsageCache } from "@/features/subscription/aiUsageCache";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
+import { capture } from "@/lib/analytics";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
@@ -121,6 +122,15 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
 
   if (data.usage) {
     writeAIUsageCache(data.usage);
+    capture("ai_prompt_used", {
+      feature: "coach_refresh",
+      source: "ai_coach_card",
+      route: window.location.pathname,
+      prompts_used: data.usage.prompts_used,
+      monthly_limit: data.usage.monthly_limit,
+      remaining: data.usage.remaining,
+      tier: data.usage.tier,
+    });
   }
 
   const s = data.suggestion as CoachSuggestion;

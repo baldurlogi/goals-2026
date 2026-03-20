@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -17,6 +18,7 @@ import { useProfileQuery } from "../onboarding/useProfileQuery";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { useGoalsState } from "@/features/goals/useGoalsQuery";
 import { scheduleIdle } from "@/lib/scheduleIdle";
+import { capture } from "@/lib/analytics";
 
 import {
   AICoachCardSkeleton,
@@ -141,11 +143,26 @@ export default function DashboardPage() {
 
   const { goals, isGoalsLoading: goalsLoading } = useGoalsState();
   const goalCount = goals.length;
+  const dashboardTrackedRef = useRef(false);
 
   const showTopEnhancements = useDeferredMount(160);
   const showSecondaryEnhancements = useDeferredMount(380);
 
   const showEmptyState = !profileQuery.isLoading && !modulesLoading && !goalsLoading && goalCount === 0;
+
+  useEffect(() => {
+    if (dashboardTrackedRef.current) return;
+    if (profileQuery.isLoading || modulesLoading || goalsLoading) return;
+
+    dashboardTrackedRef.current = true;
+    capture("dashboard_viewed", {
+      route: "/app",
+      tier,
+      goals_count: goalCount,
+      enabled_modules_count: modules.size,
+      is_empty_state: goalCount === 0,
+    });
+  }, [goalCount, goalsLoading, modules.size, modulesLoading, profileQuery.isLoading, tier]);
 
   const quickActions = useMemo(
     () =>

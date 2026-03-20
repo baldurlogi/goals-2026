@@ -18,6 +18,7 @@ import {
   markAIUsageLimitReached,
   writeAIUsageCache,
 } from "@/features/subscription/aiUsageCache";
+import { capture } from "@/lib/analytics";
 
 const SUPABASE_FN =
   "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
@@ -127,6 +128,17 @@ async function fetchImprovedSteps(goal: UserGoal): Promise<ImproveResult> {
   const data = (await res.json()) as ImproveResponse;
   if (data.usage) {
     writeAIUsageCache(data.usage);
+    capture("ai_prompt_used", {
+      feature: "goal_improve",
+      source: "improve_goal_modal",
+      route: window.location.pathname,
+      goal_id: goal.id,
+      goal_title: goal.title,
+      prompts_used: data.usage.prompts_used,
+      monthly_limit: data.usage.monthly_limit,
+      remaining: data.usage.remaining,
+      tier: data.usage.tier,
+    });
   }
 
   const improved = data.improved as ImproveResult;
