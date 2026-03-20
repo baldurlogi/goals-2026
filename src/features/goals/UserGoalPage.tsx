@@ -12,7 +12,7 @@ import { UpgradeBanner } from '@/features/subscription/UpgradeBanner';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
 import { useAuth } from '@/features/auth/authContext';
 import { GoalRemotePersistenceError } from '@/features/goals/userGoalStorage';
-import { useGoalsQuery, useSaveGoalMutation } from '@/features/goals/useGoalsQuery';
+import { useGoalsState, useSaveGoalMutation } from '@/features/goals/useGoalsQuery';
 import type { UserGoal, UserGoalStep } from '@/features/goals/goalTypes';
 import type { GoalPersistenceStatus } from '@/features/goals/userGoalStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
@@ -73,7 +73,7 @@ export function UserGoalPage() {
   const resetGoalProgressMutation = useResetGoalProgressMutation();
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const { data: goals = [], isLoading: loading } = useGoalsQuery();
+  const { goals, isGoalsLoading: loading } = useGoalsState();
   const saveGoalMutation = useSaveGoalMutation();
   const [editing, setEditing] = useState(false);
   const [improving, setImproving] = useState(false);
@@ -95,9 +95,9 @@ export function UserGoalPage() {
     return (
       <div className="space-y-4 py-16 text-center">
         <div className="text-4xl">🔍</div>
-        <div className="font-semibold">Goal not found</div>
+        <div className="font-semibold">Page not found</div>
         <Button asChild variant="secondary">
-          <Link to="/app/goals">Back to goals</Link>
+          <Link to="/app/goals">Go back</Link>
         </Button>
       </div>
     );

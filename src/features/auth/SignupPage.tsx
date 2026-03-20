@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { ArrowLeft } from "lucide-react";
 import { capture } from "@/lib/analytics";
+import { readStoredPostLoginRedirect, startGoogleAuth } from "./authRedirect";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,12 +33,15 @@ export function SignupPage() {
       route: "/signup",
     });
 
-    const redirectTo = `${window.location.origin}/auth/callback?intent=signup`;
+    const { error, redirectTo, forcedAccountSelection } = await startGoogleAuth("signup");
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
+    if (import.meta.env.DEV) {
+      console.debug("[auth] starting signup", {
+        redirectTo,
+        storedNext: readStoredPostLoginRedirect(),
+        forcedAccountSelection,
+      });
+    }
 
     if (error) {
       capture("signup_failed", {
@@ -54,6 +58,11 @@ export function SignupPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm space-y-4">
+      <Link to="/" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back to home
+      </Link>
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center pb-4">
           <div className="mx-auto mb-3 text-4xl">📊</div>
@@ -163,6 +172,7 @@ export function SignupPage() {
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

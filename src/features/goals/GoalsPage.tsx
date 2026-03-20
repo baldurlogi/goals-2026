@@ -11,7 +11,7 @@ import { ImproveGoalModal } from './components/ImproveGoalModal';
 import { GoalsPageSkeleton } from '@/features/dashboard/skeletons';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
 import { GoalRemotePersistenceError } from './userGoalStorage';
-import { useDeleteGoalMutation, useGoalsQuery, useSaveGoalMutation } from './useGoalsQuery';
+import { useDeleteGoalMutation, useGoalsState, useSaveGoalMutation } from './useGoalsQuery';
 import type { UserGoal, UserGoalStep } from './goalTypes';
 import type { GoalPersistenceStatus } from './userGoalStorage';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
@@ -55,7 +55,7 @@ export function GoalsPage() {
   const queryClient = useQueryClient();
 
   const { data: done = {} } = useGoalProgressQuery();
-  const { data: goals = [], isLoading: loading } = useGoalsQuery();
+  const { goals, isGoalsLoading: loading } = useGoalsState();
   const deleteGoalMutation = useDeleteGoalMutation();
   const saveGoalMutation = useSaveGoalMutation();
   const [sort, setSort] = useState<SortMode>('priority');

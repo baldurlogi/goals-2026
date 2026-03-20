@@ -21,7 +21,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     if (nextPath.startsWith("/")) {
       sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, nextPath);
     }
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

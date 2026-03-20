@@ -2,8 +2,7 @@ import { useEffect } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
-
-const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
+import { clearStoredPostLoginRedirect, readStoredPostLoginRedirect, resolvePostLoginPath } from "./authRedirect";
 const SIGNUP_WINDOW_MS = 5 * 60 * 1000;
 
 function isLikelySignup(user: {
@@ -17,13 +16,6 @@ function isLikelySignup(user: {
 
   if (Number.isNaN(createdAt) || Number.isNaN(lastSignInAt)) return false;
   return Math.abs(lastSignInAt - createdAt) <= SIGNUP_WINDOW_MS;
-}
-
-function resolvePostLoginPath(value: unknown) {
-  if (typeof value !== "string") return null;
-  if (!value.startsWith("/")) return null;
-  if (value.startsWith("//") || value.startsWith("/auth")) return null;
-  return value;
 }
 
 export function AuthCallbackPage() {
@@ -64,13 +56,25 @@ export function AuthCallbackPage() {
       ? `${state.from.pathname ?? ""}${state.from.search ?? ""}${state.from.hash ?? ""}`
       : null;
 
-    const persistedPath = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
+    const queryPath = resolvePostLoginPath(params.get("next"));
+    const persistedPath = readStoredPostLoginRedirect();
     const destination =
+      queryPath ??
       resolvePostLoginPath(statePath) ??
-      resolvePostLoginPath(persistedPath) ??
+      persistedPath ??
       "/app";
 
-    sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+    if (import.meta.env.DEV) {
+      console.debug("[auth] callback redirect resolved", {
+        intent,
+        queryPath,
+        statePath: resolvePostLoginPath(statePath),
+        persistedPath,
+        destination,
+      });
+    }
+
+    clearStoredPostLoginRedirect();
     navigate(destination, { replace: true });
   }, [loading, user, navigate, location.search, location.state]);
 

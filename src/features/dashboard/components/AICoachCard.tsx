@@ -144,9 +144,6 @@ function buildStarterSuggestion(signals: Awaited<ReturnType<typeof buildAISignal
   if (signals.modules.includes("nutrition") && signals.nutrition.mealsLoggedToday === 0) {
     return { action: "Log your first meal", reason: "A quick nutrition check-in gives the coach something real to work with.", href: "/app/nutrition", emoji: "🥗", module: "nutrition" };
   }
-  if (signals.modules.includes("todos") && signals.todos?.totalToday === 0) {
-    return { action: "Add one small to-do", reason: "Even one task gives your coach a concrete place to start.", href: "/app/todos", emoji: "✅", module: "todos" };
-  }
   if (signals.modules.includes("schedule") && signals.schedule?.totalBlocks === 0) {
     return { action: "Set up today's schedule", reason: "A simple plan makes your next move much easier to choose.", href: "/app/schedule", emoji: "📅", module: "schedule" };
   }
@@ -154,7 +151,7 @@ function buildStarterSuggestion(signals: Awaited<ReturnType<typeof buildAISignal
 }
 
 async function buildStaticSuggestion(): Promise<CoachSuggestion> {
-  const signals = await buildAISignals();
+  const signals = await buildAISignals(true);
   const starter = buildStarterSuggestion(signals);
   if (starter) return starter;
 

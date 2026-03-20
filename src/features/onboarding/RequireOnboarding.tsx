@@ -1,18 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, LogOut, RefreshCw } from "lucide-react";
 import { ProfileStateCard } from "./components/ProfileStateCard";
 import { OnboardingFlow } from "./OnboardingFlow";
 import { useProfileState } from "@/features/onboarding/useProfileQuery";
 import { useAuth } from "@/features/auth/authContext";
+import {
+  clearCancelledOnboarding,
+  clearStoredPostLoginRedirect,
+  markOnboardingCancelled,
+} from "@/features/auth/authRedirect";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 type Props = {
   children: React.ReactNode;
 };
-
-const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
 
 export function RequireOnboarding({ children }: Props) {
   const navigate = useNavigate();
@@ -30,10 +33,24 @@ export function RequireOnboarding({ children }: Props) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
+  useEffect(() => {
+    if (profile?.onboarding_done) {
+      clearCancelledOnboarding();
+    }
+  }, [profile?.onboarding_done]);
+
+  function handleCancelOnboarding() {
+    clearStoredPostLoginRedirect();
+    markOnboardingCancelled();
+    setShowOnboarding(false);
+    navigate("/", { replace: true });
+  }
+
   async function handleUseAnotherAccount() {
     try {
       setSigningOut(true);
-      sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+      clearStoredPostLoginRedirect();
+      clearCancelledOnboarding();
       await signOut();
       navigate("/login", { replace: true });
     } finally {
@@ -76,75 +93,16 @@ export function RequireOnboarding({ children }: Props) {
 
   if (isMissingProfile) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-2xl rounded-2xl border border-border/60 bg-card/80 backdrop-blur">
-          <CardContent className="space-y-6 p-6 sm:p-8">
-            <div className="space-y-3 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-2xl">
-                👋
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Finish setup or switch accounts
-                </h1>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  We couldn&apos;t find a saved profile for this signed-in account yet.
-                  That usually means this is a brand new account, or not the one you meant to use.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-muted/30 p-4 text-sm">
-              <div className="font-medium text-foreground">Signed in as</div>
-              <div className="mt-1 break-all text-muted-foreground">
-                {user?.email ?? "Unknown email"}
-              </div>
-              {import.meta.env.DEV && (
-                <div className="mt-2 text-xs text-muted-foreground/70">
-                  userId: {userId ?? "none"}
-                </div>
-              )}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleUseAnotherAccount}
-                disabled={signingOut}
-                className="gap-2"
-              >
-                {signingOut ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Signing out…
-                  </>
-                ) : (
-                  <>
-                    <LogOut className="h-4 w-4" />
-                    Use another account
-                  </>
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                onClick={() => setShowOnboarding(true)}
-                className="gap-2"
-              >
-                Continue to onboarding
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <p className="text-center text-xs text-muted-foreground">
-              Choose another account if you signed in with the wrong Google profile.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <OnboardingFlow
+        onComplete={() => {
+          clearCancelledOnboarding();
+          void refetch();
+        }}
+        onCancel={handleCancelOnboarding}
+      />
     );
   }
+
 
   if (!profile || !profile.onboarding_done) {
     if (!showOnboarding) {
@@ -181,7 +139,16 @@ export function RequireOnboarding({ children }: Props) {
                 )}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancelOnboarding}
+                  disabled={signingOut}
+                >
+                  Back for now
+                </Button>
+
                 <Button
                   type="button"
                   variant="outline"
@@ -221,7 +188,15 @@ export function RequireOnboarding({ children }: Props) {
       );
     }
 
-    return <OnboardingFlow onComplete={() => void refetch()} />;
+    return (
+      <OnboardingFlow
+        onComplete={() => {
+          clearCancelledOnboarding();
+          void refetch();
+        }}
+        onCancel={handleCancelOnboarding}
+      />
+    );
   }
 
   return <>{children}</>;

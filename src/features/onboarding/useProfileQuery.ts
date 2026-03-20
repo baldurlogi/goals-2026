@@ -16,7 +16,7 @@ export function useProfileQuery() {
     queryFn: () => loadProfile(userId),
     enabled: authReady && Boolean(userId),
     staleTime: 1000 * 60 * 5,
-    initialData: userId ? seedProfileCache(userId) : undefined,
+    placeholderData: userId ? seedProfileCache(userId) : undefined,
   });
 }
 
@@ -33,7 +33,8 @@ export function useProfileState() {
     authReady,
     isAuthLoading: !authReady,
     isProfileLoading:
-      isWaitingForUserId || (hasUserId && query.isLoading && !query.data),
+      isWaitingForUserId ||
+      (hasUserId && ((query.isLoading && !query.data) || query.isPlaceholderData)),
     isRefreshingProfile: hasUserId && query.isFetching && !!query.data,
     isMissingProfile:
       hasUserId &&

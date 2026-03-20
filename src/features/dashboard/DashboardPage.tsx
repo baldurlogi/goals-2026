@@ -15,7 +15,7 @@ import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useProfileQuery } from "../onboarding/useProfileQuery";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
-import { useGoalsQuery } from "@/features/goals/useGoalsQuery";
+import { useGoalsState } from "@/features/goals/useGoalsQuery";
 import { scheduleIdle } from "@/lib/scheduleIdle";
 
 import {
@@ -139,7 +139,7 @@ export default function DashboardPage() {
   const isPro = tierMeets(tier, "pro");
   const has = useCallback((id: string) => modules.has(id as never), [modules]);
 
-  const { data: goals = [], isLoading: goalsLoading } = useGoalsQuery();
+  const { goals, isGoalsLoading: goalsLoading } = useGoalsState();
   const goalCount = goals.length;
 
   const showTopEnhancements = useDeferredMount(160);

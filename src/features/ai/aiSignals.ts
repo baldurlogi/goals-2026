@@ -15,6 +15,7 @@ import {
   loadNutritionLog,
   loadPhase,
 } from "@/features/nutrition/nutritionStorage";
+import { loadWaterLog } from "@/features/water/waterStorage";
 import {
   getActiveUserId,
   getScopedStorageItem,
@@ -86,6 +87,12 @@ export type AISignals = {
     mealsLoggedToday: number;
     calorieTarget: number | null;
     proteinTarget: number | null;
+  };
+  water: {
+    ml: number;
+    targetMl: number;
+    remainingMl: number;
+    goalHit: boolean;
   };
   reading: ReadingState;
   fitness: {
@@ -427,10 +434,17 @@ function countMealsLogged(log: unknown): number {
 export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
   const cached = !forceRefresh ? readCache() : null;
 
-  const nutritionLog = await Promise.resolve(loadNutritionLog()).catch(
-    () => null,
-  );
+  const [nutritionLog, waterLog] = await Promise.all([
+    Promise.resolve(loadNutritionLog()).catch(() => null),
+    Promise.resolve(loadWaterLog()).catch(() => null),
+  ]);
   const mealsLoggedToday = countMealsLogged(nutritionLog);
+  const water = {
+    ml: waterLog?.ml ?? 0,
+    targetMl: waterLog?.targetMl ?? 2500,
+    remainingMl: Math.max((waterLog?.targetMl ?? 2500) - (waterLog?.ml ?? 0), 0),
+    goalHit: (waterLog?.ml ?? 0) >= (waterLog?.targetMl ?? 2500),
+  };
 
   if (cached) {
     const updated: AISignals = {
@@ -440,6 +454,7 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
         ...cached.nutrition,
         mealsLoggedToday,
       },
+      water,
     };
 
     writeCache(updated);
@@ -515,6 +530,7 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
       calorieTarget: profileMacros?.cal ?? null,
       proteinTarget: profileMacros?.protein ?? null,
     },
+    water,
     reading,
     fitness: {
       daysSinceWorkout: getDaysSinceWorkout(prGoals),

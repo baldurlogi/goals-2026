@@ -8,6 +8,7 @@ import {
 } from "@/lib/activeUser";
 import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
 import type { Tier } from "./useTier";
+import { supabase } from "@/lib/supabaseClient";
 
 export type AIUsageSnapshot = {
   monthKey: string;
@@ -27,8 +28,28 @@ type UsageLike = {
   remaining?: number;
 };
 
+function isUsageLike(value: unknown): value is UsageLike {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const record = value as Record<string, unknown>;
+
+  return (
+    "tier" in record ||
+    "monthly_limit" in record ||
+    "monthlyLimit" in record ||
+    "prompts_used" in record ||
+    "promptsUsed" in record ||
+    "remaining" in record
+  );
+}
+
 const STORAGE_KEY = CACHE_KEYS.AI_USAGE;
 export const AI_USAGE_EVENT = "ai-usage-updated";
+const AI_USAGE_HYDRATE_STALE_MS = 5 * 60 * 1000;
+const HYPER_RESPONDER_URL =
+  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+
+let inFlightUsageHydration: Promise<AIUsageSnapshot | null> | null = null;
 
 function getMonthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -190,6 +211,62 @@ export function writeAIUsageCache(
   return snapshot;
 }
 
+async function fetchAIUsageSnapshot(
+  fallbackTier?: Tier,
+): Promise<AIUsageSnapshot | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) return null;
+
+  const response = await fetch(HYPER_RESPONDER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ action: "usage" }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = (await response.json()) as { usage?: unknown } | unknown;
+  const usage =
+    data && typeof data === "object" && "usage" in data
+      ? (data as { usage?: unknown }).usage
+      : data;
+
+  if (!isUsageLike(usage)) return null;
+
+  return writeAIUsageCache(usage, fallbackTier);
+}
+
+export async function hydrateAIUsageCache(
+  fallbackTier?: Tier,
+): Promise<AIUsageSnapshot | null> {
+  const userId = getActiveUserId();
+  if (!userId) return null;
+
+  const cached = readAIUsageCache();
+  if (
+    cached &&
+    Date.now() - cached.updatedAt < AI_USAGE_HYDRATE_STALE_MS
+  ) {
+    return cached;
+  }
+
+  if (!inFlightUsageHydration) {
+    inFlightUsageHydration = fetchAIUsageSnapshot(fallbackTier).finally(() => {
+      inFlightUsageHydration = null;
+    });
+  }
+
+  return inFlightUsageHydration;
+}
+
 export function bumpAIUsageCache(fallbackTier?: Tier): AIUsageSnapshot | null {
   const existing = readAIUsageCache();
   const tier = existing?.tier ?? fallbackTier ?? "free";
@@ -239,15 +316,32 @@ export function markAIUsageLimitReached(
   );
 }
 
-export function useAIUsageSnapshot(expectedTier?: Tier) {
+export function useAIUsageSnapshotState(expectedTier?: Tier) {
   const [snapshot, setSnapshot] = useState<AIUsageSnapshot | null>(() =>
     readAIUsageCache(),
   );
+  const [hydrating, setHydrating] = useState<boolean>(() => !readAIUsageCache());
 
   useEffect(() => {
-    const refresh = () => setSnapshot(readAIUsageCache());
+    const refresh = () => {
+      setSnapshot(readAIUsageCache());
+      setHydrating(false);
+    };
 
     refresh();
+    setHydrating(true);
+    void hydrateAIUsageCache(expectedTier).then((nextSnapshot) => {
+      if (nextSnapshot) {
+        setSnapshot(nextSnapshot);
+        setHydrating(false);
+        return;
+      }
+
+      refresh();
+    }).catch(() => {
+      refresh();
+    });
+
     if (typeof window === "undefined") return;
 
     window.addEventListener("storage", refresh);
@@ -262,13 +356,18 @@ export function useAIUsageSnapshot(expectedTier?: Tier) {
         refresh as EventListener,
       );
     };
-  }, []);
+  }, [expectedTier]);
 
-  if (expectedTier && snapshot?.tier !== expectedTier) {
-    return null;
-  }
+  const tierMismatch = Boolean(expectedTier && snapshot?.tier !== expectedTier);
 
-  return snapshot;
+  return {
+    snapshot: tierMismatch ? null : snapshot,
+    hydrating: tierMismatch ? false : hydrating,
+  };
+}
+
+export function useAIUsageSnapshot(expectedTier?: Tier) {
+  return useAIUsageSnapshotState(expectedTier).snapshot;
 }
 
 export function getAIUsageResetLabel() {

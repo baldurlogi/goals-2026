@@ -3,12 +3,12 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { TIER_LABELS, useTier } from "@/features/subscription/useTier";
 import {
   defaultMonthlyLimitForTier,
-  useAIUsageSnapshot,
+  useAIUsageSnapshotState,
 } from "@/features/subscription/aiUsageCache";
 
 export function AIUsagePill({ className = "" }: { className?: string }) {
   const tier = useTier();
-  const snapshot = useAIUsageSnapshot(tier);
+  const { snapshot, hydrating } = useAIUsageSnapshotState(tier);
 
   const usage = snapshot ?? null;
   const monthlyLimit = usage?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
@@ -59,9 +59,9 @@ export function AIUsagePill({ className = "" }: { className?: string }) {
         </span>
       )}
 
-      {!usage && (
+      {!usage && hydrating && (
         <span className="hidden text-muted-foreground sm:inline">
-          updates after first AI use
+          syncing usage…
         </span>
       )}
 

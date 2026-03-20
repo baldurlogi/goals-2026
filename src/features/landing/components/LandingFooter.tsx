@@ -20,7 +20,7 @@ export function LandingFooter({ theme }: LandingFooterProps) {
           className="font-mono text-xs tracking-[0.06em]"
           style={{ color: t.faint }}
         >
-          DAILY<span style={{ color: t.primary }}> LIFE</span> PROGRESS
+          <span style={{ color: t.primary }}>KAIRO</span>
         </div>
 
         <div
