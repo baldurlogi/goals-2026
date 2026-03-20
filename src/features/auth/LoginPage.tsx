@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { buildAuthCallbackRedirect, readStoredPostLoginRedirect } from "./authRedirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -20,9 +21,18 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
 
+    const redirectTo = buildAuthCallbackRedirect("login");
+
+    if (import.meta.env.DEV) {
+      console.debug("[auth] starting login", {
+        redirectTo,
+        storedNext: readStoredPostLoginRedirect(),
+      });
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?intent=login` },
+      options: { redirectTo },
     });
 
     if (error) {
