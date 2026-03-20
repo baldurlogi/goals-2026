@@ -259,6 +259,47 @@ export function clearProfileState(): void {
   inFlightProfileLoads.clear();
 }
 
+type ProfileReadError = {
+  code?: string | null;
+  status?: number | null;
+  message?: string | null;
+};
+
+function isPermissionOrAuthProfileError(error: unknown): boolean {
+  const candidate = error as ProfileReadError | null;
+  const message = candidate?.message?.toLowerCase?.() ?? "";
+  const code = candidate?.code ?? null;
+  const status = candidate?.status ?? null;
+
+  return (
+    status === 401 ||
+    status === 403 ||
+    code === "42501" ||
+    message.includes("permission denied") ||
+    message.includes("row-level security") ||
+    message.includes("jwt") ||
+    message.includes("not authenticated") ||
+    message.includes("auth")
+  );
+}
+
+function shouldFallbackToCachedProfile(error: unknown): boolean {
+  if (isPermissionOrAuthProfileError(error)) return false;
+
+  const candidate = error as ProfileReadError | null;
+  const status = candidate?.status ?? null;
+  const message = candidate?.message?.toLowerCase?.() ?? "";
+
+  return (
+    status === null ||
+    status >= 500 ||
+    message.includes("failed to fetch") ||
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("tempor")
+  );
+}
+
 function writeProfileCache(profile: UserProfile) {
   try {
     writeScopedStorageItem(
@@ -300,13 +341,35 @@ export async function loadProfile(
       .maybeSingle();
 
     if (error) {
-      if (cached) {
+      if (cached && shouldFallbackToCachedProfile(error)) {
+        if (import.meta.env.DEV) {
+          console.warn("[profile] using cached profile after transient read failure", {
+            userId,
+            code: error.code,
+            status: (error as ProfileReadError).status ?? null,
+            message: error.message,
+          });
+        }
         return cached;
       }
+
+      if (import.meta.env.DEV) {
+        console.warn("[profile] profile read failed", {
+          userId,
+          code: error.code,
+          status: (error as ProfileReadError).status ?? null,
+          message: error.message,
+          hadCachedProfile: Boolean(cached),
+        });
+      }
+
       throw error;
     }
 
     if (!data) {
+      if (import.meta.env.DEV) {
+        console.info("[profile] no profile row found for authenticated user", { userId });
+      }
       return null;
     }
 

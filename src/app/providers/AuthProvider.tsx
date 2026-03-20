@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import posthog from "posthog-js";
 
 import { supabase } from "@/lib/supabaseClient";
@@ -8,6 +8,7 @@ import { clearUserCache } from "@/lib/clearUserCache";
 import { getActiveUserId, setActiveUserId } from "@/lib/activeUser";
 import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
 import { clearUserBoundQueries } from "@/lib/queryClient";
+import { clearProfileState } from "@/features/onboarding/profileStorage";
 
 function hasCachedProfileMismatch(nextUserId: string | null): boolean {
   try {
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const previousUserIdRef = useRef<string | null | undefined>(undefined);
 
   function syncAuthState(
+    event: AuthChangeEvent | "INITIAL_SESSION",
     nextSession: Session | null,
     checkCacheMismatch = false,
   ) {
@@ -64,15 +66,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userChanged =
       previousUserId !== undefined && previousUserId !== nextUserId;
 
-    const cachedMismatch = checkCacheMismatch
+    const shouldCheckCacheMismatch =
+      checkCacheMismatch &&
+      (event === "INITIAL_SESSION" ||
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT");
+
+    const cachedMismatch = shouldCheckCacheMismatch
       ? hasCachedProfileMismatch(nextUserId)
       : false;
 
+    if (import.meta.env.DEV) {
+      console.debug("[auth] auth state change", {
+        event,
+        previousUserId,
+        nextUserId,
+        userChanged,
+        cachedMismatch,
+      });
+    }
+
     if (userChanged) {
+      clearProfileState();
       clearUserBoundQueries(previousUserId ?? null);
       if (nextUserId !== previousUserId) {
         clearUserBoundQueries(nextUserId);
       }
+    }
+
+    if ((event === "SIGNED_OUT" || nextUserId === null) && previousUserId !== undefined) {
+      clearProfileState();
     }
 
     if (userChanged || cachedMismatch) {
@@ -107,14 +130,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     void supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      syncAuthState(data.session ?? null, true);
+      syncAuthState("INITIAL_SESSION", data.session ?? null, true);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
-      syncAuthState(nextSession ?? null, true);
+      syncAuthState(event, nextSession ?? null, true);
     });
 
     return () => {
@@ -126,8 +149,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     const currentUserId = user?.id ?? previousUserIdRef.current ?? null;
 
+    clearProfileState();
     clearUserBoundQueries(currentUserId);
     clearUserCache(currentUserId);
+
+    try {
+      sessionStorage.removeItem("post_login_redirect");
+    } catch {
+      // ignore
+    }
 
     setLoading(true);
 

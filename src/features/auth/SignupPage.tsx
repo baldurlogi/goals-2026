@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { capture } from "@/lib/analytics";
+import { buildAuthCallbackRedirect, readStoredPostLoginRedirect } from "./authRedirect";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,7 +33,14 @@ export function SignupPage() {
       route: "/signup",
     });
 
-    const redirectTo = `${window.location.origin}/auth/callback?intent=signup`;
+    const redirectTo = buildAuthCallbackRedirect("signup");
+
+    if (import.meta.env.DEV) {
+      console.debug("[auth] starting signup", {
+        redirectTo,
+        storedNext: readStoredPostLoginRedirect(),
+      });
+    }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",

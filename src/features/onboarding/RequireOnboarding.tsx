@@ -75,76 +75,9 @@ export function RequireOnboarding({ children }: Props) {
   }
 
   if (isMissingProfile) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-2xl rounded-2xl border border-border/60 bg-card/80 backdrop-blur">
-          <CardContent className="space-y-6 p-6 sm:p-8">
-            <div className="space-y-3 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-2xl">
-                👋
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Finish setup or switch accounts
-                </h1>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  We couldn&apos;t find a saved profile for this signed-in account yet.
-                  That usually means this is a brand new account, or not the one you meant to use.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-muted/30 p-4 text-sm">
-              <div className="font-medium text-foreground">Signed in as</div>
-              <div className="mt-1 break-all text-muted-foreground">
-                {user?.email ?? "Unknown email"}
-              </div>
-              {import.meta.env.DEV && (
-                <div className="mt-2 text-xs text-muted-foreground/70">
-                  userId: {userId ?? "none"}
-                </div>
-              )}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleUseAnotherAccount}
-                disabled={signingOut}
-                className="gap-2"
-              >
-                {signingOut ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Signing out…
-                  </>
-                ) : (
-                  <>
-                    <LogOut className="h-4 w-4" />
-                    Use another account
-                  </>
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                onClick={() => setShowOnboarding(true)}
-                className="gap-2"
-              >
-                Continue to onboarding
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <p className="text-center text-xs text-muted-foreground">
-              Choose another account if you signed in with the wrong Google profile.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <OnboardingFlow onComplete={() => void refetch()} />;
   }
+
 
   if (!profile || !profile.onboarding_done) {
     if (!showOnboarding) {
