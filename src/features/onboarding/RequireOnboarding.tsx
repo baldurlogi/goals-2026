@@ -12,6 +12,7 @@ import {
 } from "@/features/auth/authRedirect";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { capture } from "@/lib/analytics";
 
 type Props = {
   children: React.ReactNode;
@@ -40,6 +41,13 @@ export function RequireOnboarding({ children }: Props) {
   }, [profile?.onboarding_done]);
 
   function handleCancelOnboarding() {
+    capture("onboarding_cancelled", {
+      source:
+        showOnboarding || isMissingProfile
+          ? "onboarding_flow"
+          : "onboarding_gate",
+      route: "/app",
+    });
     clearStoredPostLoginRedirect();
     markOnboardingCancelled();
     setShowOnboarding(false);

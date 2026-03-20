@@ -36,6 +36,7 @@ import {
   writeAIUsageCache,
 } from "@/features/subscription/aiUsageCache";
 import { useTier, type Tier } from "@/features/subscription/useTier";
+import { capture } from "@/lib/analytics";
 
 const SUPABASE_FN =
   "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
@@ -989,6 +990,15 @@ export function useWeeklyReport(modules: Set<string>) {
           },
           tier,
         );
+        capture("ai_prompt_used", {
+          feature: "weekly_report",
+          source: "weekly_report",
+          route: window.location.pathname,
+          prompts_used: data.usage.prompts_used,
+          monthly_limit: data.usage.monthly_limit,
+          remaining: data.usage.remaining,
+          tier: data.usage.tier ?? tier,
+        });
       }
 
       setStatus("idle");

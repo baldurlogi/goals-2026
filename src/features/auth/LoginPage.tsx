@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { readStoredPostLoginRedirect, startGoogleAuth } from "./authRedirect";
+import { capture } from "@/lib/analytics";
+import {
+  hasCancelledOnboarding,
+  readStoredPostLoginRedirect,
+  startGoogleAuth,
+} from "./authRedirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -19,6 +24,14 @@ export function LoginPage() {
 
     setError(null);
     setLoading(true);
+    const resumedAfterCancel = hasCancelledOnboarding();
+
+    capture("login_started", {
+      method: "google",
+      source: "login_page",
+      route: "/login",
+      resumed_after_onboarding_cancel: resumedAfterCancel,
+    });
 
     const { error, redirectTo, forcedAccountSelection } = await startGoogleAuth("login");
 
@@ -31,6 +44,14 @@ export function LoginPage() {
     }
 
     if (error) {
+      capture("login_failed", {
+        method: "google",
+        source: "login_page",
+        route: "/login",
+        resumed_after_onboarding_cancel: resumedAfterCancel,
+        forced_account_selection: forcedAccountSelection,
+        error_message: error.message,
+      });
       setError(error.message);
       setLoading(false);
     }

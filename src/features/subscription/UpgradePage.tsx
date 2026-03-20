@@ -5,7 +5,7 @@
  * Test card: 4242 4242 4242 4242 — any future date, any CVC
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Check,
@@ -431,6 +431,13 @@ function ComparisonTable({ currentTier }: { currentTier: Tier }) {
 export function UpgradePage() {
   const tier = useTier();
   const [isYearly, setIsYearly] = useState(false);
+
+  useEffect(() => {
+    capture("subscription_page_viewed", {
+      current_tier: tier,
+      route: "/app/upgrade",
+    });
+  }, [tier]);
   const [portalLoading, setPortalLoading] = useState(false);
 
   const params = new URLSearchParams(window.location.search);

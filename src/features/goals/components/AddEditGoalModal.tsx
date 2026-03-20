@@ -88,6 +88,13 @@ export function AddEditGoalModal({
 
     creationStartTrackedRef.current = true;
 
+    captureOnce("first_goal_started", userId, {
+      entry_mode: startWithAI ? "ai" : "manual",
+      is_first_goal: true,
+      source: "goal_modal",
+      route: window.location.pathname,
+    });
+
     captureOnce("first_goal_creation_started", userId, {
       entry_mode: startWithAI ? "ai" : "manual",
       is_first_goal: true,
@@ -103,6 +110,28 @@ export function AddEditGoalModal({
 
   function updateGoal(patch: Partial<UserGoal>) {
     setGoal((g) => ({ ...g, ...patch, updatedAt: getLocalDateKey() }));
+  }
+
+  function trackFirstGoalCompleted(savedGoal: UserGoal) {
+    captureOnce("first_goal_completed", userId, {
+      goal_id: savedGoal.id,
+      goal_title: savedGoal.title,
+      steps_count: savedGoal.steps.length,
+      creation_mode: mode,
+      is_first_goal: true,
+      source: "goal_modal",
+      route: window.location.pathname,
+    });
+
+    capture("first_goal_saved", {
+      goal_id: savedGoal.id,
+      goal_title: savedGoal.title,
+      steps_count: savedGoal.steps.length,
+      creation_mode: mode,
+      is_first_goal: true,
+      source: "goal_modal",
+      route: window.location.pathname,
+    });
   }
 
   function handleAIGenerated(generated: UserGoal) {
@@ -160,15 +189,7 @@ export function AddEditGoalModal({
       if (!isEdit) {
         queueAIContextNudge();
         if (status.isFirstGoalCreated) {
-          capture("first_goal_saved", {
-            goal_id: trimmedGoal.id,
-            goal_title: trimmedGoal.title,
-            steps_count: trimmedGoal.steps.length,
-            creation_mode: mode,
-            is_first_goal: true,
-            source: "goal_modal",
-            route: window.location.pathname,
-          });
+          trackFirstGoalCompleted(trimmedGoal);
         }
       }
 
@@ -184,15 +205,7 @@ export function AddEditGoalModal({
         if (!isEdit) {
           queueAIContextNudge();
           if (cacheLooksLikeFirstGoal(trimmedGoal.id)) {
-            capture("first_goal_saved", {
-              goal_id: trimmedGoal.id,
-              goal_title: trimmedGoal.title,
-              steps_count: trimmedGoal.steps.length,
-              creation_mode: mode,
-              is_first_goal: true,
-              source: "goal_modal",
-              route: window.location.pathname,
-            });
+            trackFirstGoalCompleted(trimmedGoal);
           }
         }
         onSave(trimmedGoal);

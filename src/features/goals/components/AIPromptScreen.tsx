@@ -14,7 +14,7 @@ import type { UserGoal } from "../goalTypes";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import type { Tier } from "@/features/subscription/useTier";
 import { useAuth } from "@/features/auth/authContext";
-import { captureOnce } from "@/lib/analytics";
+import { capture, captureOnce } from "@/lib/analytics";
 import { seedGoalCache } from "../userGoalStorage";
 import {
   generateGoalFromPrompt,
@@ -87,6 +87,17 @@ export function AIPromptScreen({
         finalPrompt,
         finalAnswers,
       );
+
+      capture("ai_prompt_used", {
+        feature: "goal_generation",
+        source: "goal_ai_prompt",
+        route: window.location.pathname,
+        had_clarifying_questions: Object.keys(finalAnswers).length > 0,
+        prompts_used: u.prompts_used,
+        monthly_limit: u.monthly_limit,
+        remaining: u.remaining,
+        tier: u.tier,
+      });
 
       captureOnce("first_goal_generated", userId, {
         had_clarifying_questions: Object.keys(finalAnswers).length > 0,

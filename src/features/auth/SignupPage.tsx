@@ -2,7 +2,11 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { capture } from "@/lib/analytics";
-import { readStoredPostLoginRedirect, startGoogleAuth } from "./authRedirect";
+import {
+  hasCancelledOnboarding,
+  readStoredPostLoginRedirect,
+  startGoogleAuth,
+} from "./authRedirect";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,11 +30,13 @@ export function SignupPage() {
 
     setError(null);
     setLoading(true);
+    const resumedAfterCancel = hasCancelledOnboarding();
 
     capture("signup_started", {
       method: "google",
       source: "signup_page",
       route: "/signup",
+      resumed_after_onboarding_cancel: resumedAfterCancel,
     });
 
     const { error, redirectTo, forcedAccountSelection } = await startGoogleAuth("signup");
@@ -48,6 +54,8 @@ export function SignupPage() {
         method: "google",
         source: "signup_page",
         route: "/signup",
+        resumed_after_onboarding_cancel: resumedAfterCancel,
+        forced_account_selection: forcedAccountSelection,
         error_message: error.message,
       });
 
