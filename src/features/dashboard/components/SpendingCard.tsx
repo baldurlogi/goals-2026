@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PieChart, Pie, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, ResponsiveContainer } from 'recharts';
 import { SpendingCardSkeleton } from '@/features/dashboard/skeletons';
 import { makeShapeFn } from '@/app/pieShape';
 import { useSpendingDashboard } from '../hooks/useSpendingDashboard';
@@ -12,52 +12,6 @@ const FINANCE_GOAL_ID = 'finance';
 
 function formatDkk(n: number) {
   return new Intl.NumberFormat('da-DK').format(Math.round(n));
-}
-
-function DonutTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ name: string; value: number; payload: { color: string } }>;
-}) {
-  if (!active || !payload?.length) return null;
-  const {
-    name,
-    value,
-    payload: { color },
-  } = payload[0];
-
-  return (
-    <div
-      style={{
-        background: 'hsl(var(--popover))',
-        border: '1px solid hsl(var(--border))',
-        borderRadius: 8,
-        padding: '6px 10px',
-        color: 'hsl(var(--popover-foreground))',
-        fontSize: 12,
-        lineHeight: 1.5,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span
-          style={{
-            display: 'inline-block',
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: color,
-            flexShrink: 0,
-          }}
-        />
-        <span style={{ fontWeight: 600 }}>{name}</span>
-      </div>
-      <div style={{ marginTop: 2, paddingLeft: 14 }}>
-        {new Intl.NumberFormat('da-DK').format(Math.round(value))} DKK
-      </div>
-    </div>
-  );
 }
 
 function SpendingCardInner() {
@@ -116,7 +70,6 @@ function SpendingCardInner() {
                     paddingAngle={2}
                     shape={makeShapeFn(donutData)}
                   />
-                  <Tooltip content={<DonutTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
