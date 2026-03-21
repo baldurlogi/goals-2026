@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader, PageScaffold } from "@/components/PageScaffold";
-import { SavingsCard } from "@/features/goals/modules/finance/components/SavingsCard";
-import { ExpenseTrackerCard } from "@/features/goals/modules/finance/components/ExpenseTrackerCard";
-import { SpendingDonutCard } from "@/features/goals/modules/finance/components/SpendingDonutCard";
+import { SavingsCard } from "@/features/finance/components/SavingsCard";
+import { ExpenseTrackerCard } from "@/features/finance/components/ExpenseTrackerCard";
+import { SpendingDonutCard } from "@/features/finance/components/SpendingDonutCard";
 import {
   defaultFinanceState,
   getMonthKey,
@@ -11,7 +11,7 @@ import {
   normalizeFinanceMonthState,
   saveFinanceMonth,
   type FinanceMonthState,
-} from "@/features/goals/modules/finance/financeStorage";
+} from "@/features/finance/financeStorage";
 
 const FINANCE_PAGE_ID = "finance";
 

@@ -1,7 +1,7 @@
 import { PageHeader, PageScaffold } from "@/components/PageScaffold";
-import { RoutineStreakCard } from "@/features/goals/modules/skincare/components/RoutineStreakCard";
-import { RoutineChecklistCard } from "@/features/goals/modules/skincare/components/RoutineChecklistCard";
-import { SkinLogCard } from "@/features/goals/modules/skincare/components/SkinLogCard";
+import { RoutineStreakCard } from "@/features/skincare/components/RoutineStreakCard";
+import { RoutineChecklistCard } from "@/features/skincare/components/RoutineChecklistCard";
+import { SkinLogCard } from "@/features/skincare/components/SkinLogCard";
 
 const SKINCARE_PAGE_ID = "skincare";
 

@@ -1,4 +1,4 @@
-import { loadModuleState, saveModuleState, seedCache } from "../goalModuleStorage";
+import { loadModuleState, saveModuleState, seedCache } from "@/lib/goalModuleStorage";
 
 export type RoutineStreakState = { lastISO: string | null; streak: number };
 export type DailyRoutineState = { dayISO: string; amDone: boolean; pmDone: boolean };

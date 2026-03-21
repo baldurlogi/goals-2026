@@ -4,7 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { loadModuleState, saveModuleState, seedCache } from "@/features/goals/modules/goalModuleStorage";
+import { loadModuleState, saveModuleState, seedCache } from "@/lib/goalModuleStorage";
 
 type SavingsState = { saved: number };
 

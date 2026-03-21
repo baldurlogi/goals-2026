@@ -7,7 +7,7 @@ import {
   normalizeFinanceMonthState,
   type FinanceCategoryId,
   type FinanceMonthState,
-} from '@/features/goals/modules/finance/financeStorage';
+} from '@/features/finance/financeStorage';
 
 export const CATEGORY_COLOR: Record<FinanceCategoryId, string> = {
   rent: '#10B981',

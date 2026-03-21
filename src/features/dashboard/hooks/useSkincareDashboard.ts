@@ -14,8 +14,8 @@ import {
   type RoutineItemsState,
   type RoutineTemplateState,
   type RoutineStreakState,
-} from "@/features/goals/modules/skincare/skincareStorage";
-import { GOAL_MODULE_CHANGED_EVENT } from "@/features/goals/modules/goalModuleStorage";
+} from "@/features/skincare/skincareStorage";
+import { GOAL_MODULE_CHANGED_EVENT } from "@/lib/goalModuleStorage";
 
 const SKINCARE_GOAL_ID = "skincare";
 
