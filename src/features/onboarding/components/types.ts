@@ -1,11 +1,17 @@
 import type {
   ActivityLevel,
   MacroTargets,
-  WeeklySchedule,
   Sex,
+  WeeklySchedule,
 } from "@/features/onboarding/profileStorage";
 import { DEFAULT_WEEKLY_SCHEDULE } from "@/features/onboarding/profileStorage";
 import type { ModuleId } from "@/features/modules/modules";
+import type {
+  DateFormatPreference,
+  MeasurementSystem,
+  TimeFormatPreference,
+} from "@/lib/userPreferences";
+import { DEFAULT_USER_PREFERENCES } from "@/lib/userPreferences";
 
 export type MacroSetupMode = "manual" | "guided";
 export type NutritionGoalType =
@@ -37,6 +43,9 @@ export type OnboardingData = {
   weekly_schedule: WeeklySchedule;
   daily_reading_goal: string;
   enabled_modules: ModuleId[];
+  measurement_system: MeasurementSystem;
+  date_format: DateFormatPreference;
+  time_format: TimeFormatPreference;
   main_goal: string;
   goal_why: string;
 };
@@ -59,6 +68,9 @@ export const INITIAL_ONBOARDING_DATA: OnboardingData = {
   weekly_schedule: { ...DEFAULT_WEEKLY_SCHEDULE },
   daily_reading_goal: "20",
   enabled_modules: ["goals"],
+  measurement_system: DEFAULT_USER_PREFERENCES.measurementSystem,
+  date_format: DEFAULT_USER_PREFERENCES.dateFormat,
+  time_format: DEFAULT_USER_PREFERENCES.timeFormat,
   main_goal: "",
   goal_why: "",
 };

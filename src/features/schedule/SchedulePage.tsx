@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { SchedulePicker } from "./components/SchedulePicker";
 import { TimelineList } from "./components/TimelineList";
 import { useAuth } from "@/features/auth/authContext";
+import { formatTimeStringWithPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 import {
   applyToggleToLog,
   applyViewToLog,
@@ -197,6 +199,7 @@ function EditableBlockList({
   blocks: TimelineItem[];
   onUpdate: (blocks: TimelineItem[]) => void;
 }) {
+  const preferences = useUserPreferences();
   const [editing, setEditing] = useState<TimelineItem | null>(null);
   const [adding, setAdding] = useState(false);
   const [dragging, setDragging] = useState<number | null>(null);
@@ -265,7 +268,7 @@ function EditableBlockList({
             <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground/50" />
             <span className="text-base">{block.icon}</span>
             <span className="w-14 shrink-0 text-xs tabular-nums text-muted-foreground">
-              {block.time}
+              {formatTimeStringWithPreferences(block.time, preferences)}
             </span>
             <span className="flex-1 truncate text-sm font-medium">{block.label}</span>
             {block.tag && (

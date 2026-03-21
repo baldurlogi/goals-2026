@@ -93,6 +93,9 @@ export function ProfilePage() {
       weekly_schedule: profile.weekly_schedule,
       daily_reading_goal: profile.daily_reading_goal,
       enabled_modules: normalizeEnabledModules(profile.enabled_modules),
+      measurement_system: profile.measurement_system,
+      date_format: profile.date_format,
+      time_format: profile.time_format,
     };
     return base;
   }, [profile]);
@@ -246,13 +249,22 @@ export function ProfilePage() {
           <IdentitySection
             displayName={form.display_name}
             sex={form.sex}
+            measurementSystem={form.measurement_system}
+            dateFormat={form.date_format}
+            timeFormat={form.time_format}
             onDisplayNameChange={(value) => update({ display_name: value })}
             onSexChange={(value) => update({ sex: value })}
+            onMeasurementSystemChange={(value) =>
+              update({ measurement_system: value })
+            }
+            onDateFormatChange={(value) => update({ date_format: value })}
+            onTimeFormatChange={(value) => update({ time_format: value })}
           />
           <BodyMetricsSection
             age={form.age}
             weightKg={form.weight_kg}
             heightCm={form.height_cm}
+            measurementSystem={form.measurement_system}
             activityLevel={form.activity_level}
             onAgeChange={(value) => update({ age: value })}
             onWeightChange={(value) => update({ weight_kg: value })}

@@ -71,6 +71,9 @@ Name: ${signals.profile.displayName ?? 'Unknown'}
 Activity level: ${signals.profile.activityLevel ?? 'Unknown'}
 Weekly schedule: ${signals.profile.weeklyScheduleSummary ?? 'Unknown'}
 Daily reading goal: ${signals.profile.dailyReadingGoal ?? 'Unknown'}
+Measurement system: ${signals.profile.measurementSystem ?? 'metric'}
+Date format: ${signals.profile.dateFormat ?? 'dmy'}
+Time format: ${signals.profile.timeFormat ?? '24h'}
 Plan tier: ${signals.profile.tier ?? 'free'}
 
 ## Enabled modules

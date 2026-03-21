@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { ScheduleCardSkeleton } from "@/features/dashboard/skeletons";
 import { useScheduleDashboard } from "../hooks/useScheduleDashboard";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
+import { formatTimeStringWithPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
 type ScheduleBlock = {
   time: string;
@@ -25,6 +27,7 @@ function ScheduleRow({
   isNext?: boolean;
   done?: boolean;
 }) {
+  const preferences = useUserPreferences();
   return (
     <div
       className={`flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors ${
@@ -32,7 +35,7 @@ function ScheduleRow({
       } ${done ? "opacity-50" : ""}`}
     >
       <span className="w-11 shrink-0 text-xs tabular-nums text-muted-foreground">
-        {time}
+        {formatTimeStringWithPreferences(time, preferences)}
       </span>
       <span
         className={`flex-1 text-sm ${
@@ -52,6 +55,7 @@ function ScheduleRow({
 }
 
 function ScheduleCardInner() {
+  const preferences = useUserPreferences();
   const {
     summary,
     nextBlock,
@@ -97,7 +101,7 @@ function ScheduleCardInner() {
               <span className="font-bold text-foreground">
                 {nextBlock.icon} {nextBlock.label}
               </span>{" "}
-              · {nextBlock.time}
+              · {formatTimeStringWithPreferences(nextBlock.time, preferences)}
             </span>
           </div>
         ) : (

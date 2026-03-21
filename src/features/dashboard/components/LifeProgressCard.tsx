@@ -36,6 +36,8 @@ import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { getActiveUserId, scopedKey } from "@/lib/activeUser";
+import { formatDateWithPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
 type ModuleProgress = {
   id: string;
@@ -526,6 +528,7 @@ function OverallRing({ modules }: { modules: ModuleProgress[] }) {
 }
 
 function LifeProgressCardInner() {
+  const preferences = useUserPreferences();
   const { modules: enabledModules } = useEnabledModules();
 
   const activeUserId = getActiveUserId();
@@ -583,7 +586,7 @@ function LifeProgressCardInner() {
             </span>
           </div>
           <span className="text-[10px] text-muted-foreground/50">
-            {new Date().toLocaleDateString("en-GB", {
+            {formatDateWithPreferences(new Date(), preferences, {
               weekday: "long",
               day: "numeric",
               month: "short",

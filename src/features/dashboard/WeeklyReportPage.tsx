@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { useWeeklyReport, isSunday, type WeeklyReport } from "./hooks/useWeeklyReport";
+import { formatDateWithPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -340,6 +342,7 @@ function GenerateState({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function WeeklyReportPage() {
+  const preferences = useUserPreferences();
   const tier = useTier();
   const isPro = tierMeets(tier, "pro");
   const { modules } = useEnabledModules();
@@ -362,11 +365,11 @@ export function WeeklyReportPage() {
     const start = new Date(weekStart + "T00:00:00");
     const end = new Date(weekEnd + "T00:00:00");
 
-    const startDay = start.toLocaleDateString("en-GB", { day: "numeric" });
-    const startMonth = start.toLocaleDateString("en-GB", { month: "long" });
-    const endDay = end.toLocaleDateString("en-GB", { day: "numeric" });
-    const endMonth = end.toLocaleDateString("en-GB", { month: "long" });
-    const endYear = end.toLocaleDateString("en-GB", { year: "numeric" });
+    const startDay = formatDateWithPreferences(start, preferences, { day: "numeric" });
+    const startMonth = formatDateWithPreferences(start, preferences, { month: "long" });
+    const endDay = formatDateWithPreferences(end, preferences, { day: "numeric" });
+    const endMonth = formatDateWithPreferences(end, preferences, { month: "long" });
+    const endYear = formatDateWithPreferences(end, preferences, { year: "numeric" });
 
     if (startMonth === endMonth) {
       return `${startDay}–${endDay} ${endMonth} ${endYear}`;
@@ -450,9 +453,11 @@ export function WeeklyReportPage() {
               "{report.report.closingNote}"
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              — Your AI coach, {new Date(report.createdAt).toLocaleDateString("en-GB", {
-                weekday: "long", day: "numeric", month: "long",
-              })}
+              — Your AI coach, {formatDateWithPreferences(
+                new Date(report.createdAt),
+                preferences,
+                { weekday: "long", day: "numeric", month: "long" },
+              )}
             </p>
           </div>
 

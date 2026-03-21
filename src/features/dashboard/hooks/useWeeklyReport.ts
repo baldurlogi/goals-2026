@@ -91,6 +91,9 @@ type WeeklyDataPayload = {
     displayName: string | null;
     activityLevel: string | null;
     dailyReadingGoal: number | null;
+    measurementSystem?: string | null;
+    dateFormat?: string | null;
+    timeFormat?: string | null;
   };
   goals?: {
     total: number;
@@ -913,6 +916,9 @@ export function useWeeklyReport(modules: Set<string>) {
           displayName: profile?.display_name ?? null,
           activityLevel: profile?.activity_level ?? null,
           dailyReadingGoal: profile?.daily_reading_goal ?? null,
+          measurementSystem: profile?.measurement_system ?? null,
+          dateFormat: profile?.date_format ?? null,
+          timeFormat: profile?.time_format ?? null,
         },
         goals: summarizeGoals(
           goals

@@ -8,6 +8,11 @@ import type {
 import { normalizeWeeklySchedule } from "@/features/onboarding/profileStorage";
 import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
 import { clampNumberValue } from "@/lib/numericInput";
+import type {
+  DateFormatPreference,
+  MeasurementSystem,
+  TimeFormatPreference,
+} from "@/lib/userPreferences";
 
 export type EditableProfileFields = Pick<
   UserProfile,
@@ -23,6 +28,9 @@ export type EditableProfileFields = Pick<
   | "weekly_schedule"
   | "daily_reading_goal"
   | "enabled_modules"
+  | "measurement_system"
+  | "date_format"
+  | "time_format"
 >;
 
 export type ProfileForm = {
@@ -37,6 +45,9 @@ export type ProfileForm = {
   weekly_schedule: WeeklySchedule;
   daily_reading_goal: string;
   enabled_modules: ModuleId[];
+  measurement_system: MeasurementSystem;
+  date_format: DateFormatPreference;
+  time_format: TimeFormatPreference;
 };
 
 export function normalizeEnabledModules(
@@ -60,6 +71,9 @@ export function profileToForm(p: UserProfile): ProfileForm {
     weekly_schedule: normalizeWeeklySchedule(p.weekly_schedule, p.default_schedule_view),
     daily_reading_goal: (p.daily_reading_goal ?? 20).toString(),
     enabled_modules: normalizeEnabledModules(p.enabled_modules),
+    measurement_system: p.measurement_system,
+    date_format: p.date_format,
+    time_format: p.time_format,
   };
 }
 
@@ -91,6 +105,9 @@ export function formToFullPatch(f: ProfileForm): EditableProfileFields {
     daily_reading_goal:
       clampNumberValue(f.daily_reading_goal, { min: 1, max: 200, integer: true }) ?? 20,
     enabled_modules: f.enabled_modules,
+    measurement_system: f.measurement_system,
+    date_format: f.date_format,
+    time_format: f.time_format,
   };
 }
 

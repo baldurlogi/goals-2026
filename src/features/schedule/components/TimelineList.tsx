@@ -3,6 +3,8 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScheduleConfig, TimelineItem } from "../scheduleTypes";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatTimeStringWithPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
 // ── single compact row ────────────────────────────────────────────────────────
 function BlockRow({
@@ -16,6 +18,7 @@ function BlockRow({
   done: boolean;
   onToggle: (index: number, done: boolean) => void;
 }) {
+  const preferences = useUserPreferences();
   const [open, setOpen] = useState(false);
   const hasDetail = !!item.detail;
 
@@ -37,7 +40,7 @@ function BlockRow({
 
         {/* time */}
         <span className="w-14 shrink-0 text-[11px] tabular-nums text-muted-foreground">
-          {item.time}
+          {formatTimeStringWithPreferences(item.time, preferences)}
         </span>
 
         {/* icon + label */}

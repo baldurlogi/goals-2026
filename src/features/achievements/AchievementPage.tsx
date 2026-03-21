@@ -5,13 +5,17 @@ import { CATEGORY_CONFIG, RARITY_CONFIG } from "./achievementConfig";
 import { ACHIEVEMENTS } from "./achievementList";
 import type { AchievementCategory } from "./achievementTypes";
 import { useAchievements } from "./useAchievements";
+import { formatDateWithPreferences, type UserPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
 function BadgeCard({
   def,
   unlockedAt,
+  preferences,
 }: {
   def: (typeof ACHIEVEMENTS)[0];
   unlockedAt: string | null;
+  preferences: UserPreferences;
 }) {
   const rarity = RARITY_CONFIG[def.rarity];
   const isUnlocked = unlockedAt !== null;
@@ -52,7 +56,7 @@ function BadgeCard({
 
       {isUnlocked && unlockedAt && (
         <div className="text-[10px] text-muted-foreground/50">
-          {new Date(unlockedAt).toLocaleDateString("en-GB", {
+          {formatDateWithPreferences(new Date(unlockedAt), preferences, {
             day: "numeric",
             month: "short",
             year: "numeric",
@@ -75,6 +79,7 @@ const ALL_CATEGORIES: (AchievementCategory | "all")[] = [
 ];
 
 export function AchievementsPage() {
+  const preferences = useUserPreferences();
   const { unlocked, loading } = useAchievements();
   const [activeCategory, setActiveCategory] = useState<AchievementCategory | "all">("all");
 
@@ -201,6 +206,7 @@ export function AchievementsPage() {
               key={achievement.id}
               def={achievement}
               unlockedAt={unlockedMap.get(achievement.id) ?? null}
+              preferences={preferences}
             />
           ))}
         </div>
