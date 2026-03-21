@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Target,
@@ -9,9 +9,15 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  seedGoalStepHistory,
+  useGoalProgressState,
+  type DoneState,
+  type StepHistoryEntry,
+} from "@/features/goals/goalStore";
+import { useGoalsState } from "@/features/goals/useGoalsQuery";
 import { loadNutritionLog, loadPhase, seedNutritionCache } from "@/features/nutrition/nutritionStorage";
 import { getTargets, meals } from "@/features/nutrition/nutritionData";
-import { loadUserGoals, seedGoalCache } from "@/features/goals/userGoalStorage";
 import {
   loadReadingInputs,
   seedReadingCache,
@@ -35,7 +41,7 @@ import {
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
-import { getActiveUserId, scopedKey } from "@/lib/activeUser";
+import { getActiveUserId } from "@/lib/activeUser";
 import { formatDateWithPreferences } from "@/lib/userPreferences";
 import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
@@ -52,9 +58,6 @@ type ModuleProgress = {
   accentClass: string;
 };
 
-type GoalDoneCache = Record<string, boolean | Record<string, boolean>>;
-
-const GOAL_DONE_CACHE_KEYS = ["goals:done:v1", "cache:goals:v1"] as const;
 const MODULE_ORDER = ["goals", "fitness", "nutrition", "reading", "todos", "schedule"];
 
 const MEAL_MACROS_BY_KEY = {
@@ -77,44 +80,28 @@ function pluralize(count: number, singular: string, plural = `${singular}s`): st
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function readDoneCache(): GoalDoneCache {
-  const userId = getActiveUserId();
-
-  try {
-    const scopedKeys = userId
-      ? GOAL_DONE_CACHE_KEYS.map((key) => scopedKey(key, userId))
-      : GOAL_DONE_CACHE_KEYS;
-
-    for (const key of scopedKeys) {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw) as unknown;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return parsed as GoalDoneCache;
-      }
-    }
-    return {};
-  } catch {
-    return {};
-  }
-}
-
-function isStepDone(doneCache: GoalDoneCache, goalId: string, stepId: string): boolean {
-  const byGoal = doneCache[goalId];
-  if (byGoal && typeof byGoal === "object" && !Array.isArray(byGoal)) {
-    return Boolean((byGoal as Record<string, boolean>)[stepId]);
-  }
-  return Boolean(doneCache[stepId]);
+function isStepDone(doneState: DoneState, goalId: string, stepId: string): boolean {
+  return Boolean(doneState[goalId]?.[stepId]);
 }
 
 function isStepOverdue(idealFinish: string | null | undefined, todayKey: string): boolean {
   if (!idealFinish) return false;
   const trimmed = idealFinish.trim();
   if (!trimmed) return false;
-  return trimmed < todayKey;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return false;
+
+  const targetTime = new Date(`${trimmed}T00:00:00`).getTime();
+  const todayTime = new Date(`${todayKey}T00:00:00`).getTime();
+  if (!Number.isFinite(targetTime) || !Number.isFinite(todayTime)) return false;
+
+  return targetTime < todayTime;
 }
 
-function buildGoalsProgress(goals: Awaited<ReturnType<typeof loadUserGoals>>): ModuleProgress {
+function buildGoalsProgress(
+  goals: { steps: Array<{ id: string; idealFinish: string | null }>; id: string }[],
+  doneState: DoneState,
+  stepHistory: StepHistoryEntry[],
+): ModuleProgress {
   if (goals.length === 0) {
     return {
       id: "goals",
@@ -128,23 +115,36 @@ function buildGoalsProgress(goals: Awaited<ReturnType<typeof loadUserGoals>>): M
     };
   }
 
-  const doneCache = readDoneCache();
   const todayKey = getLocalDateKey();
+  const completedToday = new Set(
+    stepHistory
+      .filter((entry) => entry.date === todayKey)
+      .map((entry) => `${entry.goalId}:${entry.stepId}`),
+  );
 
-  let overdueTotal = 0;
-  let overdueDone = 0;
+  let overdueRemaining = 0;
+  let overdueCompletedToday = 0;
 
   for (const goal of goals) {
     for (const step of goal.steps) {
       if (!isStepOverdue(step.idealFinish, todayKey)) continue;
-      overdueTotal += 1;
-      if (isStepDone(doneCache, goal.id, step.id)) {
-        overdueDone += 1;
+      const stepKey = `${goal.id}:${step.id}`;
+      const done = isStepDone(doneState, goal.id, step.id);
+
+      if (done) {
+        if (completedToday.has(stepKey)) {
+          overdueCompletedToday += 1;
+        }
+        continue;
       }
+
+      overdueRemaining += 1;
     }
   }
 
-  if (overdueTotal === 0) {
+  const overdueTotalAtStartOfDay = overdueRemaining + overdueCompletedToday;
+
+  if (overdueTotalAtStartOfDay === 0) {
     return {
       id: "goals",
       label: "Goals",
@@ -158,8 +158,9 @@ function buildGoalsProgress(goals: Awaited<ReturnType<typeof loadUserGoals>>): M
     };
   }
 
-  const overdueRemaining = overdueTotal - overdueDone;
-  const pct = clampPct((overdueDone / overdueTotal) * 100);
+  const pct = clampPct(
+    (overdueCompletedToday / overdueTotalAtStartOfDay) * 100,
+  );
 
   return {
     id: "goals",
@@ -168,7 +169,7 @@ function buildGoalsProgress(goals: Awaited<ReturnType<typeof loadUserGoals>>): M
     icon: <Target className="h-3.5 w-3.5" />,
     pct,
     primaryStat: `${pluralize(overdueRemaining, "overdue step")} left`,
-    secondaryStat: `${overdueDone}/${overdueTotal} overdue cleared`,
+    secondaryStat: `${overdueCompletedToday}/${overdueTotalAtStartOfDay} overdue cleared today`,
     color: "rose",
     accentClass: "bg-rose-500",
   };
@@ -350,14 +351,13 @@ function sortModules(results: ModuleProgress[]): ModuleProgress[] {
   return results.sort((a, b) => MODULE_ORDER.indexOf(a.id) - MODULE_ORDER.indexOf(b.id));
 }
 
-function seedProgress(enabledModules: Set<string>, activeUserId: string | null): ModuleProgress[] {
+function seedProgress(
+  enabledModules: Set<string>,
+  activeUserId: string | null,
+): ModuleProgress[] {
   const results: ModuleProgress[] = [];
 
   try {
-    if (enabledModules.has("goals")) {
-      results.push(buildGoalsProgress(seedGoalCache(activeUserId)));
-    }
-
     if (enabledModules.has("fitness")) {
       results.push(buildFitnessProgress(readSplitCache()));
     }
@@ -386,16 +386,15 @@ function seedProgress(enabledModules: Set<string>, activeUserId: string | null):
   return sortModules(results);
 }
 
-async function fetchProgress(enabledModules: Set<string>, activeUserId: string | null): Promise<ModuleProgress[]> {
+async function fetchProgress(
+  enabledModules: Set<string>,
+  activeUserId: string | null,
+): Promise<ModuleProgress[]> {
   if (enabledModules.size === 0) return [];
 
   const results: ModuleProgress[] = [];
 
   await Promise.allSettled([
-    (async () => {
-      if (!enabledModules.has("goals")) return;
-      results.push(buildGoalsProgress(await loadUserGoals(activeUserId)));
-    })(),
     (async () => {
       if (!enabledModules.has("fitness")) return;
       results.push(buildFitnessProgress(await loadWeeklySplit(activeUserId)));
@@ -530,10 +529,20 @@ function OverallRing({ modules }: { modules: ModuleProgress[] }) {
 function LifeProgressCardInner() {
   const preferences = useUserPreferences();
   const { modules: enabledModules } = useEnabledModules();
+  const { doneState, isGoalProgressLoading } = useGoalProgressState();
+  const { goals, isGoalsLoading } = useGoalsState();
 
   const activeUserId = getActiveUserId();
-  const [progress, setProgress] = useState<ModuleProgress[]>(() => seedProgress(enabledModules, activeUserId));
-  const [loading, setLoading] = useState(() => seedProgress(enabledModules, activeUserId).length === 0);
+  const stepHistory = useMemo(
+    () => seedGoalStepHistory(activeUserId),
+    [activeUserId, doneState],
+  );
+  const [progress, setProgress] = useState<ModuleProgress[]>(() =>
+    seedProgress(enabledModules, activeUserId),
+  );
+  const [loading, setLoading] = useState(
+    () => seedProgress(enabledModules, activeUserId).length === 0,
+  );
 
   useEffect(() => {
     if (enabledModules.size === 0) return;
@@ -571,7 +580,26 @@ function LifeProgressCardInner() {
     };
   }, [activeUserId, enabledModules]);
 
+  const resolvedProgress = useMemo(() => {
+    const withoutGoals = progress.filter((item) => item.id !== "goals");
+
+    if (!enabledModules.has("goals")) {
+      return sortModules(withoutGoals);
+    }
+
+    return sortModules([
+      buildGoalsProgress(goals, doneState, stepHistory),
+      ...withoutGoals,
+    ]);
+  }, [doneState, enabledModules, goals, progress, stepHistory]);
+
   const skeletonCount = Math.max(enabledModules.size, 3);
+  const showLoading =
+    loading ||
+    (enabledModules.has("goals") &&
+      isGoalProgressLoading &&
+      isGoalsLoading &&
+      resolvedProgress.length === 0);
 
   return (
     <Card className="lg:col-span-12 overflow-hidden">
@@ -597,18 +625,18 @@ function LifeProgressCardInner() {
 
       <CardContent className="pb-5">
         <div className="flex items-start gap-5">
-          {progress.length > 0 && (
+          {resolvedProgress.length > 0 && (
             <div className="hidden shrink-0 sm:flex">
-              <OverallRing modules={progress} />
+              <OverallRing modules={resolvedProgress} />
             </div>
           )}
 
-          <div className="grid min-w-0 flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-            {loading
+            <div className="grid min-w-0 flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+            {showLoading
               ? Array.from({ length: skeletonCount }).map((_, index) => (
                   <SkeletonTile key={index} />
                 ))
-              : progress.map((item) => <ModuleTile key={item.id} item={item} />)}
+              : resolvedProgress.map((item) => <ModuleTile key={item.id} item={item} />)}
           </div>
         </div>
       </CardContent>

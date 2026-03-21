@@ -19,7 +19,7 @@ type GoalProgressRow = {
   done: Record<string, boolean> | null;
 };
 
-type StepHistoryEntry = {
+export type StepHistoryEntry = {
   goalId: string;
   stepId: string;
   date: string;
@@ -169,6 +169,11 @@ function readStepHistory(userId: string): StepHistoryEntry[] {
   } catch {
     return [];
   }
+}
+
+export function seedGoalStepHistory(userId: string | null): StepHistoryEntry[] {
+  if (!userId) return [];
+  return readStepHistory(userId);
 }
 
 function writeStepHistory(userId: string, entries: StepHistoryEntry[]) {
