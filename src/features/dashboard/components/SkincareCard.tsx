@@ -44,7 +44,7 @@ function SkincareCardInner() {
 
           <div className="rounded-lg bg-muted/50 px-2.5 py-2 text-center">
             <div className="text-base font-bold tabular-nums">
-              {summary.completedToday}/8
+              {summary.completedToday}/{summary.totalSteps}
             </div>
             <div className="mt-0.5 text-[10px] text-muted-foreground">
               done today
@@ -53,7 +53,7 @@ function SkincareCardInner() {
 
           <div className="rounded-lg bg-muted/50 px-2.5 py-2 text-center">
             <div className="text-base font-bold tabular-nums">
-              {Number(summary.amDone) + Number(summary.pmDone)}/2
+              {summary.completedRoutines}/{summary.activeRoutines}
             </div>
             <div className="mt-0.5 text-[10px] text-muted-foreground">
               routines

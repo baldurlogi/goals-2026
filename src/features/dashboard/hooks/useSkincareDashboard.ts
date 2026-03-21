@@ -1,30 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  getDailyRoutine,
+  countCompletedRoutineSections,
+  countCompletedRoutineSteps,
+  countRoutineSteps,
   getRoutineItems,
+  getRoutineTemplate,
   getRoutineStreak,
-  seedDailyRoutine,
+  isRoutineSectionComplete,
   seedRoutineItems,
+  seedRoutineTemplate,
   seedRoutineStreak,
   todayISO,
-  type DailyRoutineState,
+  type RoutineItemsState,
+  type RoutineTemplateState,
   type RoutineStreakState,
 } from "@/features/goals/modules/skincare/skincareStorage";
 import { GOAL_MODULE_CHANGED_EVENT } from "@/features/goals/modules/goalModuleStorage";
 
 const SKINCARE_GOAL_ID = "skincare";
 
-type RoutineItemsState = ReturnType<typeof seedRoutineItems>;
-
 export function useSkincareDashboard(goalId = SKINCARE_GOAL_ID) {
+  const seededRoutine = seedRoutineTemplate(goalId);
   const [streak, setStreak] = useState<RoutineStreakState>(() =>
     seedRoutineStreak(goalId),
   );
-  const [daily, setDaily] = useState<DailyRoutineState>(() =>
-    seedDailyRoutine(goalId),
+  const [routine, setRoutine] = useState<RoutineTemplateState>(() =>
+    seededRoutine,
   );
   const [items, setItems] = useState<RoutineItemsState>(() =>
-    seedRoutineItems(goalId),
+    seedRoutineItems(goalId, seededRoutine),
   );
   const [loading, setLoading] = useState(true);
 
@@ -33,16 +37,16 @@ export function useSkincareDashboard(goalId = SKINCARE_GOAL_ID) {
 
     async function fetch() {
       try {
-        const [nextStreak, nextDaily, nextItems] = await Promise.all([
+        const [nextStreak, nextRoutine] = await Promise.all([
           getRoutineStreak(goalId),
-          getDailyRoutine(goalId),
-          getRoutineItems(goalId),
+          getRoutineTemplate(goalId),
         ]);
+        const nextItems = await getRoutineItems(goalId, nextRoutine);
 
         if (cancelled) return;
 
         setStreak(nextStreak);
-        setDaily(nextDaily);
+        setRoutine(nextRoutine);
         setItems(nextItems);
       } catch (error) {
         console.warn("skincare dashboard load failed", error);
@@ -70,23 +74,26 @@ export function useSkincareDashboard(goalId = SKINCARE_GOAL_ID) {
   }, [goalId]);
 
   const summary = useMemo(() => {
-    const completedItems =
-      Object.values(items.items.am).filter(Boolean).length +
-      Object.values(items.items.pm).filter(Boolean).length;
-    const completedSessions = Number(daily.amDone) + Number(daily.pmDone);
-    const completedToday = completedItems + completedSessions;
+    const completedToday = countCompletedRoutineSteps(routine, items);
+    const totalSteps = countRoutineSteps(routine);
+    const completedRoutines = countCompletedRoutineSections(routine, items);
+    const activeRoutines =
+      Number(routine.am.length > 0) + Number(routine.pm.length > 0);
     const today = todayISO();
     const didCompleteToday = streak.lastISO === today;
 
     return {
       streakDays: streak.streak,
       completedToday,
-      amDone: daily.amDone,
-      pmDone: daily.pmDone,
+      totalSteps,
+      completedRoutines,
+      activeRoutines,
+      amDone: isRoutineSectionComplete("am", routine, items),
+      pmDone: isRoutineSectionComplete("pm", routine, items),
       didCompleteToday,
-      todaysDate: daily.dayISO,
+      todaysDate: items.dayISO,
     };
-  }, [daily, items, streak.lastISO, streak.streak]);
+  }, [items, routine, streak.lastISO, streak.streak]);
 
   return { summary, loading };
 }

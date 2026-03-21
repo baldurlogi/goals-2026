@@ -4,12 +4,66 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 import { getSkinLog, setSkinLog, seedSkinLog, todayISO, type SkinLogState } from "../skincareStorage";
 
 function clamp1to5(n: number) {
   return Math.max(1, Math.min(5, n));
+}
+
+const DEFAULT_RATING = 3;
+
+function RatingDots({
+  label,
+  value,
+  onChange,
+  lowLabel,
+  highLabel,
+}: {
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+  lowLabel: string;
+  highLabel: string;
+}) {
+  return (
+    <div className="space-y-2 rounded-xl border bg-card/30 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-medium">{label}</div>
+        <Badge variant="secondary">{value}/5</Badge>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {Array.from({ length: 5 }, (_, index) => {
+          const rating = index + 1;
+          const active = rating <= value;
+          return (
+            <button
+              key={rating}
+              type="button"
+              onClick={() => onChange(rating)}
+              className={cn(
+                "h-8 w-8 rounded-full border transition-colors",
+                active
+                  ? "border-fuchsia-500 bg-fuchsia-500 text-white"
+                  : "border-border bg-background text-muted-foreground hover:border-fuchsia-300 hover:text-foreground",
+              )}
+              aria-label={`${label}: ${rating} out of 5`}
+              aria-pressed={active}
+            >
+              {rating}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>{lowLabel}</span>
+        <span>{highLabel}</span>
+      </div>
+    </div>
+  );
 }
 
 export function SkinLogCard({ goalId }: { goalId: string }) {
@@ -18,9 +72,9 @@ export function SkinLogCard({ goalId }: { goalId: string }) {
   const today = todayISO();
   const existing = state.entries.find((e) => e.dayISO === today);
 
-  const [irritation, setIrritation] = useState(existing?.irritation ?? 3);
-  const [acne, setAcne] = useState(existing?.acne ?? 3);
-  const [hydration, setHydration] = useState(existing?.hydration ?? 3);
+  const [irritation, setIrritation] = useState(existing?.irritation ?? DEFAULT_RATING);
+  const [acne, setAcne] = useState(existing?.acne ?? DEFAULT_RATING);
+  const [hydration, setHydration] = useState(existing?.hydration ?? DEFAULT_RATING);
   const [notes, setNotes] = useState(existing?.notes ?? "");
 
   useEffect(() => {
@@ -35,6 +89,11 @@ export function SkinLogCard({ goalId }: { goalId: string }) {
           setAcne(todayEntry.acne);
           setHydration(todayEntry.hydration);
           setNotes(todayEntry.notes);
+        } else {
+          setIrritation(DEFAULT_RATING);
+          setAcne(DEFAULT_RATING);
+          setHydration(DEFAULT_RATING);
+          setNotes("");
         }
       }
     });
@@ -81,21 +140,32 @@ export function SkinLogCard({ goalId }: { goalId: string }) {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-2">
-          <div className="space-y-1">
-            <div className="text-xs text-muted-foreground">Irritation</div>
-            <Input inputMode="numeric" value={String(irritation)}
-              onChange={(e) => setIrritation(clamp1to5(Number(e.target.value)))} />
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Rate each one from 1 to 5.
           </div>
-          <div className="space-y-1">
-            <div className="text-xs text-muted-foreground">Acne</div>
-            <Input inputMode="numeric" value={String(acne)}
-              onChange={(e) => setAcne(clamp1to5(Number(e.target.value)))} />
-          </div>
-          <div className="space-y-1">
-            <div className="text-xs text-muted-foreground">Hydration</div>
-            <Input inputMode="numeric" value={String(hydration)}
-              onChange={(e) => setHydration(clamp1to5(Number(e.target.value)))} />
+          <div className="grid gap-3">
+            <RatingDots
+              label="Irritation"
+              value={irritation}
+              onChange={setIrritation}
+              lowLabel="Calm"
+              highLabel="Very irritated"
+            />
+            <RatingDots
+              label="Acne"
+              value={acne}
+              onChange={setAcne}
+              lowLabel="Clear"
+              highLabel="Bad breakout"
+            />
+            <RatingDots
+              label="Hydration"
+              value={hydration}
+              onChange={setHydration}
+              lowLabel="Very dry"
+              highLabel="Very hydrated"
+            />
           </div>
         </div>
 
