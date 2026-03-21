@@ -67,6 +67,9 @@ const FitnessCard = lazy(async () => ({
 const WaterIntakeCard = lazy(async () => ({
   default: (await import("./components/WaterIntakeCard")).WaterIntakeCard,
 }));
+const SkincareCard = lazy(async () => ({
+  default: (await import("./components/SkincareCard")).SkincareCard,
+}));
 const LifeProgressCard = lazy(async () => ({
   default: (await import("./components/LifeProgressCard")).LifeProgressCard,
 }));
@@ -309,6 +312,12 @@ export default function DashboardPage() {
           {has("fitness") && (
             <Suspense fallback={<FitnessCardSkeleton />}>
               {showSecondaryEnhancements ? <FitnessCard /> : <FitnessCardSkeleton />}
+            </Suspense>
+          )}
+
+          {has("skincare") && (
+            <Suspense fallback={<FitnessCardSkeleton />}>
+              {showSecondaryEnhancements ? <SkincareCard /> : <FitnessCardSkeleton />}
             </Suspense>
           )}
 

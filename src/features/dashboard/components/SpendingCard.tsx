@@ -159,7 +159,7 @@ function SpendingCardInner() {
             size="sm"
             className="h-7 gap-1 text-xs"
           >
-            <Link to="/app/goals/finance">
+            <Link to="/app/finance">
               Full breakdown <ChevronRight className="h-3 w-3" />
             </Link>
           </Button>

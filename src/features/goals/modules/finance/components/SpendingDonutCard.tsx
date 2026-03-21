@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   getMonthKey,
   loadFinanceMonth,
+  normalizeFinanceMonthState,
   saveFinanceMonth,
   defaultFinanceState,
   FINANCE_CHANGED_EVENT,
@@ -10,6 +11,7 @@ import {
   type FinanceMonthState,
 } from "../financeStorage";
 import { PieChart, Pie, ResponsiveContainer, Tooltip } from "recharts";
+import { makeShapeFn } from "@/app/pieShape";
 
 function formatDkk(n: number) {
   return new Intl.NumberFormat("da-DK").format(Math.round(n));
@@ -28,25 +30,19 @@ const CATEGORY_COLOR: Record<FinanceCategoryId, string> = {
   transport:     "#38BDF8",
   groceries:     "#84CC16",
   gym_health:    "#F472B6",
+  personal_care: "#FB7185",
+  shopping:      "#60A5FA",
   food_drinks:   "#F59E0B",
   entertainment: "#6366F1",
   other:         "#94A3B8",
 };
 
-type PieShapeProps = {
-  cx: number;
-  cy: number;
-  innerRadius: number;
-  outerRadius: number;
-  startAngle: number;
-  endAngle: number;
-  index: number;
-};
-
 function readCache(goalId: string, month: string): FinanceMonthState {
   try {
     const raw = localStorage.getItem(`cache:finance:${goalId}:${month}`);
-    return raw ? JSON.parse(raw) : defaultFinanceState(month);
+    return raw
+      ? normalizeFinanceMonthState(JSON.parse(raw), month)
+      : defaultFinanceState(month);
   } catch { return defaultFinanceState(month); }
 }
 
@@ -141,29 +137,7 @@ export function SpendingDonutCard(props: {
                     <Pie
                       data={donutData} dataKey="value" nameKey="name"
                       innerRadius="68%" outerRadius="95%" paddingAngle={2} stroke="transparent"
-                      shape={(props: PieShapeProps) => {
-                        const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, index } = props;
-                        const entry = donutData[index];
-                        if (!entry) return <g />;
-                        const RADIAN = Math.PI / 180;
-                        const sin0 = Math.sin(-RADIAN * startAngle);
-                        const cos0 = Math.cos(-RADIAN * startAngle);
-                        const sin1 = Math.sin(-RADIAN * endAngle);
-                        const cos1 = Math.cos(-RADIAN * endAngle);
-                        const mx0 = cx + outerRadius * cos0, my0 = cy + outerRadius * sin0;
-                        const mx1 = cx + outerRadius * cos1, my1 = cy + outerRadius * sin1;
-                        const ix0 = cx + innerRadius * cos0, iy0 = cy + innerRadius * sin0;
-                        const ix1 = cx + innerRadius * cos1, iy1 = cy + innerRadius * sin1;
-                        const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-                        const d = [
-                          `M ${mx0} ${my0}`,
-                          `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${mx1} ${my1}`,
-                          `L ${ix1} ${iy1}`,
-                          `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${ix0} ${iy0}`,
-                          "Z",
-                        ].join(" ");
-                        return <path d={d} fill={entry.color} stroke="transparent" />;
-                      }}
+                      shape={makeShapeFn(donutData)}
                     />
                     <Tooltip
                       formatter={(value, name) => [`${formatDkk(Number(value))} DKK`, String(name)]}
