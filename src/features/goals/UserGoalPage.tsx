@@ -63,6 +63,7 @@ function toGoalStep(s: UserGoalStep) {
     notes: s.notes || undefined,
     idealFinish: s.idealFinish ?? undefined,
     estimatedTime: s.estimatedTime || undefined,
+    sortOrder: s.sortOrder,
   };
 }
 

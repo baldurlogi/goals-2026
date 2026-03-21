@@ -1,9 +1,10 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { Check, PencilLine, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { validateClampedNumberInput } from "@/lib/numericInput";
 import {
   ACTIVITY_LABELS,
   calculateTDEE,
@@ -255,6 +256,10 @@ function MacroEditor({
   targets: MacroTargets;
   onChange: (t: MacroTargets) => void;
 }) {
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<keyof MacroTargets, string | null>>
+  >({});
+
   const fields: Array<{ key: keyof MacroTargets; label: string; suffix: string }> = [
     { key: "cal", label: "Calories", suffix: "kcal" },
     { key: "protein", label: "Protein", suffix: "g" },
@@ -270,17 +275,31 @@ function MacroEditor({
             {field.label}
           </label>
           <Input
-            type="number"
+            type="text"
+            inputMode="numeric"
             value={targets[field.key] > 0 ? targets[field.key] : ""}
-            onChange={(e) =>
+            onChange={(e) => {
+              const result = validateClampedNumberInput(e.target.value, {
+                min: 0,
+                max: field.key === "cal" ? 10000 : 1000,
+              });
+              setFieldErrors((prev) => ({
+                ...prev,
+                [field.key]: result.error,
+              }));
+              if (result.nextValue === null) return;
               onChange({
                 ...targets,
-                [field.key]: Number(e.target.value) || 0,
-              })
-            }
+                [field.key]: result.nextValue === "" ? 0 : Number(result.nextValue),
+              });
+            }}
+            aria-invalid={!!fieldErrors[field.key]}
             aria-label={field.label}
             placeholder={field.label}
           />
+          {fieldErrors[field.key] ? (
+            <p className="text-[11px] text-destructive">{fieldErrors[field.key]}</p>
+          ) : null}
           <p className="text-[11px] text-muted-foreground">{field.suffix}</p>
         </div>
       ))}
@@ -349,6 +368,7 @@ function TargetPreview({
 }
 
 export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
+  const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
   const currentTargets = data.macro_maintain ?? emptyTargets();
   const macroCalories = caloriesFromMacros(currentTargets);
 
@@ -591,13 +611,25 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
               Do you know your current maintenance calories? (optional)
             </label>
             <Input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={data.known_maintenance_calories}
-              onChange={(e) =>
-                onChange({ known_maintenance_calories: e.target.value })
-              }
+              onChange={(e) => {
+                const result = validateClampedNumberInput(e.target.value, {
+                  min: 1000,
+                  max: 10000,
+                });
+                setMaintenanceError(result.error);
+                if (result.nextValue !== null) {
+                  onChange({ known_maintenance_calories: result.nextValue });
+                }
+              }}
+              aria-invalid={!!maintenanceError}
               placeholder="Example: 2600"
             />
+            {maintenanceError ? (
+              <p className="text-xs text-destructive">{maintenanceError}</p>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               Leave this empty and we will estimate from your body data and activity.
             </p>

@@ -3,6 +3,7 @@ import { FITNESS_CHANGED_EVENT } from "./constants";
 import { todayISO } from "./date";
 import type { MetricType, PREntry, PRCategory, PRGoal } from "./types";
 import { CACHE_KEYS, assertRegisteredCacheWrite } from "@/lib/cacheRegistry";
+import { clampNumberValue } from "@/lib/numericInput";
 import {
   getActiveUserId,
   getScopedStorageItem,
@@ -96,13 +97,16 @@ export async function addPRGoal(
   const goal = (maybeGoal === undefined ? userIdOrGoal : maybeGoal) as Omit<PRGoal, "history" | "createdAt">;
   if (!userId) return;
 
+  const normalizedGoal =
+    clampNumberValue(goal.goal, { min: 0.01, max: 100000, decimals: 2 }) ?? 0.01;
+
   const { error } = await supabase.from("fitness_prs").insert({
     user_id: userId,
     pr_id: goal.id,
     label: goal.label,
     unit: goal.unit,
-    goal: goal.goal,
-    goal_label: goal.goalLabel,
+    goal: normalizedGoal,
+    goal_label: goal.goalLabel || `${normalizedGoal} ${goal.unit}`,
     category: goal.category,
     history: [],
     created_at: todayISO(),
@@ -128,7 +132,10 @@ export async function updatePRGoal(
 
   const payload: Record<string, unknown> = {};
 
-  if (patch.goal !== undefined) payload.goal = patch.goal;
+  if (patch.goal !== undefined) {
+    payload.goal =
+      clampNumberValue(patch.goal, { min: 0.01, max: 100000, decimals: 2 }) ?? 0.01;
+  }
   if (patch.goalLabel !== undefined) payload.goal_label = patch.goalLabel;
   if (patch.label !== undefined) payload.label = patch.label;
 
@@ -180,7 +187,10 @@ export async function logPREntry(
   const notes = (maybeNotes === undefined && typeof valueOrNotes !== "number" ? valueOrNotes : maybeNotes) as string | undefined;
   if (!userId) return;
 
-  const entry: PREntry = { value, date: todayISO(), notes };
+  const normalizedValue =
+    clampNumberValue(value, { min: 0.01, max: 100000, decimals: 2 }) ?? 0.01;
+
+  const entry: PREntry = { value: normalizedValue, date: todayISO(), notes };
 
   const { data, error: loadError } = await supabase
     .from("fitness_prs")

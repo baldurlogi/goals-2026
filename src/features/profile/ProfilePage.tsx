@@ -15,6 +15,7 @@ import { loadAIProfile, saveAIProfile, type PreferredTone } from "@/features/ai/
 import { toast } from "sonner";
 import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
 import { ProfileStateCard } from "@/features/onboarding/components/ProfileStateCard";
+import { validateClampedNumberInput } from "@/lib/numericInput";
 import { BodyMetricsSection } from "./components/BodyMetricsSection";
 import { IdentitySection } from "./components/IdentitySection";
 import { ModulesSection } from "./components/ModulesSection";
@@ -51,6 +52,7 @@ export function ProfilePage() {
   const saveProfileMutation = useSaveProfileMutation();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [readingGoalError, setReadingGoalError] = useState<string | null>(null);
 
   const [form, setForm] = useState<ProfileForm | null>(null);
 
@@ -105,7 +107,11 @@ export function ProfilePage() {
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
   }, []);
 
-  const canCalc = !!form?.weight_kg && !!form?.height_cm && !!form?.age && !!form?.sex;
+  const canCalc =
+    !!form?.sex &&
+    Number(form?.weight_kg) > 0 &&
+    Number(form?.height_cm) > 0 &&
+    Number(form?.age) > 0;
   const calculated = useMemo(() => {
     if (!form || !canCalc) return null;
     return calculateMacros(Number(form.weight_kg), Number(form.height_cm), Number(form.age), form.sex, form.activity_level);
@@ -329,7 +335,24 @@ export function ProfilePage() {
           <CardDescription>Set a clear daily pages target that matches your reading routine.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input type="number" min="1" max="200" className="w-40" value={form.daily_reading_goal} onChange={(e) => update({ daily_reading_goal: e.target.value })} />
+          <Input
+            type="text"
+            inputMode="numeric"
+            className="w-40"
+            value={form.daily_reading_goal}
+            onChange={(e) => {
+              const result = validateClampedNumberInput(e.target.value, {
+                min: 1,
+                max: 200,
+              });
+              setReadingGoalError(result.error);
+              if (result.nextValue !== null) update({ daily_reading_goal: result.nextValue });
+            }}
+            aria-invalid={!!readingGoalError}
+          />
+          {readingGoalError ? (
+            <p className="text-xs text-destructive">{readingGoalError}</p>
+          ) : null}
         </CardContent>
       </Card>
 

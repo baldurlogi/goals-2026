@@ -17,14 +17,18 @@ function parseDate(s?: string): number {
 
 function sortedSteps(steps: GoalStep[], doneMap?: Record<string, boolean>): GoalStep[] {
     return [...steps].sort((a,b) => {
-        // 1. idealFinish ascending (undated last)
-        const dateDiff = parseDate(a.idealFinish) - parseDate(b.idealFinish);
-        if (dateDiff !== 0) return dateDiff;
-        // 2. incomplete before complete
+        // 1. completed steps first, incomplete steps second
         const aDone = doneMap?.[a.id] ? 1 : 0;
         const bDone = doneMap?.[b.id] ? 1 : 0;
-        if (aDone !== bDone) return aDone - bDone;
-        // 3. stable tiebraker: label then id
+        if (aDone !== bDone) return bDone - aDone;
+        // 2. idealFinish ascending (undated last)
+        const dateDiff = parseDate(a.idealFinish) - parseDate(b.idealFinish);
+        if (dateDiff !== 0) return dateDiff;
+        // 3. manual sort order when available
+        const aSort = typeof a.sortOrder === "number" ? a.sortOrder : Number.MAX_SAFE_INTEGER;
+        const bSort = typeof b.sortOrder === "number" ? b.sortOrder : Number.MAX_SAFE_INTEGER;
+        if (aSort !== bSort) return aSort - bSort;
+        // 4. stable tiebreaker: label then id
         return a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
     })
 }

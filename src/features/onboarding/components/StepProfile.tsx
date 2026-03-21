@@ -1,14 +1,10 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import type { Sex } from "@/features/onboarding/profileStorage";
 import type { OnboardingData } from "./types";
+import { validateClampedNumberInput } from "@/lib/numericInput";
 
 type Props = { data: OnboardingData; onChange: (p: Partial<OnboardingData>) => void };
-
-function sanitizeNumberInput(value: string) {
-  if (!value) return "";
-  return /^\d*(?:\.\d{0,1})?$/.test(value) ? value : null;
-}
 
 function PillSelect<T extends string>({
   options,
@@ -37,6 +33,10 @@ function PillSelect<T extends string>({
 }
 
 export const StepProfile = memo(function StepProfile({ data, onChange }: Props) {
+  const [ageError, setAgeError] = useState<string | null>(null);
+  const [weightError, setWeightError] = useState<string | null>(null);
+  const [heightError, setHeightError] = useState<string | null>(null);
+
   return (
     <div className="space-y-6">
       <div>
@@ -56,36 +56,62 @@ export const StepProfile = memo(function StepProfile({ data, onChange }: Props) 
           />
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Input
-            type="text"
-            inputMode="numeric"
-            placeholder="Age (years)"
-            value={data.age}
-            onChange={(e) => {
-              const next = /^\d*$/.test(e.target.value) ? e.target.value : null;
-              if (next !== null) onChange({ age: next });
-            }}
-          />
-          <Input
-            type="text"
-            inputMode="decimal"
-            placeholder="Weight (kg)"
-            value={data.weight_kg}
-            onChange={(e) => {
-              const next = sanitizeNumberInput(e.target.value);
-              if (next !== null) onChange({ weight_kg: next });
-            }}
-          />
-          <Input
-            type="text"
-            inputMode="decimal"
-            placeholder="Height (cm)"
-            value={data.height_cm}
-            onChange={(e) => {
-              const next = sanitizeNumberInput(e.target.value);
-              if (next !== null) onChange({ height_cm: next });
-            }}
-          />
+          <div className="space-y-1">
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="Age (years)"
+              value={data.age}
+              onChange={(e) => {
+                const result = validateClampedNumberInput(e.target.value, {
+                  min: 1,
+                  max: 100,
+                });
+                setAgeError(result.error);
+                if (result.nextValue !== null) onChange({ age: result.nextValue });
+              }}
+              aria-invalid={!!ageError}
+            />
+            {ageError ? <p className="text-xs text-destructive">{ageError}</p> : null}
+          </div>
+          <div className="space-y-1">
+            <Input
+              type="text"
+              inputMode="decimal"
+              placeholder="Weight (kg)"
+              value={data.weight_kg}
+              onChange={(e) => {
+                const result = validateClampedNumberInput(e.target.value, {
+                  min: 1,
+                  max: 300,
+                  allowDecimal: true,
+                });
+                setWeightError(result.error);
+                if (result.nextValue !== null) onChange({ weight_kg: result.nextValue });
+              }}
+              aria-invalid={!!weightError}
+            />
+            {weightError ? <p className="text-xs text-destructive">{weightError}</p> : null}
+          </div>
+          <div className="space-y-1">
+            <Input
+              type="text"
+              inputMode="decimal"
+              placeholder="Height (cm)"
+              value={data.height_cm}
+              onChange={(e) => {
+                const result = validateClampedNumberInput(e.target.value, {
+                  min: 1,
+                  max: 220,
+                  allowDecimal: true,
+                });
+                setHeightError(result.error);
+                if (result.nextValue !== null) onChange({ height_cm: result.nextValue });
+              }}
+              aria-invalid={!!heightError}
+            />
+            {heightError ? <p className="text-xs text-destructive">{heightError}</p> : null}
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">
           Use metric units: weight in kilograms (kg) and height in centimeters (cm). Example: 72.5 kg and 178 cm.

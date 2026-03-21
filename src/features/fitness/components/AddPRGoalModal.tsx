@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { CATEGORY_LABELS, PR_SUGGESTIONS, UNIT_OPTIONS } from "../constants";
 import { fmtValue, slugify } from "../selectors";
 import { type MetricType, type PRCategory, type PRGoal } from "../types";
+import { validateClampedNumberInput, clampNumberValue } from "@/lib/numericInput";
 
 type Mode = "browse" | "custom";
 
@@ -24,6 +25,7 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
   const [customLabel, setCustomLabel] = useState("");
   const [customUnit, setCustomUnit] = useState<MetricType>("kg");
   const [customGoal, setCustomGoal] = useState("");
+  const [customGoalError, setCustomGoalError] = useState<string | null>(null);
   const [customGoalLabel, setCustomGoalLabel] = useState("");
   const [customCat, setCustomCat] = useState<PRCategory>("custom");
 
@@ -55,9 +57,9 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
 
   function handleCustomSubmit() {
     const label = customLabel.trim();
-    const goal = Number(customGoal);
+    const goal = clampNumberValue(customGoal, { min: 0.01, max: 100000, decimals: 2 });
 
-    if (!label || goal <= 0) return;
+    if (!label || !goal || goal <= 0) return;
 
     const id = `${slugify(label)}_${Date.now()}`;
 
@@ -262,13 +264,26 @@ export function AddPRGoalModal({ existingIds, onAdd, onClose }: Props) {
                     Goal value
                   </label>
                   <Input
-                    type="number"
-                    min={0}
+                    type="text"
+                    inputMode="decimal"
                     value={customGoal}
-                    onChange={(e) => setCustomGoal(e.target.value)}
+                    onChange={(e) => {
+                      const result = validateClampedNumberInput(e.target.value, {
+                        min: 0,
+                        max: 100000,
+                        allowDecimal: true,
+                        maxDecimals: 2,
+                      });
+                      setCustomGoalError(result.error);
+                      if (result.nextValue !== null) setCustomGoal(result.nextValue);
+                    }}
+                    aria-invalid={!!customGoalError}
                     placeholder="e.g. 100"
                     className="w-full bg-background px-3 py-2 text-sm"
                   />
+                  {customGoalError ? (
+                    <p className="text-xs text-destructive">{customGoalError}</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">

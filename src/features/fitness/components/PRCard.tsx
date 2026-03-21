@@ -30,6 +30,7 @@ import { Progress } from "@/components/ui/progress";
 import { CATEGORY_LABELS } from "../constants";
 import { currentBest, fmtValue, progressPct } from "../selectors";
 import { type PREntry, type PRGoal } from "../types";
+import { validateClampedNumberInput, clampNumberValue } from "@/lib/numericInput";
 
 function SparkTooltip({
   active,
@@ -62,6 +63,7 @@ function LogForm({
   onCancel: () => void;
 }) {
   const [val, setVal] = useState("");
+  const [valueError, setValueError] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
 
   const placeholder =
@@ -71,11 +73,21 @@ function LogForm({
     <div className="mt-2 space-y-2 rounded-xl border bg-muted/20 p-3">
       <div className="flex gap-2">
         <Input
-          type="number"
-          min={0}
+          type="text"
+          inputMode="decimal"
           placeholder={placeholder}
           value={val}
-          onChange={(e) => setVal(e.target.value)}
+          onChange={(e) => {
+            const result = validateClampedNumberInput(e.target.value, {
+              min: 0,
+              max: 100000,
+              allowDecimal: true,
+              maxDecimals: 2,
+            });
+            setValueError(result.error);
+            if (result.nextValue !== null) setVal(result.nextValue);
+          }}
+          aria-invalid={!!valueError}
           className="h-8 w-28 bg-background px-2.5 py-1.5 text-sm"
         />
         <Input
@@ -86,12 +98,20 @@ function LogForm({
           className="h-8 flex-1 bg-background px-2.5 py-1.5 text-sm"
         />
       </div>
+      {valueError ? <p className="text-xs text-destructive">{valueError}</p> : null}
 
       <div className="flex gap-2">
         <Button
           size="sm"
           disabled={!val || Number(val) <= 0}
-          onClick={() => onSubmit(Number(val), notes)}
+          onClick={() => {
+            const nextValue = clampNumberValue(val, {
+              min: 0.01,
+              max: 100000,
+              decimals: 2,
+            });
+            if (nextValue) onSubmit(nextValue, notes);
+          }}
         >
           Save PR
         </Button>
@@ -115,32 +135,53 @@ function GoalEditor({
   onCancel: () => void;
 }) {
   const [val, setVal] = useState(String(current));
+  const [valueError, setValueError] = useState<string | null>(null);
 
   return (
-    <span className="inline-flex items-center gap-1">
-      <Input
-        type="number"
-        value={val}
-        min={0}
-        onChange={(e) => setVal(e.target.value)}
-        className="h-7 w-20 bg-background px-1.5 py-0.5 text-xs"
-      />
-      <span className="text-xs text-muted-foreground">{unit}</span>
-      <button
-        type="button"
-        onClick={() => Number(val) > 0 && onSave(Number(val))}
-        className="text-[10px] font-semibold text-emerald-500 hover:text-emerald-400"
-      >
-        Save
-      </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="text-[10px] text-muted-foreground hover:text-foreground"
-      >
-        ✕
-      </button>
-    </span>
+    <div className="inline-flex flex-col items-start gap-1">
+      <span className="inline-flex items-center gap-1">
+        <Input
+          type="text"
+          inputMode="decimal"
+          value={val}
+          onChange={(e) => {
+            const result = validateClampedNumberInput(e.target.value, {
+              min: 0,
+              max: 100000,
+              allowDecimal: true,
+              maxDecimals: 2,
+            });
+            setValueError(result.error);
+            if (result.nextValue !== null) setVal(result.nextValue);
+          }}
+          aria-invalid={!!valueError}
+          className="h-7 w-20 bg-background px-1.5 py-0.5 text-xs"
+        />
+        <span className="text-xs text-muted-foreground">{unit}</span>
+        <button
+          type="button"
+          onClick={() => {
+            const nextValue = clampNumberValue(val, {
+              min: 0.01,
+              max: 100000,
+              decimals: 2,
+            });
+            if (nextValue) onSave(nextValue);
+          }}
+          className="text-[10px] font-semibold text-emerald-500 hover:text-emerald-400"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-[10px] text-muted-foreground hover:text-foreground"
+        >
+          ✕
+        </button>
+      </span>
+      {valueError ? <p className="text-xs text-destructive">{valueError}</p> : null}
+    </div>
   );
 }
 

@@ -1,7 +1,8 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { validateClampedNumberInput } from "@/lib/numericInput";
 import {
   ACTIVITY_LABELS,
   type ActivityLevel,
@@ -28,34 +29,70 @@ export const BodyMetricsSection = memo(function BodyMetricsSection({
   onHeightChange,
   onActivityLevelChange,
 }: Props) {
+  const [ageError, setAgeError] = useState<string | null>(null);
+  const [weightError, setWeightError] = useState<string | null>(null);
+  const [heightError, setHeightError] = useState<string | null>(null);
+
   return (
     <>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Age</label>
-          <Input type="number" min="10" max="100" value={age} onChange={(e) => onAgeChange(e.target.value)} />
+          <Input
+            type="text"
+            inputMode="numeric"
+            value={age}
+            onChange={(e) => {
+              const result = validateClampedNumberInput(e.target.value, {
+                min: 1,
+                max: 100,
+              });
+              setAgeError(result.error);
+              if (result.nextValue !== null) onAgeChange(result.nextValue);
+            }}
+            aria-invalid={!!ageError}
+          />
+          {ageError ? <p className="text-xs text-destructive">{ageError}</p> : null}
         </div>
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Weight (kg)</label>
           <Input
-            type="number"
-            min="30"
-            max="300"
+            type="text"
+            inputMode="decimal"
             value={weightKg}
-            onChange={(e) => onWeightChange(e.target.value)}
+            onChange={(e) => {
+              const result = validateClampedNumberInput(e.target.value, {
+                min: 1,
+                max: 300,
+                allowDecimal: true,
+              });
+              setWeightError(result.error);
+              if (result.nextValue !== null) onWeightChange(result.nextValue);
+            }}
+            aria-invalid={!!weightError}
           />
+          {weightError ? <p className="text-xs text-destructive">{weightError}</p> : null}
         </div>
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Height (cm)</label>
           <Input
-            type="number"
-            min="100"
-            max="250"
+            type="text"
+            inputMode="decimal"
             value={heightCm}
-            onChange={(e) => onHeightChange(e.target.value)}
+            onChange={(e) => {
+              const result = validateClampedNumberInput(e.target.value, {
+                min: 1,
+                max: 220,
+                allowDecimal: true,
+              });
+              setHeightError(result.error);
+              if (result.nextValue !== null) onHeightChange(result.nextValue);
+            }}
+            aria-invalid={!!heightError}
           />
+          {heightError ? <p className="text-xs text-destructive">{heightError}</p> : null}
         </div>
       </div>
 

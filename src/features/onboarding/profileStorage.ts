@@ -7,6 +7,7 @@ import {
 } from "@/lib/activeUser";
 import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import type { ModuleId } from "@/features/modules/modules";
+import { clampNumberValue } from "@/lib/numericInput";
 
 export type Sex = "male" | "female";
 export type ActivityLevel =
@@ -393,7 +394,56 @@ export async function saveProfile(
 ): Promise<UserProfile | null> {
   if (!userId) return null;
 
-  const normalizedPatch = { ...patch };
+  const normalizeMacros = (targets: MacroTargets | null | undefined) => {
+    if (!targets) return null;
+
+    return {
+      cal: clampNumberValue(targets.cal, { min: 0, max: 10000, integer: true }) ?? 0,
+      protein:
+        clampNumberValue(targets.protein, { min: 0, max: 1000, integer: true }) ?? 0,
+      carbs:
+        clampNumberValue(targets.carbs, { min: 0, max: 1000, integer: true }) ?? 0,
+      fat: clampNumberValue(targets.fat, { min: 0, max: 1000, integer: true }) ?? 0,
+    };
+  };
+
+  const normalizedPatch = { ...patch } as Partial<Omit<UserProfile, "id">>;
+  if ("age" in normalizedPatch) {
+    normalizedPatch.age = clampNumberValue(normalizedPatch.age, {
+      min: 1,
+      max: 100,
+      integer: true,
+    });
+  }
+  if ("weight_kg" in normalizedPatch) {
+    normalizedPatch.weight_kg = clampNumberValue(normalizedPatch.weight_kg, {
+      min: 1,
+      max: 300,
+    });
+  }
+  if ("height_cm" in normalizedPatch) {
+    normalizedPatch.height_cm = clampNumberValue(normalizedPatch.height_cm, {
+      min: 1,
+      max: 220,
+    });
+  }
+  if ("daily_reading_goal" in normalizedPatch) {
+    normalizedPatch.daily_reading_goal =
+      clampNumberValue(normalizedPatch.daily_reading_goal, {
+        min: 1,
+        max: 200,
+        integer: true,
+      }) ?? 20;
+  }
+  if ("macro_maintain" in normalizedPatch) {
+    normalizedPatch.macro_maintain = normalizeMacros(
+      normalizedPatch.macro_maintain,
+    );
+  }
+  if ("macro_cut" in normalizedPatch) {
+    normalizedPatch.macro_cut = normalizeMacros(normalizedPatch.macro_cut);
+  }
+
   if (normalizedPatch.weekly_schedule) {
     normalizedPatch.weekly_schedule = normalizeWeeklySchedule(
       normalizedPatch.weekly_schedule,
