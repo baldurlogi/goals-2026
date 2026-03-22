@@ -18,6 +18,7 @@ import {
 import { useGoalsState } from "@/features/goals/useGoalsQuery";
 import { loadNutritionLog, loadPhase, seedNutritionCache } from "@/features/nutrition/nutritionStorage";
 import { getTargets, meals } from "@/features/nutrition/nutritionData";
+import { isMacroSuccessful } from "@/features/nutrition/nutritionStatus";
 import {
   loadReadingInputs,
   seedReadingCache,
@@ -97,6 +98,11 @@ function isStepOverdue(idealFinish: string | null | undefined, todayKey: string)
   return targetTime < todayTime;
 }
 
+function isStepDueToday(idealFinish: string | null | undefined, todayKey: string): boolean {
+  if (!idealFinish) return false;
+  return idealFinish.trim() === todayKey;
+}
+
 function buildGoalsProgress(
   goals: { steps: Array<{ id: string; idealFinish: string | null }>; id: string }[],
   doneState: DoneState,
@@ -122,29 +128,32 @@ function buildGoalsProgress(
       .map((entry) => `${entry.goalId}:${entry.stepId}`),
   );
 
-  let overdueRemaining = 0;
-  let overdueCompletedToday = 0;
+  let dueNowRemaining = 0;
+  let dueNowCompletedToday = 0;
 
   for (const goal of goals) {
     for (const step of goal.steps) {
-      if (!isStepOverdue(step.idealFinish, todayKey)) continue;
+      const isOverdue = isStepOverdue(step.idealFinish, todayKey);
+      const isDueToday = isStepDueToday(step.idealFinish, todayKey);
+      if (!isOverdue && !isDueToday) continue;
+
       const stepKey = `${goal.id}:${step.id}`;
       const done = isStepDone(doneState, goal.id, step.id);
 
       if (done) {
         if (completedToday.has(stepKey)) {
-          overdueCompletedToday += 1;
+          dueNowCompletedToday += 1;
         }
         continue;
       }
 
-      overdueRemaining += 1;
+      dueNowRemaining += 1;
     }
   }
 
-  const overdueTotalAtStartOfDay = overdueRemaining + overdueCompletedToday;
+  const dueNowTotalAtStartOfDay = dueNowRemaining + dueNowCompletedToday;
 
-  if (overdueTotalAtStartOfDay === 0) {
+  if (dueNowTotalAtStartOfDay === 0) {
     return {
       id: "goals",
       label: "Goals",
@@ -152,14 +161,14 @@ function buildGoalsProgress(
       icon: <Target className="h-3.5 w-3.5" />,
       pct: 100,
       primaryStat: "Up to date",
-      secondaryStat: "No overdue steps",
+      secondaryStat: "No overdue or today steps",
       color: "rose",
       accentClass: "bg-rose-500",
     };
   }
 
   const pct = clampPct(
-    (overdueCompletedToday / overdueTotalAtStartOfDay) * 100,
+    (dueNowCompletedToday / dueNowTotalAtStartOfDay) * 100,
   );
 
   return {
@@ -168,8 +177,8 @@ function buildGoalsProgress(
     href: "/app/goals",
     icon: <Target className="h-3.5 w-3.5" />,
     pct,
-    primaryStat: `${pluralize(overdueRemaining, "overdue step")} left`,
-    secondaryStat: `${overdueCompletedToday}/${overdueTotalAtStartOfDay} overdue cleared today`,
+    primaryStat: `${pluralize(dueNowRemaining, "step")} left`,
+    secondaryStat: `${dueNowCompletedToday}/${dueNowTotalAtStartOfDay} overdue + today cleared`,
     color: "rose",
     accentClass: "bg-rose-500",
   };
@@ -233,23 +242,16 @@ function getMacroScore(log: Awaited<ReturnType<typeof loadNutritionLog>>, target
     totals.fat += entry.macros.fat;
   }
 
-  const targetMap = {
-    calories: targets.cal,
-    protein: targets.protein,
-    carbs: targets.carbs,
-    fat: targets.fat,
-  };
-
-  const keys = ["calories", "protein", "carbs", "fat"] as const;
+  const checks = [
+    { key: "cal" as const, value: totals.calories, target: targets.cal },
+    { key: "protein" as const, value: totals.protein, target: targets.protein },
+    { key: "carbs" as const, value: totals.carbs, target: targets.carbs },
+    { key: "fat" as const, value: totals.fat, target: targets.fat },
+  ];
   let inRange = 0;
 
-  for (const key of keys) {
-    const target = targetMap[key];
-    if (!target || target <= 0) continue;
-    const value = totals[key];
-    const min = target * 0.9;
-    const max = target * 1.1;
-    if (value >= min && value <= max) inRange += 1;
+  for (const check of checks) {
+    if (isMacroSuccessful(check.key, check.value, check.target)) inRange += 1;
   }
 
   return { inRange, totals };

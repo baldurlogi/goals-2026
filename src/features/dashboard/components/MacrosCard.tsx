@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MacrosCardSkeleton } from '@/features/dashboard/skeletons';
+import { isMacroSuccessful } from '@/features/nutrition/nutritionStatus';
 import { useNutritionDashboard } from '../hooks/useNutritionDashboard';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
 
@@ -180,12 +181,12 @@ function MacrosCardInner() {
 
         <div className="flex items-center justify-between">
           <div className="flex flex-wrap gap-1">
-            {logged.protein >= target.protein && (
+            {isMacroSuccessful('protein', logged.protein, target.protein) && (
               <Badge className="h-5 bg-emerald-500/10 px-2 text-[10px] text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400">
                 ✓ Protein
               </Badge>
             )}
-            {logged.cal >= target.cal && (
+            {isMacroSuccessful('cal', logged.cal, target.cal) && (
               <Badge className="h-5 bg-amber-500/10 px-2 text-[10px] text-amber-600 hover:bg-amber-500/10 dark:text-amber-400">
                 ✓ Calories
               </Badge>
