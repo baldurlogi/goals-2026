@@ -62,6 +62,9 @@ export type AISignals = {
     activityLevel: string | null;
     weeklyScheduleSummary: string | null;
     dailyReadingGoal: number | null;
+    measurementSystem: string | null;
+    dateFormat: string | null;
+    timeFormat: string | null;
     tier: "free" | "pro" | "pro_max" | null;
   };
   goals: {
@@ -501,6 +504,9 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
         profile?.weekly_schedule,
       ),
       dailyReadingGoal: profile?.daily_reading_goal ?? null,
+      measurementSystem: profile?.measurement_system ?? null,
+      dateFormat: profile?.date_format ?? null,
+      timeFormat: profile?.time_format ?? null,
       tier: profile?.tier ?? null,
     },
     goals: {

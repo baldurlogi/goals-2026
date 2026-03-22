@@ -1,9 +1,10 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import type { MacroTargets } from "@/features/onboarding/profileStorage";
+import { validateClampedNumberInput } from "@/lib/numericInput";
 
 type Props = {
   macroMaintain: MacroTargets | null;
@@ -21,6 +22,10 @@ function MacroEditor({
   targets: MacroTargets;
   onChange: (t: MacroTargets) => void;
 }) {
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<keyof MacroTargets, string | null>>
+  >({});
+
   const fields: { key: keyof MacroTargets; label: string; unit: string }[] = [
     { key: "cal", label: "Calories", unit: "kcal" },
     { key: "protein", label: "Protein", unit: "g" },
@@ -36,12 +41,30 @@ function MacroEditor({
             {f.label} ({f.unit})
           </label>
           <Input
-            type="number"
-            min="0"
-            value={targets[f.key]}
-            onChange={(e) => onChange({ ...targets, [f.key]: Number(e.target.value) || 0 })}
+            type="text"
+            inputMode="numeric"
+            value={targets[f.key] > 0 ? String(targets[f.key]) : ""}
+            onChange={(e) => {
+              const result = validateClampedNumberInput(e.target.value, {
+                min: 0,
+                max: f.key === "cal" ? 10000 : 1000,
+              });
+              setFieldErrors((prev) => ({
+                ...prev,
+                [f.key]: result.error,
+              }));
+              if (result.nextValue === null) return;
+              onChange({
+                ...targets,
+                [f.key]: result.nextValue === "" ? 0 : Number(result.nextValue),
+              });
+            }}
+            aria-invalid={!!fieldErrors[f.key]}
             className="h-9 text-sm"
           />
+          {fieldErrors[f.key] ? (
+            <p className="text-xs text-destructive">{fieldErrors[f.key]}</p>
+          ) : null}
         </div>
       ))}
     </div>

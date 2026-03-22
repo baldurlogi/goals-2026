@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { DailyPlanHeader } from "@/features/daily-plan/components/DailyPlanHeader";
+import { DailyPlanHeader } from "./navigation/DailyPlanHeader";
 import { ThemeProvider } from "./providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";

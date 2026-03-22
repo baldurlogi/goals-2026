@@ -7,6 +7,7 @@ export interface GoalStep {
   idealFinish?: string;     // "2026-04-01" or "2026-04" or "March 2026" or "ongoing"
   estimatedTime?: string;   // "2 hours", "30 min", "ongoing", "milestone"
   links?: string[];
+  sortOrder?: number;
 }
 
 export interface GoalDefinition {
@@ -33,6 +34,7 @@ export interface UserGoalStep {
   notes: string;
   idealFinish: string | null;
   estimatedTime: string;
+  links?: string[];
   sortOrder: number;
 }
 

@@ -138,6 +138,7 @@ export async function generateGoalFromPrompt(
           notes: 'Done when: this step is fully completed as described.',
           idealFinish: null,
           estimatedTime: '1-2 hours',
+          links: [],
         })),
       },
       usage: { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: 'free' },
@@ -239,6 +240,9 @@ export async function generateGoalFromPrompt(
             notes: typeof s.notes === 'string' ? s.notes : '',
             idealFinish: typeof s.idealFinish === 'string' ? s.idealFinish : null,
             estimatedTime: typeof s.estimatedTime === 'string' ? s.estimatedTime : '',
+            links: Array.isArray(s.links)
+              ? s.links.filter((item): item is string => typeof item === 'string')
+              : [],
           }))
       : [],
   };

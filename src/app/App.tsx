@@ -68,6 +68,10 @@ const FitnessPage = lazy(async () => ({
   default: (await import("@/features/fitness/FitnessPage")).FitnessPage,
 }));
 
+const FinancePage = lazy(() => import("@/features/finance/FinancePage"));
+
+const SkincarePage = lazy(() => import("@/features/skincare/SkincarePage"));
+
 const DashboardPage = lazy(() => import("@/features/dashboard/DashboardPage"));
 
 const ProfilePage = lazy(async () => ({
@@ -261,6 +265,30 @@ export default function App() {
                   <ReadingPage />
                 </Suspense>
               }
+            />
+            <Route
+              path="finance"
+              element={
+                <Suspense fallback={<AppRouteFallback />}>
+                  <FinancePage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="skincare"
+              element={
+                <Suspense fallback={<AppRouteFallback />}>
+                  <SkincarePage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="goals/finance"
+              element={<Navigate to="/app/finance" replace />}
+            />
+            <Route
+              path="goals/skincare"
+              element={<Navigate to="/app/skincare" replace />}
             />
             <Route
               path="goals"

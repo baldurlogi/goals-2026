@@ -4,9 +4,10 @@ import {
   loadFinanceMonth,
   defaultFinanceState,
   FINANCE_CHANGED_EVENT,
+  normalizeFinanceMonthState,
   type FinanceCategoryId,
   type FinanceMonthState,
-} from '@/features/goals/modules/finance/financeStorage';
+} from '@/features/finance/financeStorage';
 
 export const CATEGORY_COLOR: Record<FinanceCategoryId, string> = {
   rent: '#10B981',
@@ -14,6 +15,8 @@ export const CATEGORY_COLOR: Record<FinanceCategoryId, string> = {
   transport: '#38BDF8',
   groceries: '#84CC16',
   gym_health: '#F472B6',
+  personal_care: '#FB7185',
+  shopping: '#60A5FA',
   food_drinks: '#F59E0B',
   entertainment: '#6366F1',
   other: '#94A3B8',
@@ -41,7 +44,9 @@ function hasCache(goalId: string, month: string): boolean {
 function readCache(goalId: string, month: string): FinanceMonthState {
   try {
     const raw = localStorage.getItem(cacheKey(goalId, month));
-    return raw ? JSON.parse(raw) : defaultFinanceState(month);
+    return raw
+      ? normalizeFinanceMonthState(JSON.parse(raw), month)
+      : defaultFinanceState(month);
   } catch {
     return defaultFinanceState(month);
   }

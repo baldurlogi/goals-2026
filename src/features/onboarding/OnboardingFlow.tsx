@@ -149,6 +149,9 @@ export function OnboardingFlow({
         weekly_schedule: data.weekly_schedule,
         daily_reading_goal: Number(data.daily_reading_goal) || 20,
         enabled_modules: data.enabled_modules,
+        measurement_system: data.measurement_system,
+        date_format: data.date_format,
+        time_format: data.time_format,
       });
 
       captureOnce("onboarding_completed", userId, {

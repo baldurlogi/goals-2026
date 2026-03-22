@@ -29,6 +29,7 @@ type ImprovedStep = {
   notes: string;
   idealFinish: string | null;
   estimatedTime: string;
+  links?: string[];
   isNew: boolean;
   isChanged: boolean;
 };
@@ -100,6 +101,7 @@ async function fetchImprovedSteps(goal: UserGoal): Promise<ImproveResult> {
           notes: s.notes,
           idealFinish: s.idealFinish,
           estimatedTime: s.estimatedTime,
+          links: s.links ?? [],
         })),
       },
     }),
@@ -334,6 +336,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
       notes: s.notes,
       idealFinish: s.idealFinish,
       estimatedTime: s.estimatedTime,
+      links: s.links ?? [],
       sortOrder: i,
     }));
 

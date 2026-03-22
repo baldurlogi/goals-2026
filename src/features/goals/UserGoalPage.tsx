@@ -4,7 +4,7 @@ import { Pencil, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { useGoalProgressQuery, useResetGoalProgressMutation, useToggleGoalStepMutation } from '@/features/goals/goalStore';
+import { useGoalProgressState, useResetGoalProgressMutation, useToggleGoalStepMutation } from '@/features/goals/goalStore';
 import { StepsCard } from '@/features/goals/components/StepsCard';
 import { AddEditGoalModal } from '@/features/goals/components/AddEditGoalModal';
 import { ImproveGoalModal } from '@/features/goals/components/ImproveGoalModal';
@@ -63,12 +63,14 @@ function toGoalStep(s: UserGoalStep) {
     notes: s.notes || undefined,
     idealFinish: s.idealFinish ?? undefined,
     estimatedTime: s.estimatedTime || undefined,
+    links: s.links,
+    sortOrder: s.sortOrder,
   };
 }
 
 export function UserGoalPage() {
   const { goalId } = useParams<{ goalId: string }>();
-  const { data: doneState = {} } = useGoalProgressQuery();
+  const { doneState, isGoalProgressLoading } = useGoalProgressState();
   const toggleGoalStepMutation = useToggleGoalStepMutation();
   const resetGoalProgressMutation = useResetGoalProgressMutation();
   const { user } = useAuth();
@@ -82,7 +84,7 @@ export function UserGoalPage() {
 
   const goal = useMemo(() => goals.find((item: UserGoal) => item.id === goalId) ?? null, [goalId, goals]);
 
-  if (loading) {
+  if (loading || isGoalProgressLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-64 rounded bg-muted animate-pulse" />

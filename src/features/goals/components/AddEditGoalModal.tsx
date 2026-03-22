@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Plus, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, Plus, Sparkles, ChevronDown, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { AIPromptScreen } from "./AIPromptScreen";
 import { queueAIContextNudge } from "./AIContextNudge.utils";
 import { useAuth } from "@/features/auth/authContext";
 import { capture, captureOnce } from "@/lib/analytics";
+import { parseStepLinksInput } from "../stepDetails";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 
@@ -74,6 +75,8 @@ export function AddEditGoalModal({
   const [saving, setSaving] = useState(false);
   const [openStepId, setOpenStepId] = useState<string | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
+  const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const creationStartTrackedRef = useRef(false);
   const initialGoalCountRef = useRef<number>(isEdit ? 1 : seedGoalCache(userId).length);
@@ -156,14 +159,21 @@ export function AddEditGoalModal({
     if (openStepId === id) setOpenStepId(null);
   }
 
-  function moveStep(id: string, dir: -1 | 1) {
-    const steps = [...goal.steps];
-    const idx = steps.findIndex((s) => s.id === id);
-    const next = idx + dir;
-    if (next < 0 || next >= steps.length) return;
+  function reorderSteps(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
 
-    [steps[idx], steps[next]] = [steps[next], steps[idx]];
-    updateGoal({ steps: steps.map((s, i) => ({ ...s, sortOrder: i })) });
+    const steps = [...goal.steps];
+    const fromIndex = steps.findIndex((step) => step.id === draggedId);
+    const toIndex = steps.findIndex((step) => step.id === targetId);
+
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const [moved] = steps.splice(fromIndex, 1);
+    steps.splice(toIndex, 0, moved);
+
+    updateGoal({
+      steps: steps.map((step, index) => ({ ...step, sortOrder: index })),
+    });
   }
 
   async function handleSave() {
@@ -178,6 +188,7 @@ export function AddEditGoalModal({
         label: step.label.trim(),
         notes: step.notes.trim(),
         estimatedTime: step.estimatedTime.trim(),
+        links: step.links?.length ? step.links : undefined,
       })),
     };
 
@@ -361,19 +372,61 @@ export function AddEditGoalModal({
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  Keep it simple: add a step title first. Details are optional.
+                  Keep it simple: add a step title first. Details are optional. Drag by the grip to reorder.
                 </p>
 
                 <div className="space-y-2">
                   {goal.steps.map((step, idx) => {
                     const isOpen = openStepId === step.id;
+                    const isDragTarget = dragOverStepId === step.id;
 
                     return (
-                      <div key={step.id} className="overflow-hidden rounded-xl border">
+                      <div
+                        key={step.id}
+                        className={cn(
+                          "overflow-hidden rounded-xl border transition-colors",
+                          draggingStepId === step.id && "opacity-60",
+                          isDragTarget && "border-primary bg-primary/5",
+                        )}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          if (draggingStepId && draggingStepId !== step.id) {
+                            setDragOverStepId(step.id);
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (draggingStepId) {
+                            reorderSteps(draggingStepId, step.id);
+                          }
+                          setDraggingStepId(null);
+                          setDragOverStepId(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingStepId(null);
+                          setDragOverStepId(null);
+                        }}
+                      >
                         <div className="flex items-center gap-3 px-3 py-3">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
                             {idx + 1}
                           </div>
+
+                          <button
+                            type="button"
+                            draggable
+                            onDragStart={(event) => {
+                              setDraggingStepId(step.id);
+                              setDragOverStepId(step.id);
+                              event.dataTransfer.effectAllowed = "move";
+                              event.dataTransfer.setData("text/plain", step.id);
+                            }}
+                            title="Drag to reorder"
+                            aria-label="Drag to reorder"
+                            className="flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
+                          >
+                            <GripVertical className="h-4 w-4" />
+                          </button>
 
                           <Input
                             value={step.label}
@@ -385,28 +438,6 @@ export function AddEditGoalModal({
                           />
 
                           <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 rounded-lg border bg-background/50 p-0.5">
-                              <button
-                                type="button"
-                                onClick={() => moveStep(step.id, -1)}
-                                title="Move up"
-                                aria-label="Move up"
-                                className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                              >
-                                <ChevronUp className="h-4 w-4" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => moveStep(step.id, 1)}
-                                title="Move down"
-                                aria-label="Move down"
-                                className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </button>
-                            </div>
-
                             <button
                               type="button"
                               onClick={() => setOpenStepId(isOpen ? null : step.id)}
@@ -446,6 +477,23 @@ export function AddEditGoalModal({
                               rows={2}
                               className="resize-none text-sm"
                             />
+
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Links
+                              </div>
+                              <Textarea
+                                placeholder="One link per line"
+                                value={(step.links ?? []).join("\n")}
+                                onChange={(e) =>
+                                  updateStep(step.id, {
+                                    links: parseStepLinksInput(e.target.value),
+                                  })
+                                }
+                                rows={2}
+                                className="resize-none text-sm"
+                              />
+                            </div>
 
                             <div className="grid grid-cols-2 gap-2">
                               <div className="space-y-1">

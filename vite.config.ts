@@ -11,15 +11,15 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: [
-        "icons/icon-16.png",
-        "icons/icon-32.png",
-        "icons/icon-180.png",
-        "icons/icon-192.png",
-        "icons/icon-512.png",
+        "icons/begyn-icon-16.png",
+        "icons/begyn-icon-32.png",
+        "icons/begyn-icon-180.png",
+        "icons/begyn-icon-192.png",
+        "icons/begyn-icon-512.png",
       ],
       manifest: {
-        name: "Kairo",
-        short_name: "Kairo",
+        name: "Begyn",
+        short_name: "Begyn",
         description: "Your personal daily habits, nutrition, fitness and goals dashboard.",
         theme_color: "#0f172a",
         background_color: "#0f172a",
@@ -29,13 +29,13 @@ export default defineConfig({
         start_url: "/",
         icons: [
           {
-            src: "icons/icon-192.png",
+            src: "icons/begyn-icon-192.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "icons/icon-512.png",
+            src: "icons/begyn-icon-512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",

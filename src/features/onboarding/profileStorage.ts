@@ -7,6 +7,16 @@ import {
 } from "@/lib/activeUser";
 import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import type { ModuleId } from "@/features/modules/modules";
+import { clampNumberValue } from "@/lib/numericInput";
+import {
+  DEFAULT_USER_PREFERENCES,
+  normalizeDateFormatPreference,
+  normalizeMeasurementSystem,
+  normalizeTimeFormatPreference,
+  type DateFormatPreference,
+  type MeasurementSystem,
+  type TimeFormatPreference,
+} from "@/lib/userPreferences";
 
 export type Sex = "male" | "female";
 export type ActivityLevel =
@@ -69,6 +79,9 @@ export type UserProfile = {
   weekly_schedule: WeeklySchedule;
   daily_reading_goal: number;
   enabled_modules: ModuleId[] | null;
+  measurement_system: MeasurementSystem;
+  date_format: DateFormatPreference;
+  time_format: TimeFormatPreference;
   tier: "free" | "pro" | "pro_max";
 };
 
@@ -151,6 +164,9 @@ export function normalizeUserProfile(raw: UserProfile): UserProfile {
     ...raw,
     weekly_schedule: weeklySchedule,
     default_schedule_view: deriveLegacyScheduleView(weeklySchedule),
+    measurement_system: normalizeMeasurementSystem(raw.measurement_system),
+    date_format: normalizeDateFormatPreference(raw.date_format),
+    time_format: normalizeTimeFormatPreference(raw.time_format),
   };
 }
 
@@ -237,6 +253,9 @@ function defaultProfile(id: string): UserProfile {
     weekly_schedule: { ...DEFAULT_WEEKLY_SCHEDULE },
     daily_reading_goal: 20,
     enabled_modules: null,
+    measurement_system: DEFAULT_USER_PREFERENCES.measurementSystem,
+    date_format: DEFAULT_USER_PREFERENCES.dateFormat,
+    time_format: DEFAULT_USER_PREFERENCES.timeFormat,
     tier: "free",
   };
 }
@@ -393,7 +412,71 @@ export async function saveProfile(
 ): Promise<UserProfile | null> {
   if (!userId) return null;
 
-  const normalizedPatch = { ...patch };
+  const normalizeMacros = (targets: MacroTargets | null | undefined) => {
+    if (!targets) return null;
+
+    return {
+      cal: clampNumberValue(targets.cal, { min: 0, max: 10000, integer: true }) ?? 0,
+      protein:
+        clampNumberValue(targets.protein, { min: 0, max: 1000, integer: true }) ?? 0,
+      carbs:
+        clampNumberValue(targets.carbs, { min: 0, max: 1000, integer: true }) ?? 0,
+      fat: clampNumberValue(targets.fat, { min: 0, max: 1000, integer: true }) ?? 0,
+    };
+  };
+
+  const normalizedPatch = { ...patch } as Partial<Omit<UserProfile, "id">>;
+  if ("age" in normalizedPatch) {
+    normalizedPatch.age = clampNumberValue(normalizedPatch.age, {
+      min: 1,
+      max: 100,
+      integer: true,
+    });
+  }
+  if ("weight_kg" in normalizedPatch) {
+    normalizedPatch.weight_kg = clampNumberValue(normalizedPatch.weight_kg, {
+      min: 1,
+      max: 300,
+    });
+  }
+  if ("height_cm" in normalizedPatch) {
+    normalizedPatch.height_cm = clampNumberValue(normalizedPatch.height_cm, {
+      min: 1,
+      max: 220,
+    });
+  }
+  if ("daily_reading_goal" in normalizedPatch) {
+    normalizedPatch.daily_reading_goal =
+      clampNumberValue(normalizedPatch.daily_reading_goal, {
+        min: 1,
+        max: 200,
+        integer: true,
+      }) ?? 20;
+  }
+  if ("measurement_system" in normalizedPatch) {
+    normalizedPatch.measurement_system = normalizeMeasurementSystem(
+      normalizedPatch.measurement_system,
+    );
+  }
+  if ("date_format" in normalizedPatch) {
+    normalizedPatch.date_format = normalizeDateFormatPreference(
+      normalizedPatch.date_format,
+    );
+  }
+  if ("time_format" in normalizedPatch) {
+    normalizedPatch.time_format = normalizeTimeFormatPreference(
+      normalizedPatch.time_format,
+    );
+  }
+  if ("macro_maintain" in normalizedPatch) {
+    normalizedPatch.macro_maintain = normalizeMacros(
+      normalizedPatch.macro_maintain,
+    );
+  }
+  if ("macro_cut" in normalizedPatch) {
+    normalizedPatch.macro_cut = normalizeMacros(normalizedPatch.macro_cut);
+  }
+
   if (normalizedPatch.weekly_schedule) {
     normalizedPatch.weekly_schedule = normalizeWeeklySchedule(
       normalizedPatch.weekly_schedule,

@@ -14,8 +14,16 @@ import { ReadingInputsCard } from "./components/ReadingInputsCard";
 import { DEFAULT_READING_INPUTS } from "./readingStorage";
 import { useReadingQuery, useSaveReadingMutation } from "./useReadingQuery";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatDateWithPreferences, type UserPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
-function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
+function CompletedBooksSection({
+  books,
+  preferences,
+}: {
+  books: CompletedBook[];
+  preferences: UserPreferences;
+}) {
   if (books.length === 0) return null;
 
   return (
@@ -35,7 +43,7 @@ function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
         {books.map((b, idx) => {
           const date = new Date(b.finishedAt);
-          const monthYear = date.toLocaleDateString("en-GB", {
+          const monthYear = formatDateWithPreferences(date, preferences, {
             month: "short",
             year: "numeric",
           });
@@ -82,6 +90,7 @@ function CompletedBooksSection({ books }: { books: CompletedBook[] }) {
 }
 
 export function ReadingPage() {
+  const preferences = useUserPreferences();
   const { data: remoteInputs = DEFAULT_READING_INPUTS } = useReadingQuery();
   const saveReadingMutation = useSaveReadingMutation();
 
@@ -277,7 +286,7 @@ export function ReadingPage() {
         </Card>
 
         <div className="lg:hidden">
-          <CompletedBooksSection books={draft.completed} />
+          <CompletedBooksSection books={draft.completed} preferences={preferences} />
         </div>
       </div>
 
@@ -289,7 +298,7 @@ export function ReadingPage() {
         />
 
         <div className="hidden lg:block">
-          <CompletedBooksSection books={draft.completed} />
+          <CompletedBooksSection books={draft.completed} preferences={preferences} />
         </div>
 
         <ReadingNextCard

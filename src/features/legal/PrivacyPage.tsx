@@ -2,9 +2,9 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Shield } from "lucide-react";
 
 const LAST_UPDATED = "March 2025";
-const CONTACT_EMAIL = "legal@kairo.app";
-const APP_NAME = "Kairo";
-const CONTROLLER = "Kairo";
+const CONTACT_EMAIL = "legal@begyn.app";
+const APP_NAME = "Begyn";
+const CONTROLLER = "Begyn";
 const JURISDICTION = "Denmark";
 
 export function PrivacyPage() {
@@ -18,7 +18,7 @@ export function PrivacyPage() {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Kairo
+            Back to Begyn
           </Link>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Shield className="h-4 w-4 text-violet-400" />

@@ -12,8 +12,11 @@ import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { UpgradeBanner } from "@/features/subscription/UpgradeBanner";
 import { useWeeklyReport, isSunday } from "../hooks/useWeeklyReport";
+import { formatDateWithPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
 export function WeeklyReportCard() {
+  const preferences = useUserPreferences();
   const { modules } = useEnabledModules();
   const {
     report,
@@ -35,10 +38,10 @@ export function WeeklyReportCard() {
     const start = new Date(weekStart + "T00:00:00");
     const end = new Date(weekEnd + "T00:00:00");
 
-    const startDay = start.toLocaleDateString("en-GB", { day: "numeric" });
-    const startMonth = start.toLocaleDateString("en-GB", { month: "short" });
-    const endDay = end.toLocaleDateString("en-GB", { day: "numeric" });
-    const endMonth = end.toLocaleDateString("en-GB", { month: "short" });
+    const startDay = formatDateWithPreferences(start, preferences, { day: "numeric" });
+    const startMonth = formatDateWithPreferences(start, preferences, { month: "short" });
+    const endDay = formatDateWithPreferences(end, preferences, { day: "numeric" });
+    const endMonth = formatDateWithPreferences(end, preferences, { month: "short" });
 
     if (startMonth === endMonth) {
       return `${startDay}–${endDay} ${endMonth}`;

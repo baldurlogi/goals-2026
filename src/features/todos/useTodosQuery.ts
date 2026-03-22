@@ -7,7 +7,7 @@ import {
   deleteTodo,
   loadTodos,
   seedTodoCache,
-  setTodoDone,
+  toggleTodo,
   type TodoItem,
 } from "./todoStorage";
 
@@ -63,19 +63,12 @@ export function useToggleTodoMutation() {
   const invalidate = useTodosInvalidation();
 
   return useMutation<
-    Awaited<ReturnType<typeof setTodoDone>>,
+    Awaited<ReturnType<typeof toggleTodo>>,
     Error,
     string,
     { previous: TodoItem[] }
   >({
-    mutationFn: async (id: string) => {
-      const current =
-        queryClient.getQueryData<TodoItem[]>(queryKeys.todos(userId)) ?? [];
-      const todo = current.find((item) => item.id === id);
-      const nextDone = !todo?.done;
-
-      return setTodoDone(userId, id, nextDone);
-    },
+    mutationFn: (id: string) => toggleTodo(userId, id),
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos(userId) });
 

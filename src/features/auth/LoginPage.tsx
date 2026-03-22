@@ -67,7 +67,7 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center pb-4">
           <div className="mx-auto mb-3 text-4xl">📊</div>
-          <CardTitle className="text-xl">Kairo</CardTitle>
+          <CardTitle className="text-xl">Begyn</CardTitle>
           <CardDescription>
             Your personal dashboard for fitness, habits and goals.
           </CardDescription>
@@ -108,7 +108,7 @@ export function LoginPage() {
             </div>
 
             <span className="text-xs text-muted-foreground leading-relaxed">
-              I agree to Kairo&apos;s{" "}
+              I agree to Begyn&apos;s{" "}
               <Link
                 to="/terms"
                 className="text-violet-400 hover:underline"

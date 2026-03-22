@@ -91,6 +91,9 @@ type WeeklyDataPayload = {
     displayName: string | null;
     activityLevel: string | null;
     dailyReadingGoal: number | null;
+    measurementSystem?: string | null;
+    dateFormat?: string | null;
+    timeFormat?: string | null;
   };
   goals?: {
     total: number;
@@ -196,6 +199,9 @@ function toGoalStep(value: unknown): UserGoalStep | null {
     idealFinish: typeof value.idealFinish === "string" ? value.idealFinish : null,
     estimatedTime:
       typeof value.estimatedTime === "string" ? value.estimatedTime : "",
+    links: Array.isArray(value.links)
+      ? value.links.filter((item): item is string => typeof item === "string")
+      : undefined,
     sortOrder: typeof value.sortOrder === "number" ? value.sortOrder : 0,
   };
 }
@@ -913,6 +919,9 @@ export function useWeeklyReport(modules: Set<string>) {
           displayName: profile?.display_name ?? null,
           activityLevel: profile?.activity_level ?? null,
           dailyReadingGoal: profile?.daily_reading_goal ?? null,
+          measurementSystem: profile?.measurement_system ?? null,
+          dateFormat: profile?.date_format ?? null,
+          timeFormat: profile?.time_format ?? null,
         },
         goals: summarizeGoals(
           goals

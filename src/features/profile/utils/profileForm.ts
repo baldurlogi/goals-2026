@@ -7,6 +7,12 @@ import type {
 } from "@/features/onboarding/profileStorage";
 import { normalizeWeeklySchedule } from "@/features/onboarding/profileStorage";
 import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
+import { clampNumberValue } from "@/lib/numericInput";
+import type {
+  DateFormatPreference,
+  MeasurementSystem,
+  TimeFormatPreference,
+} from "@/lib/userPreferences";
 
 export type EditableProfileFields = Pick<
   UserProfile,
@@ -22,6 +28,9 @@ export type EditableProfileFields = Pick<
   | "weekly_schedule"
   | "daily_reading_goal"
   | "enabled_modules"
+  | "measurement_system"
+  | "date_format"
+  | "time_format"
 >;
 
 export type ProfileForm = {
@@ -36,6 +45,9 @@ export type ProfileForm = {
   weekly_schedule: WeeklySchedule;
   daily_reading_goal: string;
   enabled_modules: ModuleId[];
+  measurement_system: MeasurementSystem;
+  date_format: DateFormatPreference;
+  time_format: TimeFormatPreference;
 };
 
 export function normalizeEnabledModules(
@@ -59,23 +71,43 @@ export function profileToForm(p: UserProfile): ProfileForm {
     weekly_schedule: normalizeWeeklySchedule(p.weekly_schedule, p.default_schedule_view),
     daily_reading_goal: (p.daily_reading_goal ?? 20).toString(),
     enabled_modules: normalizeEnabledModules(p.enabled_modules),
+    measurement_system: p.measurement_system,
+    date_format: p.date_format,
+    time_format: p.time_format,
   };
 }
 
 export function formToFullPatch(f: ProfileForm): EditableProfileFields {
+  const normalizeMacros = (targets: MacroTargets | null): MacroTargets | null => {
+    if (!targets) return null;
+
+    return {
+      cal: clampNumberValue(targets.cal, { min: 0, max: 10000, integer: true }) ?? 0,
+      protein:
+        clampNumberValue(targets.protein, { min: 0, max: 1000, integer: true }) ?? 0,
+      carbs:
+        clampNumberValue(targets.carbs, { min: 0, max: 1000, integer: true }) ?? 0,
+      fat: clampNumberValue(targets.fat, { min: 0, max: 1000, integer: true }) ?? 0,
+    };
+  };
+
   return {
     display_name: f.display_name.trim() || null,
     sex: f.sex,
-    age: f.age ? Number(f.age) : null,
-    weight_kg: f.weight_kg ? Number(f.weight_kg) : null,
-    height_cm: f.height_cm ? Number(f.height_cm) : null,
+    age: clampNumberValue(f.age, { min: 1, max: 100, integer: true }),
+    weight_kg: clampNumberValue(f.weight_kg, { min: 1, max: 300 }),
+    height_cm: clampNumberValue(f.height_cm, { min: 1, max: 220 }),
     activity_level: f.activity_level,
     onboarding_done: true,
-    macro_maintain: f.macro_maintain ?? null,
-    macro_cut: f.macro_cut ?? null,
+    macro_maintain: normalizeMacros(f.macro_maintain),
+    macro_cut: normalizeMacros(f.macro_cut),
     weekly_schedule: normalizeWeeklySchedule(f.weekly_schedule, null),
-    daily_reading_goal: Number(f.daily_reading_goal) || 20,
+    daily_reading_goal:
+      clampNumberValue(f.daily_reading_goal, { min: 1, max: 200, integer: true }) ?? 20,
     enabled_modules: f.enabled_modules,
+    measurement_system: f.measurement_system,
+    date_format: f.date_format,
+    time_format: f.time_format,
   };
 }
 

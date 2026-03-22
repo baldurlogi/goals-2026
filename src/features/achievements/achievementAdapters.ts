@@ -3,7 +3,7 @@ import type { MetricType, PREntry } from '@/features/fitness/fitnessStorage';
 import { loadNutritionLog } from '@/features/nutrition/nutritionStorage';
 import { loadUserGoals } from '@/features/goals/userGoalStorage';
 import { loadReadingInputs } from '@/features/reading/readingStorage';
-import { loadModuleState } from '@/features/goals/modules/goalModuleStorage';
+import { loadModuleState } from '@/lib/goalModuleStorage';
 import { listTodos } from '@/features/todos/todoStorage';
 import { loadProfile } from '@/features/onboarding/profileStorage';
 import { supabase } from '@/lib/supabaseClient';

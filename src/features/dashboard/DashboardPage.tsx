@@ -19,6 +19,8 @@ import { useTier, tierMeets } from "@/features/subscription/useTier";
 import { useGoalsState } from "@/features/goals/useGoalsQuery";
 import { scheduleIdle } from "@/lib/scheduleIdle";
 import { capture } from "@/lib/analytics";
+import { formatDateWithPreferences } from "@/lib/userPreferences";
+import { useUserPreferences } from "@/features/profile/useUserPreferences";
 
 import {
   AICoachCardSkeleton,
@@ -64,6 +66,9 @@ const FitnessCard = lazy(async () => ({
 }));
 const WaterIntakeCard = lazy(async () => ({
   default: (await import("./components/WaterIntakeCard")).WaterIntakeCard,
+}));
+const SkincareCard = lazy(async () => ({
+  default: (await import("./components/SkincareCard")).SkincareCard,
 }));
 const LifeProgressCard = lazy(async () => ({
   default: (await import("./components/LifeProgressCard")).LifeProgressCard,
@@ -126,11 +131,12 @@ export default function DashboardPage() {
   const profileQuery = useProfileQuery();
   const profile = profileQuery.data;
   const firstName = profile?.display_name?.trim().split(/\s+/)[0] ?? "";
+  const preferences = useUserPreferences();
 
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const today = new Date().toLocaleDateString("en-GB", {
+  const today = formatDateWithPreferences(new Date(), preferences, {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -306,6 +312,12 @@ export default function DashboardPage() {
           {has("fitness") && (
             <Suspense fallback={<FitnessCardSkeleton />}>
               {showSecondaryEnhancements ? <FitnessCard /> : <FitnessCardSkeleton />}
+            </Suspense>
+          )}
+
+          {has("skincare") && (
+            <Suspense fallback={<FitnessCardSkeleton />}>
+              {showSecondaryEnhancements ? <SkincareCard /> : <FitnessCardSkeleton />}
             </Suspense>
           )}
 

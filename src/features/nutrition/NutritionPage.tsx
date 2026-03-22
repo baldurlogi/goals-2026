@@ -395,11 +395,11 @@ export function NutritionPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <MacroRow label="Calories" value={logged.cal}     target={targets.cal}     unit="kcal" mode="max" />
-              <MacroRow label="Protein"  value={logged.protein} target={targets.protein}  unit="g"    mode="min" />
+              <MacroRow macroKey="cal"     label="Calories" value={logged.cal}     target={targets.cal}     unit="kcal" mode="max" />
+              <MacroRow macroKey="protein" label="Protein"  value={logged.protein} target={targets.protein}  unit="g"    mode="min" />
               <Separator />
-              <MacroRow label="Carbs"    value={logged.carbs}   target={targets.carbs}    unit="g"    mode="range" />
-              <MacroRow label="Fat"      value={logged.fat}     target={targets.fat}      unit="g"    mode="range" />
+              <MacroRow macroKey="carbs"   label="Carbs"    value={logged.carbs}   target={targets.carbs}    unit="g"    mode="range" />
+              <MacroRow macroKey="fat"     label="Fat"      value={logged.fat}     target={targets.fat}      unit="g"    mode="range" />
             </CardContent>
           </Card>
         </div>
