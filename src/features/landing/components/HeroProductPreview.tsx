@@ -44,7 +44,7 @@ export function HeroProductPreview({
               className="flex-1 text-center font-mono text-[10px]"
               style={{ color: t.faint }}
             >
-              Kairo
+              Begyn
             </div>
           </div>
 
@@ -162,7 +162,7 @@ export function HeroProductPreview({
             className="flex-1 text-center font-mono text-[10px]"
             style={{ color: t.faint }}
           >
-            Kairo
+            Begyn
           </div>
         </div>
 

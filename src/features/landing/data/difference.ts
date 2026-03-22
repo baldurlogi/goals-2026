@@ -1,7 +1,7 @@
 export const DIFFERENT_SECTION = [
   {
     title: "Not just another planner",
-    body: "Most tools help you collect tasks. Kairo helps you turn a meaningful goal into a path you can actually follow.",
+    body: "Most tools help you collect tasks. Begyn helps you turn a meaningful goal into a path you can actually follow.",
   },
   {
     title: "Not six disconnected apps",

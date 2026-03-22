@@ -67,7 +67,7 @@ export function HeroSection({
             className="mb-3 max-w-2xl text-[15px] leading-7 sm:text-[clamp(16px,2vw,19px)] sm:leading-8"
             style={{ color: t.muted }}
           >
-            Kairo helps you turn goals, habits, health, and routines
+            Begyn helps you turn goals, habits, health, and routines
             into visible daily progress — before “someday” turns into another year
             of waiting.
           </p>

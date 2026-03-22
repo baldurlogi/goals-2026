@@ -18,8 +18,8 @@ export default defineConfig({
         "icons/icon-512.png",
       ],
       manifest: {
-        name: "Kairo",
-        short_name: "Kairo",
+        name: "Begyn",
+        short_name: "Begyn",
         description: "Your personal daily habits, nutrition, fitness and goals dashboard.",
         theme_color: "#0f172a",
         background_color: "#0f172a",

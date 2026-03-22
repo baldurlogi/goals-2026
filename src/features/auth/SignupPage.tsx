@@ -115,7 +115,7 @@ export function SignupPage() {
             </div>
 
             <span className="text-xs text-muted-foreground leading-relaxed">
-              I agree to Kairo&apos;s{" "}
+              I agree to Begyn&apos;s{" "}
               <Link
                 to="/terms"
                 className="text-violet-400 hover:underline"
