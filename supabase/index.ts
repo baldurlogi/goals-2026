@@ -46,6 +46,7 @@ type RequestBody = GenerateGoalRequest & {
       notes: string;
       idealFinish: string | null;
       estimatedTime: string;
+      links?: string[];
     }>;
   };
   weeklyData?: {
@@ -571,6 +572,7 @@ Rules:
           notes: s.notes,
           idealFinish: s.idealFinish,
           estimatedTime: s.estimatedTime,
+          links: s.links ?? [],
         })),
         null,
         2,
@@ -600,9 +602,10 @@ Return ONLY valid JSON — no markdown, no explanation:
     {
       "id": "string (keep original id if reusing that step, or new uuid for new steps)",
       "label": "string (action-oriented, starts with verb)",
-      "notes": "string (specific guidance, max 20 words)",
+      "notes": "string (specific guidance with a final 'Done when:' sentence, max 30 words)",
       "idealFinish": "YYYY-MM-DD or null",
       "estimatedTime": "string (e.g. '2 hours', '30 min', 'ongoing') or empty string",
+      "links": ["https://example.com", "https://example.com/resource"],
       "isNew": boolean,
       "isChanged": boolean
     }
@@ -615,6 +618,8 @@ Rules:
 - Preserve step ids where the step is being kept/reworded (set isChanged: true if label/notes changed)
 - Use isNew: true for brand new steps (generate a short unique id like "new_1", "new_2")
 - Today's date is ${today}
+- Put useful URLs in links, not inside notes
+- When links are not helpful, return an empty array
 - If user context is provided, tailor steps to their specific situation`;
 
       const improveRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -847,9 +852,10 @@ Return ONLY valid JSON matching this exact schema — no markdown, no explanatio
   "steps": [
     {
       "label": "string (action-oriented step, starts with verb)",
-      "notes": "string (specific guidance including Done when: criteria)",
+      "notes": "string (specific guidance ending with a clear 'Done when:' sentence)",
       "idealFinish": "YYYY-MM-DD or null",
-      "estimatedTime": "string (e.g. '2 hours', '30 min', 'ongoing') or empty string"
+      "estimatedTime": "string (e.g. '2 hours', '30 min', 'ongoing') or empty string",
+      "links": ["https://example.com", "https://example.com/resource"]
     }
   ]
 }
@@ -873,6 +879,12 @@ NOTES FIELD — must include ALL of the following when relevant:
 3. "Done when:" criteria — one sentence that tells the user exactly when this step is complete
    Example: "Done when: you have a written list of 5 programs with deadlines saved somewhere."
    Example: "Done when: you have logged at least one meal and set your calorie goal."
+
+LINKS FIELD:
+- Put any useful URLs in the links array
+- Use full absolute URLs starting with https://
+- Do not paste raw URLs into notes unless absolutely unavoidable
+- If a step does not need links, return an empty array
 
 DATES: Spread idealFinish dates realistically from today (${today}). Earlier steps sooner, later steps further out. Use null only if the step is truly open-ended.
 

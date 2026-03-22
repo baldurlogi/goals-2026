@@ -18,6 +18,7 @@ import { AIPromptScreen } from "./AIPromptScreen";
 import { queueAIContextNudge } from "./AIContextNudge.utils";
 import { useAuth } from "@/features/auth/authContext";
 import { capture, captureOnce } from "@/lib/analytics";
+import { parseStepLinksInput } from "../stepDetails";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 
@@ -187,6 +188,7 @@ export function AddEditGoalModal({
         label: step.label.trim(),
         notes: step.notes.trim(),
         estimatedTime: step.estimatedTime.trim(),
+        links: step.links?.length ? step.links : undefined,
       })),
     };
 
@@ -475,6 +477,23 @@ export function AddEditGoalModal({
                               rows={2}
                               className="resize-none text-sm"
                             />
+
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Links
+                              </div>
+                              <Textarea
+                                placeholder="One link per line"
+                                value={(step.links ?? []).join("\n")}
+                                onChange={(e) =>
+                                  updateStep(step.id, {
+                                    links: parseStepLinksInput(e.target.value),
+                                  })
+                                }
+                                rows={2}
+                                className="resize-none text-sm"
+                              />
+                            </div>
 
                             <div className="grid grid-cols-2 gap-2">
                               <div className="space-y-1">

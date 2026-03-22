@@ -1,12 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { GoalStep } from "@/features/goals/goalTypes";
+import { parseStepDetails, prettyStepLink } from "@/features/goals/stepDetails";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
-
-function prettyHref(href: string) {
-    return href.replace(/^https?:\/\//, "");
-}
 
 // -- sort helpers -------------------------------------
 function parseDate(s?: string): number {
@@ -94,6 +91,11 @@ export function StepsCard(props: {
                         const checked = !!doneMap?.[step.id];
                         const isNext = index === nextIndex && !checked;
                         const isOpen = openId === step.id;
+                        const details = parseStepDetails(step);
+                        const hasDetails =
+                            details.guidance.length > 0 ||
+                            Boolean(details.doneWhen) ||
+                            details.links.length > 0;
 
                         return (
                             <div
@@ -156,33 +158,62 @@ export function StepsCard(props: {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
+                                                disabled={!hasDetails}
                                                 onClick={() => setOpenId(isOpen ? null : step.id)}
                                             >
-                                                {isOpen ? "Hide" : "Details"}
+                                                {hasDetails ? (isOpen ? "Hide" : "Details") : "No details"}
                                             </Button>
                                         </div>
 
                                         {isOpen ? (
-                                            <div className="mt-3 space-y-2">
-                                                {step.notes ? (
-                                                    <div className="text-sm text-muted-foreground leading-relaxed">
-                                                        {step.notes}
+                                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                                {details.guidance.length ? (
+                                                    <div className="rounded-xl border bg-muted/20 p-3 md:col-span-2">
+                                                        <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                                                            How
+                                                        </div>
+                                                        <div className="mt-2 space-y-2">
+                                                            {details.guidance.map((line, lineIndex) => (
+                                                                <p
+                                                                    key={`${step.id}:guidance:${lineIndex}`}
+                                                                    className="text-sm leading-relaxed text-muted-foreground"
+                                                                >
+                                                                    {line}
+                                                                </p>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 ) : null}
 
-                                                {step.links?.length ? (
-                                                    <div className="flex flex-wrap gap-2 pt-1">
-                                                        {step.links.map((href) => (
-                                                            <a
-                                                                key={href}
-                                                                href={href}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="text-xs underline text-muted-foreground hover:text-foreground"
-                                                            >
-                                                                {prettyHref(href)}
-                                                            </a>
-                                                        ))}
+                                                {details.doneWhen ? (
+                                                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                                                        <div className="text-[11px] font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                                                            Done when
+                                                        </div>
+                                                        <p className="mt-2 text-sm leading-relaxed text-foreground">
+                                                            {details.doneWhen}
+                                                        </p>
+                                                    </div>
+                                                ) : null}
+
+                                                {details.links.length ? (
+                                                    <div className="rounded-xl border bg-background p-3">
+                                                        <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                                                            Links
+                                                        </div>
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {details.links.map((href) => (
+                                                                <a
+                                                                    key={href}
+                                                                    href={href}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
+                                                                >
+                                                                    {prettyStepLink(href)}
+                                                                </a>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 ) : null}
                                             </div>

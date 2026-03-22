@@ -34,6 +34,7 @@ export interface UserGoalStep {
   notes: string;
   idealFinish: string | null;
   estimatedTime: string;
+  links?: string[];
   sortOrder: number;
 }
 

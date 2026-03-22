@@ -199,6 +199,9 @@ function toGoalStep(value: unknown): UserGoalStep | null {
     idealFinish: typeof value.idealFinish === "string" ? value.idealFinish : null,
     estimatedTime:
       typeof value.estimatedTime === "string" ? value.estimatedTime : "",
+    links: Array.isArray(value.links)
+      ? value.links.filter((item): item is string => typeof item === "string")
+      : undefined,
     sortOrder: typeof value.sortOrder === "number" ? value.sortOrder : 0,
   };
 }
