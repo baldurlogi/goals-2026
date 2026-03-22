@@ -1,5 +1,5 @@
-const DISMISSED_KEY = 'kairo:ai-context-nudge:dismissed:v1';
-const PENDING_KEY = 'kairo:ai-context-nudge:pending:v1';
+const DISMISSED_KEY = 'begyn:ai-context-nudge:dismissed:v1';
+const PENDING_KEY = 'begyn:ai-context-nudge:pending:v1';
 
 export function isAIContextNudgeDismissed() {
   try {
