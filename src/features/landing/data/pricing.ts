@@ -12,7 +12,7 @@ export const PRICING_PLANS: PricingPlan[] = [
       "Core life dashboard",
       "Manual goals and tracking",
       "Basic progress visibility",
-      "10 AI prompts / month",
+      "10 AI credits / month",
     ],
   },
   {
@@ -21,10 +21,11 @@ export const PRICING_PLANS: PricingPlan[] = [
     monthly: 9,
     yearly: 89,
     featured: true,
-    cta: "Get Pro",
+    cta: "Coming soon",
+    comingSoon: true,
     points: [
       "Everything in Free",
-      "200 AI prompts / month",
+      "200 AI credits / month",
       "AI goal generation",
       "AI goal breakdown and suggestions",
       "Personalized AI guidance",

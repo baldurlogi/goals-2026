@@ -28,8 +28,13 @@ import {
 import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
 import { capture } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import {
+  PAID_PLANS_COMING_SOON,
+  PAID_PLANS_COMING_SOON_LABEL,
+  PAID_PLANS_PREVIEW_MESSAGE,
+} from "@/features/subscription/subscriptionConfig";
 
-const STRIPE_DISABLED = false;
+const STRIPE_DISABLED = PAID_PLANS_COMING_SOON;
 
 const PRICE_KEYS = {
   pro: { monthly: "pro_monthly", yearly: "pro_yearly" },
@@ -81,7 +86,7 @@ const PLANS: Plan[] = [
       { text: "Progress visualization", included: true },
       { text: "Achievements & badges", included: true },
       { text: "PWA — install on any device", included: true },
-      { text: "10 AI prompts per month", included: true },
+      { text: "10 AI credits per month", included: true },
       { text: "AI Coach Card on dashboard", included: false },
       { text: "AI goal optimization", included: false },
       { text: "AI Weekly Life Report", included: false },
@@ -103,12 +108,12 @@ const PLANS: Plan[] = [
     badge: "Most popular",
     features: [
       { text: "Everything in Free", included: true },
-      { text: "200 AI prompts per month", included: true },
+      { text: "200 AI credits per month", included: true },
       { text: "AI Coach Card — daily smart suggestions", included: true },
       { text: "AI goal optimization (Improve with AI)", included: true },
       { text: "AI Weekly Life Report", included: true },
       { text: "Priority support", included: true },
-      { text: "1,000 AI prompts per month", included: false },
+      { text: "1,000 AI credits per month", included: false },
     ],
   },
   {
@@ -127,7 +132,7 @@ const PLANS: Plan[] = [
       "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90",
     features: [
       { text: "Everything in Pro", included: true },
-      { text: "1,000 AI prompts per month", included: true },
+      { text: "1,000 AI credits per month", included: true },
       { text: "Early access to new AI features", included: true },
       { text: "Priority support", included: true },
     ],
@@ -138,7 +143,7 @@ const COMPARISON_ROWS = [
   { feature: "Life modules", free: true, pro: true, pro_max: true },
   { feature: "Progress visualization", free: true, pro: true, pro_max: true },
   { feature: "Achievements", free: true, pro: true, pro_max: true },
-  { feature: "AI prompts / month", free: "10", pro: "200", pro_max: "1000" },
+  { feature: "AI credits / month", free: "10", pro: "200", pro_max: "1000" },
   { feature: "AI Coach Card", free: false, pro: true, pro_max: true },
   { feature: "AI goal optimization", free: false, pro: true, pro_max: true },
   { feature: "AI Weekly Report", free: false, pro: true, pro_max: true },
@@ -243,6 +248,7 @@ function PlanCard({
   currentTier: Tier;
 }) {
   const [loading, setLoading] = useState(false);
+  const isPreviewOnly = STRIPE_DISABLED && plan.id !== "free" && !isCurrent;
 
   const displayPrice =
     plan.id === "free"
@@ -280,7 +286,12 @@ function PlanCard({
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border p-6 ${plan.borderClass} ${plan.glowClass}`}
+      className={cn(
+        "relative flex flex-col rounded-2xl border p-6 transition-colors",
+        plan.borderClass,
+        !isPreviewOnly && plan.glowClass,
+        isPreviewOnly && "border-white/10 bg-background/45 opacity-75 saturate-75",
+      )}
     >
       {plan.badge && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -292,18 +303,34 @@ function PlanCard({
 
       <div className="mb-5">
         <div
-          className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl border ${plan.borderClass} ${plan.color}`}
+          className={cn(
+            "mb-3 flex h-10 w-10 items-center justify-center rounded-xl border",
+            isPreviewOnly ? "border-white/10 text-muted-foreground" : plan.borderClass,
+            isPreviewOnly ? "bg-background/70" : plan.color,
+          )}
         >
           {plan.icon}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className={`text-lg font-bold ${plan.color}`}>{plan.name}</h3>
+          <h3
+            className={cn(
+              "text-lg font-bold",
+              isPreviewOnly ? "text-foreground/80" : plan.color,
+            )}
+          >
+            {plan.name}
+          </h3>
           {isCurrent && (
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TIER_BADGE[plan.id]}`}
             >
               Current
+            </span>
+          )}
+          {isPreviewOnly && (
+            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+              {PAID_PLANS_COMING_SOON_LABEL}
             </span>
           )}
         </div>
@@ -335,9 +362,16 @@ function PlanCard({
           Free forever
         </div>
       ) : STRIPE_DISABLED ? (
-        <div className="mb-5 flex items-center justify-center gap-2 rounded-xl border border-dashed py-2.5">
-          <Lock className="h-3.5 w-3.5 text-muted-foreground/50" />
-          <span className="text-sm text-muted-foreground">Coming soon</span>
+        <div className="mb-5 space-y-1 rounded-xl border border-dashed border-amber-400/20 bg-amber-400/5 px-3 py-2.5 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <Lock className="h-3.5 w-3.5 text-muted-foreground/50" />
+            <span className="text-sm text-muted-foreground">
+              {PAID_PLANS_COMING_SOON_LABEL}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Preview the plan for now. Checkout will open later.
+          </p>
         </div>
       ) : (
         <button
@@ -480,7 +514,7 @@ export function UpgradePage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-4 py-1.5">
             <Sparkles className="h-3.5 w-3.5 text-violet-400" />
             <span className="text-xs font-semibold text-violet-300">
-              Upgrade Begyn
+              Plans & pricing
             </span>
           </div>
 
@@ -497,7 +531,7 @@ export function UpgradePage() {
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-1.5">
               <Lock className="h-3 w-3 text-amber-400" />
               <span className="text-xs font-medium text-amber-300">
-                Payments coming soon — plans shown for preview only
+                {PAID_PLANS_PREVIEW_MESSAGE}
               </span>
             </div>
           )}

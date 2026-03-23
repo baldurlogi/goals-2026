@@ -9,6 +9,10 @@ import {
   useAIUsageSnapshotState,
 } from "@/features/subscription/aiUsageCache";
 import { TIER_BADGE, TIER_LABELS, useTier } from "@/features/subscription/useTier";
+import {
+  PAID_PLANS_COMING_SOON,
+  PAID_PLANS_COMING_SOON_LABEL,
+} from "@/features/subscription/subscriptionConfig";
 
 type Props = {
   className?: string;
@@ -147,14 +151,27 @@ export function AIUsageDetailsCard({ className }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>{getAIUsageResetLabel()}</span>
 
-          {tier !== "pro_max" && (
-            <Button asChild size="sm" className="gap-1.5">
-              <Link to="/app/upgrade">
-                Upgrade for more prompts
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          )}
+          {tier !== "pro_max" &&
+            (PAID_PLANS_COMING_SOON ? (
+              <div className="flex items-center gap-2 rounded-full border border-dashed border-violet-500/25 bg-violet-500/5 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5 text-violet-400" />
+                {PAID_PLANS_COMING_SOON_LABEL}
+                <Link
+                  to="/app/upgrade"
+                  className="inline-flex items-center gap-1 text-violet-300 transition-colors hover:text-violet-200"
+                >
+                  Preview plans
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            ) : (
+              <Button asChild size="sm" className="gap-1.5">
+                <Link to="/app/upgrade">
+                  Upgrade for more prompts
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            ))}
         </div>
       </CardContent>
     </Card>

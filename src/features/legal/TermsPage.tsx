@@ -74,9 +74,9 @@ export function TermsPage() {
             {APP_NAME} offers the following plans:
           </p>
           <div className="space-y-3">
-            <PlanRow name="Free" price="€0/month" features="10 AI prompts per month, all core tracking features" />
-            <PlanRow name="Pro" price="€9/month" features="200 AI prompts per month, AI Weekly Report, AI Goal Optimisation" />
-            <PlanRow name="Pro Max" price="€19/month" features="1,000 AI prompts per month, all Pro features" />
+            <PlanRow name="Free" price="€0/month" features="10 AI credits per month, all core tracking features" />
+            <PlanRow name="Pro" price="€9/month" features="200 AI credits per month, AI Weekly Report, AI Goal Optimisation" />
+            <PlanRow name="Pro Max" price="€19/month" features="1,000 AI credits per month, all Pro features" />
           </div>
           <p className="mt-4">
             Paid subscriptions are billed monthly via Stripe. You may cancel at any time from your

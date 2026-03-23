@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TOKENS } from "../theme/tokens";
 import type { BillingMode, PricingPlan, ThemeMode } from "../types";
+import { PAID_PLANS_COMING_SOON_LABEL } from "@/features/subscription/subscriptionConfig";
 
 type PricingCardProps = PricingPlan & {
   theme: ThemeMode;
@@ -24,20 +25,28 @@ export function PricingCard({
   featured,
   cta,
   points,
+  comingSoon,
 }: PricingCardProps) {
   const t = TOKENS[theme];
   const isFree = monthly === 0;
   const isYearly = billing === "yearly";
   const displayPrice = isYearly ? yearly : monthly;
   const equivalentMonthly = !isFree ? formatMonthlyEquivalent(yearly) : null;
+  const isPreviewOnly = Boolean(comingSoon);
 
   return (
     <Card
       className="relative h-full overflow-hidden rounded-3xl"
       style={{
-        background: featured ? t.primarySoft : t.surface,
-        border: `1px solid ${featured ? t.primaryBorder : t.border}`,
-        boxShadow: featured ? t.shadow : "none",
+        background: isPreviewOnly
+          ? t.surface2
+          : featured
+            ? t.primarySoft
+            : t.surface,
+        border: `1px solid ${isPreviewOnly ? t.border : featured ? t.primaryBorder : t.border}`,
+        boxShadow: isPreviewOnly ? "none" : featured ? t.shadow : "none",
+        opacity: isPreviewOnly ? 0.82 : 1,
+        filter: isPreviewOnly ? "saturate(0.82)" : undefined,
       }}
     >
       <CardContent className="flex h-full min-h-[560px] flex-col p-6">
@@ -51,6 +60,18 @@ export function PricingCard({
             }}
           >
             MOST POPULAR
+          </div>
+        )}
+        {isPreviewOnly && (
+          <div
+            className="absolute left-4 top-4 rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]"
+            style={{
+              background: t.surface,
+              border: `1px solid ${t.border}`,
+              color: t.primary,
+            }}
+          >
+            {PAID_PLANS_COMING_SOON_LABEL.toUpperCase()}
           </div>
         )}
 
@@ -135,15 +156,22 @@ export function PricingCard({
         <div className="mt-auto">
           <Button
             type="button"
-            onClick={onChoosePlan}
+            onClick={isPreviewOnly ? undefined : onChoosePlan}
+            disabled={isPreviewOnly}
             className="w-full rounded-xl font-semibold"
             style={{
-              background: featured ? t.primary : t.text,
-              color: featured ? "#052e16" : t.bg,
+              background: isPreviewOnly ? t.surface : featured ? t.primary : t.text,
+              color: isPreviewOnly ? t.faint : featured ? "#052e16" : t.bg,
+              border: isPreviewOnly ? `1px solid ${t.border}` : undefined,
             }}
           >
             {cta}
           </Button>
+          {isPreviewOnly && (
+            <p className="mt-3 text-center text-xs" style={{ color: t.faint }}>
+              Preview what Pro includes. Checkout opens later.
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

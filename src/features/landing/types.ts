@@ -57,4 +57,5 @@ export type PricingPlan = {
   featured: boolean;
   cta: string;
   points: string[];
+  comingSoon?: boolean;
 };
