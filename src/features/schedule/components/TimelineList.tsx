@@ -26,59 +26,64 @@ function BlockRow({
     <div className={cn("group", done && "opacity-50")}>
       <div
         className={cn(
-          "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/40",
+          "rounded-lg px-2 py-2 transition-colors hover:bg-muted/40",
           open && "bg-muted/40",
         )}
       >
-        {/* checkbox */}
-        <Checkbox
-          checked={done}
-          onCheckedChange={(c) => onToggle(index, !!c)}
-          className="shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        />
+        <div className="flex items-start gap-3">
+          <Checkbox
+            checked={done}
+            onCheckedChange={(c) => onToggle(index, !!c)}
+            className="mt-0.5 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          />
 
-        {/* time */}
-        <span className="w-14 shrink-0 text-[11px] tabular-nums text-muted-foreground">
-          {formatTimeStringWithPreferences(item.time, preferences)}
-        </span>
-
-        {/* icon + label */}
-        <span className="text-sm leading-none">{item.icon}</span>
-        <span
-          className={cn(
-            "flex-1 text-sm font-medium leading-none",
-            done && "line-through text-muted-foreground",
-          )}
-        >
-          {item.label}
-        </span>
-
-        {/* macro tag */}
-        {item.tag && (
-          <span className="shrink-0 text-[10px] font-medium text-amber-500 dark:text-amber-400 tabular-nums">
-            {item.tag}
-          </span>
-        )}
-
-        {/* expand chevron */}
-        {hasDetail && (
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="ml-1 shrink-0 text-muted-foreground/50 transition-colors hover:text-muted-foreground"
-            aria-label={open ? "Collapse" : "Expand"}
-          >
-            <ChevronDown
-              className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")}
-            />
-          </button>
-        )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-2 sm:items-center">
+              <span className="w-14 shrink-0 pt-0.5 text-[11px] tabular-nums text-muted-foreground sm:pt-0">
+                {formatTimeStringWithPreferences(item.time, preferences)}
+              </span>
+              <span className="pt-0.5 text-sm leading-none sm:pt-0">{item.icon}</span>
+              <div className="min-w-0 flex-1">
+                <div
+                  className={cn(
+                    "text-sm font-medium leading-snug",
+                    done && "line-through text-muted-foreground",
+                  )}
+                >
+                  {item.label}
+                </div>
+                {item.tag && (
+                  <div className="mt-1 text-[10px] font-medium text-amber-500 dark:text-amber-400 tabular-nums sm:hidden">
+                    {item.tag}
+                  </div>
+                )}
+              </div>
+              {item.tag && (
+                <span className="hidden shrink-0 text-[10px] font-medium text-amber-500 dark:text-amber-400 tabular-nums sm:block">
+                  {item.tag}
+                </span>
+              )}
+              {hasDetail && (
+                <button
+                  type="button"
+                  onClick={() => setOpen((o) => !o)}
+                  className="ml-1 shrink-0 pt-0.5 text-muted-foreground/50 transition-colors hover:text-muted-foreground sm:pt-0"
+                  aria-label={open ? "Collapse" : "Expand"}
+                >
+                  <ChevronDown
+                    className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")}
+                  />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* expandable detail */}
       {open && hasDetail && (
-        <div className="ml-[4.25rem] pb-2 pr-2 text-xs text-muted-foreground leading-relaxed">
+        <div className="pl-[5.2rem] pr-2 pb-2 text-xs leading-relaxed text-muted-foreground sm:pl-[4.25rem]">
           {item.detail}
         </div>
       )}

@@ -13,10 +13,10 @@ export function SchedulePicker(props: {
       type="single"
       value={value}
       onValueChange={(v) => { if (v) onChange(v as ScheduleView); }}
-      className="w-full grid grid-cols-3"
+      className="grid min-w-[280px] w-full grid-cols-3"
     >
       {(["wfh", "office", "weekend"] as ScheduleView[]).map((v) => (
-        <ToggleGroupItem key={v} value={v} className="text-xs">
+        <ToggleGroupItem key={v} value={v} className="px-2 text-[11px] sm:text-xs">
           {SCHEDULE_CONFIG[v].label}
         </ToggleGroupItem>
       ))}

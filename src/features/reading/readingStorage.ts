@@ -61,6 +61,26 @@ export type TodayReadingProgress = {
   pct: number;
 };
 
+function toTodayReadingProgress(
+  hasBook: boolean,
+  goalPages: number,
+  pagesRead: number,
+): TodayReadingProgress {
+  const pct =
+    goalPages > 0
+      ? Math.min(Math.round((pagesRead / goalPages) * 100), 100)
+      : pagesRead > 0
+        ? 100
+        : 0;
+
+  return {
+    hasBook,
+    goalPages,
+    pagesRead,
+    pct,
+  };
+}
+
 function clearAISignalsCache(userId: string | null) {
   removeScopedStorageItem(AI_SIGNALS_CACHE_KEY, userId);
 }
@@ -336,10 +356,8 @@ function syncTodayReadingProgress(
         previousPage > 0 &&
         currentPage < previousPage
       ) {
-        nextCache = {
-          ...cached,
-          latestPage: currentPage,
-        };
+        // Treat a backward page edit as a deliberate baseline reset for today.
+        nextCache = createProgressSnapshot(today, bookKey, currentPage, currentPage);
       } else {
         nextCache = {
           ...cached,
@@ -353,26 +371,28 @@ function syncTodayReadingProgress(
   upsertReadingHistoryEntry(nextInputs, nextCache, goalPages, userId);
 
   const pagesRead = Math.max(nextCache.latestPage - nextCache.baselinePage, 0);
-  const pct =
-    goalPages > 0
-      ? Math.min(Math.round((pagesRead / goalPages) * 100), 100)
-      : pagesRead > 0
-        ? 100
-        : 0;
-
-  return {
-    hasBook: true,
-    goalPages,
-    pagesRead,
-    pct,
-  };
+  return toTodayReadingProgress(true, goalPages, pagesRead);
 }
 
 export function getTodayReadingProgress(
   inputs: ReadingInputs,
   userId: string | null = getActiveUserId(),
 ): TodayReadingProgress {
-  return syncTodayReadingProgress(inputs, undefined, userId);
+  const bookKey = getBookKey(inputs);
+  const currentPage = parsePage(inputs.current.currentPage);
+  const goalPages = parseGoalPages(inputs.dailyGoalPages);
+
+  if (!bookKey.trim()) {
+    return toTodayReadingProgress(false, goalPages, 0);
+  }
+
+  const cached = readDailyProgressCache(userId);
+  if (!cached || cached.bookKey !== bookKey) {
+    return toTodayReadingProgress(true, goalPages, 0);
+  }
+
+  const pagesRead = Math.max(currentPage - cached.baselinePage, 0);
+  return toTodayReadingProgress(true, goalPages, pagesRead);
 }
 
 function normalizeReadingInputs(
@@ -458,10 +478,16 @@ export async function loadReadingInputs(
 export async function saveReadingInputs(
   userId: string | null,
   value: ReadingInputs,
+  options?: {
+    previousInputs?: ReadingInputs | null;
+  },
 ): Promise<ReadingInputs> {
   if (!userId) return value;
 
-  const previousInputs = await loadPreviousInputs(userId);
+  const previousInputs =
+    options?.previousInputs === undefined
+      ? await loadPreviousInputs(userId)
+      : options.previousInputs;
 
   try {
     const key = readingKey(userId);

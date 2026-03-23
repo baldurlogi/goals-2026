@@ -70,8 +70,8 @@ export function UpcomingTasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold">📌 Upcoming</h2>
           <p className="text-sm text-muted-foreground">
             Overdue + due in the next {horizonDays} days across all goals.
@@ -97,7 +97,7 @@ export function UpcomingTasksPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-card p-4">
+        <div className="rounded-2xl border bg-card p-4">
         {/* Summary row */}
         <div className="text-sm text-muted-foreground">
           {loading
@@ -137,9 +137,9 @@ export function UpcomingTasksPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               {grouped.map(([goalId, arr]) => (
                 <div key={goalId} className="rounded-xl border p-3">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-medium truncate">
+                      <div className="font-medium leading-snug">
                         {arr[0].goalEmoji} {arr[0].goalTitle}
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -166,50 +166,52 @@ export function UpcomingTasksPage() {
                       return (
                         <div
                           key={it.step.id}
-                          className="flex items-start justify-between gap-3"
+                          className="rounded-lg border border-transparent p-2 -mx-2 sm:mx-0 sm:p-0"
                         >
-                          <label className="flex min-w-0 items-start gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              className="mt-1"
-                              checked={!!done[it.goalId]?.[it.step.id]}
-                              onChange={() => {
-                                toggleGoalStepMutation.mutate({
-                                  goalId: it.goalId,
-                                  stepId: it.step.id,
-                                });
-                                toast('Marked as done', {
-                                  description: `${it.goalEmoji} ${it.goalTitle} — ${it.step.label}`,
-                                  action: {
-                                    label: 'Undo',
-                                    onClick: () =>
-                                      toggleGoalStepMutation.mutate({
-                                        goalId: it.goalId,
-                                        stepId: it.step.id,
-                                      }),
-                                  },
-                                });
-                              }}
-                            />
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium truncate">
-                                {it.step.label}
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <label className="flex min-w-0 items-start gap-3 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="mt-1"
+                                checked={!!done[it.goalId]?.[it.step.id]}
+                                onChange={() => {
+                                  toggleGoalStepMutation.mutate({
+                                    goalId: it.goalId,
+                                    stepId: it.step.id,
+                                  });
+                                  toast('Marked as done', {
+                                    description: `${it.goalEmoji} ${it.goalTitle} — ${it.step.label}`,
+                                    action: {
+                                      label: 'Undo',
+                                      onClick: () =>
+                                        toggleGoalStepMutation.mutate({
+                                          goalId: it.goalId,
+                                          stepId: it.step.id,
+                                        }),
+                                    },
+                                  });
+                                }}
+                              />
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium leading-snug">
+                                  {it.step.label}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  due {it.step.idealFinish}
+                                </div>
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                due {it.step.idealFinish}
-                              </div>
-                            </div>
-                          </label>
+                            </label>
 
-                          <div
-                            className={
-                              'shrink-0 rounded-full px-2 py-1 text-xs tabular-nums ' +
-                              (overdue
-                                ? 'bg-destructive/15 text-destructive'
-                                : 'bg-muted text-muted-foreground')
-                            }
-                          >
-                            {label}
+                            <div
+                              className={
+                                'self-start rounded-full px-2 py-1 text-xs tabular-nums sm:shrink-0 ' +
+                                (overdue
+                                  ? 'bg-destructive/15 text-destructive'
+                                  : 'bg-muted text-muted-foreground')
+                              }
+                            >
+                              {label}
+                            </div>
                           </div>
                         </div>
                       );

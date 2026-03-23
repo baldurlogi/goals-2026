@@ -9,6 +9,11 @@ import {
 } from "./readingStorage";
 import type { ReadingInputs } from "./readingTypes";
 
+type SaveReadingVariables = {
+  value: ReadingInputs;
+  previousInputs: ReadingInputs;
+};
+
 export function useReadingQuery() {
   const { userId, authReady } = useAuth();
 
@@ -31,11 +36,12 @@ export function useSaveReadingMutation() {
   return useMutation<
     ReadingInputs,
     Error,
-    ReadingInputs,
+    SaveReadingVariables,
     { previous: ReadingInputs }
   >({
-    mutationFn: (value: ReadingInputs) => saveReadingInputs(userId, value),
-    onMutate: async (value) => {
+    mutationFn: ({ value, previousInputs }) =>
+      saveReadingInputs(userId, value, { previousInputs }),
+    onMutate: async ({ value }) => {
       const previous =
         queryClient.getQueryData<ReadingInputs>(queryKeys.reading(userId)) ??
         DEFAULT_READING_INPUTS;
