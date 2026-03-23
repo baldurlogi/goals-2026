@@ -117,7 +117,7 @@ export function ReadingPage() {
 
     const submittedJson = draftJson;
     const timeoutId = window.setTimeout(() => {
-      saveReadingMutation.mutate(draft, {
+      saveReadingMutation.mutate({ value: draft, previousInputs: remoteInputs }, {
         onSettled: () => {
           if (JSON.stringify(draftRef.current) === submittedJson) {
             isDirtyRef.current = false;
@@ -143,7 +143,7 @@ export function ReadingPage() {
     isDirtyRef.current = false;
     setDraft(next);
     draftRef.current = next;
-    saveReadingMutation.mutate(next);
+    saveReadingMutation.mutate({ value: next, previousInputs: remoteInputs });
   }
 
   function updateField(path: ReadingFieldPath, value: string) {

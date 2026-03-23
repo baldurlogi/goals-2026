@@ -160,8 +160,8 @@ export function UserGoalPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1 space-y-1">
           <div className="text-sm text-muted-foreground">
             <Link to="/app/goals" className="underline">
               Goals
@@ -172,7 +172,9 @@ export function UserGoalPage() {
             {activeGoal.emoji} {activeGoal.title}
           </h1>
           {activeGoal.subtitle && (
-            <p className="text-muted-foreground">{activeGoal.subtitle}</p>
+            <p className="max-w-2xl pr-0 text-sm leading-relaxed text-muted-foreground sm:text-base lg:pr-6">
+              {activeGoal.subtitle}
+            </p>
           )}
           <div className="text-sm text-muted-foreground">
             {doneCount}/{total} steps · Priority:{' '}
@@ -193,14 +195,14 @@ export function UserGoalPage() {
           </div>
         </div>
 
-        <div className="shrink-0 items-end flex flex-col gap-2">
-          <div className="flex gap-2">
+        <div className="flex shrink-0 flex-col gap-2 lg:items-end">
+          <div className="flex flex-col gap-2 sm:flex-row">
             {isPro && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setImproving(true)}
-                className="gap-2 border-violet-500/30 text-violet-400 hover:bg-violet-500/10 hover:text-violet-400"
+                className="w-full gap-2 border-violet-500/30 text-violet-400 hover:bg-violet-500/10 hover:text-violet-400 sm:w-auto"
               >
                 <Sparkles className="h-3.5 w-3.5" /> Improve with AI
               </Button>
@@ -209,7 +211,7 @@ export function UserGoalPage() {
               variant="outline"
               size="sm"
               onClick={() => setEditing(true)}
-              className="gap-2"
+              className="w-full gap-2 sm:w-auto"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit goal
             </Button>
@@ -217,6 +219,7 @@ export function UserGoalPage() {
           <Button
             variant="ghost"
             size="sm"
+            className="w-full sm:w-auto"
             onClick={() => {
               void resetGoalProgressMutation.mutate({ goalId: activeGoal.id });
               clearAISignalsCache();

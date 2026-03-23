@@ -15,7 +15,7 @@ export const CACHE_KEYS = {
   NUTRITION_PHASE: "cache:nutrition_phase:v1",
   PROFILE: "cache:profile:v2",
   READING: "daily-life:reading:v2",
-  READING_DAILY_PROGRESS: "cache:reading:today-progress:v1",
+  READING_DAILY_PROGRESS: "cache:reading:today-progress:v2",
   READING_HISTORY: "cache:reading:history:v1",
   SCHEDULE_LOG: "cache:schedule_log:v1",
   SCHEDULE_TEMPLATES: "cache:schedule:templates:v1",

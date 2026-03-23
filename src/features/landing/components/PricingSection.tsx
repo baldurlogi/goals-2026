@@ -4,6 +4,7 @@ import { TOKENS } from "../theme/tokens";
 import type { BillingMode, ThemeMode } from "../types";
 import { BillingToggle } from "./BillingToggle";
 import { PricingCard } from "./PricingCard";
+import { PAID_PLANS_PREVIEW_MESSAGE } from "@/features/subscription/subscriptionConfig";
 
 type PricingSectionProps = {
   theme: ThemeMode;
@@ -103,7 +104,7 @@ export function PricingSection({
         className="mx-auto mt-6 max-w-3xl text-center text-sm"
         style={{ color: t.faint }}
       >
-        Pro Max is coming soon. Right now, we make focus on making your goal journey the easiest it can be.
+        {PAID_PLANS_PREVIEW_MESSAGE}
       </div>
     </section>
   );

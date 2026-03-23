@@ -61,6 +61,26 @@ export type TodayReadingProgress = {
   pct: number;
 };
 
+function toTodayReadingProgress(
+  hasBook: boolean,
+  goalPages: number,
+  pagesRead: number,
+): TodayReadingProgress {
+  const pct =
+    goalPages > 0
+      ? Math.min(Math.round((pagesRead / goalPages) * 100), 100)
+      : pagesRead > 0
+        ? 100
+        : 0;
+
+  return {
+    hasBook,
+    goalPages,
+    pagesRead,
+    pct,
+  };
+}
+
 function clearAISignalsCache(userId: string | null) {
   removeScopedStorageItem(AI_SIGNALS_CACHE_KEY, userId);
 }
@@ -204,15 +224,31 @@ function upsertReadingHistoryEntry(
   writeReadingHistoryCache(existing, userId);
 }
 
+function findLatestRecordedPageBeforeDate(
+  bookKey: string,
+  date: string,
+  userId: string | null = getActiveUserId(),
+): number | null {
+  const entries = readReadingHistoryCache(userId)
+    .filter((entry) => entry.bookKey === bookKey && entry.date < date)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt.localeCompare(a.updatedAt));
+
+  const latest = entries[0];
+  if (!latest) return null;
+
+  return Math.max(latest.latestPage, 0);
+}
+
 function createProgressSnapshot(
   date: string,
   bookKey: string,
   currentPage: number,
+  baselinePage = currentPage,
 ): ReadingDailyProgressCache {
   return {
     date,
     bookKey,
-    baselinePage: currentPage,
+    baselinePage,
     latestPage: currentPage,
   };
 }
@@ -238,44 +274,96 @@ function syncTodayReadingProgress(
     previousInputs && getBookKey(previousInputs) === bookKey
       ? parsePage(previousInputs.current.currentPage)
       : null;
+  const previousRecordedPage = findLatestRecordedPageBeforeDate(
+    bookKey,
+    today,
+    userId,
+  );
 
   let nextCache: ReadingDailyProgressCache;
 
   if (!cached || cached.bookKey !== bookKey) {
-    nextCache = createProgressSnapshot(today, bookKey, currentPage);
+    const baselinePage =
+      previousPage != null && previousPage > 0 && currentPage >= previousPage
+        ? previousPage
+        : previousRecordedPage != null &&
+            previousRecordedPage > 0 &&
+            currentPage >= previousRecordedPage
+          ? previousRecordedPage
+        : currentPage;
+
+    nextCache = createProgressSnapshot(
+      today,
+      bookKey,
+      currentPage,
+      baselinePage,
+    );
   } else {
     const hasPreviousPage = previousPage != null;
-    const firstMeaningfulPageSet =
+    const shouldRecoverBaselineFromPreviousPage =
       cached.baselinePage === 0 &&
-      cached.latestPage === 0 &&
+      hasPreviousPage &&
+      previousPage > 0 &&
+      currentPage >= previousPage;
+    const shouldRecoverBaselineFromHistory =
+      !hasPreviousPage &&
+      cached.baselinePage === 0 &&
+      previousRecordedPage != null &&
+      previousRecordedPage > 0 &&
+      currentPage >= previousRecordedPage;
+    const shouldResetBaselineFromCurrentPage =
+      currentPage > 0 && currentPage < cached.baselinePage;
+
+    if (shouldRecoverBaselineFromPreviousPage) {
+      nextCache = {
+        ...cached,
+        baselinePage: previousPage,
+        latestPage: currentPage,
+      };
+    } else if (shouldRecoverBaselineFromHistory) {
+      nextCache = {
+        ...cached,
+        baselinePage: previousRecordedPage,
+        latestPage: currentPage,
+      };
+    } else if (shouldResetBaselineFromCurrentPage) {
+      nextCache = createProgressSnapshot(
+        today,
+        bookKey,
+        currentPage,
+        currentPage,
+      );
+    } else {
+      const firstMeaningfulPageSet =
+        cached.baselinePage === 0 &&
+        cached.latestPage === 0 &&
       currentPage > 0 &&
       (!hasPreviousPage || previousPage === 0);
 
-    if (firstMeaningfulPageSet) {
-      nextCache = createProgressSnapshot(today, bookKey, currentPage);
-    } else if (
-      hasPreviousPage &&
-      previousPage > 0 &&
-      currentPage >= previousPage
-    ) {
-      nextCache = {
-        ...cached,
-        latestPage: currentPage,
-      };
-    } else if (
-      hasPreviousPage &&
-      previousPage > 0 &&
-      currentPage < previousPage
-    ) {
-      nextCache = {
-        ...cached,
-        latestPage: currentPage,
-      };
-    } else {
-      nextCache = {
-        ...cached,
-        latestPage: currentPage,
-      };
+      if (firstMeaningfulPageSet) {
+        nextCache = createProgressSnapshot(today, bookKey, currentPage);
+      } else if (
+        hasPreviousPage &&
+        previousPage > 0 &&
+        currentPage >= previousPage
+      ) {
+        nextCache = {
+          ...cached,
+          latestPage: currentPage,
+        };
+      } else if (
+        hasPreviousPage &&
+        previousPage > 0 &&
+        currentPage < previousPage
+      ) {
+        // Treat a backward page edit as a deliberate baseline reset for today.
+        nextCache = createProgressSnapshot(today, bookKey, currentPage, currentPage);
+      } else {
+        nextCache = {
+          ...cached,
+          latestPage: currentPage,
+        };
+      }
     }
   }
 
@@ -283,26 +371,28 @@ function syncTodayReadingProgress(
   upsertReadingHistoryEntry(nextInputs, nextCache, goalPages, userId);
 
   const pagesRead = Math.max(nextCache.latestPage - nextCache.baselinePage, 0);
-  const pct =
-    goalPages > 0
-      ? Math.min(Math.round((pagesRead / goalPages) * 100), 100)
-      : pagesRead > 0
-        ? 100
-        : 0;
-
-  return {
-    hasBook: true,
-    goalPages,
-    pagesRead,
-    pct,
-  };
+  return toTodayReadingProgress(true, goalPages, pagesRead);
 }
 
 export function getTodayReadingProgress(
   inputs: ReadingInputs,
   userId: string | null = getActiveUserId(),
 ): TodayReadingProgress {
-  return syncTodayReadingProgress(inputs, undefined, userId);
+  const bookKey = getBookKey(inputs);
+  const currentPage = parsePage(inputs.current.currentPage);
+  const goalPages = parseGoalPages(inputs.dailyGoalPages);
+
+  if (!bookKey.trim()) {
+    return toTodayReadingProgress(false, goalPages, 0);
+  }
+
+  const cached = readDailyProgressCache(userId);
+  if (!cached || cached.bookKey !== bookKey) {
+    return toTodayReadingProgress(true, goalPages, 0);
+  }
+
+  const pagesRead = Math.max(currentPage - cached.baselinePage, 0);
+  return toTodayReadingProgress(true, goalPages, pagesRead);
 }
 
 function normalizeReadingInputs(
@@ -388,10 +478,16 @@ export async function loadReadingInputs(
 export async function saveReadingInputs(
   userId: string | null,
   value: ReadingInputs,
+  options?: {
+    previousInputs?: ReadingInputs | null;
+  },
 ): Promise<ReadingInputs> {
   if (!userId) return value;
 
-  const previousInputs = await loadPreviousInputs(userId);
+  const previousInputs =
+    options?.previousInputs === undefined
+      ? await loadPreviousInputs(userId)
+      : options.previousInputs;
 
   try {
     const key = readingKey(userId);

@@ -97,12 +97,12 @@ function ManualEntryForm({
 
   return (
     <div className="space-y-3 rounded-xl border bg-muted/20 p-3">
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <input
           type="text"
           value={emoji}
           onChange={(e) => setEmoji(e.target.value)}
-          className="w-10 rounded-md border bg-background px-1.5 py-1.5 text-center text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="w-full rounded-md border bg-background px-1.5 py-1.5 text-center text-sm focus:outline-none focus:ring-1 focus:ring-ring sm:w-10"
           maxLength={2}
         />
         <input
@@ -114,7 +114,7 @@ function ManualEntryForm({
           className="flex-1 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MacroInputRow label="Calories" value={cal}     unit="kcal" onChange={setCal}     />
         <MacroInputRow label="Protein"  value={protein} unit="g"    onChange={setProtein} />
         <MacroInputRow label="Carbs"    value={carbs}   unit="g"    onChange={setCarbs}   />
@@ -150,7 +150,7 @@ function SavedMealPill({
   meal: SavedMeal; onAdd: (m: SavedMeal) => void; onDelete: (id: string) => void;
 }) {
   return (
-    <div className="group flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-muted/30 transition-colors">
+    <div className="group flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 transition-colors hover:bg-muted/30">
       <button
         type="button"
         className="flex min-w-0 flex-1 items-center gap-2 text-left"
@@ -166,7 +166,7 @@ function SavedMealPill({
       <button
         type="button"
         onClick={() => onDelete(meal.id)}
-        className="invisible shrink-0 text-muted-foreground/40 hover:text-destructive group-hover:visible"
+        className="shrink-0 text-muted-foreground/40 hover:text-destructive sm:invisible sm:group-hover:visible"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>
@@ -190,7 +190,7 @@ function CustomEntryRow({
       <button
         type="button"
         onClick={() => onRemove(entry.id)}
-        className="invisible shrink-0 text-muted-foreground/40 hover:text-destructive group-hover:visible"
+        className="shrink-0 text-muted-foreground/40 hover:text-destructive sm:invisible sm:group-hover:visible"
       >
         <X className="h-3.5 w-3.5" />
       </button>
@@ -276,8 +276,8 @@ export function NutritionPage() {
     <div className="space-y-6">
 
       {/* Phase toggle — full width */}
-      <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3">
-        <div>
+      <div className="flex flex-col gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <p className="text-sm font-semibold">
             {phase === "cut" ? "✂️ Cut phase" : "💪 Maintain / Lean bulk"}
           </p>

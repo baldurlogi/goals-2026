@@ -259,18 +259,27 @@ function EditableBlockList({
             onDragEnter={() => handleDragEnter(i)}
             onDragEnd={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${
+            className={`flex items-start gap-2 rounded-lg border px-3 py-2 transition-colors sm:items-center ${
               dragOver === i
                 ? "border-primary/50 bg-primary/5"
                 : "border-transparent bg-muted/30 hover:bg-muted/50"
             }`}
           >
-            <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground/50" />
-            <span className="text-base">{block.icon}</span>
-            <span className="w-14 shrink-0 text-xs tabular-nums text-muted-foreground">
-              {formatTimeStringWithPreferences(block.time, preferences)}
-            </span>
-            <span className="flex-1 truncate text-sm font-medium">{block.label}</span>
+            <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground/50 sm:mt-0" />
+            <span className="mt-0.5 text-base sm:mt-0">{block.icon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:w-14">
+                  {formatTimeStringWithPreferences(block.time, preferences)}
+                </span>
+                <span className="text-sm font-medium leading-snug">{block.label}</span>
+              </div>
+              {block.tag && (
+                <span className="mt-1 inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground sm:hidden">
+                  {block.tag}
+                </span>
+              )}
+            </div>
             {block.tag && (
               <span className="hidden shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground sm:block">
                 {block.tag}
@@ -433,15 +442,15 @@ export function SchedulePage() {
     <div className="space-y-4">
       <Card>
         <CardHeader className="px-4 pb-3 pt-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <p className="text-sm font-semibold">{config.label}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Tap a row to expand · check off to track progress
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                 {summary.done}/{summary.total} done
               </span>
@@ -456,18 +465,18 @@ export function SchedulePage() {
                   <Pencil className="h-3 w-3" /> Edit
                 </Button>
               ) : (
-                <div className="flex gap-1.5">
+                <div className="flex w-full gap-1.5 sm:w-auto">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 text-xs"
+                    className="h-7 flex-1 text-xs sm:flex-none"
                     onClick={cancelEdit}
                   >
                     Cancel
                   </Button>
                   <Button
                     size="sm"
-                    className="h-7 text-xs"
+                    className="h-7 flex-1 text-xs sm:flex-none"
                     onClick={saveEdit}
                     disabled={saving}
                   >
@@ -478,7 +487,7 @@ export function SchedulePage() {
             </div>
           </div>
 
-          <div className="mt-3">
+          <div className="mt-3 overflow-x-auto">
             <SchedulePicker value={view} onChange={handleViewChange} />
           </div>
 

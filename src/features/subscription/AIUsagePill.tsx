@@ -55,7 +55,7 @@ export function AIUsagePill({ className = "" }: { className?: string }) {
       ) : (
         <span>
           <span className="font-semibold text-foreground">{TIER_LABELS[tier]}</span>{" "}
-          · {monthlyLimit} AI prompts / month
+          · {monthlyLimit} AI credits / month
         </span>
       )}
 

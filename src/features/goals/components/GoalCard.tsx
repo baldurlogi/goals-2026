@@ -65,7 +65,7 @@ export function GoalCard({
           </div>
 
           {goal.subtitle && (
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {goal.subtitle}
             </p>
           )}
@@ -87,7 +87,7 @@ export function GoalCard({
         <Progress value={pct} className="h-2" />
       </div>
 
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-1">
           {onEdit && (
             <Button
@@ -122,7 +122,7 @@ export function GoalCard({
           )}
         </div>
 
-        <Button asChild variant="secondary" size="sm">
+        <Button asChild variant="secondary" size="sm" className="w-full sm:w-auto">
           <Link to={`/app/goals/${goal.id}`}>View details</Link>
         </Button>
       </div>
