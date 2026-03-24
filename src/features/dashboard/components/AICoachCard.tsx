@@ -87,7 +87,7 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
 
   if (!session?.access_token) throw new Error("Not signed in");
 
-  const { systemContext } = await buildAIContext();
+  const { systemContext, signals } = await buildAIContext(true);
   const lastSuggestedModule = readLastModule();
 
   const res = await fetch(SUPABASE_FN, {
@@ -136,7 +136,7 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   const s = data.suggestion as CoachSuggestion;
   if (!s?.action || !s?.href) throw new Error("Invalid suggestion shape");
 
-  return s;
+  return normalizeCoachSuggestion(s, signals);
 }
 
 // ── Starter + static suggestion builders ─────────────────────────────────────
@@ -158,6 +158,119 @@ function buildStarterSuggestion(signals: Awaited<ReturnType<typeof buildAISignal
     return { action: "Set up today's schedule", reason: "A simple plan makes your next move much easier to choose.", href: "/app/schedule", emoji: "📅", module: "schedule" };
   }
   return null;
+}
+
+function candidateToCoachSuggestion(
+  candidate: ReturnType<typeof buildSuggestionCandidates>[number],
+): CoachSuggestion {
+  const EMOJI: Record<string, string> = {
+    goals: "🎯",
+    reading: "📖",
+    nutrition: "🥗",
+    fitness: "💪",
+    todos: "✅",
+    schedule: "📅",
+  };
+
+  return {
+    action: candidate.action,
+    reason: candidate.reason,
+    href: candidate.href,
+    emoji: EMOJI[candidate.module] ?? "💡",
+    module: candidate.module,
+  };
+}
+
+function isMealLoggingSuggestion(suggestion: CoachSuggestion): boolean {
+  const text = `${suggestion.action} ${suggestion.reason}`.toLowerCase();
+  return (
+    suggestion.module === "nutrition" &&
+    suggestion.href === "/app/nutrition" &&
+    text.includes("log") &&
+    (text.includes("meal") ||
+      text.includes("breakfast") ||
+      text.includes("lunch") ||
+      text.includes("snack") ||
+      text.includes("dinner"))
+  );
+}
+
+function getExpectedNutritionTimingSuggestion(
+  signals: Awaited<ReturnType<typeof buildAISignals>>,
+): CoachSuggestion | null {
+  const meals = signals.nutrition.mealsLoggedToday;
+  if (meals >= 4) return null;
+
+  const hour = new Date().getHours();
+  const mealWindows = [
+    { dueFrom: 6, action: "Log breakfast", reason: "0 of 4 meals logged today." },
+    { dueFrom: 13, action: "Log lunch", reason: "1 of 4 meals logged today." },
+    {
+      dueFrom: 17,
+      action: "Log your afternoon snack",
+      reason: "2 of 4 meals logged today.",
+    },
+    { dueFrom: 21, action: "Log dinner", reason: "3 of 4 meals logged today." },
+  ] as const;
+
+  const nextMeal = mealWindows[meals];
+  if (!nextMeal || hour < nextMeal.dueFrom) return null;
+
+  return {
+    action: nextMeal.action,
+    reason: nextMeal.reason,
+    href: "/app/nutrition",
+    emoji: meals === 0 ? "🥗" : "🍽️",
+    module: "nutrition",
+  };
+}
+
+function normalizeCoachSuggestion(
+  suggestion: CoachSuggestion,
+  signals: Awaited<ReturnType<typeof buildAISignals>>,
+): CoachSuggestion {
+  const candidates = buildSuggestionCandidates(signals);
+  const topCandidate = candidates[0] ?? null;
+  const topPriority = topCandidate?.priority ?? 0;
+  const urgentGoalCandidate =
+    topCandidate && topCandidate.module === "goals" && topPriority >= 86
+      ? candidateToCoachSuggestion(topCandidate)
+      : null;
+
+  if (urgentGoalCandidate && suggestion.module !== "goals") {
+    return urgentGoalCandidate;
+  }
+
+  const expectedNutritionSuggestion = getExpectedNutritionTimingSuggestion(signals);
+  if (isMealLoggingSuggestion(suggestion)) {
+    if (expectedNutritionSuggestion) {
+      const normalizedAction = suggestion.action.trim().toLowerCase();
+      const expectedAction = expectedNutritionSuggestion.action.trim().toLowerCase();
+      if (normalizedAction !== expectedAction) {
+        return urgentGoalCandidate ?? expectedNutritionSuggestion;
+      }
+    } else {
+      return urgentGoalCandidate ?? candidateToCoachSuggestion(topCandidate ?? {
+        module: "goals",
+        priority: 10,
+        action: "Review your upcoming tasks",
+        reason: "A quick scan helps you choose the next meaningful step.",
+        href: "/app/upcoming",
+        icon: Zap,
+      });
+    }
+  }
+
+  if (
+    urgentGoalCandidate &&
+    suggestion.module === "goals" &&
+    topCandidate &&
+    suggestion.action.trim().toLowerCase() !== topCandidate.action.trim().toLowerCase()
+  ) {
+    return urgentGoalCandidate;
+  }
+
+  return suggestion;
 }
 
 async function buildStaticSuggestion(): Promise<CoachSuggestion> {
@@ -184,7 +297,10 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
     ? `You were working on "${session.goalTitle}" yesterday — keep the momentum going.`
     : top.reason;
 
-  return { action: top.action, reason, href: top.href, emoji: EMOJI[top.module] ?? "💡", module: top.module };
+  return normalizeCoachSuggestion(
+    { action: top.action, reason, href: top.href, emoji: EMOJI[top.module] ?? "💡", module: top.module },
+    signals,
+  );
 }
 
 // ── Usage pill ────────────────────────────────────────────────────────────────

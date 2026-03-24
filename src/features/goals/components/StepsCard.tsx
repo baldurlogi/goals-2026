@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { GoalStep } from "@/features/goals/goalTypes";
 import { parseStepDetails, prettyStepLink } from "@/features/goals/stepDetails";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 
@@ -12,20 +13,32 @@ function parseDate(s?: string): number {
     return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
 }
 
+function stepUrgencyRank(step: GoalStep, todayKey: string): number {
+    const due = step.idealFinish?.trim();
+    if (!due) return 3;
+    if (due < todayKey) return 0;
+    if (due === todayKey) return 1;
+    return 2;
+}
+
 function sortedSteps(steps: GoalStep[], doneMap?: Record<string, boolean>): GoalStep[] {
+    const todayKey = getLocalDateKey();
     return [...steps].sort((a,b) => {
-        // 1. completed steps first, incomplete steps second
+        // 1. incomplete steps first, completed steps last
         const aDone = doneMap?.[a.id] ? 1 : 0;
         const bDone = doneMap?.[b.id] ? 1 : 0;
-        if (aDone !== bDone) return bDone - aDone;
-        // 2. idealFinish ascending (undated last)
+        if (aDone !== bDone) return aDone - bDone;
+        // 2. overdue first, then due today, then future dated, then undated
+        const urgencyDiff = stepUrgencyRank(a, todayKey) - stepUrgencyRank(b, todayKey);
+        if (urgencyDiff !== 0) return urgencyDiff;
+        // 3. idealFinish ascending (undated last)
         const dateDiff = parseDate(a.idealFinish) - parseDate(b.idealFinish);
         if (dateDiff !== 0) return dateDiff;
-        // 3. manual sort order when available
+        // 4. manual sort order when available
         const aSort = typeof a.sortOrder === "number" ? a.sortOrder : Number.MAX_SAFE_INTEGER;
         const bSort = typeof b.sortOrder === "number" ? b.sortOrder : Number.MAX_SAFE_INTEGER;
         if (aSort !== bSort) return aSort - bSort;
-        // 4. stable tiebreaker: label then id
+        // 5. stable tiebreaker: label then id
         return a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
     })
 }

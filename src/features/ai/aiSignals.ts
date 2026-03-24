@@ -21,6 +21,7 @@ import {
   getScopedStorageItem,
   scopedKey,
 } from "@/lib/activeUser";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 
 const CACHE_KEY = "cache:ai-signals:v1";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -159,8 +160,18 @@ function priorityRank(priority: string | undefined): number {
   return 99;
 }
 
+function stepUrgencyRank(
+  stepDate: string | null | undefined,
+  today: string,
+): number {
+  if (!stepDate) return 3;
+  if (stepDate < today) return 0;
+  if (stepDate === today) return 1;
+  return 2;
+}
+
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateKey();
 }
 
 function isBooleanRecord(value: unknown): value is Record<string, boolean> {
@@ -485,9 +496,43 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
 
   const today = todayISO();
   const highestPriorityGoal = sortedGoals[0] ?? null;
-  const highestPriorityStepInfo = highestPriorityGoal
-    ? getStepInfo(highestPriorityGoal, doneMap, today)
-    : null;
+
+  const goalEntries = sortedGoals.map((goal) => {
+    const stepInfo = getStepInfo(goal, doneMap, today);
+    return {
+      goal,
+      stepInfo,
+      urgencyRank:
+        stepInfo.overdueStepLabel
+          ? 0
+          : stepUrgencyRank(stepInfo.nextStepDate, today),
+    };
+  });
+
+  goalEntries.sort((a, b) => {
+    if (a.urgencyRank !== b.urgencyRank) return a.urgencyRank - b.urgencyRank;
+
+    if (a.urgencyRank === 0) {
+      if (a.stepInfo.overdueCount !== b.stepInfo.overdueCount) {
+        return b.stepInfo.overdueCount - a.stepInfo.overdueCount;
+      }
+      const aDate = a.stepInfo.overdueStepDate ?? "9999-99-99";
+      const bDate = b.stepInfo.overdueStepDate ?? "9999-99-99";
+      if (aDate !== bDate) return aDate.localeCompare(bDate);
+    } else {
+      const aDate = a.stepInfo.nextStepDate ?? "9999-99-99";
+      const bDate = b.stepInfo.nextStepDate ?? "9999-99-99";
+      if (aDate !== bDate) return aDate.localeCompare(bDate);
+    }
+
+    const priorityDiff =
+      priorityRank(a.goal.priority) - priorityRank(b.goal.priority);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    return (a.goal.title ?? "").localeCompare(b.goal.title ?? "");
+  });
+
+  const mostUrgentGoalEntry = goalEntries[0] ?? null;
 
   const overdueSteps = countOverdueIncompleteSteps(goalList, doneMap, today);
 
@@ -515,12 +560,10 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
       highestPriority: highestPriorityGoal?.priority ?? null,
       overdueSteps,
       nextStepLabel:
-        highestPriorityStepInfo?.overdueStepLabel ??
-        highestPriorityStepInfo?.nextStepLabel ??
+        mostUrgentGoalEntry?.stepInfo.overdueStepLabel ??
+        mostUrgentGoalEntry?.stepInfo.nextStepLabel ??
         null,
-      topGoals: sortedGoals.slice(0, 10).map((goal) => {
-        const stepInfo = getStepInfo(goal, doneMap, today);
-
+      topGoals: goalEntries.slice(0, 10).map(({ goal, stepInfo }) => {
         return {
           id: goal.id ?? "",
           title: goal.title ?? "Untitled goal",

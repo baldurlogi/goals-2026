@@ -514,6 +514,12 @@ Rules:
 - "emoji": single relevant emoji
 - "module": which area this is about. One of: nutrition, fitness, reading, goals, schedule, todos
 - Be specific — reference actual numbers, goal names, book titles, or streaks from the context above
+- If there are overdue goal steps, prefer an overdue goal step over anything else unless the user is missing essential setup data
+- If there are no overdue steps but there are goal steps due today, prefer a due-today goal step over any goal step due tomorrow or later
+- Never suggest a goal step due in 2+ days when an overdue or due-today goal step exists
+- Respect the user's local time and nutrition timing windows from the context above
+- Do NOT suggest logging lunch before 13:00 local time, snack before 17:00 local time, or dinner before 21:00 local time
+- Do NOT suggest a "third meal", "fourth meal", snack, or dinner early just because multiple meals are already logged
 - Spread suggestions across life areas — goals progress, reading streak, fitness PRs, upcoming tasks all matter equally`;
 
       const coachRes = await fetch("https://api.anthropic.com/v1/messages", {
