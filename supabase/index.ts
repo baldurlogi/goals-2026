@@ -31,6 +31,7 @@ type RequestBody = GenerateGoalRequest & {
     | "improve"
     | "weekly-report";
   userContext?: string;
+  improveRequest?: string;
   stepCount?: number;
   lastSuggestedModule?: string;
   title?: string;
@@ -252,6 +253,7 @@ Deno.serve(async (req: Request) => {
 
     const {
       userContext,
+      improveRequest,
       lastSuggestedModule,
       existingGoal,
       weeklyData,
@@ -569,6 +571,9 @@ Rules:
       const contextBlock = userContext?.trim()
         ? `${userContext.trim()}\n\n---\n\n`
         : "";
+      const improveRequestBlock = improveRequest?.trim()
+        ? `The user specifically wants these improvements:\n${improveRequest.trim()}\n\n`
+        : "";
 
       const currentStepsJson = JSON.stringify(
         existingGoal.steps.map((s, i) => ({
@@ -586,7 +591,7 @@ Rules:
 
       const improveSystem = `${contextBlock}You are an expert goal-planning coach. The user has an existing goal with steps and wants you to improve it.
 
-Existing goal:
+${improveRequestBlock}Existing goal:
 - Title: "${existingGoal.title}"
 - Subtitle: "${existingGoal.subtitle}"
 - Priority: ${existingGoal.priority}
@@ -601,6 +606,12 @@ Your job: Return an improved version of the steps. You may:
 - Set better idealFinish dates spread realistically from today
 - Remove redundant or overlapping steps
 - Break overly broad steps into smaller concrete ones
+
+If the user gave a specific improvement request:
+- Prioritize that request over general cleanup
+- Focus changes on the steps most relevant to that request
+- Leave unrelated steps mostly unchanged unless a small supporting tweak is clearly helpful
+- Mention the requested focus in the summary when relevant
 
 Return ONLY valid JSON — no markdown, no explanation:
 {

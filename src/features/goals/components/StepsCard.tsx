@@ -5,6 +5,7 @@ import { parseStepDetails, prettyStepLink } from "@/features/goals/stepDetails";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
+import { Pencil } from "lucide-react";
 
 // -- sort helpers -------------------------------------
 function parseDate(s?: string): number {
@@ -49,6 +50,7 @@ export function StepsCard(props: {
     steps: GoalStep[];
     doneMap?: Record<string, boolean>;
     onToggle: (stepId: string) => void;
+    onEditStep?: (stepId: string, stepNumber: number) => void;
     disabled?: boolean;
     maxHeightClassName?: string; // e.g. "md:max-h-[640px]"
     className?: string;
@@ -57,6 +59,7 @@ export function StepsCard(props: {
         steps: rawSteps,
         doneMap,
         onToggle,
+        onEditStep,
         maxHeightClassName = "max-h-none lg:max-h-[640px]",
         className,
         disabled = false,
@@ -168,14 +171,29 @@ export function StepsCard(props: {
                                                 </div>
                                             </div>
                                             
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                disabled={!hasDetails}
-                                                onClick={() => setOpenId(isOpen ? null : step.id)}
-                                            >
-                                                {hasDetails ? (isOpen ? "Hide" : "Details") : "No details"}
-                                            </Button>
+                                            <div className="flex shrink-0 items-center gap-1">
+                                                {onEditStep ? (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={disabled}
+                                                        onClick={() => onEditStep(step.id, index + 1)}
+                                                        className="gap-1.5"
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                        Edit
+                                                    </Button>
+                                                ) : null}
+
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    disabled={!hasDetails}
+                                                    onClick={() => setOpenId(isOpen ? null : step.id)}
+                                                >
+                                                    {hasDetails ? (isOpen ? "Hide" : "Details") : "No details"}
+                                                </Button>
+                                            </div>
                                         </div>
 
                                         {isOpen ? (

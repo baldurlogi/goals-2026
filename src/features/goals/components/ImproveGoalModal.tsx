@@ -8,6 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabaseClient";
 import { getAISystemContext } from "@/features/ai/buildAIContext";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
@@ -67,7 +68,10 @@ class AIUsageLimitError extends Error {
   }
 }
 
-async function fetchImprovedSteps(goal: UserGoal): Promise<ImproveResult> {
+async function fetchImprovedSteps(
+  goal: UserGoal,
+  improveRequest: string,
+): Promise<ImproveResult> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -90,6 +94,7 @@ async function fetchImprovedSteps(goal: UserGoal): Promise<ImproveResult> {
     body: JSON.stringify({
       action: "improve",
       userContext,
+      improveRequest,
       existingGoal: {
         title: goal.title,
         subtitle: goal.subtitle,
@@ -237,20 +242,21 @@ type Props = {
 };
 
 export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
-  const [phase, setPhase] = useState<"loading" | "review" | "error" | "limit">(
-    "loading",
-  );
+  const [phase, setPhase] = useState<
+    "prompt" | "loading" | "review" | "error" | "limit"
+  >("prompt");
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [limitTier, setLimitTier] = useState<Tier | null>(null);
   const [result, setResult] = useState<ImproveResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState<Record<string, StepStatus>>({});
+  const [improveRequest, setImproveRequest] = useState("");
 
   const originalById = Object.fromEntries(goal.steps.map((s) => [s.id, s]));
 
   const load = useCallback(async () => {
       try {
-        const r = await fetchImprovedSteps(goal);
+        const r = await fetchImprovedSteps(goal, improveRequest.trim());
         setResult(r);
 
         const defaults: Record<string, StepStatus> = {};
@@ -273,7 +279,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
           setPhase("error");
         }
       }
-    }, [goal]);
+    }, [goal, improveRequest]);
 
   const reload = useCallback(() => {
     setPhase("loading");
@@ -283,14 +289,6 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
     setLimitMessage(null);
     setLimitTier(null);
     void load();
-  }, [load]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      void load();
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
   }, [load]);
 
   useEffect(() => {
@@ -347,6 +345,16 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
     (v) => v === "accepted",
   ).length;
 
+  function handleStartImprove() {
+    setPhase("loading");
+    setError(null);
+    setResult(null);
+    setAccepted({});
+    setLimitMessage(null);
+    setLimitTier(null);
+    void load();
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="relative flex h-full max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
@@ -373,6 +381,31 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {phase === "prompt" && (
+            <div className="space-y-5 p-6">
+              <div className="rounded-xl border border-violet-500/20 bg-violet-500/10 p-4">
+                <p className="text-sm leading-relaxed text-violet-200">
+                  Tell AI exactly what you want improved so the suggestions stay focused.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">What should be improved?</div>
+                <Textarea
+                  value={improveRequest}
+                  onChange={(event) => setImproveRequest(event.target.value)}
+                  placeholder="Examples: make the steps more realistic for my schedule, improve only the skincare product recommendations, tighten the deadlines, break broad steps into smaller actions..."
+                  rows={6}
+                  className="resize-none text-sm"
+                />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  You can ask for better deadlines, clearer steps, stronger notes,
+                  product/resource recommendations, or just one part of the plan.
+                </p>
+              </div>
+            </div>
+          )}
+
           {phase === "loading" && (
             <div className="flex flex-col items-center justify-center gap-4 py-20">
               <div className="flex gap-1.5">
@@ -467,9 +500,41 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
           )}
         </div>
 
+        {phase === "prompt" && (
+          <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
+            <AIUsageInlineHint
+              actionLabel="Generating improvements uses 1 AI prompt"
+              className="max-w-fit"
+            />
+
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={!improveRequest.trim()}
+                onClick={handleStartImprove}
+                className="gap-1.5"
+              >
+                Generate suggestions
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {phase === "review" && (
           <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
             <div className="space-y-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPhase("prompt")}
+                className="gap-1.5 text-xs"
+              >
+                Change request
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
