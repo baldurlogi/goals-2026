@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  completeRoutineStreakDay,
   countCompletedRoutineSections,
   countCompletedRoutineSteps,
   countRoutineSteps,
+  getDisplayedRoutineStreak,
   getRoutineItems,
   getRoutineTemplate,
   getRoutineStreak,
@@ -80,10 +82,18 @@ export function useSkincareDashboard(goalId = SKINCARE_GOAL_ID) {
     const activeRoutines =
       Number(routine.am.length > 0) + Number(routine.pm.length > 0);
     const today = todayISO();
-    const didCompleteToday = streak.lastISO === today;
+    const routineCompleteToday =
+      items.dayISO === today &&
+      isRoutineSectionComplete("am", routine, items) &&
+      isRoutineSectionComplete("pm", routine, items);
+    const effectiveStreak = routineCompleteToday
+      ? completeRoutineStreakDay(streak, today)
+      : streak;
+    const didCompleteToday = effectiveStreak.lastISO === today;
+    const displayedStreak = getDisplayedRoutineStreak(effectiveStreak, today);
 
     return {
-      streakDays: streak.streak,
+      streakDays: displayedStreak,
       completedToday,
       totalSteps,
       completedRoutines,
@@ -93,7 +103,7 @@ export function useSkincareDashboard(goalId = SKINCARE_GOAL_ID) {
       didCompleteToday,
       todaysDate: items.dayISO,
     };
-  }, [items, routine, streak.lastISO, streak.streak]);
+  }, [items, routine, streak]);
 
   return { summary, loading };
 }
