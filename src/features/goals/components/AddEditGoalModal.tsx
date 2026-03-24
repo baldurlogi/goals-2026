@@ -18,7 +18,7 @@ import { AIPromptScreen } from "./AIPromptScreen";
 import { queueAIContextNudge } from "./AIContextNudge.utils";
 import { useAuth } from "@/features/auth/authContext";
 import { capture, captureOnce } from "@/lib/analytics";
-import { parseStepLinksInput } from "../stepDetails";
+import { buildStepNotes, parseStepDetails, parseStepLinksInput } from "../stepDetails";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 
@@ -379,6 +379,9 @@ export function AddEditGoalModal({
                   {goal.steps.map((step, idx) => {
                     const isOpen = openStepId === step.id;
                     const isDragTarget = dragOverStepId === step.id;
+                    const details = parseStepDetails(step);
+                    const guidanceText = details.guidance.join("\n");
+                    const linksText = (step.links?.length ? step.links : details.links).join("\n");
 
                     return (
                       <div
@@ -468,15 +471,39 @@ export function AddEditGoalModal({
 
                         {isOpen && (
                           <div className="space-y-2 border-t px-3 pb-3 pt-3">
-                            <Textarea
-                              placeholder="Notes (optional)"
-                              value={step.notes}
-                              onChange={(e) =>
-                                updateStep(step.id, { notes: e.target.value })
-                              }
-                              rows={2}
-                              className="resize-none text-sm"
-                            />
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                How
+                              </div>
+                              <Textarea
+                                placeholder="How to do it, notes, examples, or checklist"
+                                value={guidanceText}
+                                onChange={(e) =>
+                                  updateStep(step.id, {
+                                    notes: buildStepNotes(e.target.value, details.doneWhen),
+                                  })
+                                }
+                                rows={3}
+                                className="resize-none text-sm"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Done when
+                              </div>
+                              <Textarea
+                                placeholder="What must be true for this step to count as done?"
+                                value={details.doneWhen ?? ""}
+                                onChange={(e) =>
+                                  updateStep(step.id, {
+                                    notes: buildStepNotes(guidanceText, e.target.value),
+                                  })
+                                }
+                                rows={2}
+                                className="resize-none text-sm"
+                              />
+                            </div>
 
                             <div className="space-y-1">
                               <div className="text-xs text-muted-foreground">
@@ -484,7 +511,7 @@ export function AddEditGoalModal({
                               </div>
                               <Textarea
                                 placeholder="One link per line"
-                                value={(step.links ?? []).join("\n")}
+                                value={linksText}
                                 onChange={(e) =>
                                   updateStep(step.id, {
                                     links: parseStepLinksInput(e.target.value),

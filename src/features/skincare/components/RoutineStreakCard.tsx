@@ -1,47 +1,49 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 
 import {
-  diffDays, getRoutineStreak, setRoutineStreak, seedRoutineStreak, todayISO,
+  completeRoutineStreakDay,
+  getDisplayedRoutineStreak,
+  getRoutineCompletionStatus,
+  getRoutineStreak,
+  setRoutineStreak,
+  seedRoutineStreak,
+  todayISO,
   type RoutineStreakState,
 } from "../skincareStorage";
+import { GOAL_MODULE_CHANGED_EVENT } from "@/lib/goalModuleStorage";
 
 export function RoutineStreakCard({ goalId }: { goalId: string }) {
   const [state, setState] = useState<RoutineStreakState>(() => seedRoutineStreak(goalId));
 
   useEffect(() => {
     let cancelled = false;
-    getRoutineStreak(goalId).then((fresh) => {
+    async function fetch() {
+      const fresh = await getRoutineStreak(goalId);
       if (!cancelled) setState(fresh);
-    });
-    return () => { cancelled = true; };
+    }
+
+    void fetch();
+    window.addEventListener(GOAL_MODULE_CHANGED_EVENT, fetch);
+    window.addEventListener("storage", fetch);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(GOAL_MODULE_CHANGED_EVENT, fetch);
+      window.removeEventListener("storage", fetch);
+    };
   }, [goalId]);
 
   const today = todayISO();
-
-  const status = useMemo(() => {
-    const last = state.lastISO;
-    if (!last) return { label: "No completed days yet", tone: "secondary" as const };
-    const d = diffDays(last, today);
-    if (d === 0) return { label: "Completed today", tone: "default" as const };
-    if (d === 1) return { label: "Complete today to keep streak", tone: "secondary" as const };
-    return { label: "Missed days → resets on next completion", tone: "destructive" as const };
-  }, [state.lastISO, today]);
+  const status = getRoutineCompletionStatus(state, today);
+  const displayedStreak = getDisplayedRoutineStreak(state, today);
 
   async function markDayComplete() {
-    const last = state.lastISO;
-    let next: RoutineStreakState;
-
-    if (!last) {
-      next = { lastISO: today, streak: 1 };
-    } else {
-      const d = diffDays(last, today);
-      if (d === 0) return;
-      next = { lastISO: today, streak: d === 1 ? state.streak + 1 : 1 };
-    }
+    const next = completeRoutineStreakDay(state, today);
+    if (next.lastISO === state.lastISO && next.streak === state.streak) return;
 
     setState(next);
     await setRoutineStreak(goalId, next);
@@ -61,7 +63,7 @@ export function RoutineStreakCard({ goalId }: { goalId: string }) {
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-2xl font-semibold">{state.streak}</div>
+            <div className="text-2xl font-semibold">{displayedStreak}</div>
             <div className="text-sm text-muted-foreground">completed days</div>
           </div>
           <Badge variant={status.tone}>{status.label}</Badge>
@@ -75,7 +77,7 @@ export function RoutineStreakCard({ goalId }: { goalId: string }) {
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Tip: use the checklist below; when AM + PM are done, hit "Mark day complete".
+          Tip: completing both AM and PM today updates your streak automatically.
         </div>
       </CardContent>
     </Card>

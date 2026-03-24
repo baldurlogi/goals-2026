@@ -5,6 +5,7 @@ import {
   type AIUserProfile,
   type PreferredTone,
 } from '@/features/ai/aiUserProfile';
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 
 const SNAPSHOT_TTL_MS = 30 * 60 * 1000;
 
@@ -19,6 +20,12 @@ function buildSystemPrompt(
   aiProfile: AIUserProfile | null,
 ): string {
   const tone = aiProfile?.preferred_tone ?? 'direct';
+  const now = new Date();
+  const localHour = now.getHours();
+  const localTime = `${String(localHour).padStart(2, "0")}:${String(
+    now.getMinutes(),
+  ).padStart(2, "0")}`;
+  const localDate = getLocalDateKey(now);
 
   const toneInstructions: Record<PreferredTone, string> = {
     direct: 'Be direct and concise. Lead with the action.',
@@ -36,7 +43,11 @@ function buildSystemPrompt(
           .map(
             (goal, index) =>
               `${index + 1}. ${goal.title} (${goal.priority ?? 'unknown'} priority${
-                goal.nextStepLabel ? `, next step: ${goal.nextStepLabel}` : ''
+                goal.overdueStepLabel
+                  ? `, overdue: ${goal.overdueStepLabel}${goal.overdueStepDate ? ` on ${goal.overdueStepDate}` : ''}`
+                  : goal.nextStepLabel
+                    ? `, next step: ${goal.nextStepLabel}${goal.nextStepDate ? ` on ${goal.nextStepDate}` : ''}`
+                    : ''
               })`,
           )
           .join('\n')
@@ -68,6 +79,8 @@ function buildSystemPrompt(
 
 ## User summary
 Name: ${signals.profile.displayName ?? 'Unknown'}
+Local date: ${localDate}
+Local time: ${localTime}
 Activity level: ${signals.profile.activityLevel ?? 'Unknown'}
 Weekly schedule: ${signals.profile.weeklyScheduleSummary ?? 'Unknown'}
 Daily reading goal: ${signals.profile.dailyReadingGoal ?? 'Unknown'}
@@ -83,13 +96,14 @@ ${signals.modules.join(', ')}
 Goal count: ${signals.goals.count}
 Overdue steps: ${signals.goals.overdueSteps}
 Highest priority goal: ${signals.goals.highestPriorityTitle ?? 'None'}
-Next step on top goal: ${signals.goals.nextStepLabel ?? 'None'}
+Most urgent goal step: ${signals.goals.nextStepLabel ?? 'None'}
 Top goals:
 ${topGoals}
 
 ## Nutrition
 Phase: ${signals.nutrition.phase}
 Meals logged today: ${signals.nutrition.mealsLoggedToday}
+Nutrition timing windows: breakfast from 06:00, lunch from 13:00, snack from 17:00, dinner from 21:00
 Calorie target: ${signals.nutrition.calorieTarget ?? 'Unknown'}
 Protein target: ${signals.nutrition.proteinTarget ?? 'Unknown'}
 

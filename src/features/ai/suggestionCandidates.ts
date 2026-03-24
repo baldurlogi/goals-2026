@@ -31,6 +31,35 @@ export type SuggestionCandidate = {
   icon: LucideIcon;
 };
 
+function goalCandidatePriority(
+  priority: string | null,
+  stepDate: string | null,
+  overdueCount: number,
+  today: string,
+): number {
+  const priorityBonus = priority === "high" ? 2 : priority === "medium" ? 1 : 0;
+
+  if (stepDate && stepDate < today) {
+    return 120 + Math.min(overdueCount, 9) + priorityBonus;
+  }
+
+  if (stepDate === today) {
+    return 108 + priorityBonus;
+  }
+
+  if (!stepDate) {
+    return 72 + priorityBonus;
+  }
+
+  const daysUntil = Math.floor(
+    (new Date(stepDate).getTime() - new Date(today).getTime()) / 86400000,
+  );
+
+  if (daysUntil <= 1) return 96 + priorityBonus;
+  if (daysUntil <= 3) return 84 + priorityBonus;
+  return 70 + priorityBonus;
+}
+
 function hasModule(signals: AISignals, module: ModuleId): boolean {
   return signals.modules.includes(module);
 }
@@ -116,15 +145,6 @@ export function buildSuggestionCandidates(
         icon: Target,
       });
     } else {
-      // Build one specific suggestion per goal, scored by priority ladder:
-      // 98 = high + overdue, 92 = medium + overdue, 86 = high + upcoming (≤3 days),
-      // 78 = low + overdue, 72 = medium + upcoming, 64 = low + upcoming
-      const THREE_DAYS_FROM_NOW = (() => {
-        const d = new Date();
-        d.setDate(d.getDate() + 3);
-        return d.toISOString().slice(0, 10);
-      })();
-
       const today = new Date().toISOString().slice(0, 10);
 
       for (const goal of signals.goals.topGoals) {
@@ -132,9 +152,12 @@ export function buildSuggestionCandidates(
 
         // Overdue step — most urgent
         if (goal.overdueStepLabel) {
-          const baseScore = p === 'high' ? 98 : p === 'medium' ? 92 : 78;
-          const overdueBonus = Math.min(goal.overdueCount ?? 0, 9) / 10;
-          const score = baseScore + overdueBonus;
+          const score = goalCandidatePriority(
+            p,
+            goal.overdueStepDate,
+            goal.overdueCount ?? 0,
+            today,
+          );
 
           const daysOverdue = goal.overdueStepDate
             ? Math.floor(
@@ -158,10 +181,19 @@ export function buildSuggestionCandidates(
           });
         }
 
-        // Upcoming step within 3 days
-        if (goal.nextStepLabel && goal.nextStepDate && goal.nextStepDate <= THREE_DAYS_FROM_NOW) {
-          const score = p === 'high' ? 86 : p === 'medium' ? 72 : 64;
+        // Upcoming step within 3 days, with due-today outranking any later step
+        if (
+          goal.nextStepLabel &&
+          goal.nextStepDate
+        ) {
           const daysUntil = Math.floor((new Date(goal.nextStepDate).getTime() - new Date(today).getTime()) / 86400000);
+          if (daysUntil > 3) continue;
+          const score = goalCandidatePriority(
+            p,
+            goal.nextStepDate,
+            goal.overdueCount ?? 0,
+            today,
+          );
           items.push({
             module: "goals",
             priority: score,
@@ -174,7 +206,7 @@ export function buildSuggestionCandidates(
 
         // Upcoming step with no date — lower priority nudge
         if (goal.nextStepLabel && !goal.nextStepDate && !goal.overdueStepLabel) {
-          const score = p === 'high' ? 80 : p === 'medium' ? 66 : 56;
+          const score = goalCandidatePriority(p, null, goal.overdueCount ?? 0, today);
           items.push({
             module: "goals",
             priority: score,

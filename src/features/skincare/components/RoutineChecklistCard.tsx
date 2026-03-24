@@ -9,15 +9,18 @@ import { Input } from "@/components/ui/input";
 
 import {
   buildRoutineItemsForDay,
+  completeRoutineStreakDay,
   countCompletedRoutineSteps,
   countRoutineSteps,
   createRoutineStep,
   getDailyRoutine, setDailyRoutine,
   getRoutineItems, setRoutineItems, seedRoutineItems,
+  getRoutineStreak,
   getRoutineTemplate, setRoutineTemplate, seedRoutineTemplate,
   isRoutineSectionComplete,
   normalizeRoutineItems,
   sanitizeRoutineStepLabel,
+  setRoutineStreak,
   syncDailyRoutineWithItems,
   todayISO,
   type DailyRoutineState,
@@ -67,11 +70,39 @@ export function RoutineChecklistCard({ goalId }: { goalId: string }) {
       ) {
         void setDailyRoutine(goalId, syncedDaily);
       }
+
+      if (syncedDaily.dayISO === todayISO() && syncedDaily.amDone && syncedDaily.pmDone) {
+        const currentStreak = await getRoutineStreak(goalId);
+        const nextStreak = completeRoutineStreakDay(currentStreak, syncedDaily.dayISO);
+        if (
+          nextStreak.lastISO !== currentStreak.lastISO ||
+          nextStreak.streak !== currentStreak.streak
+        ) {
+          void setRoutineStreak(goalId, nextStreak);
+        }
+      }
     }
 
     void fetch();
     return () => { cancelled = true; };
   }, [goalId]);
+
+  async function syncStreakForDailyState(nextDaily: DailyRoutineState) {
+    if (nextDaily.dayISO !== todayISO() || !nextDaily.amDone || !nextDaily.pmDone) {
+      return;
+    }
+
+    const currentStreak = await getRoutineStreak(goalId);
+    const nextStreak = completeRoutineStreakDay(currentStreak, nextDaily.dayISO);
+    if (
+      nextStreak.lastISO === currentStreak.lastISO &&
+      nextStreak.streak === currentStreak.streak
+    ) {
+      return;
+    }
+
+    await setRoutineStreak(goalId, nextStreak);
+  }
 
   async function persistItems(nextItems: RoutineItemsState) {
     const nextDaily = syncDailyRoutineWithItems(routine, nextItems);
@@ -81,6 +112,7 @@ export function RoutineChecklistCard({ goalId }: { goalId: string }) {
       setRoutineItems(goalId, nextItems),
       setDailyRoutine(goalId, nextDaily),
     ]);
+    await syncStreakForDailyState(nextDaily);
   }
 
   async function persistRoutine(nextRoutine: RoutineTemplateState) {

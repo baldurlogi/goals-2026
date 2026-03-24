@@ -178,6 +178,53 @@ export function countCompletedRoutineSections(
     Number(isRoutineSectionComplete("pm", routine, items));
 }
 
+export function getDisplayedRoutineStreak(
+  state: RoutineStreakState,
+  referenceISO = todayISO(),
+) {
+  if (!state.lastISO || state.streak <= 0) return 0;
+  return diffDays(state.lastISO, referenceISO) <= 1 ? state.streak : 0;
+}
+
+export function getRoutineCompletionStatus(
+  state: RoutineStreakState,
+  referenceISO = todayISO(),
+) {
+  if (!state.lastISO) {
+    return { label: "No completed days yet", tone: "secondary" as const };
+  }
+
+  const dayGap = diffDays(state.lastISO, referenceISO);
+
+  if (dayGap === 0) {
+    return { label: "Completed today", tone: "default" as const };
+  }
+
+  if (dayGap === 1) {
+    return { label: "Complete today to keep streak", tone: "secondary" as const };
+  }
+
+  return { label: "Streak broken - complete today to restart", tone: "destructive" as const };
+}
+
+export function completeRoutineStreakDay(
+  state: RoutineStreakState,
+  dayISO = todayISO(),
+): RoutineStreakState {
+  if (!state.lastISO) {
+    return { lastISO: dayISO, streak: 1 };
+  }
+
+  const dayGap = diffDays(state.lastISO, dayISO);
+  if (dayGap === 0) return state;
+
+  const currentStreak = getDisplayedRoutineStreak(state, dayISO);
+  return {
+    lastISO: dayISO,
+    streak: dayGap === 1 ? currentStreak + 1 : 1,
+  };
+}
+
 export function syncDailyRoutineWithItems(
   routine: RoutineTemplateState,
   items: RoutineItemsState,

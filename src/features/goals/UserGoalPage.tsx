@@ -8,6 +8,7 @@ import { useGoalProgressState, useResetGoalProgressMutation, useToggleGoalStepMu
 import { StepsCard } from '@/features/goals/components/StepsCard';
 import { AddEditGoalModal } from '@/features/goals/components/AddEditGoalModal';
 import { ImproveGoalModal } from '@/features/goals/components/ImproveGoalModal';
+import { EditStepModal } from '@/features/goals/components/EditStepModal';
 import { UpgradeBanner } from '@/features/subscription/UpgradeBanner';
 import { useTier, tierMeets } from '@/features/subscription/useTier';
 import { useAuth } from '@/features/auth/authContext';
@@ -78,6 +79,10 @@ export function UserGoalPage() {
   const { goals, isGoalsLoading: loading } = useGoalsState();
   const saveGoalMutation = useSaveGoalMutation();
   const [editing, setEditing] = useState(false);
+  const [editingStepState, setEditingStepState] = useState<{
+    stepId: string;
+    stepNumber: number;
+  } | null>(null);
   const [improving, setImproving] = useState(false);
   const tier = useTier();
   const isPro = tierMeets(tier, 'pro');
@@ -106,6 +111,9 @@ export function UserGoalPage() {
   }
 
   const activeGoal = goal;
+  const editingStep = editingStepState
+    ? activeGoal.steps.find((step: UserGoalStep) => step.id === editingStepState.stepId) ?? null
+    : null;
 
   const doneMap = doneState[activeGoal.id] ?? {};
   const total = activeGoal.steps.length;
@@ -152,6 +160,42 @@ export function UserGoalPage() {
         description: `${nextDoneCount}/${total} steps complete`,
       });
     }
+  }
+
+  function handleEditStep(stepId: string, stepNumber: number) {
+    setEditingStepState({ stepId, stepNumber });
+  }
+
+  function handleSaveStep(updatedStep: UserGoalStep) {
+    const updatedGoal: UserGoal = {
+      ...activeGoal,
+      steps: activeGoal.steps.map((step: UserGoalStep) =>
+        step.id === updatedStep.id ? updatedStep : step,
+      ),
+      updatedAt: getLocalDateKey(),
+    };
+
+    clearAISignalsCache();
+
+    void saveGoalMutation
+      .mutateAsync(updatedGoal)
+      .then((status: GoalPersistenceStatus) => {
+        setEditingStepState(null);
+        if (status.remoteSyncSucceeded) {
+          toast.success('Step updated');
+        } else {
+          toast.warning("Step updated locally, syncing failed. We'll retry.");
+        }
+      })
+      .catch((error: unknown) => {
+        if (error instanceof GoalRemotePersistenceError && error.localCacheWriteSucceeded) {
+          setEditingStepState(null);
+          toast.warning("Step updated locally, syncing failed. We'll retry.");
+          return;
+        }
+
+        toast.error('Could not update step. Please try again.');
+      });
   }
 
   const goalProgressIsPending =
@@ -254,6 +298,7 @@ export function UserGoalPage() {
           steps={activeGoal.steps.map(toGoalStep)}
           doneMap={doneMap}
           onToggle={handleToggleStep}
+          onEditStep={handleEditStep}
           disabled={goalProgressIsPending}
           maxHeightClassName="max-h-none md:max-h-[560px] lg:max-h-[640px]"
         />
@@ -269,6 +314,20 @@ export function UserGoalPage() {
             });
           }}
           onClose={() => setEditing(false)}
+        />
+      )}
+
+      {editingStep && editingStepState && (
+        <EditStepModal
+          step={editingStep}
+          stepNumber={editingStepState.stepNumber}
+          saving={saveGoalMutation.isPending}
+          onSave={handleSaveStep}
+          onClose={() => {
+            if (!saveGoalMutation.isPending) {
+              setEditingStepState(null);
+            }
+          }}
         />
       )}
 

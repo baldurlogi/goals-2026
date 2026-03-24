@@ -55,6 +55,18 @@ export function parseStepLinksInput(value: string): string[] {
   );
 }
 
+export function buildStepNotes(
+  guidanceText: string,
+  doneWhenText?: string | null,
+) {
+  const guidance = guidanceText.trim();
+  const doneWhen = doneWhenText?.trim() ?? "";
+
+  return [guidance, doneWhen ? `Done when: ${doneWhen}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function extractLinks(text: string) {
   return dedupe(
     Array.from(text.matchAll(new RegExp(`${URL_PATTERN.source}|${DOMAIN_PATTERN.source}`, "gi")))
