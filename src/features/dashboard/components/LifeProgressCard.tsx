@@ -25,6 +25,7 @@ import {
   READING_CHANGED_EVENT,
   getTodayReadingProgress,
 } from "@/features/reading/readingStorage";
+import { getDisplayedReadingStreak } from "@/features/reading/readingUtils";
 import { loadTodos, seedTodoCache } from "@/features/todos/todoStorage";
 import {
   loadScheduleLog,
@@ -279,7 +280,11 @@ function buildNutritionProgress(
 
 function buildReadingProgress(inputs: Awaited<ReturnType<typeof loadReadingInputs>>): ModuleProgress {
   const hasBook = inputs.current.title.trim().length > 0;
-  const streak = inputs.streak ?? 0;
+  const streak = getDisplayedReadingStreak(
+    inputs.streak ?? 0,
+    inputs.lastReadDate,
+    getLocalDateKey(),
+  );
   const daily = getTodayReadingProgress(inputs);
 
   return {

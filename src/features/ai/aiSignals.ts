@@ -22,6 +22,7 @@ import {
   scopedKey,
 } from "@/lib/activeUser";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
+import { getDisplayedReadingStreak } from "@/features/reading/readingUtils";
 
 const CACHE_KEY = "cache:ai-signals:v1";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -350,6 +351,7 @@ function readReadingState(): ReadingState {
         totalPages?: string | number;
       };
       streak?: number;
+      lastReadDate?: string | null;
       dailyGoalPages?: string | number;
     };
 
@@ -374,7 +376,11 @@ function readReadingState(): ReadingState {
         book?.totalPages != null
           ? parseInt(String(book.totalPages), 10) || null
           : null,
-      streak: typeof parsed.streak === "number" ? parsed.streak : 0,
+      streak: getDisplayedReadingStreak(
+        typeof parsed.streak === "number" ? parsed.streak : 0,
+        typeof parsed.lastReadDate === "string" ? parsed.lastReadDate : null,
+        getLocalDateKey(),
+      ),
       targetPages:
         parsed.dailyGoalPages != null
           ? parseInt(String(parsed.dailyGoalPages), 10) || 20

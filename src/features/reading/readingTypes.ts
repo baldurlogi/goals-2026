@@ -28,6 +28,13 @@ export type ReadingStats = ReadingPlan & {
   daysToFinishNext?: number;
 };
 
+export type ReadingDailyProgress = {
+  date: string;
+  bookKey: string;
+  baselinePage: number;
+  latestPage: number;
+};
+
 export type ReadingInputs = {
   current: {
     title: string;
@@ -46,6 +53,8 @@ export type ReadingInputs = {
   lastReadDate: string | null;
   /** Consecutive days with at least one page update */
   streak: number;
+  /** Persisted same-day reading progress snapshot used by dashboard/status UI */
+  dailyProgress?: ReadingDailyProgress | null;
 };
 
 export type ReadingFieldPath =

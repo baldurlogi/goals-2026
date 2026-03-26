@@ -32,6 +32,20 @@ export function updateReadingStreak(
   return { streak: 1, lastReadDate: todayKey };
 }
 
+export function getDisplayedReadingStreak(
+  streak: number,
+  lastReadDate: string | null,
+  todayKey: string,
+) {
+  if (!lastReadDate || streak <= 0) return 0;
+
+  const last = new Date(`${lastReadDate}T00:00:00`);
+  const today = new Date(`${todayKey}T00:00:00`);
+  const dayGap = Math.round((today.getTime() - last.getTime()) / 86400000);
+
+  return dayGap <= 1 ? streak : 0;
+}
+
 export function inputsToPlan(inputs: ReadingInputs): ReadingPlan {
   const first = inputs.upNext?.[0];
 
