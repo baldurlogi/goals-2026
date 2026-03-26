@@ -22,6 +22,7 @@ import {
   loadReadingInputs,
   getWeeklyReadingSummary,
 } from "@/features/reading/readingStorage";
+import { getDisplayedReadingStreak } from "@/features/reading/readingUtils";
 import { loadPRGoals } from "@/features/fitness/prGoalStorage";
 import {
   getDaysSinceWorkout,
@@ -662,13 +663,18 @@ async function collectReadingData(
 
   const inputs = await loadReadingInputs();
   const summary = getWeeklyReadingSummary(inputs, weekStart, weekEnd);
+  const displayedStreak = getDisplayedReadingStreak(
+    inputs.streak ?? 0,
+    inputs.lastReadDate,
+    getLocalDateKey(),
+  );
 
   const hasOnlyThinSignal =
-    summary.daysRead <= 1 && (inputs.streak ?? 0) > 1 && summary.pagesRead === 0;
+    summary.daysRead <= 1 && displayedStreak > 1 && summary.pagesRead === 0;
 
   return {
     currentBook: inputs.current.title.trim() || null,
-    streak: inputs.streak ?? 0,
+    streak: displayedStreak,
     pagesRead: hasOnlyThinSignal ? null : summary.pagesRead,
     dailyGoalPages: summary.goalPages,
     daysRead: summary.daysRead,

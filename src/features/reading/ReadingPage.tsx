@@ -3,8 +3,8 @@ import type { CompletedBook, ReadingFieldPath, ReadingInputs } from "./readingTy
 import {
   canAcceptDigitsOrBlank,
   getReadingStats,
+  getDisplayedReadingStreak,
   inputsToPlan,
-  updateReadingStreak,
 } from "./readingUtils";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { Flame, BookOpen } from "lucide-react";
@@ -133,6 +133,11 @@ export function ReadingPage() {
     const plan = inputsToPlan(draft);
     return getReadingStats(plan);
   }, [draft]);
+  const displayedStreak = getDisplayedReadingStreak(
+    draft.streak ?? 0,
+    draft.lastReadDate,
+    getLocalDateKey(),
+  );
 
   function updateDraft(updater: (prev: ReadingInputs) => ReadingInputs) {
     isDirtyRef.current = true;
@@ -165,17 +170,10 @@ export function ReadingPage() {
       }
 
       if (path === "current.currentPage") {
-        const updated = {
+        return {
           ...prev,
           current: { ...prev.current, currentPage: value },
         };
-
-        if (value.trim() && Number(value) > 0) {
-          const streakUpdate = updateReadingStreak(prev, getLocalDateKey());
-          return { ...updated, ...streakUpdate };
-        }
-
-        return updated;
       }
 
       if (path === "current.totalPages") {
@@ -255,13 +253,13 @@ export function ReadingPage() {
             <div
               className={[
                 "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-                (draft.streak ?? 0) > 0 ? "bg-orange-500/15" : "bg-muted",
+                displayedStreak > 0 ? "bg-orange-500/15" : "bg-muted",
               ].join(" ")}
             >
               <Flame
                 className={[
                   "h-6 w-6",
-                  (draft.streak ?? 0) > 0
+                  displayedStreak > 0
                     ? "text-orange-500"
                     : "text-muted-foreground",
                 ].join(" ")}
@@ -269,13 +267,13 @@ export function ReadingPage() {
             </div>
             <div>
               <p className="text-2xl font-bold tabular-nums">
-                {draft.streak ?? 0}
+                {displayedStreak}
                 <span className="ml-1 text-sm font-normal text-muted-foreground">
                   day streak
                 </span>
               </p>
               <p className="text-xs text-muted-foreground">
-                {(draft.streak ?? 0) === 0
+                {displayedStreak === 0
                   ? "Update your page count to start a streak"
                   : draft.lastReadDate === getLocalDateKey()
                     ? "You read today — keep it up! 🔥"
