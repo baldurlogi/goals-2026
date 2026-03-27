@@ -284,6 +284,11 @@ type ProfileReadError = {
   message?: string | null;
 };
 
+type ProfileWriteError = ProfileReadError & {
+  details?: string | null;
+  hint?: string | null;
+};
+
 function isPermissionOrAuthProfileError(error: unknown): boolean {
   const candidate = error as ProfileReadError | null;
   const message = candidate?.message?.toLowerCase?.() ?? "";
@@ -317,6 +322,22 @@ function shouldFallbackToCachedProfile(error: unknown): boolean {
     message.includes("timeout") ||
     message.includes("tempor")
   );
+}
+
+function getMissingProfileColumn(error: unknown): string | null {
+  const candidate = error as ProfileWriteError | null;
+  const code = candidate?.code ?? null;
+  const message = candidate?.message ?? "";
+
+  if (code !== "PGRST204" && !message.toLowerCase().includes("column")) {
+    return null;
+  }
+
+  const quotedMatch =
+    message.match(/'([^']+)' column/i) ??
+    message.match(/column ['"]?([a-z_]+)['"]?/i);
+
+  return quotedMatch?.[1] ?? null;
 }
 
 function writeProfileCache(profile: UserProfile) {
@@ -487,17 +508,42 @@ export async function saveProfile(
     );
   }
 
-  const { error } = await supabase
-    .from("profiles")
-    .upsert({ id: userId, ...normalizedPatch }, { onConflict: "id" });
+  const persistedPatch = {
+    ...normalizedPatch,
+  } as Partial<Omit<UserProfile, "id">>;
+  const upsertPayload: Record<string, unknown> = {
+    id: userId,
+    ...normalizedPatch,
+  };
 
-  if (error) throw error;
+  while (true) {
+    const { error } = await supabase
+      .from("profiles")
+      .upsert(upsertPayload, { onConflict: "id" });
+
+    if (!error) break;
+
+    const missingColumn = getMissingProfileColumn(error);
+    if (!missingColumn || !(missingColumn in upsertPayload)) {
+      throw error;
+    }
+
+    delete upsertPayload[missingColumn];
+    delete persistedPatch[missingColumn as keyof Omit<UserProfile, "id">];
+
+    if (import.meta.env.DEV) {
+      console.warn("[profile] retrying save without missing column", {
+        userId,
+        missingColumn,
+      });
+    }
+  }
 
   const cached = readProfileCache(userId);
   const next = normalizeUserProfile(
     cached
-      ? ({ ...cached, ...normalizedPatch } as UserProfile)
-      : ({ ...defaultProfile(userId), ...normalizedPatch } as UserProfile),
+      ? ({ ...cached, ...persistedPatch } as UserProfile)
+      : ({ ...defaultProfile(userId), ...persistedPatch } as UserProfile),
   );
 
   writeProfileCache(next);
@@ -508,12 +554,19 @@ export async function saveProfile(
 
 export async function completeOnboarding(
   profile: Omit<UserProfile, "id" | "onboarding_done" | "tier" | "default_schedule_view">,
+  options?: {
+    userId?: string | null;
+  },
 ): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const fallbackUserId = options?.userId ?? getActiveUserId();
+  let userId = fallbackUserId ?? null;
 
-  const userId = user?.id ?? null;
+  if (!userId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    userId = user?.id ?? null;
+  }
 
   if (!userId) {
     throw new Error("Not signed in");
