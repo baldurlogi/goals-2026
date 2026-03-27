@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { OnboardingData } from "./types";
@@ -23,26 +23,36 @@ export const StepReading = memo(function StepReading({
   data,
   onChange,
 }: Props) {
+  const [draftGoal, setDraftGoal] = useState(data.daily_reading_goal);
   const goal = parseGoal(data.daily_reading_goal);
   const isPreset = PRESET_OPTIONS.includes(goal as (typeof PRESET_OPTIONS)[number]);
 
+  useEffect(() => {
+    setDraftGoal(data.daily_reading_goal);
+  }, [data.daily_reading_goal]);
+
   function setGoal(next: number) {
-    onChange({ daily_reading_goal: String(clampGoal(next)) });
+    const value = String(clampGoal(next));
+    setDraftGoal(value);
+    onChange({ daily_reading_goal: value });
   }
 
   function handleCustomChange(raw: string) {
     const digitsOnly = raw.replace(/[^\d]/g, "");
-
-    if (digitsOnly === "") {
-      onChange({ daily_reading_goal: "" });
-      return;
-    }
-
-    onChange({ daily_reading_goal: String(clampGoal(Number(digitsOnly))) });
+    setDraftGoal(digitsOnly);
   }
 
   function handleCustomBlur() {
-    onChange({ daily_reading_goal: String(goal) });
+    if (draftGoal === "") {
+      const fallback = "20";
+      setDraftGoal(fallback);
+      onChange({ daily_reading_goal: fallback });
+      return;
+    }
+
+    const normalized = String(clampGoal(Number(draftGoal)));
+    setDraftGoal(normalized);
+    onChange({ daily_reading_goal: normalized });
   }
 
   return (
@@ -123,7 +133,7 @@ export const StepReading = memo(function StepReading({
                 id="daily-reading-goal"
                 type="text"
                 inputMode="numeric"
-                value={data.daily_reading_goal}
+                value={draftGoal}
                 onChange={(e) => handleCustomChange(e.target.value)}
                 onBlur={handleCustomBlur}
                 className="h-9 w-16 border-0 bg-transparent p-0 text-center text-lg font-semibold tabular-nums shadow-none focus-visible:ring-0"

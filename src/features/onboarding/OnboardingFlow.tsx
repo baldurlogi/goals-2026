@@ -152,6 +152,8 @@ export function OnboardingFlow({
         measurement_system: data.measurement_system,
         date_format: data.date_format,
         time_format: data.time_format,
+      }, {
+        userId,
       });
 
       captureOnce("onboarding_completed", userId, {

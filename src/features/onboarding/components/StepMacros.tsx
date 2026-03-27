@@ -153,7 +153,11 @@ function buildSmartSuggestion(data: OnboardingData): {
     return null;
   }
 
-  const maintenanceFromUser = Number(data.known_maintenance_calories);
+  const rawMaintenanceFromUser = Number(data.known_maintenance_calories);
+  const maintenanceFromUser =
+    Number.isFinite(rawMaintenanceFromUser) && rawMaintenanceFromUser >= 1000
+      ? rawMaintenanceFromUser
+      : 0;
   const baseCalories =
     maintenanceFromUser > 0
       ? maintenanceFromUser
@@ -616,13 +620,29 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
               value={data.known_maintenance_calories}
               onChange={(e) => {
                 const result = validateClampedNumberInput(e.target.value, {
-                  min: 1000,
+                  min: 0,
                   max: 10000,
                 });
-                setMaintenanceError(result.error);
+                setMaintenanceError(null);
                 if (result.nextValue !== null) {
                   onChange({ known_maintenance_calories: result.nextValue });
                 }
+              }}
+              onBlur={() => {
+                const value = Number(data.known_maintenance_calories);
+                if (
+                  data.known_maintenance_calories.trim() &&
+                  Number.isFinite(value) &&
+                  value > 0 &&
+                  value < 1000
+                ) {
+                  setMaintenanceError(
+                    "If you enter maintenance calories, use at least 1000 kcal.",
+                  );
+                  return;
+                }
+
+                setMaintenanceError(null);
               }}
               aria-invalid={!!maintenanceError}
               placeholder="Example: 2600"
