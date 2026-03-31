@@ -11,6 +11,20 @@ export function resolvePostLoginPath(value: unknown): string | null {
   return value;
 }
 
+function isPublicAuthPath(path: string): boolean {
+  return path === "/" || path === "/login" || path === "/signup";
+}
+
+export function resolvePostAuthDestination(...values: unknown[]): string {
+  for (const value of values) {
+    const path = resolvePostLoginPath(value);
+    if (!path || isPublicAuthPath(path)) continue;
+    return path;
+  }
+
+  return "/app";
+}
+
 export function readStoredPostLoginRedirect(): string | null {
   try {
     return resolvePostLoginPath(sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY));

@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLandingTheme } from "./hooks/useLandingTheme";
 import { LandingNavbar } from "./components/LandingNavbar";
 import { HeroSection } from "./components/HeroSection";
 import type { BillingMode } from "./types";
@@ -112,7 +111,7 @@ function DeferredSection({
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useLandingTheme();
+  const theme = "dark";
   const [billing, setBilling] = useState<BillingMode>("monthly");
 
   const showStageOne = useDeferredMount(120);
@@ -122,7 +121,6 @@ export function LandingPage() {
     <LandingShell theme={theme}>
       <LandingNavbar
         theme={theme}
-        onToggleTheme={toggleTheme}
         onSignIn={() => navigate("/login")}
         onGetStarted={() => navigate("/signup")}
       />
@@ -130,7 +128,6 @@ export function LandingPage() {
       <HeroSection
         theme={theme}
         onGetStarted={() => navigate("/signup")}
-        onLogIn={() => navigate("/login")}
         onSeeHowItWorks={() =>
           document
             .getElementById("how-it-works")

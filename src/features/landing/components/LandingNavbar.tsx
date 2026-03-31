@@ -2,18 +2,15 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TOKENS } from "../theme/tokens";
 import type { ThemeMode } from "../types";
-import { ThemeToggle } from "./ThemeToggle";
 
 type LandingNavbarProps = {
   theme: ThemeMode;
-  onToggleTheme: () => void;
   onSignIn: () => void;
   onGetStarted: () => void;
 };
 
 export function LandingNavbar({
   theme,
-  onToggleTheme,
   onSignIn,
   onGetStarted,
 }: LandingNavbarProps) {
@@ -117,8 +114,6 @@ export function LandingNavbar({
         </div>
 
         <div className="flex items-center gap-2">
-          <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
-
           <Button
             type="button"
             variant="ghost"

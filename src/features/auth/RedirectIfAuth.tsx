@@ -4,7 +4,7 @@ import {
   clearStoredPostLoginRedirect,
   hasCancelledOnboarding,
   readStoredPostLoginRedirect,
-  resolvePostLoginPath,
+  resolvePostAuthDestination,
 } from "./authRedirect";
 
 export function RedirectIfAuth({ children }: { children: React.ReactNode }) {
@@ -22,15 +22,11 @@ export function RedirectIfAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (user) {
-    // Let signed-in users still visit the landing page.
-    if (location.pathname === "/") {
-      return <>{children}</>;
-    }
+    const cancelledOnboarding = hasCancelledOnboarding();
+    const isAuthScreen =
+      location.pathname === "/login" || location.pathname === "/signup";
 
-    if (
-      hasCancelledOnboarding() &&
-      (location.pathname === "/login" || location.pathname === "/signup")
-    ) {
+    if (cancelledOnboarding && (location.pathname === "/" || isAuthScreen)) {
       return <>{children}</>;
     }
 
@@ -43,10 +39,7 @@ export function RedirectIfAuth({ children }: { children: React.ReactNode }) {
       : null;
 
     const persistedPath = readStoredPostLoginRedirect();
-    const destination =
-      resolvePostLoginPath(statePath) ??
-      resolvePostLoginPath(persistedPath) ??
-      "/app";
+    const destination = resolvePostAuthDestination(statePath, persistedPath);
 
     clearStoredPostLoginRedirect();
     return <Navigate to={destination} replace />;

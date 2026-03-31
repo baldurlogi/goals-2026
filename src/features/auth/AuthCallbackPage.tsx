@@ -2,7 +2,12 @@ import { useEffect } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
-import { clearStoredPostLoginRedirect, readStoredPostLoginRedirect, resolvePostLoginPath } from "./authRedirect";
+import {
+  clearStoredPostLoginRedirect,
+  readStoredPostLoginRedirect,
+  resolvePostAuthDestination,
+  resolvePostLoginPath,
+} from "./authRedirect";
 const SIGNUP_WINDOW_MS = 5 * 60 * 1000;
 
 function isLikelySignup(user: {
@@ -58,11 +63,11 @@ export function AuthCallbackPage() {
 
     const queryPath = resolvePostLoginPath(params.get("next"));
     const persistedPath = readStoredPostLoginRedirect();
-    const destination =
-      queryPath ??
-      resolvePostLoginPath(statePath) ??
-      persistedPath ??
-      "/app";
+    const destination = resolvePostAuthDestination(
+      queryPath,
+      resolvePostLoginPath(statePath),
+      persistedPath,
+    );
 
     if (import.meta.env.DEV) {
       console.debug("[auth] callback redirect resolved", {
