@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getAISystemContext } from "@/features/ai/buildAIContext";
 import { loadUserGoals } from "@/features/goals/userGoalStorage";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
+import type { StepHistoryEntry } from "@/features/goals/goalStore";
 import { loadProfile } from "@/features/onboarding/profileStorage";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import {
@@ -180,6 +181,17 @@ type WeeklyReportLimitPayload = {
   monthly_limit?: number;
   prompts_used?: number;
 };
+
+const REPORT_MODULE_META = {
+  goals: { label: "Goals", emoji: "🎯" },
+  fitness: { label: "Fitness", emoji: "💪" },
+  nutrition: { label: "Nutrition", emoji: "🥗" },
+  reading: { label: "Reading", emoji: "📖" },
+  todos: { label: "Todos", emoji: "✅" },
+  schedule: { label: "Schedule", emoji: "📅" },
+} as const;
+
+type ReportModuleKey = keyof typeof REPORT_MODULE_META;
 
 type SplitDayCacheEntry = {
   label?: string;
@@ -421,6 +433,224 @@ export function isSunday(): boolean {
   return new Date().getDay() === 0;
 }
 
+function clampScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function average(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function asReportModuleKey(value: string): ReportModuleKey | null {
+  return value in REPORT_MODULE_META ? (value as ReportModuleKey) : null;
+}
+
+function fallbackModuleOneliner(
+  module: ReportModuleKey,
+  payload: WeeklyDataPayload,
+) {
+  switch (module) {
+    case "goals": {
+      const goals = payload.goals;
+      if (!goals || goals.total === 0) return "No goals set yet.";
+      if (goals.overdueSteps > 0) {
+        return `${goals.overdueSteps} overdue step${goals.overdueSteps === 1 ? "" : "s"} still need attention.`;
+      }
+      return `${goals.stepsCompletedThisWeek} step${goals.stepsCompletedThisWeek === 1 ? "" : "s"} completed this week.`;
+    }
+    case "fitness": {
+      const fitness = payload.fitness;
+      if (!fitness) return "No fitness data this week.";
+      if ((fitness.workoutsThisWeek ?? 0) > 0) {
+        return `${fitness.workoutsThisWeek} workout${fitness.workoutsThisWeek === 1 ? "" : "s"} logged this week.`;
+      }
+      return "No workouts logged this week.";
+    }
+    case "nutrition": {
+      const nutrition = payload.nutrition;
+      if (!nutrition) return "No nutrition data this week.";
+      return `${nutrition.daysLogged} day${nutrition.daysLogged === 1 ? "" : "s"} of nutrition logged.`;
+    }
+    case "reading": {
+      const reading = payload.reading;
+      if (!reading?.currentBook) return "No current book set.";
+      if ((reading.pagesRead ?? 0) > 0) {
+        return `${reading.pagesRead} page${reading.pagesRead === 1 ? "" : "s"} read this week.`;
+      }
+      return `${reading.daysRead} day${reading.daysRead === 1 ? "" : "s"} with reading activity.`;
+    }
+    case "todos": {
+      const todos = payload.todos;
+      if (!todos) return "No todo data this week.";
+      return `${todos.completedThisWeek ?? 0} todo${todos.completedThisWeek === 1 ? "" : "s"} completed this week.`;
+    }
+    case "schedule": {
+      const schedule = payload.schedule;
+      if (!schedule) return "No schedule data this week.";
+      return `${schedule.blocksCompletedThisWeek} block${schedule.blocksCompletedThisWeek === 1 ? "" : "s"} completed this week.`;
+    }
+  }
+}
+
+function scoreGoals(goals?: WeeklyDataPayload["goals"]) {
+  if (!goals) return 0;
+  if (goals.total === 0) return 18;
+
+  const avgProgress = average(goals.topGoals.map((goal) => goal.pct));
+  const completionBoost = Math.min(goals.stepsCompletedThisWeek * 7, 28);
+  const overduePenalty = Math.min(goals.overdueSteps * 8, 36);
+  const activeGoalBoost = Math.min(goals.total * 4, 12);
+
+  return clampScore(avgProgress * 0.65 + completionBoost + activeGoalBoost - overduePenalty);
+}
+
+function scoreFitness(fitness?: WeeklyDataPayload["fitness"]) {
+  if (!fitness) return 0;
+
+  const workouts = Math.max(fitness.workoutsThisWeek ?? 0, 0);
+  const workoutScore = Math.min((workouts / 4) * 70, 70);
+  const recencyScore =
+    typeof fitness.daysSinceLastWorkout === "number"
+      ? Math.max(0, 20 - Math.min(fitness.daysSinceLastWorkout, 10) * 2)
+      : fitness.dataCompleteness === "unknown"
+        ? 12
+        : 0;
+  const prBoost = Math.min((fitness.prsThisWeek ?? 0) * 5, 10);
+
+  return clampScore(workoutScore + recencyScore + prBoost);
+}
+
+function scoreNutrition(nutrition?: WeeklyDataPayload["nutrition"]) {
+  if (!nutrition) return 0;
+
+  const dayScore = Math.min((nutrition.daysLogged / 7) * 55, 55);
+  const calorieScore =
+    nutrition.calorieTarget && nutrition.avgCaloriesLogged > 0
+      ? Math.max(
+          0,
+          25 - Math.min(
+            Math.abs(nutrition.avgCaloriesLogged - nutrition.calorieTarget) /
+              nutrition.calorieTarget,
+            1,
+          ) * 35,
+        )
+      : nutrition.dataCompleteness === "unknown"
+        ? 12
+        : 0;
+  const proteinScore =
+    nutrition.proteinTarget && nutrition.avgProteinLogged > 0
+      ? Math.max(
+          0,
+          20 - Math.min(
+            Math.abs(nutrition.avgProteinLogged - nutrition.proteinTarget) /
+              nutrition.proteinTarget,
+            1,
+          ) * 28,
+        )
+      : nutrition.dataCompleteness === "unknown"
+        ? 10
+        : 0;
+
+  return clampScore(dayScore + calorieScore + proteinScore);
+}
+
+function scoreReading(reading?: WeeklyDataPayload["reading"]) {
+  if (!reading) return 0;
+  if (!reading.currentBook) return 15;
+
+  const weeklyGoalPages = Math.max(reading.dailyGoalPages * 7, 1);
+  const pageScore =
+    typeof reading.pagesRead === "number"
+      ? Math.min(reading.pagesRead / weeklyGoalPages, 1.2) * 65
+      : 0;
+  const daysScore = Math.min((reading.daysRead / 7) * 25, 25);
+  const streakScore = Math.min((reading.streak / 7) * 10, 10);
+  const partialSignalBoost =
+    reading.pagesRead === null && reading.daysRead > 0 ? 12 : 0;
+
+  return clampScore(pageScore + daysScore + streakScore + partialSignalBoost);
+}
+
+function scoreTodos(todos?: WeeklyDataPayload["todos"]) {
+  if (!todos) return 0;
+
+  const created = Math.max(todos.totalCreatedThisWeek, 0);
+  const completedThisWeek = Math.max(todos.completedThisWeek ?? 0, 0);
+  const completionRatio =
+    created > 0 ? Math.min(completedThisWeek / created, 1.2) : completedThisWeek > 0 ? 1 : 0;
+  const completionScore = completionRatio * 70;
+  const openPenalty = Math.min(Math.max(todos.openCount, 0), 20);
+
+  return clampScore(completionScore + 20 - openPenalty);
+}
+
+function scoreSchedule(schedule?: WeeklyDataPayload["schedule"]) {
+  if (!schedule) return 0;
+
+  const blockRatio =
+    schedule.totalBlocksThisWeek > 0
+      ? Math.min(schedule.blocksCompletedThisWeek / schedule.totalBlocksThisWeek, 1.1)
+      : 0;
+  const blockScore = blockRatio * 75;
+  const dayScore = Math.min((schedule.activeDays / 7) * 25, 25);
+
+  return clampScore(blockScore + dayScore);
+}
+
+function scoreModule(
+  module: ReportModuleKey,
+  payload: WeeklyDataPayload,
+) {
+  switch (module) {
+    case "goals":
+      return scoreGoals(payload.goals);
+    case "fitness":
+      return scoreFitness(payload.fitness);
+    case "nutrition":
+      return scoreNutrition(payload.nutrition);
+    case "reading":
+      return scoreReading(payload.reading);
+    case "todos":
+      return scoreTodos(payload.todos);
+    case "schedule":
+      return scoreSchedule(payload.schedule);
+  }
+}
+
+function computeModuleScores(payload: WeeklyDataPayload): ModuleScore[] {
+  return payload.modules
+    .map((moduleName) => asReportModuleKey(moduleName))
+    .filter((module): module is ReportModuleKey => module !== null)
+    .map((module) => ({
+      module,
+      label: REPORT_MODULE_META[module].label,
+      emoji: REPORT_MODULE_META[module].emoji,
+      score: scoreModule(module, payload),
+      oneliner: fallbackModuleOneliner(module, payload),
+    }));
+}
+
+function normalizeWeeklyReportScores(
+  report: WeeklyReport,
+  payload: WeeklyDataPayload,
+): WeeklyReport {
+  const aiScores = new Map(report.moduleScores.map((item) => [item.module, item]));
+  const moduleScores = computeModuleScores(payload).map((item) => {
+    const ai = aiScores.get(item.module);
+    return {
+      ...item,
+      oneliner: ai?.oneliner?.trim() || item.oneliner,
+    };
+  });
+
+  return {
+    ...report,
+    moduleScores,
+    overallScore: clampScore(average(moduleScores.map((item) => item.score))),
+  };
+}
+
 function summarizeGoals(goals: GoalSummaryModel[]) {
   const userId = getActiveUserId();
   const doneMap = userId
@@ -428,8 +658,8 @@ function summarizeGoals(goals: GoalSummaryModel[]) {
         scopedKey("goals:done:v1", userId),
       ) ?? {}
     : {};
-  const history: Array<{ date?: string }> = userId
-    ? (readJson<Array<{ date?: string }>>(
+  const history: StepHistoryEntry[] = userId
+    ? (readJson<StepHistoryEntry[]>(
         scopedKey("goals:step-history:v1", userId),
       ) ?? [])
     : [];
@@ -437,7 +667,7 @@ function summarizeGoals(goals: GoalSummaryModel[]) {
   const today = getLocalDateKey();
   const weekStart = getCurrentWeekStart();
 
-  const topGoals = goals.slice(0, 5).map((goal) => {
+  const goalProgress = goals.map((goal) => {
     const steps = Array.isArray(goal.steps) ? goal.steps : [];
     const done = doneMap[String(goal.id)] ?? {};
     const doneCount = steps.filter((step) => done[String(step.id)]).length;
@@ -449,6 +679,21 @@ function summarizeGoals(goals: GoalSummaryModel[]) {
       pct,
     };
   });
+
+  const priorityRank: Record<string, number> = {
+    high: 3,
+    medium: 2,
+    low: 1,
+  };
+
+  const topGoals = [...goalProgress]
+    .sort(
+      (a, b) =>
+        (priorityRank[b.priority] ?? 0) - (priorityRank[a.priority] ?? 0) ||
+        b.pct - a.pct ||
+        a.title.localeCompare(b.title),
+    )
+    .slice(0, 5);
 
   const overdueSteps = goals.reduce((count, goal) => {
     const steps = Array.isArray(goal.steps) ? goal.steps : [];
@@ -466,12 +711,11 @@ function summarizeGoals(goals: GoalSummaryModel[]) {
     );
   }, 0);
 
-  const stepsCompletedThisWeek = history.filter(
-    (entry: { date?: string }) => {
-      const date = typeof entry?.date === "string" ? entry.date : "";
-      return date >= weekStart && date <= today;
-    },
-  ).length;
+  const stepsCompletedThisWeek = new Set(
+    history
+      .filter((entry) => entry.date >= weekStart && entry.date <= today)
+      .map((entry) => `${entry.goalId}:${entry.stepId}`),
+  ).size;
 
   return {
     total: goals.length,
@@ -801,6 +1045,48 @@ async function collectScheduleData(
   };
 }
 
+async function collectWeeklyDataPayload(
+  modules: Set<string>,
+  weekStart: string,
+  weekEnd: string,
+): Promise<WeeklyDataPayload> {
+  const [goals, fitness, nutrition, reading, todos, schedule] =
+    await Promise.all([
+      loadUserGoals(),
+      collectFitnessData(modules, weekStart, weekEnd),
+      collectNutritionData(modules, weekStart, weekEnd),
+      collectReadingData(modules, weekStart, weekEnd),
+      collectTodosData(modules, weekStart, weekEnd),
+      collectScheduleData(modules, weekStart, weekEnd),
+    ]);
+
+  const profile = await loadProfile();
+
+  return {
+    weekStart,
+    weekEnd,
+    modules: Array.from(modules),
+    profile: {
+      displayName: profile?.display_name ?? null,
+      activityLevel: profile?.activity_level ?? null,
+      dailyReadingGoal: profile?.daily_reading_goal ?? null,
+      measurementSystem: profile?.measurement_system ?? null,
+      dateFormat: profile?.date_format ?? null,
+      timeFormat: profile?.time_format ?? null,
+    },
+    goals: summarizeGoals(
+      goals
+        .map((goal) => toGoalSummaryModel(goal))
+        .filter((goal): goal is GoalSummaryModel => goal !== null),
+    ),
+    fitness,
+    nutrition,
+    reading,
+    todos,
+    schedule,
+  };
+}
+
 export function useWeeklyReport(modules: Set<string>) {
   const tier = useTier();
 
@@ -867,6 +1153,11 @@ export function useWeeklyReport(modules: Set<string>) {
           createdAt: row.created_at,
         };
 
+        if (row.week_start === weekStart) {
+          const weeklyData = await collectWeeklyDataPayload(modules, weekStart, weekEnd);
+          latest.report = normalizeWeeklyReportScores(latest.report, weeklyData);
+        }
+
         setReport(latest);
         writeLatestReportCache(latest);
         setStatus("idle");
@@ -880,7 +1171,7 @@ export function useWeeklyReport(modules: Set<string>) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [modules, weekEnd, weekStart]);
 
   const generate = useCallback(async () => {
     setStatus("generating");
@@ -896,17 +1187,7 @@ export function useWeeklyReport(modules: Set<string>) {
         throw new Error("Not signed in");
       }
 
-      const [goals, fitness, nutrition, reading, todos, schedule] =
-        await Promise.all([
-          loadUserGoals(),
-          collectFitnessData(modules, weekStart, weekEnd),
-          collectNutritionData(modules, weekStart, weekEnd),
-          collectReadingData(modules, weekStart, weekEnd),
-          collectTodosData(modules, weekStart, weekEnd),
-          collectScheduleData(modules, weekStart, weekEnd),
-        ]);
-
-      const profile = await loadProfile();
+      const weeklyData = await collectWeeklyDataPayload(modules, weekStart, weekEnd);
 
       let userContext = "";
       try {
@@ -914,32 +1195,6 @@ export function useWeeklyReport(modules: Set<string>) {
       } catch {
         // non-fatal
       }
-
-      const enabledModules: Set<string> = modules;
-
-      const weeklyData: WeeklyDataPayload = {
-        weekStart,
-        weekEnd,
-        modules: Array.from(enabledModules),
-        profile: {
-          displayName: profile?.display_name ?? null,
-          activityLevel: profile?.activity_level ?? null,
-          dailyReadingGoal: profile?.daily_reading_goal ?? null,
-          measurementSystem: profile?.measurement_system ?? null,
-          dateFormat: profile?.date_format ?? null,
-          timeFormat: profile?.time_format ?? null,
-        },
-        goals: summarizeGoals(
-          goals
-            .map((goal) => toGoalSummaryModel(goal))
-            .filter((goal): goal is GoalSummaryModel => goal !== null),
-        ),
-        fitness,
-        nutrition,
-        reading,
-        todos,
-        schedule,
-      };
 
       const res = await fetch(SUPABASE_FN, {
         method: "POST",
@@ -986,10 +1241,15 @@ export function useWeeklyReport(modules: Set<string>) {
         throw new Error("Failed to parse report response");
       }
 
+      const normalizedReport = normalizeWeeklyReportScores(
+        data.report,
+        weeklyData,
+      );
+
       const newRecord: WeeklyReportRecord = {
         id: crypto.randomUUID(),
         weekStart,
-        report: data.report,
+        report: normalizedReport,
         createdAt: new Date().toISOString(),
       };
 
