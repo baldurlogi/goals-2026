@@ -10,7 +10,6 @@ import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { Flame, BookOpen } from "lucide-react";
 import { ReadingNowCard } from "./components/ReadingNowCard";
 import { ReadingNextCard } from "./components/ReadingNextCard";
-import { ReadingInputsCard } from "./components/ReadingInputsCard";
 import { DEFAULT_READING_INPUTS } from "./readingStorage";
 import { useReadingQuery, useSaveReadingMutation } from "./useReadingQuery";
 import { Card, CardContent } from "@/components/ui/card";
@@ -96,43 +95,68 @@ export function ReadingPage() {
 
   const [draft, setDraft] = useState<ReadingInputs>(remoteInputs);
   const draftRef = useRef(draft);
-  const isDirtyRef = useRef(false);
+  const [editingSection, setEditingSection] = useState<"current" | "queue" | null>(
+    null,
+  );
+  const [quickCurrentPage, setQuickCurrentPage] = useState(
+    remoteInputs.current.currentPage,
+  );
 
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
 
   useEffect(() => {
-    if (!isDirtyRef.current) {
+    if (!editingSection) {
       setDraft(remoteInputs);
       draftRef.current = remoteInputs;
     }
-  }, [remoteInputs]);
+  }, [editingSection, remoteInputs]);
 
   useEffect(() => {
-    const remoteJson = JSON.stringify(remoteInputs);
-    const draftJson = JSON.stringify(draft);
-
-    if (remoteJson === draftJson) return;
-
-    const submittedJson = draftJson;
-    const timeoutId = window.setTimeout(() => {
-      saveReadingMutation.mutate({ value: draft, previousInputs: remoteInputs }, {
-        onSettled: () => {
-          if (JSON.stringify(draftRef.current) === submittedJson) {
-            isDirtyRef.current = false;
-          }
-        },
-      });
-    }, 250);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [draft, remoteInputs, saveReadingMutation]);
+    if (editingSection !== "current") {
+      setQuickCurrentPage(remoteInputs.current.currentPage);
+    }
+  }, [editingSection, remoteInputs.current.currentPage]);
 
   const stats = useMemo(() => {
     const plan = inputsToPlan(draft);
     return getReadingStats(plan);
   }, [draft]);
+  const hasCurrentPendingChanges = useMemo(
+    () =>
+      JSON.stringify({
+        current: {
+          title: draft.current.title,
+          author: draft.current.author,
+          totalPages: draft.current.totalPages,
+        },
+        dailyGoalPages: draft.dailyGoalPages,
+      }) !==
+      JSON.stringify({
+        current: {
+          title: remoteInputs.current.title,
+          author: remoteInputs.current.author,
+          totalPages: remoteInputs.current.totalPages,
+        },
+        dailyGoalPages: remoteInputs.dailyGoalPages,
+      }),
+    [
+      draft.current.author,
+      draft.current.title,
+      draft.current.totalPages,
+      draft.dailyGoalPages,
+      remoteInputs.current.author,
+      remoteInputs.current.title,
+      remoteInputs.current.totalPages,
+      remoteInputs.dailyGoalPages,
+    ],
+  );
+  const hasQueuePendingChanges = useMemo(
+    () => JSON.stringify(draft.upNext) !== JSON.stringify(remoteInputs.upNext),
+    [draft.upNext, remoteInputs.upNext],
+  );
+  const currentPageDirty = quickCurrentPage !== remoteInputs.current.currentPage;
   const displayedStreak = getDisplayedReadingStreak(
     draft.streak ?? 0,
     draft.lastReadDate,
@@ -140,20 +164,62 @@ export function ReadingPage() {
   );
 
   function updateDraft(updater: (prev: ReadingInputs) => ReadingInputs) {
-    isDirtyRef.current = true;
     setDraft((prev) => updater(prev));
   }
 
   function commitNow(next: ReadingInputs) {
-    isDirtyRef.current = false;
     setDraft(next);
     draftRef.current = next;
     saveReadingMutation.mutate({ value: next, previousInputs: remoteInputs });
   }
 
+  function handleStartEditing(section: "current" | "queue") {
+    setDraft(remoteInputs);
+    draftRef.current = remoteInputs;
+    setEditingSection(section);
+  }
+
+  function handleCancelEditing() {
+    setDraft(remoteInputs);
+    draftRef.current = remoteInputs;
+    setEditingSection(null);
+  }
+
+  function handleSaveChanges() {
+    const next = draftRef.current;
+    saveReadingMutation.mutate(
+      { value: next, previousInputs: remoteInputs },
+      {
+        onSuccess: (saved) => {
+          setDraft(saved);
+          draftRef.current = saved;
+          setEditingSection(null);
+        },
+      },
+    );
+  }
+
+  function handleQuickCurrentPageChange(value: string) {
+    if (!canAcceptDigitsOrBlank(value)) return;
+    setQuickCurrentPage(value);
+  }
+
+  function handleSaveCurrentPage() {
+    if (!currentPageDirty) return;
+
+    const next = {
+      ...remoteInputs,
+      current: {
+        ...remoteInputs.current,
+        currentPage: quickCurrentPage,
+      },
+    };
+
+    commitNow(next);
+  }
+
   function updateField(path: ReadingFieldPath, value: string) {
     const digitOnlyPaths: ReadingFieldPath[] = [
-      "current.currentPage",
       "current.totalPages",
       "dailyGoalPages",
     ];
@@ -246,8 +312,37 @@ export function ReadingPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-4">
-        <ReadingInputsCard value={draft} onChange={updateField} />
+        <ReadingNowCard
+          stats={stats}
+          onMarkCompleted={markCurrentCompleted}
+          onReset={resetAll}
+          isEditing={editingSection === "current"}
+          isSaving={saveReadingMutation.isPending}
+          hasPendingChanges={hasCurrentPendingChanges}
+          onStartEditing={() => handleStartEditing("current")}
+          onSave={handleSaveChanges}
+          onCancel={handleCancelEditing}
+          currentPageValue={quickCurrentPage}
+          onCurrentPageChange={handleQuickCurrentPageChange}
+          onSaveCurrentPage={handleSaveCurrentPage}
+          currentPageDirty={currentPageDirty}
+          titleValue={draft.current.title}
+          authorValue={draft.current.author}
+          totalPagesValue={draft.current.totalPages}
+          dailyGoalValue={draft.dailyGoalPages}
+          onTitleChange={(value) => updateField("current.title", value)}
+          onAuthorChange={(value) => updateField("current.author", value)}
+          onTotalPagesChange={(value) => updateField("current.totalPages", value)}
+          onDailyGoalChange={(value) => updateField("dailyGoalPages", value)}
+          controlsDisabled={editingSection === "queue"}
+        />
 
+        <div className="hidden lg:block">
+          <CompletedBooksSection books={draft.completed} preferences={preferences} />
+        </div>
+      </div>
+
+      <div className="space-y-4">
         <Card>
           <CardContent className="flex items-center gap-4 py-4">
             <div
@@ -283,28 +378,23 @@ export function ReadingPage() {
           </CardContent>
         </Card>
 
-        <div className="lg:hidden">
-          <CompletedBooksSection books={draft.completed} preferences={preferences} />
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <ReadingNowCard
-          stats={stats}
-          onMarkCompleted={markCurrentCompleted}
-          onReset={resetAll}
-        />
-
-        <div className="hidden lg:block">
-          <CompletedBooksSection books={draft.completed} preferences={preferences} />
-        </div>
-
         <ReadingNextCard
           queue={draft.upNext}
           onRemove={removeFromQueue}
           onReorder={reorderQueue}
           onAdd={addToQueue}
+          editable={editingSection === "queue"}
+          isSaving={saveReadingMutation.isPending}
+          hasPendingChanges={hasQueuePendingChanges}
+          onStartEditing={() => handleStartEditing("queue")}
+          onSave={handleSaveChanges}
+          onCancel={handleCancelEditing}
+          controlsDisabled={editingSection === "current"}
         />
+
+        <div className="lg:hidden">
+          <CompletedBooksSection books={draft.completed} preferences={preferences} />
+        </div>
       </div>
     </div>
   );

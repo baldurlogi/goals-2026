@@ -297,7 +297,16 @@ function repairDailyProgressCandidate(
   }
 
   let baselinePage = Math.max(candidate.baselinePage, 0);
-  let latestPage = Math.max(candidate.latestPage, 0, params.currentPage);
+  let latestPage = Math.max(candidate.latestPage, 0);
+
+  if (params.currentPage > 0) {
+    if (baselinePage > 0 && params.currentPage < baselinePage) {
+      baselinePage = params.currentPage;
+      latestPage = params.currentPage;
+    } else {
+      latestPage = params.currentPage;
+    }
+  }
 
   if (
     baselinePage === 0 &&
@@ -497,8 +506,10 @@ function computeDailyProgress(
         previousPage > 0 &&
         currentPage < previousPage
       ) {
-        // Treat a backward page edit as a deliberate baseline reset for today.
-        nextProgress = createProgressSnapshot(today, bookKey, currentPage, currentPage);
+        nextProgress = {
+          ...activeProgress,
+          latestPage: currentPage,
+        };
       } else {
         nextProgress = {
           ...activeProgress,
@@ -572,7 +583,6 @@ export function getTodayReadingProgress(
   userId: string | null = getActiveUserId(),
 ): TodayReadingProgress {
   const bookKey = getBookKey(inputs);
-  const currentPage = parsePage(inputs.current.currentPage);
   const goalPages = parseGoalPages(inputs.dailyGoalPages);
 
   if (!bookKey.trim()) {
@@ -585,8 +595,7 @@ export function getTodayReadingProgress(
     return toTodayReadingProgress(true, goalPages, 0);
   }
 
-  const latestPage = Math.max(currentPage, progress.latestPage);
-  const pagesRead = Math.max(latestPage - progress.baselinePage, 0);
+  const pagesRead = Math.max(progress.latestPage - progress.baselinePage, 0);
   return toTodayReadingProgress(true, goalPages, pagesRead);
 }
 

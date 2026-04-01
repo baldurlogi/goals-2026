@@ -1,19 +1,61 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { ReadingStats } from "../readingTypes";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Loader2, Pencil, Save, X } from "lucide-react";
 
 export function ReadingNowCard({
   stats,
   onMarkCompleted,
   onReset,
+  isEditing,
+  isSaving,
+  hasPendingChanges,
+  onStartEditing,
+  onSave,
+  onCancel,
+  currentPageValue,
+  onCurrentPageChange,
+  onSaveCurrentPage,
+  currentPageDirty,
+  titleValue,
+  authorValue,
+  totalPagesValue,
+  dailyGoalValue,
+  onTitleChange,
+  onAuthorChange,
+  onTotalPagesChange,
+  onDailyGoalChange,
+  controlsDisabled = false,
 }: {
   stats: ReadingStats;
   onMarkCompleted: () => void;
   onReset: () => void;
+  isEditing: boolean;
+  isSaving: boolean;
+  hasPendingChanges: boolean;
+  onStartEditing: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  currentPageValue: string;
+  onCurrentPageChange: (value: string) => void;
+  onSaveCurrentPage: () => void;
+  currentPageDirty: boolean;
+  titleValue: string;
+  authorValue: string;
+  totalPagesValue: string;
+  dailyGoalValue: string;
+  onTitleChange: (value: string) => void;
+  onAuthorChange: (value: string) => void;
+  onTotalPagesChange: (value: string) => void;
+  onDailyGoalChange: (value: string) => void;
+  controlsDisabled?: boolean;
 }) {
   const hasBook = !!stats.current.title;
+  const pageControlsDisabled = controlsDisabled || isSaving || isEditing;
 
   return (
     <Card className="border-rose-200/60 dark:border-rose-900/60">
@@ -50,6 +92,113 @@ export function ReadingNowCard({
 
         <Separator />
 
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="reading-current-page" className="text-sm font-medium">
+              Current page
+            </Label>
+            <span className="text-xs text-muted-foreground">
+              Quick update
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              id="reading-current-page"
+              value={currentPageValue}
+              onChange={(event) => onCurrentPageChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !pageControlsDisabled && currentPageDirty) {
+                  onSaveCurrentPage();
+                }
+              }}
+              inputMode="numeric"
+              placeholder="0"
+              disabled={pageControlsDisabled}
+              className="sm:max-w-[180px]"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onSaveCurrentPage}
+              disabled={pageControlsDisabled || !currentPageDirty}
+              className="gap-2 sm:w-auto"
+            >
+              {isSaving && !isEditing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Updating…
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Update page
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {isEditing ? (
+          <>
+            <Separator />
+
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="reading-title">Current book</Label>
+                  <Input
+                    id="reading-title"
+                    value={titleValue}
+                    onChange={(event) => onTitleChange(event.target.value)}
+                    placeholder="Atomic Habits"
+                    disabled={isSaving}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reading-author">Author</Label>
+                  <Input
+                    id="reading-author"
+                    value={authorValue}
+                    onChange={(event) => onAuthorChange(event.target.value)}
+                    placeholder="James Clear"
+                    disabled={isSaving}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="reading-total-pages">Total pages</Label>
+                  <Input
+                    id="reading-total-pages"
+                    value={totalPagesValue}
+                    onChange={(event) => onTotalPagesChange(event.target.value)}
+                    inputMode="numeric"
+                    placeholder="320"
+                    disabled={isSaving}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reading-daily-goal">Daily goal (pages)</Label>
+                  <Input
+                    id="reading-daily-goal"
+                    value={dailyGoalValue}
+                    onChange={(event) => onDailyGoalChange(event.target.value)}
+                    inputMode="numeric"
+                    placeholder="10"
+                    disabled={isSaving}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        <Separator />
+
         <div className="mt-4 flex items-end justify-between gap-4">
           <div className="min-w-0">
             <div className="text-sm text-muted-foreground">Pages left</div>
@@ -72,17 +221,59 @@ export function ReadingNowCard({
 
         <Separator />
 
-        <div className="flex gap-2 pt-1">
-          <Button
-            onClick={onMarkCompleted}
-            disabled={!hasBook}
-            className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
-          >
-            Mark as completed
-          </Button>
-          <Button variant="ghost" onClick={onReset} className="text-muted-foreground">
-            Reset
-          </Button>
+        <div className="flex flex-wrap gap-2 pt-1">
+          {isEditing ? (
+            <>
+              <Button
+                onClick={onSave}
+                disabled={isSaving || !hasPendingChanges}
+                className="flex-1 gap-2 bg-rose-600 text-white hover:bg-rose-700"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save details
+                  </>
+                )}
+              </Button>
+              <Button variant="ghost" onClick={onCancel} disabled={isSaving} className="gap-2 text-muted-foreground">
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                onClick={onMarkCompleted}
+                disabled={!hasBook || controlsDisabled}
+                className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                Mark as completed
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onStartEditing}
+                disabled={controlsDisabled}
+                className="gap-2"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit details
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={onReset}
+                disabled={controlsDisabled}
+                className="text-muted-foreground"
+              >
+                Reset
+              </Button>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>
