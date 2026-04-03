@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import { getAISystemContext } from "@/features/ai/buildAIContext";
 import { loadUserGoals } from "@/features/goals/userGoalStorage";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
@@ -40,8 +40,7 @@ import {
 import { useTier, type Tier } from "@/features/subscription/useTier";
 import { capture } from "@/lib/analytics";
 
-const SUPABASE_FN =
-  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+const SUPABASE_FN = getSupabaseFunctionUrl("hyper-responder");
 
 const WEEKLY_REPORT_CACHE_KEY = "cache:weekly-report:latest:v1";
 

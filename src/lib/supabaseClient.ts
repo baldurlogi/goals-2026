@@ -17,3 +17,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnon, {
     flowType:           "pkce",
   },
 });
+
+export function getSupabaseFunctionUrl(functionName: string): string {
+  return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/${functionName}`;
+}

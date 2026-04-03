@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import { getAISystemContext } from "@/features/ai/buildAIContext";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
@@ -21,22 +21,23 @@ import {
 } from "@/features/subscription/aiUsageCache";
 import { capture } from "@/lib/analytics";
 
-const SUPABASE_FN =
-  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+const SUPABASE_FN = getSupabaseFunctionUrl("hyper-responder");
 
 type ImprovedStep = {
   id: string;
+  action: "update" | "add" | "remove";
+  targetStepId: string | null;
+  insertAfterStepId: string | null;
   label: string;
   notes: string;
   idealFinish: string | null;
   estimatedTime: string;
   links?: string[];
-  isNew: boolean;
-  isChanged: boolean;
+  reason?: string;
 };
 
 type ImproveResult = {
-  steps: ImprovedStep[];
+  changes: ImprovedStep[];
   summary: string;
 };
 
@@ -46,6 +47,8 @@ type ImproveLimitPayload = {
   tier?: Tier;
   monthly_limit?: number;
   prompts_used?: number;
+  details?: string;
+  raw_text?: string;
 };
 
 type ImproveResponse = {
@@ -128,8 +131,15 @@ async function fetchImprovedSteps(
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? "Failed to get suggestions");
+    const err = (await res.json().catch(() => ({}))) as ImproveLimitPayload;
+    const detail = typeof err.details === "string"
+      ? err.details
+      : typeof err.raw_text === "string"
+        ? err.raw_text
+        : "";
+
+    const message = err.error ?? "Failed to get suggestions";
+    throw new Error(detail ? `${message}: ${detail}` : message);
   }
 
   const data = (await res.json()) as ImproveResponse;
@@ -149,7 +159,7 @@ async function fetchImprovedSteps(
   }
 
   const improved = data.improved as ImproveResult;
-  if (!improved?.steps?.length) throw new Error("No steps returned");
+  if (!improved?.changes?.length) throw new Error("No changes returned");
   return improved;
 }
 
@@ -167,13 +177,18 @@ function StepDiffRow({
   onToggle: () => void;
 }) {
   const isAccepted = status === "accepted";
-  const tag = step.isNew ? "new" : step.isChanged ? "improved" : "unchanged";
+  const tag = step.action;
 
   const tagColors = {
-    new: "bg-emerald-500/15 text-emerald-500",
-    improved: "bg-violet-500/15 text-violet-400",
-    unchanged: "bg-muted text-muted-foreground",
+    add: "bg-emerald-500/15 text-emerald-500",
+    update: "bg-violet-500/15 text-violet-400",
+    remove: "bg-rose-500/15 text-rose-400",
   };
+
+  const title =
+    step.action === "remove"
+      ? originalStep?.label || "Remove step"
+      : step.label;
 
   return (
     <div
@@ -202,7 +217,7 @@ function StepDiffRow({
                 !isAccepted ? "line-through text-muted-foreground" : ""
               }`}
             >
-              {step.label}
+              {title}
             </span>
             <span
               className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
@@ -213,21 +228,33 @@ function StepDiffRow({
             </span>
           </div>
 
-          {step.isChanged && originalStep && (
+          {step.action === "update" && originalStep && (
             <div className="text-[11px] text-muted-foreground/60 line-through">
               was: {originalStep.label}
             </div>
           )}
 
-          {step.notes && (
+          {step.action === "remove" && originalStep && (
+            <div className="text-[11px] text-muted-foreground/70">
+              Removes: {originalStep.label}
+            </div>
+          )}
+
+          {step.action !== "remove" && step.notes && (
             <p className="text-xs leading-relaxed text-muted-foreground">
               {step.notes}
             </p>
           )}
 
+          {step.reason && (
+            <p className="text-[11px] leading-relaxed text-muted-foreground/70">
+              Why: {step.reason}
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground/60">
-            {step.idealFinish && <span>📅 {step.idealFinish}</span>}
-            {step.estimatedTime && <span>⏱ {step.estimatedTime}</span>}
+            {step.action !== "remove" && step.idealFinish && <span>📅 {step.idealFinish}</span>}
+            {step.action !== "remove" && step.estimatedTime && <span>⏱ {step.estimatedTime}</span>}
           </div>
         </div>
       </div>
@@ -260,7 +287,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
         setResult(r);
 
         const defaults: Record<string, StepStatus> = {};
-        r.steps.forEach((s) => {
+        r.changes.forEach((s) => {
           defaults[s.id] = "accepted";
         });
 
@@ -309,7 +336,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
 
   function acceptAll() {
     const all: Record<string, StepStatus> = {};
-    result?.steps.forEach((s) => {
+    result?.changes.forEach((s) => {
       all[s.id] = "accepted";
     });
     setAccepted(all);
@@ -317,7 +344,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
 
   function rejectAll() {
     const all: Record<string, StepStatus> = {};
-    result?.steps.forEach((s) => {
+    result?.changes.forEach((s) => {
       all[s.id] = "rejected";
     });
     setAccepted(all);
@@ -326,16 +353,68 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
   function handleApply() {
     if (!result) return;
 
-    const acceptedSteps = result.steps.filter((s) => accepted[s.id] === "accepted");
+    const acceptedChanges = result.changes.filter(
+      (s) => accepted[s.id] === "accepted",
+    );
 
-    const newSteps: UserGoalStep[] = acceptedSteps.map((s, i) => ({
-      id: s.isNew ? crypto.randomUUID() : s.id,
-      label: s.label,
-      notes: s.notes,
-      idealFinish: s.idealFinish,
-      estimatedTime: s.estimatedTime,
-      links: s.links ?? [],
-      sortOrder: i,
+    const nextSteps: Array<UserGoalStep & { links: string[] }> = goal.steps.map((step) => ({
+      ...step,
+      links: step.links ?? [],
+    }));
+
+    acceptedChanges.forEach((change) => {
+      const targetStepId = change.targetStepId ?? change.id;
+
+      if (change.action === "update") {
+        const targetIndex = nextSteps.findIndex((step) => step.id === targetStepId);
+        if (targetIndex === -1) return;
+
+        nextSteps[targetIndex] = {
+          ...nextSteps[targetIndex],
+          label: change.label,
+          notes: change.notes,
+          idealFinish: change.idealFinish,
+          estimatedTime: change.estimatedTime,
+          links: change.links ?? [],
+        };
+        return;
+      }
+
+      if (change.action === "remove") {
+        const targetIndex = nextSteps.findIndex((step) => step.id === targetStepId);
+        if (targetIndex === -1) return;
+        nextSteps.splice(targetIndex, 1);
+        return;
+      }
+
+      const newStep: UserGoalStep & { links: string[] } = {
+        id: crypto.randomUUID(),
+        label: change.label,
+        notes: change.notes,
+        idealFinish: change.idealFinish,
+        estimatedTime: change.estimatedTime,
+        links: change.links ?? [],
+        sortOrder: nextSteps.length,
+      };
+
+      const insertAfterId = change.insertAfterStepId;
+      if (!insertAfterId) {
+        nextSteps.push(newStep);
+        return;
+      }
+
+      const insertIndex = nextSteps.findIndex((step) => step.id === insertAfterId);
+      if (insertIndex === -1) {
+        nextSteps.push(newStep);
+        return;
+      }
+
+      nextSteps.splice(insertIndex + 1, 0, newStep);
+    });
+
+    const newSteps: UserGoalStep[] = nextSteps.map((step, index) => ({
+      ...step,
+      sortOrder: index,
     }));
 
     onApply(newSteps);
@@ -458,7 +537,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
 
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
-                  {acceptedCount} of {result.steps.length} steps selected
+                  {acceptedCount} of {result.changes.length} changes selected
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -480,11 +559,13 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
               </div>
 
               <div className="space-y-2">
-                {result.steps.map((step) => (
+                {result.changes.map((step) => (
                   <StepDiffRow
                     key={step.id}
                     step={step}
-                    originalStep={originalById[step.id] ?? null}
+                    originalStep={
+                      originalById[step.targetStepId ?? step.id] ?? null
+                    }
                     status={accepted[step.id] ?? "accepted"}
                     onToggle={() => toggleStep(step.id)}
                   />
@@ -560,7 +641,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
                 onClick={handleApply}
                 className="gap-1.5"
               >
-                Apply {acceptedCount} step{acceptedCount !== 1 ? "s" : ""}
+                Apply {acceptedCount} change{acceptedCount !== 1 ? "s" : ""}
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>

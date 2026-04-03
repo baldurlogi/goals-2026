@@ -155,6 +155,82 @@ function sanitizeAnthropicJsonText(text: string): string {
     .trim();
 }
 
+function extractFirstJsonBlock(text: string): string | null {
+  let start = -1;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "{" || char === "[") {
+      start = index;
+      break;
+    }
+  }
+
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let opening: "{" | "[" | null = null;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === "{" || char === "[") {
+      if (depth === 0) {
+        opening = char;
+      }
+      depth += 1;
+    } else if (char === "}" || char === "]") {
+      depth -= 1;
+
+      if (depth === 0) {
+        const closingMatches =
+          (opening === "{" && char === "}") ||
+          (opening === "[" && char === "]");
+
+        if (!closingMatches) return null;
+        return text.slice(start, index + 1);
+      }
+
+      if (depth < 0) return null;
+    }
+  }
+
+  return null;
+}
+
+function parseJsonWithFallback<T>(text: string): T | null {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const extracted = extractFirstJsonBlock(text);
+    if (!extracted) return null;
+
+    try {
+      return JSON.parse(extracted) as T;
+    } catch {
+      return null;
+    }
+  }
+}
+
 async function parseAnthropicJsonResponse<T = unknown>(
   res: Response,
   failureLabel: string,
@@ -190,12 +266,16 @@ async function parseAnthropicJsonResponse<T = unknown>(
       .join(""),
   );
 
-  try {
+  const parsed = parseJsonWithFallback<T>(text);
+
+  if (parsed !== null) {
     return {
       ok: true as const,
-      value: JSON.parse(text) as T,
+      value: parsed,
     };
-  } catch {
+  }
+
+  {
     return {
       ok: false as const,
       response: jsonResponse(
@@ -598,14 +678,13 @@ ${improveRequestBlock}Existing goal:
 - Current steps:
 ${currentStepsJson}
 
-Your job: Return an improved version of the steps. You may:
-- Reorder steps into a more logical sequence
-- Rewrite vague labels to be clearer and more actionable
-- Add missing steps that are obviously needed
-- Improve notes to be more specific and helpful
-- Set better idealFinish dates spread realistically from today
-- Remove redundant or overlapping steps
-- Break overly broad steps into smaller concrete ones
+Your job: Return a SMALL, focused set of proposed changes to the steps. Do not rewrite the whole goal.
+
+You may:
+- Update existing steps that should change
+- Add a small number of missing steps that are clearly needed
+- Remove a redundant step only if that directly helps the user's request
+- Tighten notes, dates, links, and estimated time for the affected steps
 
 If the user gave a specific improvement request:
 - Prioritize that request over general cleanup
@@ -615,28 +694,38 @@ If the user gave a specific improvement request:
 
 Return ONLY valid JSON — no markdown, no explanation:
 {
-  "steps": [
+  "changes": [
     {
-      "id": "string (keep original id if reusing that step, or new uuid for new steps)",
-      "label": "string (action-oriented, starts with verb)",
-      "notes": "string (specific guidance with a final 'Done when:' sentence, max 30 words)",
+      "id": "string (unique id for this proposed change; use target step id for updates/removals, use new_1/new_2 for additions)",
+      "action": "update" | "add" | "remove",
+      "targetStepId": "string or null (existing step id for update/remove, null for add)",
+      "insertAfterStepId": "string or null (for adds, place it after this existing step id when possible)",
+      "label": "string (required for add/update, empty string for remove)",
+      "notes": "string (required for add/update, specific guidance with a final 'Done when:' sentence, max 30 words; empty string for remove)",
       "idealFinish": "YYYY-MM-DD or null",
-      "estimatedTime": "string (e.g. '2 hours', '30 min', 'ongoing') or empty string",
+      "estimatedTime": "string (e.g. '2 hours', '30 min', 'ongoing') or empty string; empty for remove",
       "links": ["https://example.com", "https://example.com/resource"],
-      "isNew": boolean,
-      "isChanged": boolean
+      "reason": "string (brief reason for this proposed change, max 14 words)"
     }
   ],
   "summary": "string (one sentence explaining the key improvements made, max 20 words)"
 }
 
 Rules:
-- Keep between ${Math.max(existingGoal.steps.length, 4)} and ${Math.min(existingGoal.steps.length + 4, 12)} steps total
-- Preserve step ids where the step is being kept/reworded (set isChanged: true if label/notes changed)
-- Use isNew: true for brand new steps (generate a short unique id like "new_1", "new_2")
+- Return 1 to 6 changes total, never the full step list
+- Do not return unchanged steps
+- Prefer updating existing steps over adding new ones
+- Only add a step when it clearly helps the user's specific request
+- Only remove a step when it is redundant or conflicts with the user's request
+- For update/remove, targetStepId must match an existing step id
+- For add, targetStepId must be null and insertAfterStepId should reference a related existing step when possible
 - Today's date is ${today}
 - Put useful URLs in links, not inside notes
 - When links are not helpful, return an empty array
+- notes must be a single plain-text sentence or two on one line, not bullets or markdown
+- Escape any double quotes inside JSON strings properly
+- Do not add any text before or after the JSON object
+- Keep the rest of the goal untouched outside these proposed changes
 - If user context is provided, tailor steps to their specific situation`;
 
       const improveRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -648,7 +737,8 @@ Rules:
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
+          max_tokens: 4000,
+          temperature: 0,
           system: improveSystem,
           messages: [{ role: "user", content: "Improve my goal steps." }],
         }),

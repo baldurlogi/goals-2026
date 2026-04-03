@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Sparkles, RefreshCw, ArrowRight, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import { buildAIContext } from "@/features/ai/buildAIContext";
 import { buildAISignals } from "@/features/ai/aiSignals";
 import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
@@ -39,7 +39,7 @@ const CACHE_KEY        = "cache:ai-coach:v1";
 const LAST_MODULE_KEY  = "cache:ai-coach:last-module";
 const LAST_SESSION_KEY = "cache:ai-coach:last-session:v1";
 const CACHE_TTL        = 60 * 60 * 1000;
-const SUPABASE_FN      = "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+const SUPABASE_FN      = getSupabaseFunctionUrl("hyper-responder");
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
 

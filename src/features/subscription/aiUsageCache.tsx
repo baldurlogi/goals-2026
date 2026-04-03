@@ -8,7 +8,7 @@ import {
 } from "@/lib/activeUser";
 import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
 import type { Tier } from "./useTier";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 
 export type AIUsageSnapshot = {
   monthKey: string;
@@ -46,8 +46,7 @@ function isUsageLike(value: unknown): value is UsageLike {
 const STORAGE_KEY = CACHE_KEYS.AI_USAGE;
 export const AI_USAGE_EVENT = "ai-usage-updated";
 const AI_USAGE_HYDRATE_STALE_MS = 5 * 60 * 1000;
-const HYPER_RESPONDER_URL =
-  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+const HYPER_RESPONDER_URL = getSupabaseFunctionUrl("hyper-responder");
 
 let inFlightUsageHydration: Promise<AIUsageSnapshot | null> | null = null;
 

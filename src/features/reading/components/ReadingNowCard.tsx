@@ -215,7 +215,7 @@ export function ReadingNowCard({
           </div>
 
           <div className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white tabular-nums">
-            ~{stats.daysToFinishCurrent} days
+            ~{stats.daysToFinishCurrent} days until completion
           </div>
         </div>
 
