@@ -393,7 +393,6 @@ function computeDailyProgress(
   const currentPage = parsePage(nextInputs.current.currentPage);
 
   if (!bookKey.trim()) {
-    clearDailyProgressCache(userId);
     return null;
   }
 
@@ -519,7 +518,6 @@ function computeDailyProgress(
     }
   }
 
-  writeDailyProgressCache(nextProgress, userId);
   return nextProgress;
 }
 
@@ -707,20 +705,6 @@ export async function saveReadingInputs(
     dailyProgress,
   };
 
-  try {
-    const key = readingKey(userId);
-    assertRegisteredCacheWrite(key);
-    writeScopedStorageItem(STORAGE_KEY, userId, JSON.stringify(nextValue));
-  } catch {
-    // ignore
-  }
-
-  if (dailyProgress) {
-    upsertReadingHistoryEntry(nextValue, dailyProgress, goalPages, userId);
-  } else {
-    clearDailyProgressCache(userId);
-  }
-
   const { error } = await supabase.from("reading_state").upsert(
     {
       user_id: userId,
@@ -732,6 +716,21 @@ export async function saveReadingInputs(
 
   if (error) throw error;
 
+  try {
+    const key = readingKey(userId);
+    assertRegisteredCacheWrite(key);
+    writeScopedStorageItem(STORAGE_KEY, userId, JSON.stringify(nextValue));
+  } catch {
+    // ignore
+  }
+
+  if (dailyProgress) {
+    writeDailyProgressCache(dailyProgress, userId);
+    upsertReadingHistoryEntry(nextValue, dailyProgress, goalPages, userId);
+  } else {
+    clearDailyProgressCache(userId);
+  }
+
   clearAISignalsCache(userId);
   emitReadingChanged();
   return nextValue;
@@ -740,7 +739,6 @@ export async function saveReadingInputs(
 export async function resetReadingInputs(
   userId: string | null,
 ): Promise<ReadingInputs> {
-  clearDailyProgressCache(userId);
   await saveReadingInputs(userId, DEFAULT_READING_INPUTS);
   return DEFAULT_READING_INPUTS;
 }
