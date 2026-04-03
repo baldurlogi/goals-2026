@@ -11,6 +11,8 @@ import {
   getWeakestLiftLabel,
   loadPRGoals,
 } from "@/features/fitness/fitnessStorage";
+import { loadRecentSleepRecoveryEntries } from "@/features/sleep/sleepStorage";
+import { loadRecentMentalWellbeingEntries } from "@/features/wellbeing/wellbeingStorage";
 import {
   loadNutritionLog,
   loadPhase,
@@ -24,7 +26,7 @@ import {
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { getDisplayedReadingStreak } from "@/features/reading/readingUtils";
 
-const CACHE_KEY = "cache:ai-signals:v1";
+const CACHE_KEY = "cache:ai-signals:v2";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 type GoalLike = {
@@ -55,6 +57,8 @@ type TodoSignal = {
   totalCount: number;
   openCount: number;
 };
+
+type ScoreTrend = "up" | "down" | "steady" | "unknown";
 
 export type AISignals = {
   builtAt: string;
@@ -104,6 +108,25 @@ export type AISignals = {
     daysSinceWorkout: number | null;
     strongestLift: string | null;
     weakestLift: string | null;
+  };
+  sleep: {
+    lastLogDate: string | null;
+    lastSleepDurationMinutes: number | null;
+    lastSleepQualityScore: number | null;
+    averageSleepDurationMinutes: number | null;
+    averageSleepQualityScore: number | null;
+    bedtimeConsistencyMinutes: number | null;
+    lastEnergyLevel: number | null;
+  };
+  wellbeing: {
+    lastLogDate: string | null;
+    lastMoodScore: number | null;
+    lastStressLevel: number | null;
+    averageMoodScore: number | null;
+    averageStressLevel: number | null;
+    recentMoodTrend: ScoreTrend;
+    recentStressTrend: ScoreTrend;
+    journalDaysLast7: number;
   };
   todos: TodoSignal | null;
   schedule: {
@@ -451,6 +474,47 @@ function countMealsLogged(log: unknown): number {
   return preset + custom;
 }
 
+function averageNumber(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Number(
+    (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1),
+  );
+}
+
+function toNormalizedBedtimeMinutes(value: string | null): number | null {
+  if (!value) return null;
+
+  const [hoursText, minutesText] = value.split(":");
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+  const total = hours * 60 + minutes;
+  return hours < 12 ? total + 24 * 60 : total;
+}
+
+function computeBedtimeConsistencyMinutes(
+  bedtimes: Array<string | null>,
+): number | null {
+  const values = bedtimes
+    .map((value) => toNormalizedBedtimeMinutes(value))
+    .filter((value): value is number => value !== null);
+
+  if (values.length < 2) return null;
+  return Math.max(...values) - Math.min(...values);
+}
+
+function computeTrend(values: number[]): ScoreTrend {
+  if (values.length < 2) return "unknown";
+
+  const first = values[0];
+  const last = values[values.length - 1];
+  const delta = last - first;
+
+  if (Math.abs(delta) < 0.5) return "steady";
+  return delta > 0 ? "up" : "down";
+}
+
 export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
   const cached = !forceRefresh ? readCache() : null;
 
@@ -481,11 +545,24 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
     return updated;
   }
 
-  const [profile, goals, prGoals, nutritionPhase] = await Promise.all([
+  const activeUserId = getActiveUserId();
+
+  const [profile, goals, prGoals, nutritionPhase, recentSleepEntries, recentWellbeingEntries] =
+    await Promise.all([
     Promise.resolve(loadProfile()).catch(() => null),
     Promise.resolve(loadUserGoals()).catch(() => []),
     Promise.resolve(loadPRGoals()).catch(() => []),
     Promise.resolve(loadPhase()).catch(() => "maintain" as const),
+    activeUserId
+      ? Promise.resolve(loadRecentSleepRecoveryEntries(activeUserId, 7)).catch(
+          () => [],
+        )
+      : Promise.resolve([]),
+    activeUserId
+      ? Promise.resolve(loadRecentMentalWellbeingEntries(activeUserId, 7)).catch(
+          () => [],
+        )
+      : Promise.resolve([]),
   ]);
 
   const reading = readReadingState();
@@ -545,6 +622,24 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
   const profileMacros =
     nutritionPhase === "cut" ? profile?.macro_cut : profile?.macro_maintain;
 
+  const sleepDurations = recentSleepEntries
+    .map((entry) => entry.sleepDurationMinutes)
+    .filter((value): value is number => value !== null);
+  const sleepQualityScores = recentSleepEntries
+    .map((entry) => entry.sleepQualityScore)
+    .filter((value): value is number => value !== null);
+  const latestSleepEntry = recentSleepEntries[0] ?? null;
+
+  const wellbeingMoodScores = recentWellbeingEntries
+    .flatMap((entry) => (entry.moodScore === null ? [] : [entry.moodScore]))
+    .reverse();
+  const wellbeingStressScores = recentWellbeingEntries
+    .flatMap((entry) =>
+      entry.stressLevel === null ? [] : [entry.stressLevel],
+    )
+    .reverse();
+  const latestWellbeingEntry = recentWellbeingEntries[0] ?? null;
+
   const signals: AISignals = {
     builtAt: new Date().toISOString(),
     modules,
@@ -591,6 +686,29 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
       daysSinceWorkout: getDaysSinceWorkout(prGoals),
       strongestLift: getStrongestLiftLabel(prGoals),
       weakestLift: getWeakestLiftLabel(prGoals),
+    },
+    sleep: {
+      lastLogDate: latestSleepEntry?.logDate ?? null,
+      lastSleepDurationMinutes: latestSleepEntry?.sleepDurationMinutes ?? null,
+      lastSleepQualityScore: latestSleepEntry?.sleepQualityScore ?? null,
+      averageSleepDurationMinutes: averageNumber(sleepDurations),
+      averageSleepQualityScore: averageNumber(sleepQualityScores),
+      bedtimeConsistencyMinutes: computeBedtimeConsistencyMinutes(
+        recentSleepEntries.map((entry) => entry.bedtime),
+      ),
+      lastEnergyLevel: latestSleepEntry?.energyLevel ?? null,
+    },
+    wellbeing: {
+      lastLogDate: latestWellbeingEntry?.logDate ?? null,
+      lastMoodScore: latestWellbeingEntry?.moodScore ?? null,
+      lastStressLevel: latestWellbeingEntry?.stressLevel ?? null,
+      averageMoodScore: averageNumber(wellbeingMoodScores),
+      averageStressLevel: averageNumber(wellbeingStressScores),
+      recentMoodTrend: computeTrend(wellbeingMoodScores),
+      recentStressTrend: computeTrend(wellbeingStressScores),
+      journalDaysLast7: recentWellbeingEntries.filter(
+        (entry) => (entry.journalEntry?.trim() ?? "") !== "",
+      ).length,
     },
     todos,
     schedule,

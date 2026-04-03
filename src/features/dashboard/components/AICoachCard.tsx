@@ -154,6 +154,12 @@ function buildStarterSuggestion(signals: Awaited<ReturnType<typeof buildAISignal
   if (signals.modules.includes("nutrition") && signals.nutrition.mealsLoggedToday === 0) {
     return { action: "Log your first meal", reason: "A quick nutrition check-in gives the coach something real to work with.", href: "/app/nutrition", emoji: "🥗", module: "nutrition" };
   }
+  if (signals.modules.includes("sleep") && !signals.sleep.lastLogDate) {
+    return { action: "Log last night's sleep", reason: "A simple sleep entry helps your coach spot recovery patterns.", href: "/app/sleep", emoji: "😴", module: "sleep" };
+  }
+  if (signals.modules.includes("wellbeing") && !signals.wellbeing.lastLogDate) {
+    return { action: "Do a quick check-in", reason: "One wellbeing note gives your coach better context for today.", href: "/app/wellbeing", emoji: "💚", module: "wellbeing" };
+  }
   if (signals.modules.includes("schedule") && signals.schedule?.totalBlocks === 0) {
     return { action: "Set up today's schedule", reason: "A simple plan makes your next move much easier to choose.", href: "/app/schedule", emoji: "📅", module: "schedule" };
   }

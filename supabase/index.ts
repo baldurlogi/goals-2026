@@ -105,6 +105,25 @@ type RequestBody = GenerateGoalRequest & {
       activeDays?: number;
       dataCompleteness?: "complete" | "partial" | "unknown";
     };
+    sleep?: {
+      avgSleepDurationMinutes?: number | null;
+      avgSleepQualityScore?: number | null;
+      bedtimeConsistencyMinutes?: number | null;
+      loggedDays?: number;
+      lastSleepDurationMinutes?: number | null;
+      lastSleepQualityScore?: number | null;
+      dataCompleteness?: "complete" | "partial" | "unknown";
+    };
+    wellbeing?: {
+      avgMoodScore?: number | null;
+      avgStressLevel?: number | null;
+      recentMoodTrend?: "up" | "down" | "steady" | "unknown";
+      recentStressTrend?: "up" | "down" | "steady" | "unknown";
+      checkInDays?: number;
+      journalDays?: number;
+      gratitudeDays?: number;
+      dataCompleteness?: "complete" | "partial" | "unknown";
+    };
   };
 };
 
@@ -576,7 +595,7 @@ Rules:
 
       const rotationRule = lastSuggestedModule
         ? `ROTATION RULE: The last suggestion was about "${lastSuggestedModule}". You MUST suggest a completely different life area this time. Do not mention ${lastSuggestedModule} at all.`
-        : "Choose the highest-impact action across any area: goals, fitness, reading, nutrition, todos.";
+        : "Choose the highest-impact action across any area: goals, fitness, reading, nutrition, sleep, wellbeing, todos.";
 
       const coachSystem = `${userContext.trim()}
 
@@ -592,9 +611,9 @@ Rules:
 - Schema: { "action": "string", "reason": "string", "href": "string", "emoji": "string", "module": "string" }
 - "action": one punchy sentence, max 12 words, starts with a verb
 - "reason": one sentence of context/motivation, max 15 words
-- "href": the most relevant app route. One of: /app/nutrition, /app/fitness, /app/reading, /app/goals, /app/schedule, /app/todos, /app/upcoming
+- "href": the most relevant app route. One of: /app/nutrition, /app/fitness, /app/reading, /app/goals, /app/schedule, /app/sleep, /app/wellbeing, /app/todos, /app/upcoming
 - "emoji": single relevant emoji
-- "module": which area this is about. One of: nutrition, fitness, reading, goals, schedule, todos
+- "module": which area this is about. One of: nutrition, fitness, reading, goals, schedule, sleep, wellbeing, todos
 - Be specific — reference actual numbers, goal names, book titles, or streaks from the context above
 - If there are overdue goal steps, prefer an overdue goal step over anything else unless the user is missing essential setup data
 - If there are no overdue steps but there are goal steps due today, prefer a due-today goal step over any goal step due tomorrow or later
@@ -602,7 +621,7 @@ Rules:
 - Respect the user's local time and nutrition timing windows from the context above
 - Do NOT suggest logging lunch before 13:00 local time, snack before 17:00 local time, or dinner before 21:00 local time
 - Do NOT suggest a "third meal", "fourth meal", snack, or dinner early just because multiple meals are already logged
-- Spread suggestions across life areas — goals progress, reading streak, fitness PRs, upcoming tasks all matter equally`;
+- Spread suggestions across life areas — goals progress, reading streak, fitness PRs, sleep consistency, wellbeing check-ins, and upcoming tasks all matter equally`;
 
       const coachRes = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -794,6 +813,8 @@ Rules:
       const reading = (d.reading ?? {}) as Record<string, unknown>;
       const todos = (d.todos ?? {}) as Record<string, unknown>;
       const schedule = (d.schedule ?? {}) as Record<string, unknown>;
+      const sleep = (d.sleep ?? {}) as Record<string, unknown>;
+      const wellbeing = (d.wellbeing ?? {}) as Record<string, unknown>;
 
       const dataBlock = `Week: ${d.weekStart} to ${d.weekEnd}
 Enabled modules: ${d.modules.join(", ")}
@@ -840,7 +861,26 @@ SCHEDULE
 - Blocks completed: ${typeof schedule.blocksCompletedThisWeek === "number" ? schedule.blocksCompletedThisWeek : "unknown"}
 - Total blocks tracked: ${typeof schedule.totalBlocksThisWeek === "number" ? schedule.totalBlocksThisWeek : "unknown"}
 - Active days tracked: ${typeof schedule.activeDays === "number" ? schedule.activeDays : "unknown"}
-- Data completeness: ${typeof schedule.dataCompleteness === "string" ? schedule.dataCompleteness : "unknown"}`;
+- Data completeness: ${typeof schedule.dataCompleteness === "string" ? schedule.dataCompleteness : "unknown"}
+
+SLEEP / RECOVERY
+- Nights logged: ${typeof sleep.loggedDays === "number" ? sleep.loggedDays : "unknown"}/7
+- Avg sleep duration: ${typeof sleep.avgSleepDurationMinutes === "number" ? sleep.avgSleepDurationMinutes : "unknown"} minutes
+- Avg sleep quality: ${typeof sleep.avgSleepQualityScore === "number" ? sleep.avgSleepQualityScore : "unknown"} / 100
+- Bedtime consistency window: ${typeof sleep.bedtimeConsistencyMinutes === "number" ? sleep.bedtimeConsistencyMinutes : "unknown"} minutes
+- Latest sleep duration: ${typeof sleep.lastSleepDurationMinutes === "number" ? sleep.lastSleepDurationMinutes : "unknown"} minutes
+- Latest sleep quality: ${typeof sleep.lastSleepQualityScore === "number" ? sleep.lastSleepQualityScore : "unknown"} / 100
+- Data completeness: ${typeof sleep.dataCompleteness === "string" ? sleep.dataCompleteness : "unknown"}
+
+MENTAL WELLBEING
+- Check-ins this week: ${typeof wellbeing.checkInDays === "number" ? wellbeing.checkInDays : "unknown"}/7
+- Avg mood: ${typeof wellbeing.avgMoodScore === "number" ? wellbeing.avgMoodScore : "unknown"} / 5
+- Avg stress: ${typeof wellbeing.avgStressLevel === "number" ? wellbeing.avgStressLevel : "unknown"} / 5
+- Recent mood trend: ${typeof wellbeing.recentMoodTrend === "string" ? wellbeing.recentMoodTrend : "unknown"}
+- Recent stress trend: ${typeof wellbeing.recentStressTrend === "string" ? wellbeing.recentStressTrend : "unknown"}
+- Journal days: ${typeof wellbeing.journalDays === "number" ? wellbeing.journalDays : "unknown"}
+- Gratitude days: ${typeof wellbeing.gratitudeDays === "number" ? wellbeing.gratitudeDays : "unknown"}
+- Data completeness: ${typeof wellbeing.dataCompleteness === "string" ? wellbeing.dataCompleteness : "unknown"}`;
 
       const reportSystem = `${contextBlock}You are an insightful AI life coach generating a weekly life review report.
 
@@ -853,7 +893,7 @@ Generate a structured weekly report in ONLY valid JSON — no markdown, no expla
   "overallScore": number (0-100, honest holistic score for the week),
   "moduleScores": [
     {
-      "module": "string (goals|fitness|nutrition|reading|todos|schedule)",
+      "module": "string (goals|fitness|nutrition|reading|todos|schedule|sleep|wellbeing)",
       "label": "string (display name)",
       "emoji": "string",
       "score": number (0-100),
@@ -870,7 +910,7 @@ Generate a structured weekly report in ONLY valid JSON — no markdown, no expla
     { "title": "string (max 8 words)", "detail": "string (insight about a behavioural trend, 1-2 sentences)" }
   ],
   "nextWeekFocus": [
-    { "priority": number (1-3), "action": "string (starts with verb, max 10 words)", "why": "string (max 12 words)", "href": "string (/app/goals|/app/fitness|/app/nutrition|/app/reading|/app/todos|/app/schedule)" }
+    { "priority": number (1-3), "action": "string (starts with verb, max 10 words)", "why": "string (max 12 words)", "href": "string (/app/goals|/app/fitness|/app/nutrition|/app/reading|/app/todos|/app/schedule|/app/sleep|/app/wellbeing)" }
   ],
   "closingNote": "string (warm, motivating closing sentence, personalised, max 20 words)"
 }
@@ -887,7 +927,7 @@ Rules:
 - Never say the user read 0 pages / did 0 workouts / completed 0 todos unless the data explicitly confirms zero
 - If module data is partial, mention uncertainty briefly instead of making a false claim
 - Do not heavily penalize a module solely because tracking data is incomplete
-- Reward strong signals like streaks, days logged, PRs, completed blocks, or visible goal progress
+- Reward strong signals like streaks, days logged, PRs, completed blocks, consistent sleep logging, journaling, or visible goal progress
 - closingNote should feel personal`;
 
       const reportRes = await fetch("https://api.anthropic.com/v1/messages", {

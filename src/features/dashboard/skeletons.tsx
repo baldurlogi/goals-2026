@@ -241,6 +241,58 @@ export function WaterIntakeCardSkeleton() {
   );
 }
 
+export function SleepCardSkeleton() {
+  return (
+    <SkeletonCard
+      colSpan="lg:col-span-6"
+      accentColor="bg-gradient-to-r from-indigo-500 via-sky-400 to-cyan-400"
+    >
+      <CardHeader className="space-y-2 pb-2 pt-5">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-5 w-20 rounded-full" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 pb-5">
+        <Skeleton className="h-8 w-28" />
+        <Skeleton className="h-3 w-36" />
+        <div className="grid grid-cols-3 gap-2">
+          <Skeleton className="h-14 rounded-lg" />
+          <Skeleton className="h-14 rounded-lg" />
+          <Skeleton className="h-14 rounded-lg" />
+        </div>
+        <Skeleton className="h-8 w-full rounded-md" />
+      </CardContent>
+    </SkeletonCard>
+  );
+}
+
+export function WellbeingCardSkeleton() {
+  return (
+    <SkeletonCard
+      colSpan="lg:col-span-6"
+      accentColor="bg-gradient-to-r from-pink-500 via-rose-400 to-orange-300"
+    >
+      <CardHeader className="space-y-2 pb-2 pt-5">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-5 w-24 rounded-full" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 pb-5">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-3 w-28" />
+        <div className="grid grid-cols-3 gap-2">
+          <Skeleton className="h-14 rounded-lg" />
+          <Skeleton className="h-14 rounded-lg" />
+          <Skeleton className="h-14 rounded-lg" />
+        </div>
+        <Skeleton className="h-8 w-full rounded-md" />
+      </CardContent>
+    </SkeletonCard>
+  );
+}
+
 export function AchievementsCardSkeleton() {
   return (
     <SkeletonCard

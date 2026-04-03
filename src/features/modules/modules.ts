@@ -9,6 +9,8 @@ import {
   CheckSquare,
   Sparkles,
   Pin,
+  Moon,
+  Heart,
 } from "lucide-react";
 
 export type ModuleId =
@@ -17,6 +19,8 @@ export type ModuleId =
   | "nutrition"
   | "fitness"
   | "schedule"
+  | "sleep"
+  | "wellbeing"
   | "finance"
   | "todos"
   | "skincare";
@@ -76,6 +80,24 @@ export const ALL_MODULES: ModuleDef[] = [
     href: "/app/schedule",
     section: "Daily Plan",
     navLabel: "Schedule",
+  },
+  {
+    id: "sleep",
+    label: "Sleep / Recovery",
+    icon: Moon,
+    description: "Log sleep, recovery, and how rested you feel",
+    href: "/app/sleep",
+    section: "Daily Plan",
+    navLabel: "Sleep",
+  },
+  {
+    id: "wellbeing",
+    label: "Mental Wellbeing",
+    icon: Heart,
+    description: "Check in with mood, stress, and daily reflections",
+    href: "/app/wellbeing",
+    section: "Daily Plan",
+    navLabel: "Wellbeing",
   },
   {
     id: "finance",

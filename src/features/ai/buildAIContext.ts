@@ -75,6 +75,48 @@ function buildSystemPrompt(
     .filter(Boolean)
     .join('\n\n');
 
+  const sleepAverageDuration =
+    typeof signals.sleep.averageSleepDurationMinutes === "number"
+      ? `${Math.round(signals.sleep.averageSleepDurationMinutes)} min`
+      : "Unknown";
+  const latestSleepDuration =
+    typeof signals.sleep.lastSleepDurationMinutes === "number"
+      ? `${signals.sleep.lastSleepDurationMinutes} min`
+      : "Unknown";
+  const latestSleepQuality =
+    typeof signals.sleep.lastSleepQualityScore === "number"
+      ? `${signals.sleep.lastSleepQualityScore}/100`
+      : "Unknown";
+  const sleepAverageQuality =
+    typeof signals.sleep.averageSleepQualityScore === "number"
+      ? `${Math.round(signals.sleep.averageSleepQualityScore)}/100`
+      : "Unknown";
+  const sleepConsistency =
+    typeof signals.sleep.bedtimeConsistencyMinutes === "number"
+      ? `${Math.round(signals.sleep.bedtimeConsistencyMinutes)} min window`
+      : "Unknown";
+
+  const wellbeingAverageMood =
+    typeof signals.wellbeing.averageMoodScore === "number"
+      ? `${signals.wellbeing.averageMoodScore}/5`
+      : "Unknown";
+  const wellbeingAverageStress =
+    typeof signals.wellbeing.averageStressLevel === "number"
+      ? `${signals.wellbeing.averageStressLevel}/5`
+      : "Unknown";
+  const latestSleepEnergy =
+    typeof signals.sleep.lastEnergyLevel === "number"
+      ? `${signals.sleep.lastEnergyLevel}/5`
+      : "Unknown";
+  const latestMood =
+    typeof signals.wellbeing.lastMoodScore === "number"
+      ? `${signals.wellbeing.lastMoodScore}/5`
+      : "Unknown";
+  const latestStress =
+    typeof signals.wellbeing.lastStressLevel === "number"
+      ? `${signals.wellbeing.lastStressLevel}/5`
+      : "Unknown";
+
   return `You are a personal life coach AI embedded inside the user's Life OS app.
 
 ## User summary
@@ -115,6 +157,25 @@ Days since workout: ${signals.fitness.daysSinceWorkout ?? 'Unknown'}
 Strongest lift: ${signals.fitness.strongestLift ?? 'Unknown'}
 Weakest lift: ${signals.fitness.weakestLift ?? 'Unknown'}
 
+## Sleep / Recovery
+Last sleep log date: ${signals.sleep.lastLogDate ?? 'Unknown'}
+Last sleep duration: ${latestSleepDuration}
+Last sleep quality: ${latestSleepQuality}
+Average sleep duration (recent): ${sleepAverageDuration}
+Average sleep quality (recent): ${sleepAverageQuality}
+Bedtime consistency (recent): ${sleepConsistency}
+Morning energy from latest log: ${latestSleepEnergy}
+
+## Mental Wellbeing
+Last wellbeing check-in date: ${signals.wellbeing.lastLogDate ?? 'Unknown'}
+Latest mood: ${latestMood}
+Latest stress: ${latestStress}
+Average mood (recent): ${wellbeingAverageMood}
+Average stress (recent): ${wellbeingAverageStress}
+Recent mood trend: ${signals.wellbeing.recentMoodTrend}
+Recent stress trend: ${signals.wellbeing.recentStressTrend}
+Journaled check-ins in recent history: ${signals.wellbeing.journalDaysLast7}
+
 ${personalContext || '## Coaching notes\nThe user benefits from concrete, small, low-friction next steps.'}
 
 ## Coaching style
@@ -138,12 +199,16 @@ export async function buildAIContext(
       Date.now() - new Date(aiProfile.last_context_built_at).getTime();
 
     if (age < SNAPSHOT_TTL_MS) {
-      const cachedSignals = aiProfile.last_context_snapshot as AISignals;
+      const cachedSignals = aiProfile.last_context_snapshot as Partial<AISignals>;
+      if (!cachedSignals.sleep || !cachedSignals.wellbeing) {
+        // fall through and rebuild with the latest signal shape
+      } else {
       return {
-        systemContext: buildSystemPrompt(cachedSignals, aiProfile),
-        signals: cachedSignals,
+        systemContext: buildSystemPrompt(cachedSignals as AISignals, aiProfile),
+        signals: cachedSignals as AISignals,
         aiProfile,
       };
+      }
     }
   }
 
