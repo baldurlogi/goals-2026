@@ -1,6 +1,13 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  ExerciseDbError,
+  type ExerciseCatalogItem,
+  getExerciseCatalogFilters,
+  getExerciseSwapCandidates,
+  searchExerciseCatalog,
+} from "./exerciseDb.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,13 +26,22 @@ type GenerateGoalRequest = {
   stepCount?: number;
 };
 
-type ChargedAction = "goal" | "coach" | "improve" | "weekly-report";
+type ChargedAction =
+  | "goal"
+  | "coach"
+  | "improve"
+  | "weekly-report"
+  | "fitness-plan";
 
 type RequestBody = GenerateGoalRequest & {
   action?:
     | "goal"
     | "clarify"
     | "lookup_book"
+    | "fitness_exercise_search"
+    | "fitness_exercise_swap"
+    | "fitness_exercise_filters"
+    | "fitness-plan"
     | "usage"
     | "coach"
     | "improve"
@@ -36,6 +52,31 @@ type RequestBody = GenerateGoalRequest & {
   lastSuggestedModule?: string;
   title?: string;
   author?: string;
+  exerciseQuery?: string;
+  target?: string;
+  equipment?: string;
+  limit?: number;
+  weekStart?: string;
+  adherenceContext?: string;
+  recoveryContext?: string;
+  fitnessProfile?: {
+    primaryGoal?: string | null;
+    trainingDaysPerWeek?: number | null;
+    sessionMinutes?: number | null;
+    trainingLocation?: string | null;
+    equipment?: string[];
+    experienceLevel?: string | null;
+    preferredMuscleGroups?: string[];
+    exercisesToAvoid?: string[];
+    injuryNotes?: string | null;
+    fitnessNotes?: string | null;
+  } | null;
+  currentExercise?: {
+    externalExerciseId?: string | null;
+    name?: string | null;
+    target?: string | null;
+    equipment?: string | null;
+  };
   existingGoal?: {
     title: string;
     subtitle: string;
@@ -143,16 +184,279 @@ function actionNeedsAnthropic(
     action === "goal" ||
     action === "clarify" ||
     action === "lookup_book" ||
+    action === "fitness-plan" ||
     action === "coach" ||
     action === "improve" ||
     action === "weekly-report"
   );
 }
 
+function actionNeedsExerciseDb(
+  action: RequestBody["action"] | undefined,
+): boolean {
+  return (
+    action === "fitness_exercise_search" ||
+    action === "fitness_exercise_swap" ||
+    action === "fitness_exercise_filters"
+  );
+}
+
+type FitnessPlannerOutput = {
+  fitness_goal: string | null;
+  days_per_week: number | null;
+  split_name: string | null;
+  progression_note: string | null;
+  recovery_note: string | null;
+  sessions: Array<{
+    day_index: number;
+    title: string;
+    focus: string | null;
+    exercises: Array<{
+      source: "custom" | "exercisedb";
+      external_exercise_id: string | null;
+      name: string;
+      target: string | null;
+      equipment: string | null;
+      sets: number | null;
+      reps: string | null;
+      rest_seconds: number | null;
+      notes: string | null;
+    }>;
+  }>;
+};
+
 function monthlyLimitForTier(tier: string): number {
   if (tier === "pro") return 200;
   if (tier === "pro_max") return 1000;
   return 10;
+}
+
+function clampInteger(
+  value: unknown,
+  min: number,
+  max: number,
+): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function normalizeText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const item of value) {
+    const normalized = normalizeText(item);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
+  }
+
+  return result;
+}
+
+function normalizeFitnessPlannerOutput(
+  value: unknown,
+  profile: RequestBody["fitnessProfile"],
+): FitnessPlannerOutput {
+  const record =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  const sessions = Array.isArray(record.sessions)
+    ? record.sessions
+        .map((session) => normalizePlannerSession(session))
+        .filter(
+          (session): session is FitnessPlannerOutput["sessions"][number] =>
+            session !== null,
+        )
+        .sort((left, right) => left.day_index - right.day_index)
+    : [];
+
+  const fallbackGoal = normalizeText(profile?.primaryGoal)?.replaceAll("_", " ");
+  const fallbackDaysPerWeek =
+    clampInteger(profile?.trainingDaysPerWeek, 1, 7) ??
+    (sessions.length > 0 ? sessions.length : null);
+
+  return {
+    fitness_goal:
+      normalizeText(record.fitness_goal ?? record.fitnessGoal) ?? fallbackGoal,
+    days_per_week:
+      clampInteger(record.days_per_week ?? record.daysPerWeek, 1, 7) ??
+      fallbackDaysPerWeek,
+    split_name: normalizeText(record.split_name ?? record.splitName),
+    progression_note: normalizeText(
+      record.progression_note ?? record.progressionNote,
+    ),
+    recovery_note: normalizeText(record.recovery_note ?? record.recoveryNote),
+    sessions,
+  };
+}
+
+function normalizePlannerSession(
+  value: unknown,
+): FitnessPlannerOutput["sessions"][number] | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  return {
+    day_index:
+      clampInteger(record.day_index ?? record.dayIndex, 1, 7) ?? 1,
+    title: normalizeText(record.title) ?? "Workout session",
+    focus: normalizeText(record.focus),
+    exercises: Array.isArray(record.exercises)
+      ? record.exercises
+          .map((exercise) => normalizePlannerExercise(exercise))
+          .filter(
+            (exercise): exercise is FitnessPlannerOutput["sessions"][number]["exercises"][number] =>
+              exercise !== null,
+          )
+      : [],
+  };
+}
+
+function normalizePlannerExercise(
+  value: unknown,
+): FitnessPlannerOutput["sessions"][number]["exercises"][number] | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const name = normalizeText(record.name);
+  if (!name) return null;
+
+  return {
+    source: record.source === "exercisedb" ? "exercisedb" : "custom",
+    external_exercise_id: normalizeText(
+      record.external_exercise_id ?? record.externalExerciseId,
+    ),
+    name,
+    target: normalizeText(record.target),
+    equipment: normalizeText(record.equipment),
+    sets: clampInteger(record.sets, 1, 12),
+    reps: normalizeText(record.reps),
+    rest_seconds: clampInteger(
+      record.rest_seconds ?? record.restSeconds,
+      15,
+      600,
+    ),
+    notes: normalizeText(record.notes),
+  };
+}
+
+async function buildFitnessExerciseCandidateContext(
+  exerciseDbConfig: {
+    baseUrl: string;
+    apiKey?: string | null;
+    apiHost?: string | null;
+  },
+  profile: RequestBody["fitnessProfile"],
+): Promise<string> {
+  if (!exerciseDbConfig.baseUrl) {
+    return "Exercise catalog unavailable for this request.";
+  }
+
+  const targets = derivePlannerTargets(profile);
+  if (targets.length === 0) {
+    return "No exercise targets were derived from the user's profile.";
+  }
+
+  const availableEquipment = normalizeStringArray(profile?.equipment).map((item) =>
+    item.toLowerCase()
+  );
+
+  try {
+    const results = await Promise.all(
+      targets.map(async (target) => ({
+        target,
+        exercises: await searchExerciseCatalog(exerciseDbConfig, {
+          target,
+          limit: 8,
+        }),
+      })),
+    );
+
+    const groups = results
+      .map(({ target, exercises }) => {
+        const filtered = filterExercisesForEquipment(
+          exercises,
+          availableEquipment,
+        ).slice(0, 5);
+
+        if (filtered.length === 0) return null;
+
+        const lines = filtered.map((exercise) =>
+          `- ${exercise.name} | id: ${exercise.externalExerciseId} | target: ${exercise.target ?? "unknown"} | equipment: ${exercise.equipment ?? "unknown"}`
+        );
+
+        return `Target: ${target}\n${lines.join("\n")}`;
+      })
+      .filter((group): group is string => Boolean(group));
+
+    return groups.length > 0
+      ? groups.join("\n\n")
+      : "Exercise catalog search returned no useful candidates.";
+  } catch {
+    return "Exercise catalog search failed, so candidate exercises are unavailable for this request.";
+  }
+}
+
+function derivePlannerTargets(
+  profile: RequestBody["fitnessProfile"],
+): string[] {
+  const preferred = normalizeStringArray(profile?.preferredMuscleGroups);
+  if (preferred.length > 0) {
+    return preferred.slice(0, 4);
+  }
+
+  const goal = normalizeText(profile?.primaryGoal)?.toLowerCase() ?? "";
+
+  if (goal.includes("strength") || goal.includes("muscle")) {
+    return ["chest", "back", "quads", "hamstrings"];
+  }
+
+  if (goal.includes("fat") || goal.includes("fitness") || goal.includes("consistency")) {
+    return ["quads", "glutes", "back", "shoulders"];
+  }
+
+  if (goal.includes("endurance")) {
+    return ["glutes", "hamstrings", "core", "back"];
+  }
+
+  return ["chest", "back", "quads"];
+}
+
+function filterExercisesForEquipment(
+  exercises: ExerciseCatalogItem[],
+  availableEquipment: string[],
+): ExerciseCatalogItem[] {
+  if (availableEquipment.length === 0) {
+    return exercises;
+  }
+
+  const filtered = exercises.filter((exercise) => {
+    const equipment = exercise.equipment?.toLowerCase() ?? "";
+    if (!equipment) return true;
+    if (equipment.includes("body")) return true;
+
+    return availableEquipment.some((item) => equipment.includes(item));
+  });
+
+  return filtered.length > 0 ? filtered : exercises;
 }
 
 type AnthropicJsonResult<T> =
@@ -266,7 +570,11 @@ async function parseAnthropicJsonResponse<T = unknown>(
     };
   }
 
-  let data: { content?: Array<{ type: string; text?: string }> };
+  let data: {
+    content?: Array<{ type: string; text?: string }>;
+    stop_reason?: string | null;
+  };
+
   try {
     data = JSON.parse(raw);
   } catch {
@@ -294,15 +602,60 @@ async function parseAnthropicJsonResponse<T = unknown>(
     };
   }
 
-  {
-    return {
-      ok: false as const,
-      response: jsonResponse(
-        { error: `${failureLabel} returned invalid JSON`, raw_text: text },
-        500,
-      ),
-    };
-  }
+  const likelyTruncated =
+    data.stop_reason === "max_tokens" ||
+    text.endsWith('"') ||
+    text.endsWith(":") ||
+    text.endsWith(",") ||
+    text.endsWith("[") ||
+    text.endsWith("{");
+
+  return {
+    ok: false as const,
+    response: jsonResponse(
+      {
+        error: likelyTruncated
+          ? `${failureLabel} response was truncated before valid JSON completed`
+          : `${failureLabel} returned invalid JSON`,
+        raw_text: text,
+        stop_reason: data.stop_reason ?? null,
+      },
+      500,
+    ),
+  };
+}
+
+async function requestFitnessPlanFromAnthropic(
+  anthropicApiKey: string,
+  plannerSystem: string,
+  concise = false,
+): Promise<AnthropicJsonResult<unknown>> {
+  const userPrompt = concise
+    ? "Generate my personalized weekly workout plan. Keep it concise: 4-5 exercises per session maximum, short notes, and no extra detail."
+    : "Generate my personalized weekly workout plan.";
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": anthropicApiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: concise ? 3200 : 2600,
+      temperature: 0.2,
+      system: plannerSystem,
+      messages: [
+        {
+          role: "user",
+          content: userPrompt,
+        },
+      ],
+    }),
+  });
+
+  return await parseAnthropicJsonResponse<unknown>(res, "Fitness plan");
 }
 
 Deno.serve(async (req: Request) => {
@@ -323,6 +676,9 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const exerciseDbBaseUrl = Deno.env.get("EXERCISEDB_API_BASE_URL");
+    const exerciseDbApiKey = Deno.env.get("EXERCISEDB_API_KEY");
+    const exerciseDbApiHost = Deno.env.get("EXERCISEDB_API_HOST");
 
     if (!supabaseUrl || !supabaseKey) {
       return jsonResponse({ error: "Missing Supabase function secrets" }, 500);
@@ -334,6 +690,13 @@ Deno.serve(async (req: Request) => {
     if (actionNeedsAnthropic(action) && !anthropicApiKey) {
       return jsonResponse(
         { error: "Missing ANTHROPIC_API_KEY secret" },
+        500,
+      );
+    }
+
+    if (actionNeedsExerciseDb(action) && !exerciseDbBaseUrl) {
+      return jsonResponse(
+        { error: "Missing EXERCISEDB_API_BASE_URL secret" },
         500,
       );
     }
@@ -572,6 +935,240 @@ Rules:
           : null;
 
       return jsonResponse({ pages, author: resolvedAuthor });
+    }
+
+    // ── FITNESS EXERCISE SEARCH actions (no usage charge) ────────────────
+    if (action === "fitness_exercise_search") {
+      try {
+        const exercises = await searchExerciseCatalog(
+          {
+            baseUrl: exerciseDbBaseUrl ?? "",
+            apiKey: exerciseDbApiKey,
+            apiHost: exerciseDbApiHost,
+          },
+          {
+            query: body.exerciseQuery,
+            target: body.target,
+            equipment: body.equipment,
+            limit: body.limit,
+          },
+        );
+
+        return jsonResponse({ exercises });
+      } catch (error) {
+        if (error instanceof ExerciseDbError) {
+          return jsonResponse(
+            {
+              error: error.message,
+              code: error.code,
+              details: error.details,
+            },
+            error.status,
+          );
+        }
+
+        throw error;
+      }
+    }
+
+    if (action === "fitness_exercise_swap") {
+      try {
+        const exercises = await getExerciseSwapCandidates(
+          {
+            baseUrl: exerciseDbBaseUrl ?? "",
+            apiKey: exerciseDbApiKey,
+            apiHost: exerciseDbApiHost,
+          },
+          {
+            currentExerciseId: body.currentExercise?.externalExerciseId ?? null,
+            currentExerciseName: body.currentExercise?.name ?? null,
+            target: body.currentExercise?.target ?? body.target ?? null,
+            equipment: body.currentExercise?.equipment ?? body.equipment ?? null,
+            limit: body.limit,
+          },
+        );
+
+        return jsonResponse({ exercises });
+      } catch (error) {
+        if (error instanceof ExerciseDbError) {
+          return jsonResponse(
+            {
+              error: error.message,
+              code: error.code,
+              details: error.details,
+            },
+            error.status,
+          );
+        }
+
+        throw error;
+      }
+    }
+
+    if (action === "fitness_exercise_filters") {
+      try {
+        const filters = await getExerciseCatalogFilters(
+          {
+            baseUrl: exerciseDbBaseUrl ?? "",
+            apiKey: exerciseDbApiKey,
+            apiHost: exerciseDbApiHost,
+          },
+        );
+
+        return jsonResponse(filters);
+      } catch (error) {
+        if (error instanceof ExerciseDbError) {
+          return jsonResponse(
+            {
+              error: error.message,
+              code: error.code,
+              details: error.details,
+            },
+            error.status,
+          );
+        }
+
+        throw error;
+      }
+    }
+
+    // ── FITNESS PLAN action ───────────────────────────────────────────────
+    if (action === "fitness-plan") {
+      const reserved = await reserveChargedActionOrReturn("fitness-plan");
+      if ("response" in reserved) return reserved.response;
+      const { usage } = reserved;
+
+      const fitnessProfile = body.fitnessProfile ?? null;
+      const weekStart = normalizeText(body.weekStart) ?? new Date().toISOString().slice(0, 10);
+      const contextBlock = userContext?.trim()
+        ? `${userContext.trim()}\n\n---\n\n`
+        : "";
+      const adherenceBlock = body.adherenceContext?.trim()
+        ? `Recent adherence:\n${body.adherenceContext.trim()}\n\n`
+        : "Recent adherence: unavailable\n\n";
+      const recoveryBlock = body.recoveryContext?.trim()
+        ? `Recent sleep / recovery:\n${body.recoveryContext.trim()}\n\n`
+        : "Recent sleep / recovery: unavailable\n\n";
+      const exerciseCandidates = await buildFitnessExerciseCandidateContext(
+        {
+          baseUrl: exerciseDbBaseUrl ?? "",
+          apiKey: exerciseDbApiKey,
+          apiHost: exerciseDbApiHost,
+        },
+        fitnessProfile,
+      );
+
+      const fitnessProfileBlock = `Fitness planning profile:
+- Primary goal: ${normalizeText(fitnessProfile?.primaryGoal)?.replaceAll("_", " ") ?? "Unknown"}
+- Training days per week: ${clampInteger(fitnessProfile?.trainingDaysPerWeek, 1, 7) ?? "Unknown"}
+- Session duration: ${clampInteger(fitnessProfile?.sessionMinutes, 15, 240) ?? "Unknown"} minutes
+- Training location: ${normalizeText(fitnessProfile?.trainingLocation) ?? "Unknown"}
+- Experience level: ${normalizeText(fitnessProfile?.experienceLevel) ?? "Unknown"}
+- Available equipment: ${normalizeStringArray(fitnessProfile?.equipment).join(", ") || "Unknown"}
+- Preferred muscle groups: ${normalizeStringArray(fitnessProfile?.preferredMuscleGroups).join(", ") || "None specified"}
+- Exercises to avoid: ${normalizeStringArray(fitnessProfile?.exercisesToAvoid).join(", ") || "None specified"}
+- Injury / restriction notes: ${normalizeText(fitnessProfile?.injuryNotes) ?? "None provided"}
+- Extra fitness notes: ${normalizeText(fitnessProfile?.fitnessNotes) ?? "None provided"}`;
+
+      const plannerSystem = `${contextBlock}You are an expert strength and conditioning coach creating a practical weekly workout plan for a real user.
+
+${fitnessProfileBlock}
+
+${adherenceBlock}${recoveryBlock}Exercise candidate data from ExerciseDB:
+${exerciseCandidates}
+
+Plan week start: ${weekStart}
+
+Return ONLY valid JSON with this exact schema:
+{
+  "fitness_goal": "string or null",
+  "days_per_week": number or null,
+  "split_name": "string or null",
+  "progression_note": "string or null",
+  "recovery_note": "string or null",
+  "sessions": [
+    {
+      "day_index": number,
+      "title": "string",
+      "focus": "string or null",
+      "exercises": [
+        {
+          "source": "custom" | "exercisedb",
+          "external_exercise_id": "string or null",
+          "name": "string",
+          "target": "string or null",
+          "equipment": "string or null",
+          "sets": number or null,
+          "reps": "string or null",
+          "rest_seconds": number or null,
+          "notes": "string or null"
+        }
+      ]
+    }
+  ]
+}
+
+Rules:
+- The AI is the planner. Use ExerciseDB candidates only to support exercise choice.
+- Prefer ExerciseDB candidates when they fit the user's constraints. If you use one, set source to "exercisedb" and include the exact external_exercise_id shown above.
+- If a useful exercise is not in the candidate list, you may use source "custom" with external_exercise_id null.
+- Respect injuries, restrictions, equipment limits, experience level, session duration, and training location.
+- If profile data is missing, make sensible assumptions and keep the plan beginner-safe and practical.
+- sessions should usually match days_per_week when that is known, otherwise choose a sensible 3-5 day structure.
+- day_index uses Monday=1 through Sunday=7.
+- Keep sessions realistic for the stated session duration. Avoid bloated plans.
+- Default to 4-6 exercises per session.
+- Never exceed 6 exercises in a session unless the user explicitly needs it.
+- Keep notes short and practical, usually under 10 words.
+- Prefer compact JSON over verbose detail.
+- Keep exercises grounded and common. No gimmicky movements.
+- For beginners, keep exercise count lower and instructions simpler.
+- Use recent adherence and sleep / recovery as light steering, not as hard rules.
+- If recovery looks poor, keep the weekly structure simpler, reduce overall exercise count slightly, and make the recovery note more conservative.
+- If adherence looks low or several earlier planned sessions were missed, prefer a more repeatable split and lower complexity rather than trying to cram volume.
+- If adherence is strong and recovery is solid, the progression note can be a bit more ambitious, but still practical and sustainable.
+- Missing adherence or recovery data should be treated as unknown, not as bad.
+- progression_note should explain how to progress over the next 1-2 weeks in one sentence.
+- recovery_note should explain how to manage recovery in one sentence.
+- Do not include markdown or explanation outside the JSON object.`;
+
+      let parsed = await requestFitnessPlanFromAnthropic(
+        anthropicApiKey,
+        plannerSystem,
+        false,
+      );
+
+      if (parsed.ok === false) {
+        const retryPayload = await parsed.response.clone().json().catch(() => null);
+        const retryable =
+          retryPayload?.error ===
+            "Fitness plan response was truncated before valid JSON completed" ||
+          retryPayload?.stop_reason === "max_tokens";
+
+        if (retryable) {
+          parsed = await requestFitnessPlanFromAnthropic(
+            anthropicApiKey,
+            `${plannerSystem}
+
+      Additional compression rule:
+      - Keep every session concise.
+      - Use 4-5 exercises per session maximum.
+      - Keep notes very short.
+      - Prefer compact exercise selection over exhaustive coverage.
+      - Return only the JSON object.`,
+            true,
+          );
+        }
+      }
+
+      if (parsed.ok === false) {
+        return parsed.response;
+      }
+
+      return jsonResponse({
+        plan: normalizeFitnessPlannerOutput(parsed.value, fitnessProfile),
+        usage,
+      });
     }
 
     // ── USAGE action (no usage charge) ───────────────────────────────────
