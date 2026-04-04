@@ -114,7 +114,7 @@ function RatingGroup({
   return (
     <div className="space-y-2">
       <FieldLabel hint={hint}>{label}</FieldLabel>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
         {options.map((option) => {
           const isActive = value === option.value;
 
@@ -128,7 +128,7 @@ function RatingGroup({
                 )
               }
               className={cn(
-                "rounded-xl border px-2 py-3 text-center transition-colors",
+                "rounded-xl border px-1.5 py-2.5 text-center transition-colors sm:px-2 sm:py-3",
                 isActive
                   ? "border-pink-500 bg-pink-500/10 text-foreground"
                   : "border-border bg-background hover:border-pink-300 hover:bg-muted/40",
@@ -136,7 +136,7 @@ function RatingGroup({
               aria-pressed={isActive}
             >
               <div className="text-sm font-semibold">{option.label}</div>
-              <div className="mt-1 text-[11px] text-muted-foreground">
+              <div className="mt-1 hidden text-[11px] text-muted-foreground sm:block">
                 {option.description}
               </div>
             </button>

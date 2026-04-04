@@ -147,7 +147,7 @@ export function LandingNavbar({
           <Button
             type="button"
             onClick={onGetStarted}
-            className="rounded-xl px-4 font-semibold"
+            className="rounded-xl px-3 text-sm font-semibold sm:px-4"
             style={{
               background: t.primary,
               color: theme === "dark" ? "#052e16" : "#ffffff",

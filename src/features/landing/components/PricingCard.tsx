@@ -49,7 +49,7 @@ export function PricingCard({
         filter: isPreviewOnly ? "saturate(0.82)" : undefined,
       }}
     >
-      <CardContent className="flex h-full min-h-[560px] flex-col p-6">
+      <CardContent className="flex h-full min-h-0 flex-col p-5 sm:min-h-[560px] sm:p-6">
         {featured && (
           <div
             className="absolute right-4 top-4 rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]"
@@ -80,16 +80,16 @@ export function PricingCard({
         </div>
 
         <div
-          className="mb-5 min-h-[48px] text-sm leading-6"
+          className="mb-4 min-h-0 text-sm leading-6 sm:mb-5 sm:min-h-[48px]"
           style={{ color: t.muted }}
         >
           {sub}
         </div>
 
-        <div className="mb-4 min-h-[108px]">
-          <div className="mb-2 flex min-h-[52px] items-end gap-1.5">
+        <div className="mb-4 min-h-0 sm:min-h-[108px]">
+          <div className="mb-2 flex min-h-0 items-end gap-1.5 sm:min-h-[52px]">
             <div
-              className="min-w-[110px] text-[42px] leading-none"
+              className="min-w-[92px] text-[38px] leading-none sm:min-w-[110px] sm:text-[42px]"
               style={{
                 color: t.text,
                 fontFamily: "'Instrument Serif', serif",
@@ -105,7 +105,7 @@ export function PricingCard({
             )}
           </div>
 
-          <div className="min-h-[52px]">
+          <div className="min-h-0 sm:min-h-[52px]">
             {isFree ? (
               <div className="text-xs" style={{ color: t.primary }}>
                 No credit card required
@@ -142,7 +142,7 @@ export function PricingCard({
           </div>
         </div>
 
-        <div className="mb-6 grid min-h-[190px] gap-2.5">
+        <div className="mb-6 grid min-h-0 gap-2.5 sm:min-h-[190px]">
           {points.map((point) => (
             <div key={point} className="flex items-start gap-2.5">
               <span style={{ color: t.primary }}>●</span>

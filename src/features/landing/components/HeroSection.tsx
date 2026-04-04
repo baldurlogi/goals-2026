@@ -18,7 +18,7 @@ export function HeroSection({
 
   return (
     <section
-      className="relative overflow-hidden px-4 pb-14 pt-24 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8"
+      className="relative overflow-hidden px-4 pb-12 pt-20 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8"
       style={{ background: t.bg }}
     >
       <div
@@ -26,10 +26,10 @@ export function HeroSection({
         style={{ background: t.heroGlow }}
       />
 
-      <div className="relative mx-auto grid w-full max-w-7xl gap-8 lg:grid-cols-2 lg:items-center lg:gap-14">
-        <div className="flex min-h-[360px] flex-col justify-center sm:min-h-[460px]">
+      <div className="relative mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-2 lg:items-center lg:gap-14">
+        <div className="flex min-h-0 flex-col justify-center sm:min-h-[460px]">
           <h1
-            className="mb-4 text-[clamp(38px,9vw,80px)] leading-[0.98] tracking-[-0.04em]"
+            className="mb-4 max-w-[11ch] text-[clamp(34px,10vw,80px)] leading-[0.98] tracking-[-0.04em] sm:max-w-none"
             style={{
               fontFamily: "'Instrument Serif', serif",
               fontWeight: 400,
@@ -44,7 +44,7 @@ export function HeroSection({
           </h1>
 
           <p
-            className="mb-7 max-w-2xl text-[15px] leading-7 sm:mb-8 sm:text-[clamp(16px,2vw,19px)] sm:leading-8"
+            className="mb-6 max-w-xl text-sm leading-6 sm:mb-8 sm:max-w-2xl sm:text-[clamp(16px,2vw,19px)] sm:leading-8"
             style={{ color: t.muted }}
           >
             Begyn turns your goals, habits, health, and routines into one clear
@@ -52,11 +52,11 @@ export function HeroSection({
             moving without relying on motivation.
           </p>
 
-          <div className="mb-4 flex min-h-[64px] flex-wrap gap-3">
+          <div className="mb-4 flex flex-col gap-3 sm:min-h-[64px] sm:flex-row sm:flex-wrap">
             <Button
               type="button"
               onClick={onGetStarted}
-              className="rounded-xl px-5 py-6 text-sm font-semibold"
+              className="min-h-12 w-full rounded-xl px-5 py-3.5 text-sm font-semibold sm:w-auto sm:py-6"
               style={{
                 background: t.primary,
                 color: theme === "dark" ? "#052e16" : "#ffffff",
@@ -69,7 +69,7 @@ export function HeroSection({
               type="button"
               variant="ghost"
               onClick={onSeeHowItWorks}
-              className="rounded-xl border px-5 py-6 text-sm font-semibold"
+              className="min-h-12 w-full rounded-xl border px-5 py-3.5 text-sm font-semibold sm:w-auto sm:py-6"
               style={{
                 background: "transparent",
                 borderColor: t.borderStrong,
