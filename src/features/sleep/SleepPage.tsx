@@ -559,7 +559,7 @@ export default function SleepPage() {
                       <FieldLabel hint="How did you feel after waking up?">
                         Energy level
                       </FieldLabel>
-                      <div className="grid grid-cols-5 gap-2">
+                      <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                         {ENERGY_LEVELS.map((option) => {
                           const isActive = draft.energyLevel === option.value;
 
@@ -577,7 +577,7 @@ export default function SleepPage() {
                                 }))
                               }
                               className={cn(
-                                "rounded-xl border px-2 py-3 text-center transition-colors",
+                                "rounded-xl border px-1.5 py-2.5 text-center transition-colors sm:px-2 sm:py-3",
                                 isActive
                                   ? "border-indigo-500 bg-indigo-500/10 text-foreground"
                                   : "border-border bg-background hover:border-indigo-300 hover:bg-muted/40",
@@ -588,7 +588,7 @@ export default function SleepPage() {
                               <div className="text-sm font-semibold">
                                 {option.label}
                               </div>
-                              <div className="mt-1 text-[11px] text-muted-foreground">
+                              <div className="mt-1 hidden text-[11px] text-muted-foreground sm:block">
                                 {option.description}
                               </div>
                             </button>

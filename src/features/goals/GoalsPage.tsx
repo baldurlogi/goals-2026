@@ -226,18 +226,18 @@ export function GoalsPage() {
               plan — or create one manually.
             </p>
           </div>
-          <div className="flex justify-center gap-3">
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Button
               variant="outline"
               onClick={() => setLocalModal('ai')}
-              className="gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
+              className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary sm:w-auto"
             >
               <Sparkles className="h-4 w-4" /> Generate with AI
             </Button>
             <Button
               onClick={() => setLocalModal('new')}
               variant="ghost"
-              className="gap-2"
+              className="w-full gap-2 sm:w-auto"
             >
               <Plus className="h-4 w-4" /> Add manually
             </Button>
