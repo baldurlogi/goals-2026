@@ -16,7 +16,7 @@ export function HeroProductPreview({
   if (compact) {
     return (
       <Card
-        className="overflow-hidden rounded-3xl"
+        className="overflow-hidden rounded-[28px]"
         style={{
           background: t.surface,
           border: `1px solid ${t.borderStrong}`,
@@ -26,8 +26,8 @@ export function HeroProductPreview({
               : "0 14px 36px rgba(15,23,42,0.08)",
         }}
       >
-        <CardContent className="p-4">
-          <div className="mb-4 flex h-6 items-center gap-2">
+        <CardContent className="p-3.5 sm:p-4">
+          <div className="mb-3 flex h-6 items-center gap-2">
             <div
               className="h-2.5 w-2.5 rounded-full"
               style={{ background: t.rose, opacity: 0.7 }}
@@ -48,9 +48,9 @@ export function HeroProductPreview({
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div
-              className="rounded-2xl border p-4"
+              className="rounded-2xl border p-3.5"
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -74,7 +74,7 @@ export function HeroProductPreview({
                   Today
                 </div>
                 <div
-                  className="mb-1 text-[15px] font-bold tracking-[-0.02em]"
+                  className="mb-1 text-sm font-bold tracking-[-0.02em] sm:text-[15px]"
                   style={{ color: t.text }}
                 >
                   Run 4 km after work
@@ -86,7 +86,7 @@ export function HeroProductPreview({
             </div>
 
             <div
-              className="rounded-2xl border p-4"
+              className="rounded-2xl border p-3.5"
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
