@@ -70,7 +70,7 @@ export function AIUsagePill({ className = "" }: { className?: string }) {
           to="/app/upgrade"
           className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
         >
-          Upgrade
+          Coming later
           <ArrowRight className="h-3 w-3" />
         </Link>
       )}

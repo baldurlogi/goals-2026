@@ -55,7 +55,7 @@ export function PricingSection({
           Start free.
           <br />
           <em style={{ color: t.primary }}>
-            Upgrade when you want more support staying consistent.
+            Paid plans are coming later.
           </em>
         </h2>
 
@@ -63,9 +63,8 @@ export function PricingSection({
           className="mx-auto mb-6 max-w-2xl text-sm leading-8 sm:text-[15px]"
           style={{ color: t.faint }}
         >
-          Use the core system for free, or unlock more AI prompts, stronger
-          planning, and better day-to-day guidance when you want extra help
-          following through.
+          Use the full beta for free right now, and preview how paid plans may
+          expand later as Begyn grows.
         </p>
 
         <BillingToggle

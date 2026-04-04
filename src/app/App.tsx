@@ -44,6 +44,10 @@ const SchedulePage = lazy(async () => ({
   default: (await import("@/features/schedule/SchedulePage")).SchedulePage,
 }));
 
+const SleepPage = lazy(() => import("@/features/sleep/SleepPage"));
+
+const WellbeingPage = lazy(() => import("@/features/wellbeing/WellbeingPage"));
+
 const ReadingPage = lazy(async () => ({
   default: (await import("@/features/reading/ReadingPage")).ReadingPage,
 }));
@@ -255,6 +259,22 @@ export default function App() {
               element={
                 <Suspense fallback={<AppRouteFallback />}>
                   <SchedulePage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="sleep"
+              element={
+                <Suspense fallback={<AppRouteFallback />}>
+                  <SleepPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="wellbeing"
+              element={
+                <Suspense fallback={<AppRouteFallback />}>
+                  <WellbeingPage />
                 </Suspense>
               }
             />

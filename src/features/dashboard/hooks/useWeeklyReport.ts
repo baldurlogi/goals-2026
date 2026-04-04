@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import { getAISystemContext } from "@/features/ai/buildAIContext";
 import { loadUserGoals } from "@/features/goals/userGoalStorage";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
@@ -39,9 +39,10 @@ import {
 } from "@/features/subscription/aiUsageCache";
 import { useTier, type Tier } from "@/features/subscription/useTier";
 import { capture } from "@/lib/analytics";
+import { loadSleepRecoveryEntriesInRange } from "@/features/sleep/sleepStorage";
+import { loadMentalWellbeingEntriesInRange } from "@/features/wellbeing/wellbeingStorage";
 
-const SUPABASE_FN =
-  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+const SUPABASE_FN = getSupabaseFunctionUrl("hyper-responder");
 
 const WEEKLY_REPORT_CACHE_KEY = "cache:weekly-report:latest:v1";
 
@@ -140,6 +141,25 @@ type WeeklyDataPayload = {
     activeDays: number;
     dataCompleteness: Completeness;
   };
+  sleep?: {
+    avgSleepDurationMinutes: number | null;
+    avgSleepQualityScore: number | null;
+    bedtimeConsistencyMinutes: number | null;
+    loggedDays: number;
+    lastSleepDurationMinutes: number | null;
+    lastSleepQualityScore: number | null;
+    dataCompleteness: Completeness;
+  };
+  wellbeing?: {
+    avgMoodScore: number | null;
+    avgStressLevel: number | null;
+    recentMoodTrend: "up" | "down" | "steady" | "unknown";
+    recentStressTrend: "up" | "down" | "steady" | "unknown";
+    checkInDays: number;
+    journalDays: number;
+    gratitudeDays: number;
+    dataCompleteness: Completeness;
+  };
 };
 
 type GoalSummaryModel = Pick<UserGoal, "id" | "title" | "priority" | "steps">;
@@ -189,6 +209,8 @@ const REPORT_MODULE_META = {
   reading: { label: "Reading", emoji: "📖" },
   todos: { label: "Todos", emoji: "✅" },
   schedule: { label: "Schedule", emoji: "📅" },
+  sleep: { label: "Sleep", emoji: "😴" },
+  wellbeing: { label: "Wellbeing", emoji: "💚" },
 } as const;
 
 type ReportModuleKey = keyof typeof REPORT_MODULE_META;
@@ -442,6 +464,42 @@ function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function averageOrNull(values: number[]) {
+  if (values.length === 0) return null;
+  return Number(average(values).toFixed(1));
+}
+
+function toNormalizedBedtimeMinutes(value: string | null) {
+  if (!value) return null;
+
+  const [hoursText, minutesText] = value.split(":");
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+  const total = hours * 60 + minutes;
+  return hours < 12 ? total + 24 * 60 : total;
+}
+
+function computeBedtimeConsistencyMinutes(
+  values: Array<string | null>,
+): number | null {
+  const minutes = values
+    .map((value) => toNormalizedBedtimeMinutes(value))
+    .filter((value): value is number => value !== null);
+
+  if (minutes.length < 2) return null;
+  return Math.max(...minutes) - Math.min(...minutes);
+}
+
+function computeTrend(values: number[]): "up" | "down" | "steady" | "unknown" {
+  if (values.length < 2) return "unknown";
+
+  const delta = values[values.length - 1] - values[0];
+  if (Math.abs(delta) < 0.5) return "steady";
+  return delta > 0 ? "up" : "down";
+}
+
 function asReportModuleKey(value: string): ReportModuleKey | null {
   return value in REPORT_MODULE_META ? (value as ReportModuleKey) : null;
 }
@@ -489,6 +547,19 @@ function fallbackModuleOneliner(
       const schedule = payload.schedule;
       if (!schedule) return "No schedule data this week.";
       return `${schedule.blocksCompletedThisWeek} block${schedule.blocksCompletedThisWeek === 1 ? "" : "s"} completed this week.`;
+    }
+    case "sleep": {
+      const sleep = payload.sleep;
+      if (!sleep) return "No sleep data this week.";
+      if (sleep.avgSleepDurationMinutes !== null) {
+        return `${sleep.loggedDays} night${sleep.loggedDays === 1 ? "" : "s"} logged with ${Math.round(sleep.avgSleepDurationMinutes)} min average sleep.`;
+      }
+      return `${sleep.loggedDays} sleep log${sleep.loggedDays === 1 ? "" : "s"} recorded this week.`;
+    }
+    case "wellbeing": {
+      const wellbeing = payload.wellbeing;
+      if (!wellbeing) return "No wellbeing check-ins this week.";
+      return `${wellbeing.checkInDays} wellbeing check-in${wellbeing.checkInDays === 1 ? "" : "s"} logged this week.`;
     }
   }
 }
@@ -598,6 +669,53 @@ function scoreSchedule(schedule?: WeeklyDataPayload["schedule"]) {
   return clampScore(blockScore + dayScore);
 }
 
+function scoreSleep(sleep?: WeeklyDataPayload["sleep"]) {
+  if (!sleep) return 0;
+
+  const loggingScore = Math.min((sleep.loggedDays / 7) * 45, 45);
+  const durationScore =
+    typeof sleep.avgSleepDurationMinutes === "number"
+      ? Math.max(
+          0,
+          25 -
+            Math.min(
+              Math.abs(sleep.avgSleepDurationMinutes - 480) / 240,
+              1,
+            ) *
+              25,
+        )
+      : sleep.dataCompleteness === "unknown"
+        ? 8
+        : 0;
+  const qualityScore =
+    typeof sleep.avgSleepQualityScore === "number"
+      ? Math.min((sleep.avgSleepQualityScore / 100) * 20, 20)
+      : 0;
+  const consistencyScore =
+    typeof sleep.bedtimeConsistencyMinutes === "number"
+      ? Math.max(0, 10 - Math.min(sleep.bedtimeConsistencyMinutes / 120, 1) * 10)
+      : 0;
+
+  return clampScore(loggingScore + durationScore + qualityScore + consistencyScore);
+}
+
+function scoreWellbeing(wellbeing?: WeeklyDataPayload["wellbeing"]) {
+  if (!wellbeing) return 0;
+
+  const checkInScore = Math.min((wellbeing.checkInDays / 7) * 60, 60);
+  const journalScore = Math.min((wellbeing.journalDays / 5) * 20, 20);
+  const moodSignal =
+    typeof wellbeing.avgMoodScore === "number"
+      ? Math.min((wellbeing.avgMoodScore / 5) * 10, 10)
+      : 0;
+  const stressSignal =
+    typeof wellbeing.avgStressLevel === "number"
+      ? Math.max(0, ((6 - wellbeing.avgStressLevel) / 5) * 10)
+      : 0;
+
+  return clampScore(checkInScore + journalScore + moodSignal + stressSignal);
+}
+
 function scoreModule(
   module: ReportModuleKey,
   payload: WeeklyDataPayload,
@@ -615,6 +733,10 @@ function scoreModule(
       return scoreTodos(payload.todos);
     case "schedule":
       return scoreSchedule(payload.schedule);
+    case "sleep":
+      return scoreSleep(payload.sleep);
+    case "wellbeing":
+      return scoreWellbeing(payload.wellbeing);
   }
 }
 
@@ -1045,12 +1167,150 @@ async function collectScheduleData(
   };
 }
 
+async function collectSleepData(
+  modules: Set<string>,
+  weekStart: string,
+  weekEnd: string,
+) {
+  if (!modules.has("sleep")) return undefined;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      avgSleepDurationMinutes: null,
+      avgSleepQualityScore: null,
+      bedtimeConsistencyMinutes: null,
+      loggedDays: 0,
+      lastSleepDurationMinutes: null,
+      lastSleepQualityScore: null,
+      dataCompleteness: "unknown" as Completeness,
+    };
+  }
+
+  try {
+    const entries = await loadSleepRecoveryEntriesInRange(
+      user.id,
+      weekStart,
+      weekEnd,
+    );
+    const durationValues = entries
+      .map((entry) => entry.sleepDurationMinutes)
+      .filter((value): value is number => value !== null);
+    const qualityValues = entries
+      .map((entry) => entry.sleepQualityScore)
+      .filter((value): value is number => value !== null);
+    const latest = entries[entries.length - 1] ?? null;
+
+    return {
+      avgSleepDurationMinutes: averageOrNull(durationValues),
+      avgSleepQualityScore: averageOrNull(qualityValues),
+      bedtimeConsistencyMinutes: computeBedtimeConsistencyMinutes(
+        entries.map((entry) => entry.bedtime),
+      ),
+      loggedDays: entries.length,
+      lastSleepDurationMinutes: latest?.sleepDurationMinutes ?? null,
+      lastSleepQualityScore: latest?.sleepQualityScore ?? null,
+      dataCompleteness:
+        entries.length >= 5
+          ? ("complete" as Completeness)
+          : entries.length > 0
+            ? ("partial" as Completeness)
+            : ("unknown" as Completeness),
+    };
+  } catch (error) {
+    console.warn("collectSleepData error:", error);
+    return {
+      avgSleepDurationMinutes: null,
+      avgSleepQualityScore: null,
+      bedtimeConsistencyMinutes: null,
+      loggedDays: 0,
+      lastSleepDurationMinutes: null,
+      lastSleepQualityScore: null,
+      dataCompleteness: "unknown" as Completeness,
+    };
+  }
+}
+
+async function collectWellbeingData(
+  modules: Set<string>,
+  weekStart: string,
+  weekEnd: string,
+) {
+  if (!modules.has("wellbeing")) return undefined;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      avgMoodScore: null,
+      avgStressLevel: null,
+      recentMoodTrend: "unknown" as const,
+      recentStressTrend: "unknown" as const,
+      checkInDays: 0,
+      journalDays: 0,
+      gratitudeDays: 0,
+      dataCompleteness: "unknown" as Completeness,
+    };
+  }
+
+  try {
+    const entries = await loadMentalWellbeingEntriesInRange(
+      user.id,
+      weekStart,
+      weekEnd,
+    );
+    const moodValues = entries
+      .flatMap((entry) => (entry.moodScore === null ? [] : [entry.moodScore]));
+    const stressValues = entries
+      .flatMap((entry) =>
+        entry.stressLevel === null ? [] : [entry.stressLevel],
+      );
+
+    return {
+      avgMoodScore: averageOrNull(moodValues),
+      avgStressLevel: averageOrNull(stressValues),
+      recentMoodTrend: computeTrend(moodValues),
+      recentStressTrend: computeTrend(stressValues),
+      checkInDays: entries.length,
+      journalDays: entries.filter(
+        (entry) => (entry.journalEntry?.trim() ?? "") !== "",
+      ).length,
+      gratitudeDays: entries.filter(
+        (entry) => (entry.gratitudeEntry?.trim() ?? "") !== "",
+      ).length,
+      dataCompleteness:
+        entries.length >= 5
+          ? ("complete" as Completeness)
+          : entries.length > 0
+            ? ("partial" as Completeness)
+            : ("unknown" as Completeness),
+    };
+  } catch (error) {
+    console.warn("collectWellbeingData error:", error);
+    return {
+      avgMoodScore: null,
+      avgStressLevel: null,
+      recentMoodTrend: "unknown" as const,
+      recentStressTrend: "unknown" as const,
+      checkInDays: 0,
+      journalDays: 0,
+      gratitudeDays: 0,
+      dataCompleteness: "unknown" as Completeness,
+    };
+  }
+}
+
 async function collectWeeklyDataPayload(
   modules: Set<string>,
   weekStart: string,
   weekEnd: string,
 ): Promise<WeeklyDataPayload> {
-  const [goals, fitness, nutrition, reading, todos, schedule] =
+  const [goals, fitness, nutrition, reading, todos, schedule, sleep, wellbeing] =
     await Promise.all([
       loadUserGoals(),
       collectFitnessData(modules, weekStart, weekEnd),
@@ -1058,6 +1318,8 @@ async function collectWeeklyDataPayload(
       collectReadingData(modules, weekStart, weekEnd),
       collectTodosData(modules, weekStart, weekEnd),
       collectScheduleData(modules, weekStart, weekEnd),
+      collectSleepData(modules, weekStart, weekEnd),
+      collectWellbeingData(modules, weekStart, weekEnd),
     ]);
 
   const profile = await loadProfile();
@@ -1084,6 +1346,8 @@ async function collectWeeklyDataPayload(
     reading,
     todos,
     schedule,
+    sleep,
+    wellbeing,
   };
 }
 

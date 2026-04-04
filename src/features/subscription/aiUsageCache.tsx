@@ -7,8 +7,11 @@ import {
   writeScopedStorageItem,
 } from "@/lib/activeUser";
 import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
-import type { Tier } from "./useTier";
-import { supabase } from "@/lib/supabaseClient";
+import {
+  effectiveTierForFeatureAccess,
+  type Tier,
+} from "./useTier";
+import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 
 export type AIUsageSnapshot = {
   monthKey: string;
@@ -46,8 +49,7 @@ function isUsageLike(value: unknown): value is UsageLike {
 const STORAGE_KEY = CACHE_KEYS.AI_USAGE;
 export const AI_USAGE_EVENT = "ai-usage-updated";
 const AI_USAGE_HYDRATE_STALE_MS = 5 * 60 * 1000;
-const HYPER_RESPONDER_URL =
-  "https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder";
+const HYPER_RESPONDER_URL = getSupabaseFunctionUrl("hyper-responder");
 
 let inFlightUsageHydration: Promise<AIUsageSnapshot | null> | null = null;
 
@@ -91,8 +93,10 @@ function resolveTier(
 }
 
 export function defaultMonthlyLimitForTier(tier: Tier): number {
-  if (tier === "pro") return 200;
-  if (tier === "pro_max") return 1000;
+  const effectiveTier = effectiveTierForFeatureAccess(tier);
+
+  if (effectiveTier === "pro") return 200;
+  if (effectiveTier === "pro_max") return 1000;
   return 10;
 }
 

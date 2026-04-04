@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link } from "react-router-dom";
-import { Apple, BookOpen, Dumbbell, TrendingUp, Zap } from "lucide-react";
+import { Apple, BookOpen, Dumbbell, Heart, Moon, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { DashboardStartHereCard } from "./components/DashboardStartHereCard";
@@ -30,10 +30,12 @@ import {
   MacrosCardSkeleton,
   ReadingCardSkeleton,
   ScheduleCardSkeleton,
+  SleepCardSkeleton,
   SpendingCardSkeleton,
   TodoCardSkeleton,
   UpcomingGoalsCardSkeleton,
   WaterIntakeCardSkeleton,
+  WellbeingCardSkeleton,
   WeeklyReportCardSkeleton,
 } from "./skeletons";
 
@@ -45,6 +47,12 @@ const AIUsagePill = lazy(async () => ({
 }));
 const ReadingCard = lazy(async () => ({
   default: (await import("./components/ReadingCard")).ReadingCard,
+}));
+const SleepCard = lazy(async () => ({
+  default: (await import("./components/SleepCard")).SleepCard,
+}));
+const WellbeingCard = lazy(async () => ({
+  default: (await import("./components/WellbeingCard")).WellbeingCard,
 }));
 const MacrosCard = lazy(async () => ({
   default: (await import("./components/MacrosCard")).MacrosCard,
@@ -187,6 +195,20 @@ export default function DashboardPage() {
           href: "/app/reading",
           color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
         },
+        has("sleep") && {
+          icon: <Moon className="h-4 w-4" />,
+          label: "Log sleep",
+          sub: "Sleep / Recovery",
+          href: "/app/sleep",
+          color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+        },
+        has("wellbeing") && {
+          icon: <Heart className="h-4 w-4" />,
+          label: "Check in",
+          sub: "Mental Wellbeing",
+          href: "/app/wellbeing",
+          color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
+        },
         has("fitness") && {
           icon: <Dumbbell className="h-4 w-4" />,
           label: "Log a PR",
@@ -283,6 +305,26 @@ export default function DashboardPage() {
             {has("reading") && (
               <Suspense fallback={<ReadingCardSkeleton />}>
                 {showTopEnhancements ? <ReadingCard /> : <ReadingCardSkeleton />}
+              </Suspense>
+            )}
+          </div>
+        )}
+
+        {(has("sleep") || has("wellbeing")) && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12">
+            {has("sleep") && (
+              <Suspense fallback={<SleepCardSkeleton />}>
+                {showSecondaryEnhancements ? <SleepCard /> : <SleepCardSkeleton />}
+              </Suspense>
+            )}
+
+            {has("wellbeing") && (
+              <Suspense fallback={<WellbeingCardSkeleton />}>
+                {showSecondaryEnhancements ? (
+                  <WellbeingCard />
+                ) : (
+                  <WellbeingCardSkeleton />
+                )}
               </Suspense>
             )}
           </div>

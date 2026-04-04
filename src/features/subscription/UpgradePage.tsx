@@ -519,12 +519,12 @@ export function UpgradePage() {
           </div>
 
           <h1 className="text-3xl font-bold tracking-tight">
-            Unlock your full potential
+            Pricing preview
           </h1>
 
           <p className="mx-auto max-w-md text-muted-foreground">
-            Add AI coaching to every part of your life — from daily suggestions
-            to goal optimization and weekly insights.
+            The full beta is open right now. This page previews how paid plans
+            may look later as Begyn grows.
           </p>
 
           {STRIPE_DISABLED && (

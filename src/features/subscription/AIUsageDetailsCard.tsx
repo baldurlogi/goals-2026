@@ -160,14 +160,14 @@ export function AIUsageDetailsCard({ className }: Props) {
                   to="/app/upgrade"
                   className="inline-flex items-center gap-1 text-violet-300 transition-colors hover:text-violet-200"
                 >
-                  Preview plans
+                  Pricing preview
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
             ) : (
               <Button asChild size="sm" className="gap-1.5">
                 <Link to="/app/upgrade">
-                  Upgrade for more prompts
+                  Pricing preview
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>

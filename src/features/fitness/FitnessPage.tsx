@@ -4,7 +4,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageScaffold, SectionHeading } from "@/components/PageScaffold";
 import { AddPRGoalModal } from "@/features/fitness/components/AddPRGoalModal";
+import { FitnessPlanningProfileCard } from "@/features/fitness/components/FitnessPlanningProfileCard";
 import { PRCard } from "@/features/fitness/components/PRCard";
+import { WeeklyWorkoutPlanCard } from "@/features/fitness/components/WeeklyWorkoutPlanCard";
 import { WeeklySplitCard } from "@/features/fitness/components/WeeklySplitCard";
 import { CATEGORY_LABELS, FITNESS_CHANGED_EVENT } from "./constants";
 import {
@@ -153,6 +155,10 @@ export function FitnessPage() {
         description="Weekly plan, workout streak, and personal records."
         icon={<Dumbbell className="h-5 w-5 text-violet-500" />}
       />
+
+      <FitnessPlanningProfileCard />
+
+      <WeeklyWorkoutPlanCard />
 
       <WeeklySplitCard />
 

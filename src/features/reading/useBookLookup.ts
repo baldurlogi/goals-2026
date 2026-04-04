@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabaseFunctionUrl, supabase } from '@/lib/supabaseClient';
 
 type LookupState = 'idle' | 'loading' | 'done' | 'error' | 'not_found';
 
@@ -20,17 +20,14 @@ export function useBookLookup(onFound: (info: BookInfo) => void) {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hyper-responder`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ action: 'lookup_book', title: title.trim(), author: author.trim() }),
+      const res = await fetch(getSupabaseFunctionUrl('hyper-responder'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+        body: JSON.stringify({ action: 'lookup_book', title: title.trim(), author: author.trim() }),
+      });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 

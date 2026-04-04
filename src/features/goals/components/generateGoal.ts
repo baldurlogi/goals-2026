@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabaseFunctionUrl, supabase } from '@/lib/supabaseClient';
 import { writeAIUsageCache } from '@/features/subscription/aiUsageCache';
 import { getAISystemContext } from '@/features/ai/buildAIContext';
 import { createBlankGoal, createBlankStep } from '../userGoalStorage';
@@ -41,8 +41,7 @@ export class AILimitError extends Error {
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
-const EDGE_FN_URL =
-  'https://jvtpemjrswfwsiwkhreq.supabase.co/functions/v1/hyper-responder';
+const EDGE_FN_URL = getSupabaseFunctionUrl('hyper-responder');
 
 const USE_MOCK_AI = import.meta.env.VITE_USE_MOCK_AI === 'true';
 
