@@ -38,6 +38,28 @@ export type ExerciseCatalogFilters = {
   equipment: string[];
 };
 
+export type ExerciseImageInput = {
+  exerciseId: string;
+  resolution?: number;
+};
+
+export type ExerciseImageResult = {
+  dataUrl: string;
+  contentType: string;
+};
+
+export type ExercisePreviewInput = {
+  exerciseId?: string | null;
+  query?: string | null;
+  target?: string | null;
+  equipment?: string | null;
+  resolution?: number;
+};
+
+export type ExercisePreviewResult = ExerciseImageResult & {
+  exercise: ExerciseCatalogItem | null;
+};
+
 type ExerciseDbErrorCode =
   | "not_configured"
   | "timeout"
@@ -67,6 +89,7 @@ export class ExerciseDbError extends Error {
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 24;
 const DEFAULT_TIMEOUT_MS = 6000;
+const DEFAULT_PAGE = 1;
 
 export async function searchExerciseCatalog(
   config: ExerciseDbConfig,
@@ -89,15 +112,22 @@ export async function getExerciseSwapCandidates(
   input: ExerciseSwapInput,
 ): Promise<ExerciseCatalogItem[]> {
   const limit = clampLimit(input.limit);
+  const searchLimit = shouldUseRapidApiRouteSet(config)
+    ? Math.max(limit * 3, 12)
+    : Math.max(limit * 2, 10);
 
   const primaryResults = await searchExerciseCatalog(config, {
     target: input.target ?? undefined,
     equipment: input.equipment ?? undefined,
-    limit: Math.max(limit * 2, 10),
+    limit: searchLimit,
   });
 
   const primaryFiltered = excludeCurrentExercise(primaryResults, input);
-  if (primaryFiltered.length >= limit || !input.target) {
+  if (
+    primaryFiltered.length >= limit ||
+    !input.target ||
+    shouldUseRapidApiRouteSet(config)
+  ) {
     return primaryFiltered.slice(0, limit);
   }
 
@@ -116,16 +146,18 @@ export async function getExerciseCatalogFilters(
   config: ExerciseDbConfig,
 ): Promise<ExerciseCatalogFilters> {
   const [targets, equipment] = await Promise.all([
-    fetchStringListWithFallback(config, [
-      "/targets",
-      "/targetList",
-      "/exercises/targets",
-    ]),
-    fetchStringListWithFallback(config, [
-      "/equipment",
-      "/equipmentList",
-      "/exercises/equipment",
-    ]),
+    fetchStringListWithFallback(
+      config,
+      shouldUseRapidApiRouteSet(config)
+        ? ["/exercises/targetList", "/muscles"]
+        : ["/muscles", "/exercises/targetList"],
+    ),
+    fetchStringListWithFallback(
+      config,
+      shouldUseRapidApiRouteSet(config)
+        ? ["/exercises/equipmentList", "/equipments"]
+        : ["/equipments", "/exercises/equipmentList"],
+    ),
   ]);
 
   return {
@@ -134,18 +166,119 @@ export async function getExerciseCatalogFilters(
   };
 }
 
+export async function getExerciseImage(
+  config: ExerciseDbConfig,
+  input: ExerciseImageInput,
+): Promise<ExerciseImageResult> {
+  const exerciseId = normalizeNullableText(input.exerciseId);
+  if (!exerciseId) {
+    throw new ExerciseDbError(
+      "invalid_response",
+      "Missing exercise id for exercise image.",
+      400,
+    );
+  }
+
+  const resolution = clampInteger(input.resolution, 120, 512) ?? 180;
+  const response = await fetchExerciseDbResponse(
+    config,
+    "/image",
+    new URLSearchParams({
+      exerciseId,
+      resolution: String(resolution),
+    }),
+  );
+
+  const contentType = response.headers.get("content-type")?.trim() ||
+    "image/webp";
+  const buffer = await response.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  if (bytes.length === 0) {
+    throw new ExerciseDbError(
+      "invalid_response",
+      "Exercise image returned an empty response.",
+      502,
+    );
+  }
+
+  return {
+    contentType,
+    dataUrl: `data:${contentType};base64,${encodeBase64(bytes)}`,
+  };
+}
+
+export async function getExercisePreview(
+  config: ExerciseDbConfig,
+  input: ExercisePreviewInput,
+): Promise<ExercisePreviewResult> {
+  const directExerciseId = normalizeNullableText(input.exerciseId);
+
+  let exercise: ExerciseCatalogItem | null = null;
+
+  if (directExerciseId) {
+    exercise = {
+      source: "exercisedb",
+      externalExerciseId: directExerciseId,
+      name: normalizeNullableText(input.query) ?? "Exercise preview",
+      target: normalizeNullableText(input.target),
+      equipment: normalizeNullableText(input.equipment),
+      bodyPart: null,
+      secondaryMuscles: [],
+      instructions: [],
+      imageUrl: null,
+      videoUrl: null,
+    };
+  } else {
+    const query = normalizeNullableText(input.query);
+    if (!query) {
+      throw new ExerciseDbError(
+        "invalid_response",
+        "Missing exercise name for exercise preview.",
+        400,
+      );
+    }
+
+    const matches = await searchExerciseCatalog(config, {
+      query,
+      target: normalizeNullableText(input.target),
+      equipment: normalizeNullableText(input.equipment),
+      limit: 5,
+    });
+
+    exercise = matches[0] ?? null;
+    if (!exercise) {
+      throw new ExerciseDbError(
+        "invalid_response",
+        "No ExerciseDB preview was found for this movement.",
+        404,
+      );
+    }
+  }
+
+  const image = await getExerciseImage(config, {
+    exerciseId: exercise.externalExerciseId,
+    resolution: input.resolution,
+  });
+
+  return {
+    ...image,
+    exercise,
+  };
+}
+
 async function fetchExerciseCollection(
   config: ExerciseDbConfig,
   input: ExerciseCatalogSearchInput,
 ): Promise<unknown[]> {
-  const searchParams = buildExerciseSearchParams(input);
+  const query = normalizeNullableText(input.query);
+  const target = normalizeNullableText(input.target);
+  const equipment = normalizeNullableText(input.equipment);
+  const limit = clampLimit(input.limit);
 
-  const candidates = [
-    { path: "/exercises/search", searchParams },
-    { path: "/exercises", searchParams },
-    { path: "/api/v1/exercises/search", searchParams },
-    { path: "/api/v1/exercises", searchParams },
-  ];
+  const candidates = query
+    ? buildSearchCandidates(config, { query, target, equipment, limit })
+    : buildCollectionCandidates(config, { target, equipment, limit });
 
   let lastError: ExerciseDbError | null = null;
 
@@ -219,6 +352,26 @@ async function fetchExerciseDbJson(
   path: string,
   searchParams?: URLSearchParams,
 ): Promise<unknown> {
+  const response = await fetchExerciseDbResponse(config, path, searchParams);
+  const raw = await response.text();
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new ExerciseDbError(
+      "invalid_response",
+      "Exercise metadata returned invalid JSON.",
+      502,
+      raw || null,
+    );
+  }
+}
+
+async function fetchExerciseDbResponse(
+  config: ExerciseDbConfig,
+  path: string,
+  searchParams?: URLSearchParams,
+): Promise<Response> {
   if (!config.baseUrl.trim()) {
     throw new ExerciseDbError(
       "not_configured",
@@ -233,15 +386,12 @@ async function fetchExerciseDbJson(
 
   const headers = new Headers({
     "Accept": "application/json",
+    "Content-Type": "application/json",
   });
 
-  if (config.apiKey) {
-    headers.set("x-rapidapi-key", config.apiKey);
-    headers.set("Authorization", `Bearer ${config.apiKey}`);
-  }
-
-  if (config.apiHost) {
-    headers.set("x-rapidapi-host", config.apiHost);
+  if (shouldUseRapidApiHeaders(config)) {
+    headers.set("x-rapidapi-key", config.apiKey!.trim());
+    headers.set("x-rapidapi-host", config.apiHost!.trim());
   }
 
   const controller = new AbortController();
@@ -255,9 +405,8 @@ async function fetchExerciseDbJson(
       signal: controller.signal,
     });
 
-    const raw = await response.text();
-
     if (!response.ok) {
+      const raw = await response.text();
       if (response.status === 429) {
         throw new ExerciseDbError(
           "rate_limited",
@@ -275,16 +424,7 @@ async function fetchExerciseDbJson(
       );
     }
 
-    try {
-      return JSON.parse(raw);
-    } catch {
-      throw new ExerciseDbError(
-        "invalid_response",
-        "Exercise metadata returned invalid JSON.",
-        502,
-        raw || null,
-      );
-    }
+    return response;
   } catch (error) {
     if (error instanceof ExerciseDbError) throw error;
 
@@ -307,35 +447,201 @@ async function fetchExerciseDbJson(
   }
 }
 
-function buildExerciseSearchParams(
-  input: ExerciseCatalogSearchInput,
-): URLSearchParams {
+function clampInteger(
+  value: unknown,
+  min: number,
+  max: number,
+): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+}
+
+function buildExerciseDbParams(input: {
+  name?: string | null;
+  muscle?: string | null;
+  equipment?: string | null;
+  limit?: number | null;
+}): URLSearchParams {
   const params = new URLSearchParams();
 
-  const query = input.query?.trim();
-  const target = input.target?.trim();
-  const equipment = input.equipment?.trim();
-  const limit = clampLimit(input.limit);
-
-  if (query) {
-    params.set("name", query);
-    params.set("query", query);
-    params.set("search", query);
+  if (input.name) {
+    params.set("name", input.name);
   }
 
-  if (target) {
-    params.set("target", target);
-    params.set("muscle", target);
-    params.set("targetMuscle", target);
+  if (input.muscle) {
+    params.set("muscle", input.muscle);
   }
 
-  if (equipment) {
-    params.set("equipment", equipment);
+  if (input.equipment) {
+    params.set("equipment", input.equipment);
   }
 
-  params.set("limit", String(limit));
+  params.set("limit", String(clampLimit(input.limit ?? undefined)));
+  params.set("page", String(DEFAULT_PAGE));
 
   return params;
+}
+
+function buildSearchCandidates(
+  config: ExerciseDbConfig,
+  input: {
+    query: string;
+    target: string | null;
+    equipment: string | null;
+    limit: number;
+  },
+): Array<{ path: string; searchParams?: URLSearchParams }> {
+  const hostedCandidates = [
+    {
+      path: "/exercises/search",
+      searchParams: buildExerciseDbParams({
+        name: input.query,
+        limit: input.limit,
+      }),
+    },
+  ];
+
+  const rapidCandidates = [
+    {
+      path: `/exercises/name/${encodeURIComponent(input.query)}`,
+      searchParams: buildRapidExerciseDbParams(input.limit),
+    },
+  ];
+
+  if (input.target || input.equipment) {
+    rapidCandidates.push({
+      path: "/exercises",
+      searchParams: buildExerciseDbParams({
+        name: input.query,
+        muscle: input.target,
+        equipment: input.equipment,
+        limit: input.limit,
+      }),
+    });
+  }
+
+  return dedupeCandidates(
+    shouldUseRapidApiRouteSet(config)
+      ? [...rapidCandidates, ...hostedCandidates]
+      : [...hostedCandidates, ...rapidCandidates],
+  );
+}
+
+function buildCollectionCandidates(
+  config: ExerciseDbConfig,
+  input: {
+  target: string | null;
+  equipment: string | null;
+  limit: number;
+}): Array<{ path: string; searchParams?: URLSearchParams }> {
+  const hostedCandidates: Array<{
+    path: string;
+    searchParams?: URLSearchParams;
+  }> = [];
+  const rapidCandidates: Array<{
+    path: string;
+    searchParams?: URLSearchParams;
+  }> = [];
+
+  if (input.target && input.equipment) {
+    hostedCandidates.push({
+      path: "/exercises",
+      searchParams: buildExerciseDbParams({
+        muscle: input.target,
+        equipment: input.equipment,
+        limit: input.limit,
+      }),
+    });
+  }
+
+  if (input.target) {
+    hostedCandidates.push({
+      path: "/exercises/muscles",
+      searchParams: buildExerciseDbParams({
+        muscle: input.target,
+        limit: input.limit,
+      }),
+    });
+    rapidCandidates.push({
+      path: `/exercises/target/${encodeURIComponent(input.target)}`,
+      searchParams: buildRapidExerciseDbParams(input.limit),
+    });
+  }
+
+  if (input.equipment) {
+    hostedCandidates.push({
+      path: "/exercises/equipments",
+      searchParams: buildExerciseDbParams({
+        equipment: input.equipment,
+        limit: input.limit,
+      }),
+    });
+    rapidCandidates.push({
+      path: `/exercises/equipment/${encodeURIComponent(input.equipment)}`,
+      searchParams: buildRapidExerciseDbParams(input.limit),
+    });
+  }
+
+  hostedCandidates.push({
+    path: "/exercises",
+    searchParams: buildExerciseDbParams({
+      muscle: input.target,
+      equipment: input.equipment,
+      limit: input.limit,
+    }),
+  });
+
+  rapidCandidates.push({
+    path: "/exercises",
+    searchParams: buildRapidExerciseDbParams(input.limit),
+  });
+
+  return dedupeCandidates(
+    shouldUseRapidApiRouteSet(config)
+      ? [...rapidCandidates, ...hostedCandidates]
+      : [...hostedCandidates, ...rapidCandidates],
+  );
+}
+
+function buildRapidExerciseDbParams(limit: number): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  return params;
+}
+
+function shouldUseRapidApiHeaders(config: ExerciseDbConfig): boolean {
+  return Boolean(config.apiKey?.trim() && config.apiHost?.trim());
+}
+
+function shouldUseRapidApiRouteSet(config: ExerciseDbConfig): boolean {
+  return shouldUseRapidApiHeaders(config) ||
+    config.baseUrl.includes("rapidapi.com");
+}
+
+function dedupeCandidates(
+  candidates: Array<{ path: string; searchParams?: URLSearchParams }>,
+): Array<{ path: string; searchParams?: URLSearchParams }> {
+  const seen = new Set<string>();
+
+  return candidates.filter((candidate) => {
+    const query = candidate.searchParams?.toString() ?? "";
+    const key = `${candidate.path}?${query}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function extractArrayPayload(data: unknown): unknown[] | null {

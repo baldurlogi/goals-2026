@@ -1,10 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   CalendarDays,
   Dumbbell,
   LoaderCircle,
   Moon,
-  Repeat2,
   ShieldCheck,
   RefreshCw,
   Sparkles,
@@ -27,16 +26,12 @@ import {
   useFitnessPlanningProfileQuery,
   useCurrentFitnessWeeklyPlanState,
   useGenerateFitnessWeeklyPlanMutation,
-  useSaveFitnessWeeklyPlanMutation,
 } from "../useFitnessPlanningQuery";
 import { AILimitError } from "../generateFitnessWeeklyPlan";
-import { SwapWorkoutExerciseModal } from "./SwapWorkoutExerciseModal";
 import type {
   FitnessPlanningProfile,
   FitnessWeeklyPlan,
-  WorkoutPlanExercise,
 } from "../planningTypes";
-import type { ExerciseCatalogItem } from "../exerciseCatalogTypes";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -120,15 +115,10 @@ export function WeeklyWorkoutPlanCard() {
   const weekRange = formatWeekRange();
   const profileQuery = useFitnessPlanningProfileQuery();
   const weeklyPlanState = useCurrentFitnessWeeklyPlanState();
-  const saveWeeklyPlanMutation = useSaveFitnessWeeklyPlanMutation(weekStart);
   const generatePlanMutation = useGenerateFitnessWeeklyPlanMutation(
     weekStart,
     profileQuery.data ?? null,
   );
-  const [swapTarget, setSwapTarget] = useState<{
-    sessionIndex: number;
-    exerciseIndex: number;
-  } | null>(null);
 
   const plan = weeklyPlanState.plan;
   const hasPlan = weeklyPlanState.hasPlan;
@@ -140,10 +130,6 @@ export function WeeklyWorkoutPlanCard() {
     () => buildFitReasons(profileQuery.data, plan),
     [plan, profileQuery.data],
   );
-  const activeSwapExercise: WorkoutPlanExercise | null =
-    swapTarget && plan?.sessions[swapTarget.sessionIndex]
-      ? plan.sessions[swapTarget.sessionIndex].exercises[swapTarget.exerciseIndex] ?? null
-      : null;
   const isProfileLight = useMemo(() => {
     const profile = profileQuery.data;
     if (!profile) return true;
@@ -178,58 +164,6 @@ export function WeeklyWorkoutPlanCard() {
     }
   }
 
-  async function handleSwapExercise(candidate: ExerciseCatalogItem) {
-    if (!plan || !swapTarget) return;
-
-    const { sessionIndex, exerciseIndex } = swapTarget;
-    const currentExercise =
-      plan.sessions[sessionIndex]?.exercises[exerciseIndex] ?? null;
-
-    if (!currentExercise) return;
-
-    try {
-      const nextSessions = plan.sessions.map((session, currentSessionIndex) => {
-        if (currentSessionIndex !== sessionIndex) return session;
-
-        return {
-          ...session,
-          exercises: session.exercises.map((exercise, currentExerciseIndex) => {
-            if (currentExerciseIndex !== exerciseIndex) return exercise;
-
-            return {
-              ...exercise,
-              source: "exercisedb" as const,
-              externalExerciseId: candidate.externalExerciseId,
-              name: candidate.name,
-              target: candidate.target ?? exercise.target,
-              equipment: candidate.equipment ?? exercise.equipment,
-            };
-          }),
-        };
-      });
-
-      await saveWeeklyPlanMutation.mutateAsync({
-        fitnessGoal: plan.fitnessGoal,
-        daysPerWeek: plan.daysPerWeek,
-        splitName: plan.splitName,
-        progressionNote: plan.progressionNote,
-        recoveryNote: plan.recoveryNote,
-        sessions: nextSessions,
-        status: plan.status,
-        source: plan.source,
-      });
-
-      toast.success(`${currentExercise.name} swapped for ${candidate.name}`);
-      setSwapTarget(null);
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Couldn't swap this exercise.",
-      );
-    }
-  }
-
   return (
     <>
       <Card className="rounded-xl">
@@ -256,8 +190,7 @@ export function WeeklyWorkoutPlanCard() {
             onClick={() => void handleGenerate()}
             disabled={
               generatePlanMutation.isPending ||
-              profileQuery.isLoading ||
-              saveWeeklyPlanMutation.isPending
+              profileQuery.isLoading
             }
           >
             {generatePlanMutation.isPending ? (
@@ -392,7 +325,7 @@ export function WeeklyWorkoutPlanCard() {
                 defaultValue={`day-${plan.sessions[0]?.dayIndex ?? 1}`}
                 className="px-4"
               >
-                {plan.sessions.map((session, sessionIndex) => (
+                {plan.sessions.map((session) => (
                   <AccordionItem
                     key={`${session.dayIndex}-${session.title}`}
                     value={`day-${session.dayIndex}`}
@@ -434,7 +367,9 @@ export function WeeklyWorkoutPlanCard() {
                               </div>
                             </div>
                             <Badge variant="secondary">
-                              {exercise.source === "exercisedb" ? "ExerciseDB" : "Custom"}
+                              {exercise.source === "exercisedb"
+                                ? "Linked demo"
+                                : "Planned movement"}
                             </Badge>
                           </div>
 
@@ -475,27 +410,6 @@ export function WeeklyWorkoutPlanCard() {
                             </p>
                           )}
 
-                          <div className="mt-3 flex justify-end">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs"
-                              onClick={() =>
-                                setSwapTarget({
-                                  sessionIndex,
-                                  exerciseIndex: index,
-                                })
-                              }
-                              disabled={
-                                saveWeeklyPlanMutation.isPending ||
-                                generatePlanMutation.isPending
-                              }
-                            >
-                              <Repeat2 className="h-3.5 w-3.5" />
-                              Swap exercise
-                            </Button>
-                          </div>
                         </div>
                       ))}
                     </AccordionContent>
@@ -523,8 +437,7 @@ export function WeeklyWorkoutPlanCard() {
                 onClick={() => void handleGenerate()}
                 disabled={
                   generatePlanMutation.isPending ||
-                  profileQuery.isLoading ||
-                  saveWeeklyPlanMutation.isPending
+                  profileQuery.isLoading
                 }
               >
                 {generatePlanMutation.isPending ? (
@@ -542,14 +455,6 @@ export function WeeklyWorkoutPlanCard() {
         )}
         </CardContent>
       </Card>
-
-      <SwapWorkoutExerciseModal
-        open={Boolean(swapTarget && activeSwapExercise)}
-        exercise={activeSwapExercise}
-        onClose={() => setSwapTarget(null)}
-        onSwap={(candidate) => void handleSwapExercise(candidate)}
-        isSaving={saveWeeklyPlanMutation.isPending}
-      />
     </>
   );
 }

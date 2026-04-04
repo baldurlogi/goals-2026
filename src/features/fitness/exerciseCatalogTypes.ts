@@ -30,3 +30,25 @@ export type ExerciseCatalogFilters = {
   targets: string[];
   equipment: string[];
 };
+
+export type ExerciseImageParams = {
+  exerciseId: string;
+  resolution?: number;
+};
+
+export type ExerciseImageResult = {
+  dataUrl: string;
+  contentType: string;
+};
+
+export type ExercisePreviewParams = {
+  exerciseId?: string | null;
+  query?: string | null;
+  target?: string | null;
+  equipment?: string | null;
+  resolution?: number;
+};
+
+export type ExercisePreviewResult = ExerciseImageResult & {
+  exercise: ExerciseCatalogItem | null;
+};

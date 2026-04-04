@@ -2,6 +2,7 @@ import { X, RefreshCw, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useExerciseSwapCandidatesQuery } from "../useExerciseCatalogQuery";
+import { ExerciseCatalogRequestError } from "../exerciseCatalogClient";
 import type { WorkoutPlanExercise } from "../planningTypes";
 import type { ExerciseCatalogItem } from "../exerciseCatalogTypes";
 
@@ -49,6 +50,10 @@ export function SwapWorkoutExerciseModal({
 
   if (!open || !exercise) return null;
 
+  const isRateLimited =
+    swapQuery.error instanceof ExerciseCatalogRequestError &&
+    swapQuery.error.code === "rate_limited";
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center"
@@ -87,7 +92,9 @@ export function SwapWorkoutExerciseModal({
             </div>
 
             <Badge variant="secondary">
-              {exercise.source === "exercisedb" ? "Current: ExerciseDB" : "Current: Custom"}
+              {exercise.source === "exercisedb"
+                ? "Current: Linked demo"
+                : "Current: Planned movement"}
             </Badge>
           </div>
         </div>
@@ -106,6 +113,12 @@ export function SwapWorkoutExerciseModal({
                   ? swapQuery.error.message
                   : "Please try again."}
               </p>
+              {isRateLimited ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  The RapidAPI free tier can throttle short bursts. Waiting a little
+                  before retrying is usually enough.
+                </p>
+              ) : null}
               <Button
                 variant="outline"
                 size="sm"
@@ -113,7 +126,7 @@ export function SwapWorkoutExerciseModal({
                 onClick={() => void swapQuery.refetch()}
               >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                Try again
+                {isRateLimited ? "Retry in a moment" : "Try again"}
               </Button>
             </div>
           ) : swapQuery.data && swapQuery.data.length > 0 ? (

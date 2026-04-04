@@ -4,6 +4,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   ExerciseDbError,
   type ExerciseCatalogItem,
+  getExerciseImage,
+  getExercisePreview,
   getExerciseCatalogFilters,
   getExerciseSwapCandidates,
   searchExerciseCatalog,
@@ -41,6 +43,8 @@ type RequestBody = GenerateGoalRequest & {
     | "fitness_exercise_search"
     | "fitness_exercise_swap"
     | "fitness_exercise_filters"
+    | "fitness_exercise_image"
+    | "fitness_exercise_preview"
     | "fitness-plan"
     | "usage"
     | "coach"
@@ -56,6 +60,8 @@ type RequestBody = GenerateGoalRequest & {
   target?: string;
   equipment?: string;
   limit?: number;
+  resolution?: number;
+  exerciseId?: string;
   weekStart?: string;
   adherenceContext?: string;
   recoveryContext?: string;
@@ -197,7 +203,9 @@ function actionNeedsExerciseDb(
   return (
     action === "fitness_exercise_search" ||
     action === "fitness_exercise_swap" ||
-    action === "fitness_exercise_filters"
+    action === "fitness_exercise_filters" ||
+    action === "fitness_exercise_image" ||
+    action === "fitness_exercise_preview"
   );
 }
 
@@ -226,9 +234,14 @@ type FitnessPlannerOutput = {
 };
 
 function monthlyLimitForTier(tier: string): number {
+  if (tier === "free") return 200;
   if (tier === "pro") return 200;
   if (tier === "pro_max") return 1000;
   return 10;
+}
+
+function tierHasBetaProAccess(tier: string): boolean {
+  return tier === "free" || tier === "pro" || tier === "pro_max";
 }
 
 function clampInteger(
@@ -365,30 +378,47 @@ async function buildFitnessExerciseCandidateContext(
     apiHost?: string | null;
   },
   profile: RequestBody["fitnessProfile"],
-): Promise<string> {
+): Promise<{
+  text: string;
+  items: ExerciseCatalogItem[];
+}> {
   if (!exerciseDbConfig.baseUrl) {
-    return "Exercise catalog unavailable for this request.";
+    return {
+      text: "Exercise catalog unavailable for this request.",
+      items: [],
+    };
   }
 
   const targets = derivePlannerTargets(profile);
   if (targets.length === 0) {
-    return "No exercise targets were derived from the user's profile.";
+    return {
+      text: "No exercise targets were derived from the user's profile.",
+      items: [],
+    };
   }
+  const isRapidApi = Boolean(
+    exerciseDbConfig.apiKey?.trim() && exerciseDbConfig.apiHost?.trim(),
+  );
+  const candidateTargets = isRapidApi ? targets.slice(0, 2) : targets;
 
   const availableEquipment = normalizeStringArray(profile?.equipment).map((item) =>
     item.toLowerCase()
   );
 
   try {
-    const results = await Promise.all(
-      targets.map(async (target) => ({
-        target,
-        exercises: await searchExerciseCatalog(exerciseDbConfig, {
+    const results: Array<{
+      target: string;
+      exercises: ExerciseCatalogItem[];
+    }> = [];
+
+    for (const target of candidateTargets) {
+      const exercises = await searchExerciseCatalog(exerciseDbConfig, {
           target,
-          limit: 8,
-        }),
-      })),
-    );
+          limit: isRapidApi ? 6 : 8,
+        });
+
+      results.push({ target, exercises });
+    }
 
     const groups = results
       .map(({ target, exercises }) => {
@@ -407,11 +437,25 @@ async function buildFitnessExerciseCandidateContext(
       })
       .filter((group): group is string => Boolean(group));
 
-    return groups.length > 0
-      ? groups.join("\n\n")
-      : "Exercise catalog search returned no useful candidates.";
+    const items = dedupeExerciseCatalogItems(
+      results.flatMap(({ exercises }) =>
+        filterExercisesForEquipment(exercises, availableEquipment).slice(0, 5)
+      ),
+    );
+
+    return {
+      text: groups.length > 0
+        ? groups.join("\n\n")
+        : "Exercise catalog search returned no useful candidates.",
+      items,
+    };
   } catch {
-    return "Exercise catalog search failed, so candidate exercises are unavailable for this request.";
+    return {
+      text: isRapidApi
+        ? "Exercise catalog search was skipped because the Rapid free tier is temporarily constrained."
+        : "Exercise catalog search failed, so candidate exercises are unavailable for this request.",
+      items: [],
+    };
   }
 }
 
@@ -457,6 +501,148 @@ function filterExercisesForEquipment(
   });
 
   return filtered.length > 0 ? filtered : exercises;
+}
+
+function dedupeExerciseCatalogItems(
+  items: ExerciseCatalogItem[],
+): ExerciseCatalogItem[] {
+  const seen = new Set<string>();
+  const result: ExerciseCatalogItem[] = [];
+
+  for (const item of items) {
+    const key = item.externalExerciseId.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+
+  return result;
+}
+
+function enrichFitnessPlannerOutputWithCandidates(
+  plan: FitnessPlannerOutput,
+  candidates: ExerciseCatalogItem[],
+): FitnessPlannerOutput {
+  if (candidates.length === 0) return plan;
+
+  return {
+    ...plan,
+    sessions: plan.sessions.map((session) => ({
+      ...session,
+      exercises: session.exercises.map((exercise) =>
+        enrichPlannerExerciseWithCandidate(exercise, candidates)
+      ),
+    })),
+  };
+}
+
+function enrichPlannerExerciseWithCandidate(
+  exercise: FitnessPlannerOutput["sessions"][number]["exercises"][number],
+  candidates: ExerciseCatalogItem[],
+): FitnessPlannerOutput["sessions"][number]["exercises"][number] {
+  if (exercise.source === "exercisedb" && exercise.external_exercise_id) {
+    return exercise;
+  }
+
+  const match = findBestExerciseCandidateMatch(exercise, candidates);
+  if (!match) return exercise;
+
+  return {
+    ...exercise,
+    source: "exercisedb",
+    external_exercise_id: match.externalExerciseId,
+    target: exercise.target ?? match.target,
+    equipment: exercise.equipment ?? match.equipment,
+  };
+}
+
+function findBestExerciseCandidateMatch(
+  exercise: FitnessPlannerOutput["sessions"][number]["exercises"][number],
+  candidates: ExerciseCatalogItem[],
+): ExerciseCatalogItem | null {
+  const scored = candidates
+    .map((candidate) => ({
+      candidate,
+      score: scoreExerciseCandidateMatch(exercise, candidate),
+    }))
+    .filter((item) => item.score >= 70)
+    .sort((left, right) => right.score - left.score);
+
+  return scored[0]?.candidate ?? null;
+}
+
+function scoreExerciseCandidateMatch(
+  exercise: FitnessPlannerOutput["sessions"][number]["exercises"][number],
+  candidate: ExerciseCatalogItem,
+): number {
+  const exerciseName = normalizeMatchText(exercise.name);
+  const candidateName = normalizeMatchText(candidate.name);
+  const exerciseTarget = normalizeMatchText(exercise.target);
+  const candidateTarget = normalizeMatchText(candidate.target);
+  const exerciseEquipment = normalizeMatchText(exercise.equipment);
+  const candidateEquipment = normalizeMatchText(candidate.equipment);
+
+  let score = 0;
+
+  if (!exerciseName || !candidateName) return 0;
+
+  if (exerciseName === candidateName) {
+    score += 80;
+  } else if (
+    exerciseName.includes(candidateName) || candidateName.includes(exerciseName)
+  ) {
+    score += 62;
+  } else {
+    const overlap = countSharedMatchTokens(exerciseName, candidateName);
+    if (overlap >= 3) score += 48;
+    else if (overlap === 2) score += 34;
+  }
+
+  if (exerciseTarget && candidateTarget) {
+    if (exerciseTarget === candidateTarget) score += 18;
+    else if (
+      exerciseTarget.includes(candidateTarget) ||
+      candidateTarget.includes(exerciseTarget)
+    ) {
+      score += 10;
+    }
+  }
+
+  if (exerciseEquipment && candidateEquipment) {
+    if (exerciseEquipment === candidateEquipment) score += 14;
+    else if (
+      exerciseEquipment.includes(candidateEquipment) ||
+      candidateEquipment.includes(exerciseEquipment)
+    ) {
+      score += 8;
+    }
+  }
+
+  return score;
+}
+
+function normalizeMatchText(value: string | null | undefined): string {
+  if (!value) return "";
+
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function countSharedMatchTokens(left: string, right: string): number {
+  const leftTokens = new Set(left.split(" ").filter(Boolean));
+  const rightTokens = new Set(right.split(" ").filter(Boolean));
+  let count = 0;
+
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      count += 1;
+    }
+  }
+
+  return count;
 }
 
 type AnthropicJsonResult<T> =
@@ -628,11 +814,19 @@ async function parseAnthropicJsonResponse<T = unknown>(
 async function requestFitnessPlanFromAnthropic(
   anthropicApiKey: string,
   plannerSystem: string,
-  concise = false,
+  mode: "standard" | "concise" | "ultra-concise" = "standard",
 ): Promise<AnthropicJsonResult<unknown>> {
-  const userPrompt = concise
-    ? "Generate my personalized weekly workout plan. Keep it concise: 4-5 exercises per session maximum, short notes, and no extra detail."
-    : "Generate my personalized weekly workout plan.";
+  const userPrompt = mode === "standard"
+    ? "Generate my personalized weekly workout plan."
+    : mode === "concise"
+    ? "Generate my personalized weekly workout plan. Keep it concise: 4-5 exercises per session maximum, very short notes, and no extra detail."
+    : "Generate my personalized weekly workout plan. Keep it ultra concise: 4 exercises per session maximum unless truly necessary, use null notes unless essential, and avoid unnecessary wording.";
+
+  const maxTokens = mode === "standard"
+    ? 4200
+    : mode === "concise"
+    ? 4600
+    : 5200;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -643,7 +837,7 @@ async function requestFitnessPlanFromAnthropic(
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: concise ? 3200 : 2600,
+      max_tokens: maxTokens,
       temperature: 0.2,
       system: plannerSystem,
       messages: [
@@ -793,12 +987,15 @@ Deno.serve(async (req: Request) => {
         throw new Error("Failed to reserve AI prompt: empty response");
       }
 
+      const prompts_used = Number(row.prompts_used ?? 0);
+      const monthly_limit = monthlyLimitForTier(tier);
+
       return {
-        prompts_used: Number(row.prompts_used ?? 0),
-        monthly_limit: Number(row.monthly_limit ?? 10),
-        remaining: Number(row.remaining ?? 0),
-        tier: String(row.tier ?? "free"),
-        allowed: Boolean(row.allowed),
+        prompts_used,
+        monthly_limit,
+        remaining: Math.max(0, monthly_limit - prompts_used),
+        tier,
+        allowed: prompts_used < monthly_limit,
       };
     }
 
@@ -1032,6 +1229,71 @@ Rules:
       }
     }
 
+    if (action === "fitness_exercise_image") {
+      try {
+        const image = await getExerciseImage(
+          {
+            baseUrl: exerciseDbBaseUrl ?? "",
+            apiKey: exerciseDbApiKey,
+            apiHost: exerciseDbApiHost,
+          },
+          {
+            exerciseId: body.exerciseId ?? body.currentExercise?.externalExerciseId ?? "",
+            resolution: body.resolution,
+          },
+        );
+
+        return jsonResponse(image);
+      } catch (error) {
+        if (error instanceof ExerciseDbError) {
+          return jsonResponse(
+            {
+              error: error.message,
+              code: error.code,
+              details: error.details,
+            },
+            error.status,
+          );
+        }
+
+        throw error;
+      }
+    }
+
+    if (action === "fitness_exercise_preview") {
+      try {
+        const preview = await getExercisePreview(
+          {
+            baseUrl: exerciseDbBaseUrl ?? "",
+            apiKey: exerciseDbApiKey,
+            apiHost: exerciseDbApiHost,
+          },
+          {
+            exerciseId: body.exerciseId ?? body.currentExercise?.externalExerciseId ?? null,
+            query: body.exerciseQuery ?? body.currentExercise?.name ?? null,
+            target: body.target ?? body.currentExercise?.target ?? null,
+            equipment: body.equipment ?? body.currentExercise?.equipment ?? null,
+            resolution: body.resolution,
+          },
+        );
+
+        return jsonResponse(preview);
+      } catch (error) {
+        if (error instanceof ExerciseDbError) {
+          return jsonResponse(
+            {
+              error: error.message,
+              code: error.code,
+              details: error.details,
+            },
+            error.status,
+          );
+        }
+
+        throw error;
+      }
+    }
+
     // ── FITNESS PLAN action ───────────────────────────────────────────────
     if (action === "fitness-plan") {
       const reserved = await reserveChargedActionOrReturn("fitness-plan");
@@ -1049,7 +1311,7 @@ Rules:
       const recoveryBlock = body.recoveryContext?.trim()
         ? `Recent sleep / recovery:\n${body.recoveryContext.trim()}\n\n`
         : "Recent sleep / recovery: unavailable\n\n";
-      const exerciseCandidates = await buildFitnessExerciseCandidateContext(
+      const exerciseCandidateContext = await buildFitnessExerciseCandidateContext(
         {
           baseUrl: exerciseDbBaseUrl ?? "",
           apiKey: exerciseDbApiKey,
@@ -1075,7 +1337,7 @@ Rules:
 ${fitnessProfileBlock}
 
 ${adherenceBlock}${recoveryBlock}Exercise candidate data from ExerciseDB:
-${exerciseCandidates}
+${exerciseCandidateContext.text}
 
 Plan week start: ${weekStart}
 
@@ -1135,7 +1397,7 @@ Rules:
       let parsed = await requestFitnessPlanFromAnthropic(
         anthropicApiKey,
         plannerSystem,
-        false,
+        "standard",
       );
 
       if (parsed.ok === false) {
@@ -1156,8 +1418,31 @@ Rules:
       - Keep notes very short.
       - Prefer compact exercise selection over exhaustive coverage.
       - Return only the JSON object.`,
-            true,
+            "concise",
           );
+        }
+
+        if (parsed.ok === false) {
+          const secondRetryPayload = await parsed.response.clone().json().catch(() => null);
+          const secondRetryable =
+            secondRetryPayload?.error ===
+              "Fitness plan response was truncated before valid JSON completed" ||
+            secondRetryPayload?.stop_reason === "max_tokens";
+
+          if (secondRetryable) {
+            parsed = await requestFitnessPlanFromAnthropic(
+              anthropicApiKey,
+              `${plannerSystem}
+
+      Additional compression rule:
+      - Use 4 exercises per session maximum unless the user's constraints clearly require 5.
+      - Use null for notes unless a note is genuinely important for safety or setup.
+      - Keep title, focus, progression_note, and recovery_note compact.
+      - Prefer practical coverage over exercise variety.
+      - Return only the JSON object.`,
+              "ultra-concise",
+            );
+          }
         }
       }
 
@@ -1165,8 +1450,16 @@ Rules:
         return parsed.response;
       }
 
+      const normalizedPlan = normalizeFitnessPlannerOutput(
+        parsed.value,
+        fitnessProfile,
+      );
+
       return jsonResponse({
-        plan: normalizeFitnessPlannerOutput(parsed.value, fitnessProfile),
+        plan: enrichFitnessPlannerOutputWithCandidates(
+          normalizedPlan,
+          exerciseCandidateContext.items,
+        ),
         usage,
       });
     }
@@ -1384,11 +1677,11 @@ Rules:
         );
       }
 
-      if (tier !== "pro_max" && tier !== "pro") {
+      if (!tierHasBetaProAccess(tier)) {
         return jsonResponse(
           {
             error: "upgrade_required",
-            message: "The AI Weekly Report is available on Pro and Pro Max plans.",
+            message: "The AI Weekly Report is available on this beta and paid plans.",
             upgrade_required: true,
             tier,
           },

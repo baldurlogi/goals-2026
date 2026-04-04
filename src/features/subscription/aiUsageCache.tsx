@@ -7,7 +7,10 @@ import {
   writeScopedStorageItem,
 } from "@/lib/activeUser";
 import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
-import type { Tier } from "./useTier";
+import {
+  effectiveTierForFeatureAccess,
+  type Tier,
+} from "./useTier";
 import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 
 export type AIUsageSnapshot = {
@@ -90,8 +93,10 @@ function resolveTier(
 }
 
 export function defaultMonthlyLimitForTier(tier: Tier): number {
-  if (tier === "pro") return 200;
-  if (tier === "pro_max") return 1000;
+  const effectiveTier = effectiveTierForFeatureAccess(tier);
+
+  if (effectiveTier === "pro") return 200;
+  if (effectiveTier === "pro_max") return 1000;
   return 10;
 }
 

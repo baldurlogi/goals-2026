@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Sparkles, ArrowRight, Zap } from "lucide-react";
 import {
+  BETA_FREE_TIER_UNLOCKS_PRO,
   TIER_LABELS,
   useTier,
   type Tier,
@@ -16,13 +17,20 @@ type Props = {
   onSecondaryAction?: () => void;
 };
 
-const NEXT_TIER: Record<Tier, Tier | null> = {
-  free: "pro",
-  pro: "pro_max",
-  pro_max: null,
-};
+function nextTierFor(tier: Tier): Tier | null {
+  if (tier === "free") {
+    return BETA_FREE_TIER_UNLOCKS_PRO ? null : "pro";
+  }
+
+  if (tier === "pro") return "pro_max";
+  return null;
+}
 
 function defaultMessageForTier(tier: Tier) {
+  if (tier === "free" && BETA_FREE_TIER_UNLOCKS_PRO) {
+    return "You've used all 200 beta AI prompts this month. Your limit resets on the 1st.";
+  }
+
   if (tier === "free") {
     return "You've used all 10 free AI prompts this month. Upgrade to Pro for 200 prompts/month.";
   }
@@ -44,7 +52,7 @@ export function AIUsageLimitNotice({
 }: Props) {
   const liveTier = useTier();
   const activeTier = tier ?? liveTier;
-  const nextTier = NEXT_TIER[activeTier];
+  const nextTier = nextTierFor(activeTier);
   const nextTierLabel = nextTier ? TIER_LABELS[nextTier] : null;
 
   return (

@@ -116,12 +116,13 @@ export function DailyPlanHeader() {
         icon: m.icon,
       }));
 
+    const moduleItems = [...dailyItems, ...otherItems];
+
     return [
-      ...(dailyItems.length > 0
-        ? [{ label: "Daily Plan", items: dailyItems }]
-        : []),
       ...(goalsItems.length > 0 ? [{ label: "Goals", items: goalsItems }] : []),
-      ...(otherItems.length > 0 ? [{ label: "Other", items: otherItems }] : []),
+      ...(moduleItems.length > 0
+        ? [{ label: "Modules", items: moduleItems }]
+        : []),
     ];
   }, [modules]);
 
@@ -308,7 +309,7 @@ export function DailyPlanHeader() {
             <DropdownMenuItem asChild>
               <Link to="/app/upgrade" className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-violet-400" />
-                <span>Upgrade plan</span>
+                <span>Pricing preview</span>
               </Link>
             </DropdownMenuItem>
 

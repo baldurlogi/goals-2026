@@ -3,11 +3,17 @@ import { useAuth } from "@/features/auth/authContext";
 import { queryKeys } from "@/lib/queryKeys";
 import {
   getExerciseCatalogFilters,
+  getExerciseImage,
+  getExercisePreview,
   getExerciseSwapCandidates,
   searchExerciseCatalog,
 } from "./exerciseCatalogClient";
 import type {
   ExerciseCatalogFilters,
+  ExerciseImageParams,
+  ExerciseImageResult,
+  ExercisePreviewParams,
+  ExercisePreviewResult,
   ExerciseCatalogItem,
   ExerciseCatalogSearchParams,
   ExerciseSwapParams,
@@ -33,9 +39,10 @@ export function useExerciseCatalogSearchQuery(
     ),
     queryFn: async () => searchExerciseCatalog(params),
     enabled,
-    staleTime: 5 * 60_000,
-    gcTime: 10 * 60_000,
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
+    retry: false,
   });
 }
 
@@ -60,9 +67,10 @@ export function useExerciseSwapCandidatesQuery(
     ),
     queryFn: async () => getExerciseSwapCandidates(params),
     enabled,
-    staleTime: 5 * 60_000,
-    gcTime: 10 * 60_000,
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
+    retry: false,
   });
 }
 
@@ -79,5 +87,59 @@ export function useExerciseCatalogFiltersQuery(
     staleTime: 60 * 60_000,
     gcTime: 2 * 60 * 60_000,
     refetchOnWindowFocus: false,
+    retry: false,
+  });
+}
+
+export function useExerciseImageQuery(
+  params: ExerciseImageParams,
+  options?: { enabled?: boolean },
+) {
+  const { userId, authReady } = useAuth();
+  const enabled = (options?.enabled ?? true) &&
+    authReady &&
+    Boolean(userId) &&
+    Boolean(params.exerciseId.trim());
+
+  return useQuery<ExerciseImageResult>({
+    queryKey: queryKeys.fitnessExerciseImage(
+      userId,
+      params.exerciseId.trim(),
+      params.resolution ?? 180,
+    ),
+    queryFn: async () => getExerciseImage(params),
+    enabled,
+    staleTime: 60 * 60_000,
+    gcTime: 2 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+}
+
+export function useExercisePreviewQuery(
+  params: ExercisePreviewParams,
+  options?: { enabled?: boolean },
+) {
+  const { userId, authReady } = useAuth();
+  const enabled = (options?.enabled ?? true) &&
+    authReady &&
+    Boolean(userId) &&
+    Boolean(params.exerciseId?.trim() || params.query?.trim());
+
+  return useQuery<ExercisePreviewResult>({
+    queryKey: queryKeys.fitnessExercisePreview(
+      userId,
+      params.exerciseId?.trim() ?? "",
+      params.query?.trim() ?? "",
+      params.target?.trim() ?? "",
+      params.equipment?.trim() ?? "",
+      params.resolution ?? 180,
+    ),
+    queryFn: async () => getExercisePreview(params),
+    enabled,
+    staleTime: 60 * 60_000,
+    gcTime: 2 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 }

@@ -21,9 +21,19 @@ export const TIER_BADGE: Record<Tier, string> = {
   pro_max: "bg-amber-400/15 text-amber-400 border border-amber-400/30",
 };
 
+export const BETA_FREE_TIER_UNLOCKS_PRO = true;
+
+export function effectiveTierForFeatureAccess(userTier: Tier): Tier {
+  if (BETA_FREE_TIER_UNLOCKS_PRO && userTier === "free") {
+    return "pro";
+  }
+
+  return userTier;
+}
+
 export function tierMeets(userTier: Tier, required: Tier): boolean {
   const rank: Record<Tier, number> = { free: 0, pro: 1, pro_max: 2 };
-  return rank[userTier] >= rank[required];
+  return rank[effectiveTierForFeatureAccess(userTier)] >= rank[required];
 }
 
 export function useTier(): Tier {

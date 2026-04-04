@@ -1,12 +1,40 @@
 import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import type {
   ExerciseCatalogFilters,
+  ExerciseImageParams,
+  ExerciseImageResult,
+  ExercisePreviewParams,
+  ExercisePreviewResult,
   ExerciseCatalogItem,
   ExerciseCatalogSearchParams,
   ExerciseSwapParams,
 } from "./exerciseCatalogTypes";
 
 const HYPER_RESPONDER_URL = getSupabaseFunctionUrl("hyper-responder");
+
+type ExerciseCatalogErrorCode =
+  | "rate_limited"
+  | "not_configured"
+  | "timeout"
+  | "upstream_error"
+  | "invalid_response"
+  | "unknown";
+
+export class ExerciseCatalogRequestError extends Error {
+  status: number;
+  code: ExerciseCatalogErrorCode;
+
+  constructor(
+    message: string,
+    status: number,
+    code: ExerciseCatalogErrorCode = "unknown",
+  ) {
+    super(message);
+    this.name = "ExerciseCatalogRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
 
 async function getAccessToken(): Promise<string> {
   const {
@@ -38,16 +66,33 @@ async function callExerciseCatalog<T>(
 
   if (!response.ok) {
     let message = `Exercise metadata request failed (${response.status})`;
+    let code: ExerciseCatalogErrorCode = "unknown";
 
     try {
       const parsed = JSON.parse(raw) as {
         error?: string;
         details?: string;
+        code?: string;
       };
 
+      if (parsed.code === "rate_limited") {
+        code = "rate_limited";
+        message =
+          "Exercise options are temporarily busy on the Rapid free tier. Wait a minute and try again.";
+      } else if (
+        parsed.code === "not_configured" ||
+        parsed.code === "timeout" ||
+        parsed.code === "upstream_error" ||
+        parsed.code === "invalid_response"
+      ) {
+        code = parsed.code;
+      }
+
       if (parsed.error) {
-        message = parsed.error;
-        if (parsed.details) {
+        if (code !== "rate_limited") {
+          message = parsed.error;
+        }
+        if (parsed.details && code !== "rate_limited") {
           message += `: ${parsed.details}`;
         }
       }
@@ -57,7 +102,7 @@ async function callExerciseCatalog<T>(
       }
     }
 
-    throw new Error(message);
+    throw new ExerciseCatalogRequestError(message, response.status, code);
   }
 
   try {
@@ -111,4 +156,27 @@ export async function getExerciseCatalogFilters(): Promise<ExerciseCatalogFilter
       ? data.equipment.filter((value): value is string => typeof value === "string")
       : [],
   };
+}
+
+export async function getExerciseImage(
+  params: ExerciseImageParams,
+): Promise<ExerciseImageResult> {
+  return callExerciseCatalog<ExerciseImageResult>({
+    action: "fitness_exercise_image",
+    exerciseId: params.exerciseId,
+    resolution: params.resolution,
+  });
+}
+
+export async function getExercisePreview(
+  params: ExercisePreviewParams,
+): Promise<ExercisePreviewResult> {
+  return callExerciseCatalog<ExercisePreviewResult>({
+    action: "fitness_exercise_preview",
+    exerciseId: params.exerciseId ?? undefined,
+    exerciseQuery: params.query?.trim() || undefined,
+    target: params.target?.trim() || undefined,
+    equipment: params.equipment?.trim() || undefined,
+    resolution: params.resolution,
+  });
 }

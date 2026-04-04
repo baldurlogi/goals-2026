@@ -19,6 +19,8 @@ const USER_BOUND_QUERY_ROOTS = new Set([
   "fitness-exercise-search",
   "fitness-exercise-swap",
   "fitness-exercise-filters",
+  "fitness-exercise-image",
+  "fitness-exercise-preview",
   "sleep-log",
   "sleep-history",
   "wellbeing-log",
