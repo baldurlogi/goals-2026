@@ -117,7 +117,7 @@ export function GoalCard({
               className="h-8 gap-1.5 px-2 text-xs text-violet-400 hover:bg-violet-500/10 hover:text-violet-400"
               title="Improve with AI"
             >
-              <Sparkles className="h-3 w-3" /> AI
+              <Sparkles className="h-3 w-3" /> Improve with AI
             </Button>
           )}
         </div>

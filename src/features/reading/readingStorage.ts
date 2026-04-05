@@ -96,6 +96,38 @@ export const DEFAULT_READING_INPUTS: ReadingInputs = {
   dailyProgress: null,
 };
 
+function hasCurrentBook(
+  inputs: Pick<ReadingInputs, "current">,
+): boolean {
+  return [
+    inputs.current.title,
+    inputs.current.author,
+    inputs.current.totalPages,
+    inputs.current.currentPage,
+  ].some((value) => String(value ?? "").trim().length > 0);
+}
+
+function promoteFirstQueuedBookToCurrent(
+  inputs: ReadingInputs,
+): ReadingInputs {
+  if (hasCurrentBook(inputs) || inputs.upNext.length === 0) {
+    return inputs;
+  }
+
+  const [firstQueuedBook, ...remainingQueue] = inputs.upNext;
+
+  return {
+    ...inputs,
+    current: {
+      title: firstQueuedBook.title,
+      author: firstQueuedBook.author,
+      totalPages: firstQueuedBook.totalPages,
+      currentPage: "",
+    },
+    upNext: remainingQueue,
+  };
+}
+
 function parsePage(value: unknown): number {
   const parsed = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
@@ -606,7 +638,7 @@ function normalizeReadingInputs(
       ? p.dailyGoalPages
       : DEFAULT_READING_INPUTS.dailyGoalPages;
 
-  return {
+  return promoteFirstQueuedBookToCurrent({
     ...DEFAULT_READING_INPUTS,
     ...p,
     current: { ...DEFAULT_READING_INPUTS.current, ...(p.current ?? {}) },
@@ -616,7 +648,7 @@ function normalizeReadingInputs(
     lastReadDate: typeof p.lastReadDate === "string" ? p.lastReadDate : null,
     streak: typeof p.streak === "number" ? p.streak : 0,
     dailyProgress: normalizeDailyProgress(p.dailyProgress),
-  };
+  });
 }
 
 async function loadPreviousInputs(
@@ -692,15 +724,23 @@ export async function saveReadingInputs(
 ): Promise<ReadingInputs> {
   if (!userId) return value;
 
+  const normalizedValue = promoteFirstQueuedBookToCurrent(value);
   const previousInputs =
     options?.previousInputs === undefined
       ? await loadPreviousInputs(userId)
       : options.previousInputs;
-  const dailyProgress = computeDailyProgress(value, previousInputs, userId);
-  const goalPages = parseGoalPages(value.dailyGoalPages);
-  const streakState = applyReadingStreakFromProgress(value, previousInputs);
+  const dailyProgress = computeDailyProgress(
+    normalizedValue,
+    previousInputs,
+    userId,
+  );
+  const goalPages = parseGoalPages(normalizedValue.dailyGoalPages);
+  const streakState = applyReadingStreakFromProgress(
+    normalizedValue,
+    previousInputs,
+  );
   const nextValue: ReadingInputs = {
-    ...value,
+    ...normalizedValue,
     ...streakState,
     dailyProgress,
   };

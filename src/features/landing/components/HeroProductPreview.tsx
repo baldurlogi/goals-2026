@@ -190,13 +190,15 @@ export function HeroProductPreview({
                 minHeight: 52,
               }}
             >
-              I want to stop restarting and finally train for my marathon
+              I want to stop restarting and get leaner, stronger, and more
+              consistent by summer
             </div>
 
             <div className="mb-4 flex min-h-[36px] flex-wrap gap-2">
-              {[5, 8, 10].map((n, i) => (
+              {["Weekly plan", "Habits + milestones", "Adjusts as you go"].map(
+                (label, i) => (
                 <div
-                  key={n}
+                  key={label}
                   className="rounded-full border px-3 py-1.5 text-[11px]"
                   style={{
                     borderColor: i === 1 ? t.primaryBorder : t.border,
@@ -204,7 +206,7 @@ export function HeroProductPreview({
                     color: i === 1 ? t.primary : t.muted,
                   }}
                 >
-                  {n} steps
+                  {label}
                 </div>
               ))}
             </div>
@@ -217,13 +219,13 @@ export function HeroProductPreview({
               }}
             >
               <div className="mb-3 flex min-h-[52px] items-center gap-3">
-                <div className="text-2xl">🏃</div>
+                <div className="text-2xl">💪</div>
                 <div>
                   <div
                     className="text-[15px] font-bold tracking-[-0.02em]"
                     style={{ color: t.text }}
                   >
-                    Marathon by October
+                    Leaner and stronger by summer
                   </div>
                   <div className="text-xs" style={{ color: t.muted }}>
                     AI plan generated · broken into clear next steps
@@ -233,10 +235,10 @@ export function HeroProductPreview({
 
               <div className="grid gap-0">
                 {[
-                  "Choose your marathon race",
-                  "Build base mileage",
-                  "Add a weekly long run",
-                  "Practice fueling and pacing",
+                  "Lock in a 3-day lifting split that fits your real week",
+                  "Prep 2 repeatable high-protein meals for busy days",
+                  "Set a simple sleep cutoff so your training feels sustainable",
+                  "Track weekly weigh-ins and gym consistency every Sunday",
                 ].map((item, i) => (
                   <div
                     key={item}
