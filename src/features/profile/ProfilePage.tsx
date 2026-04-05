@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,6 +23,7 @@ import { toast } from "sonner";
 import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
 import { ProfileStateCard } from "@/features/onboarding/components/ProfileStateCard";
 import { validateClampedNumberInput } from "@/lib/numericInput";
+import { cn } from "@/lib/utils";
 import { BodyMetricsSection } from "./components/BodyMetricsSection";
 import { IdentitySection } from "./components/IdentitySection";
 import { ModulesSection } from "./components/ModulesSection";
@@ -47,11 +55,75 @@ const SCHEDULE_OPTIONS: { value: WeeklyScheduleValue; label: string; description
   { value: "off", label: "Off", description: "Day off" },
 ];
 
+type ProfileSectionKey =
+  | "profile"
+  | "modules"
+  | "macros"
+  | "schedule"
+  | "reading";
+
+type SettingsNavSection = ProfileSectionKey | "ai";
+
+const PROFILE_SECTION_FIELDS: Record<
+  ProfileSectionKey,
+  Array<keyof EditableProfileFields>
+> = {
+  profile: [
+    "display_name",
+    "sex",
+    "age",
+    "weight_kg",
+    "height_cm",
+    "activity_level",
+    "measurement_system",
+    "date_format",
+    "time_format",
+  ],
+  modules: ["enabled_modules"],
+  macros: ["macro_maintain", "macro_cut"],
+  schedule: ["weekly_schedule"],
+  reading: ["daily_reading_goal"],
+};
+
+const SETTINGS_NAV_ITEMS: Array<{
+  id: SettingsNavSection;
+  label: string;
+}> = [
+  { id: "profile", label: "Profile" },
+  { id: "modules", label: "Modules" },
+  { id: "macros", label: "Macros" },
+  { id: "schedule", label: "Schedule" },
+  { id: "reading", label: "Reading" },
+  { id: "ai", label: "AI Coach" },
+];
+
+function pickSectionPatch(
+  fullPatch: Partial<EditableProfileFields> | null,
+  section: ProfileSectionKey,
+) {
+  if (!fullPatch) return null;
+
+  const sectionPatch = {} as Partial<EditableProfileFields>;
+
+  for (const key of PROFILE_SECTION_FIELDS[section]) {
+    if (key in fullPatch) {
+      Object.assign(sectionPatch, {
+        [key]: fullPatch[key],
+      });
+    }
+  }
+
+  return Object.keys(sectionPatch).length > 0 ? sectionPatch : null;
+}
+
 export function ProfilePage() {
   const { profile, isAuthLoading, isProfileLoading, isMissingProfile, error: loadError, isFetching, refetch } = useProfileState();
   const saveProfileMutation = useSaveProfileMutation();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [activeSaveSection, setActiveSaveSection] = useState<ProfileSectionKey | null>(null);
+  const [lastSavedSection, setLastSavedSection] = useState<ProfileSectionKey | null>(null);
+  const [lastErroredSection, setLastErroredSection] = useState<ProfileSectionKey | null>(null);
   const [readingGoalError, setReadingGoalError] = useState<string | null>(null);
 
   const [form, setForm] = useState<ProfileForm | null>(null);
@@ -62,9 +134,31 @@ export function ProfilePage() {
   const [aiGoalsSummary, setAiGoalsSummary] = useState("");
   const [aiLifestyleNotes, setAiLifestyleNotes] = useState("");
   const [aiFocusAreas, setAiFocusAreas] = useState<string[]>([]);
+  const hydratedProfileIdRef = useRef<string | null>(null);
+  const sectionRefs = useRef<Record<SettingsNavSection, HTMLDivElement | null>>({
+    profile: null,
+    modules: null,
+    macros: null,
+    schedule: null,
+    reading: null,
+    ai: null,
+  });
+  const [activeNavSection, setActiveNavSection] = useState<SettingsNavSection>("profile");
 
   useEffect(() => {
-    setForm(profile ? profileToForm(profile) : null);
+    setForm((prev) => {
+      if (!profile) {
+        hydratedProfileIdRef.current = null;
+        return null;
+      }
+
+      if (!prev || hydratedProfileIdRef.current !== profile.id) {
+        hydratedProfileIdRef.current = profile.id;
+        return profileToForm(profile);
+      }
+
+      return prev;
+    });
   }, [profile]);
 
   useEffect(() => {
@@ -76,6 +170,42 @@ export function ProfilePage() {
       setAiLifestyleNotes(ai.lifestyle_notes ?? "");
       setAiFocusAreas(ai.active_modules ?? []);
     });
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntries = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio);
+
+        const nextVisible = visibleEntries[0];
+        if (!nextVisible) return;
+
+        const sectionId = nextVisible.target.getAttribute(
+          "data-settings-section",
+        ) as SettingsNavSection | null;
+
+        if (sectionId) {
+          setActiveNavSection(sectionId);
+        }
+      },
+      {
+        rootMargin: "-120px 0px -55% 0px",
+        threshold: [0.2, 0.4, 0.6],
+      },
+    );
+
+    const elements = Object.values(sectionRefs.current).filter(
+      (element): element is HTMLDivElement => Boolean(element),
+    );
+
+    elements.forEach((element) => observer.observe(element));
+
+    return () => {
+      elements.forEach((element) => observer.unobserve(element));
+      observer.disconnect();
+    };
   }, []);
 
   const originalFull = useMemo(() => {
@@ -103,10 +233,17 @@ export function ProfilePage() {
   const nextFull = useMemo(() => (form ? formToFullPatch(form) : null), [form]);
   const patch = useMemo(() => (originalFull && nextFull ? diffPatch(originalFull, nextFull) : null), [nextFull, originalFull]);
   const isDirty = !!patch && Object.keys(patch).length > 0;
+  const profileSectionPatch = useMemo(() => pickSectionPatch(patch, "profile"), [patch]);
+  const modulesSectionPatch = useMemo(() => pickSectionPatch(patch, "modules"), [patch]);
+  const macrosSectionPatch = useMemo(() => pickSectionPatch(patch, "macros"), [patch]);
+  const scheduleSectionPatch = useMemo(() => pickSectionPatch(patch, "schedule"), [patch]);
+  const readingSectionPatch = useMemo(() => pickSectionPatch(patch, "reading"), [patch]);
 
   const update = useCallback((p: Partial<ProfileForm>) => {
     setSaved(false);
     setError(null);
+    setLastSavedSection(null);
+    setLastErroredSection(null);
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
   }, []);
 
@@ -120,19 +257,28 @@ export function ProfilePage() {
     return calculateMacros(Number(form.weight_kg), Number(form.height_cm), Number(form.age), form.sex, form.activity_level);
   }, [canCalc, form]);
 
-  const handleSave = useCallback(async () => {
-    if (!patch || Object.keys(patch).length === 0) return;
+  const handleSaveSection = useCallback(async (section: ProfileSectionKey) => {
+    const sectionPatch = pickSectionPatch(patch, section);
+    if (!sectionPatch || Object.keys(sectionPatch).length === 0) return;
+
     setError(null);
     setSaved(false);
+    setLastSavedSection(null);
+    setLastErroredSection(null);
+    setActiveSaveSection(section);
+
     try {
-      await saveProfileMutation.mutateAsync(patch);
+      await saveProfileMutation.mutateAsync(sectionPatch);
       setSaved(true);
-      void refetch();
+      setLastSavedSection(section);
     } catch (e) {
       console.error(e);
       setError("Could not save profile. Your previous saved values are still intact.");
+      setLastErroredSection(section);
+    } finally {
+      setActiveSaveSection(null);
     }
-  }, [patch, refetch, saveProfileMutation]);
+  }, [patch, saveProfileMutation]);
 
   const handleSaveAI = useCallback(async () => {
     setAiSaving(true);
@@ -152,6 +298,14 @@ export function ProfilePage() {
       setAiSaving(false);
     }
   }, [aiAboutMe, aiFocusAreas, aiGoalsSummary, aiLifestyleNotes, aiTone]);
+
+  const scrollToSection = useCallback((section: SettingsNavSection) => {
+    setActiveNavSection(section);
+    sectionRefs.current[section]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
 
   if (isAuthLoading) {
     return (
@@ -209,37 +363,41 @@ export function ProfilePage() {
           </p>
         </div>
         <div className="flex items-center gap-2 self-start">
-          {saved ? (
+          {saved && !isDirty ? (
             <div className="flex items-center gap-1 text-xs text-emerald-600"><Check className="h-4 w-4" /> Saved</div>
           ) : null}
-          <Button onClick={() => void handleSave()} disabled={!isDirty || saveProfileMutation.isPending} className="min-w-28 gap-2">
-            {saveProfileMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {saveProfileMutation.isPending ? "Saving…" : "Save changes"}
-          </Button>
         </div>
       </div>
 
-      <Card className="rounded-2xl border-dashed bg-muted/20 py-4 shadow-none">
-        <CardContent className="space-y-2 pt-0 text-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-medium text-foreground">Save status</p>
-            <span className="text-xs text-muted-foreground">
-              {saveProfileMutation.isPending
-                ? "Saving updates to your profile…"
-                : isDirty
-                  ? "You have unsaved changes."
-                  : "All changes are synced with your saved profile."}
-            </span>
-          </div>
-          <p className="text-muted-foreground">
-            Changes here update the same normalized profile data used during onboarding, so dashboard defaults stay aligned right away.
-          </p>
-          {error ? <p className="font-medium text-destructive">{error}</p> : null}
-        </CardContent>
-      </Card>
+      <div className="sticky top-14 z-20 -mx-4 border-y bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/75 lg:mx-0 lg:rounded-xl lg:border">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {SETTINGS_NAV_ITEMS.map((item) => (
+            <Button
+              key={item.id}
+              type="button"
+              variant={activeNavSection === item.id ? "default" : "outline"}
+              size="sm"
+              onClick={() => scrollToSection(item.id)}
+              className={cn(
+                "shrink-0 rounded-full",
+                activeNavSection !== item.id && "bg-background",
+              )}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      </div>
 
       <AIUsageDetailsCard />
 
+      <div
+        ref={(element) => {
+          sectionRefs.current.profile = element;
+        }}
+        data-settings-section="profile"
+        className="scroll-mt-36"
+      >
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">👤 Profile</CardTitle>
@@ -272,8 +430,39 @@ export function ProfilePage() {
             onActivityLevelChange={(value) => update({ activity_level: value })}
           />
         </CardContent>
+        <CardFooter className="flex flex-col items-start justify-between gap-3 border-t sm:flex-row sm:items-center">
+          <p className="text-xs text-muted-foreground">
+            {lastErroredSection === "profile" && error
+              ? error
+              : profileSectionPatch
+                ? "Save identity, body metrics, and preferences together."
+                : lastSavedSection === "profile"
+                  ? "Profile details are saved."
+                  : "No profile changes to save right now."}
+          </p>
+          <Button
+            onClick={() => void handleSaveSection("profile")}
+            disabled={!profileSectionPatch || saveProfileMutation.isPending}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {activeSaveSection === "profile" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {activeSaveSection === "profile"
+              ? "Saving…"
+              : lastSavedSection === "profile" && !profileSectionPatch
+                ? "Saved"
+                : "Save profile"}
+          </Button>
+        </CardFooter>
       </Card>
+      </div>
 
+      <div
+        ref={(element) => {
+          sectionRefs.current.modules = element;
+        }}
+        data-settings-section="modules"
+        className="scroll-mt-36"
+      >
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">🧩 Modules</CardTitle>
@@ -282,8 +471,39 @@ export function ProfilePage() {
         <CardContent>
           <ModulesSection value={form.enabled_modules} onChange={(next) => update({ enabled_modules: next })} />
         </CardContent>
+        <CardFooter className="flex flex-col items-start justify-between gap-3 border-t sm:flex-row sm:items-center">
+          <p className="text-xs text-muted-foreground">
+            {lastErroredSection === "modules" && error
+              ? error
+              : modulesSectionPatch
+                ? "Save your enabled modules when you're happy with this setup."
+                : lastSavedSection === "modules"
+                  ? "Modules are saved."
+                  : "No module changes to save right now."}
+          </p>
+          <Button
+            onClick={() => void handleSaveSection("modules")}
+            disabled={!modulesSectionPatch || saveProfileMutation.isPending}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {activeSaveSection === "modules" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {activeSaveSection === "modules"
+              ? "Saving…"
+              : lastSavedSection === "modules" && !modulesSectionPatch
+                ? "Saved"
+                : "Save modules"}
+          </Button>
+        </CardFooter>
       </Card>
+      </div>
 
+      <div
+        ref={(element) => {
+          sectionRefs.current.macros = element;
+        }}
+        data-settings-section="macros"
+        className="scroll-mt-36"
+      >
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">🥗 Macros</CardTitle>
@@ -302,8 +522,39 @@ export function ProfilePage() {
             }}
           />
         </CardContent>
+        <CardFooter className="flex flex-col items-start justify-between gap-3 border-t sm:flex-row sm:items-center">
+          <p className="text-xs text-muted-foreground">
+            {lastErroredSection === "macros" && error
+              ? error
+              : macrosSectionPatch
+                ? "Save your nutrition targets after recalculating or editing them."
+                : lastSavedSection === "macros"
+                  ? "Macros are saved."
+                  : "No macro changes to save right now."}
+          </p>
+          <Button
+            onClick={() => void handleSaveSection("macros")}
+            disabled={!macrosSectionPatch || saveProfileMutation.isPending}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {activeSaveSection === "macros" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {activeSaveSection === "macros"
+              ? "Saving…"
+              : lastSavedSection === "macros" && !macrosSectionPatch
+                ? "Saved"
+                : "Save macros"}
+          </Button>
+        </CardFooter>
       </Card>
+      </div>
 
+      <div
+        ref={(element) => {
+          sectionRefs.current.schedule = element;
+        }}
+        data-settings-section="schedule"
+        className="scroll-mt-36"
+      >
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">📅 Schedule</CardTitle>
@@ -339,8 +590,39 @@ export function ProfilePage() {
             </div>
           ))}
         </CardContent>
+        <CardFooter className="flex flex-col items-start justify-between gap-3 border-t sm:flex-row sm:items-center">
+          <p className="text-xs text-muted-foreground">
+            {lastErroredSection === "schedule" && error
+              ? error
+              : scheduleSectionPatch
+                ? "Save your weekly defaults so daily planning stays predictable."
+                : lastSavedSection === "schedule"
+                  ? "Schedule defaults are saved."
+                  : "No schedule changes to save right now."}
+          </p>
+          <Button
+            onClick={() => void handleSaveSection("schedule")}
+            disabled={!scheduleSectionPatch || saveProfileMutation.isPending}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {activeSaveSection === "schedule" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {activeSaveSection === "schedule"
+              ? "Saving…"
+              : lastSavedSection === "schedule" && !scheduleSectionPatch
+                ? "Saved"
+                : "Save schedule"}
+          </Button>
+        </CardFooter>
       </Card>
+      </div>
 
+      <div
+        ref={(element) => {
+          sectionRefs.current.reading = element;
+        }}
+        data-settings-section="reading"
+        className="scroll-mt-36"
+      >
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">📖 Reading</CardTitle>
@@ -366,7 +648,33 @@ export function ProfilePage() {
             <p className="text-xs text-destructive">{readingGoalError}</p>
           ) : null}
         </CardContent>
+        <CardFooter className="flex flex-col items-start justify-between gap-3 border-t sm:flex-row sm:items-center">
+          <p className="text-xs text-muted-foreground">
+            {lastErroredSection === "reading" && error
+              ? error
+              : readingGoalError
+                ? readingGoalError
+                : readingSectionPatch
+                  ? "Save your daily reading target when it feels right."
+                  : lastSavedSection === "reading"
+                    ? "Reading goal is saved."
+                    : "No reading changes to save right now."}
+          </p>
+          <Button
+            onClick={() => void handleSaveSection("reading")}
+            disabled={!readingSectionPatch || !!readingGoalError || saveProfileMutation.isPending}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {activeSaveSection === "reading" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {activeSaveSection === "reading"
+              ? "Saving…"
+              : lastSavedSection === "reading" && !readingSectionPatch
+                ? "Saved"
+                : "Save reading"}
+          </Button>
+        </CardFooter>
       </Card>
+      </div>
 
       <Link to="/app/achievements">
         <Card className="mb-6 cursor-pointer rounded-2xl border-amber-500/20 bg-amber-500/5 transition-all hover:bg-amber-500/10">
@@ -378,20 +686,28 @@ export function ProfilePage() {
         </Card>
       </Link>
 
-      <AISettingsSection
-        aiSaving={aiSaving}
-        aiAboutMe={aiAboutMe}
-        aiTone={aiTone}
-        aiGoalsSummary={aiGoalsSummary}
-        aiLifestyleNotes={aiLifestyleNotes}
-        aiFocusAreas={aiFocusAreas}
-        onAiAboutMeChange={setAiAboutMe}
-        onAiToneChange={setAiTone}
-        onAiGoalsSummaryChange={setAiGoalsSummary}
-        onAiLifestyleNotesChange={setAiLifestyleNotes}
-        onAiFocusAreasChange={setAiFocusAreas}
-        onSave={() => void handleSaveAI()}
-      />
+      <div
+        ref={(element) => {
+          sectionRefs.current.ai = element;
+        }}
+        data-settings-section="ai"
+        className="scroll-mt-36"
+      >
+        <AISettingsSection
+          aiSaving={aiSaving}
+          aiAboutMe={aiAboutMe}
+          aiTone={aiTone}
+          aiGoalsSummary={aiGoalsSummary}
+          aiLifestyleNotes={aiLifestyleNotes}
+          aiFocusAreas={aiFocusAreas}
+          onAiAboutMeChange={setAiAboutMe}
+          onAiToneChange={setAiTone}
+          onAiGoalsSummaryChange={setAiGoalsSummary}
+          onAiLifestyleNotesChange={setAiLifestyleNotes}
+          onAiFocusAreasChange={setAiFocusAreas}
+          onSave={() => void handleSaveAI()}
+        />
+      </div>
     </div>
   );
 }

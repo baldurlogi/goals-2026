@@ -14,14 +14,11 @@ import {
   Ellipsis,
   LayoutDashboard,
   LogOut,
-  Moon,
   Sparkles,
-  Sun,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/authContext";
-import { useTheme } from "@/app/providers/theme-context";
 import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import {
   ALL_MODULES,
@@ -79,7 +76,6 @@ type NavSection = {
 export function DailyPlanHeader() {
   const { pathname } = useLocation();
   const { user, signOut } = useAuth();
-  const { theme, toggle } = useTheme();
   const { modules } = useEnabledModules();
 
   const sections: NavSection[] = useMemo(() => {
@@ -242,23 +238,6 @@ export function DailyPlanHeader() {
         </DropdownMenu>
 
         <div className="flex-1" />
-
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={
-            theme === "dark"
-              ? "Switch to light mode"
-              : "Switch to dark mode"
-          }
-          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

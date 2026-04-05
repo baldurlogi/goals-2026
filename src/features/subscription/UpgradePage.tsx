@@ -25,7 +25,6 @@ import {
   FunctionsRelayError,
   FunctionsFetchError,
 } from "@supabase/supabase-js";
-import { AIUsageDetailsCard } from "@/features/subscription/AIUsageDetailsCard";
 import { capture } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import {
@@ -464,14 +463,15 @@ function ComparisonTable({ currentTier }: { currentTier: Tier }) {
 
 export function UpgradePage() {
   const tier = useTier();
+  const visibleCurrentTier: Tier = STRIPE_DISABLED ? "free" : tier;
   const [isYearly, setIsYearly] = useState(false);
 
   useEffect(() => {
     capture("subscription_page_viewed", {
-      current_tier: tier,
+      current_tier: visibleCurrentTier,
       route: "/app/upgrade",
     });
-  }, [tier]);
+  }, [visibleCurrentTier]);
   const [portalLoading, setPortalLoading] = useState(false);
 
   const params = new URLSearchParams(window.location.search);
@@ -584,21 +584,20 @@ export function UpgradePage() {
         </div>
       </div>
 
-      <AIUsageDetailsCard />
-
       <div className="grid gap-5 md:grid-cols-3">
         {PLANS.map((plan) => (
           <PlanCard
             key={plan.id}
             plan={plan}
-            isCurrent={tier === plan.id}
+            isCurrent={visibleCurrentTier === plan.id}
             isYearly={isYearly}
-            currentTier={tier}
+            currentTier={visibleCurrentTier}
           />
         ))}
       </div>
 
-      {(tier === "pro" || tier === "pro_max") && !STRIPE_DISABLED && (
+      {(visibleCurrentTier === "pro" || visibleCurrentTier === "pro_max") &&
+        !STRIPE_DISABLED && (
         <div className="flex justify-center">
           <button
             type="button"
@@ -618,7 +617,7 @@ export function UpgradePage() {
 
       <div className="space-y-4">
         <h2 className="text-center text-lg font-semibold">Full comparison</h2>
-        <ComparisonTable currentTier={tier} />
+        <ComparisonTable currentTier={visibleCurrentTier} />
       </div>
 
       <div className="space-y-4">

@@ -33,7 +33,7 @@ function SortButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
         active
           ? 'bg-foreground text-background'
           : 'text-muted-foreground hover:text-foreground'
@@ -187,16 +187,15 @@ export function GoalsPage() {
             </Button>
 
             <Button
-              variant="outline"
               onClick={() => setLocalModal('ai')}
-              className="w-full gap-2 sm:w-auto"
+              className="w-full gap-2 bg-violet-600 text-white hover:bg-violet-500 hover:text-white sm:w-auto"
             >
               <Sparkles className="h-4 w-4" /> Generate with AI
             </Button>
           </div>
 
           {goals.length > 0 && (
-            <div className="order-2 flex items-center gap-1 rounded-lg border bg-card p-1 sm:order-1">
+            <div className="order-2 flex items-center gap-1 rounded-xl border bg-card p-1 sm:order-1">
               <SortButton
                 active={sort === 'priority'}
                 onClick={() => setSort('priority')}
@@ -228,9 +227,8 @@ export function GoalsPage() {
           </div>
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Button
-              variant="outline"
               onClick={() => setLocalModal('ai')}
-              className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary sm:w-auto"
+              className="w-full gap-2 bg-violet-600 text-white hover:bg-violet-500 hover:text-white sm:w-auto"
             >
               <Sparkles className="h-4 w-4" /> Generate with AI
             </Button>

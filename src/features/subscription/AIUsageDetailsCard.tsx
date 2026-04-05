@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   defaultMonthlyLimitForTier,
-  getAIUsageResetLabel,
   useAIUsageSnapshotState,
 } from "@/features/subscription/aiUsageCache";
 import { TIER_BADGE, TIER_LABELS, useTier } from "@/features/subscription/useTier";
@@ -54,7 +53,7 @@ export function AIUsageDetailsCard({ className }: Props) {
             <div>
               <CardTitle className="text-base">AI usage</CardTitle>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Your monthly AI prompt allowance and current usage.
+                Your monthly AI prompt allowance and current usage. Resets on the 1st of each month.
               </p>
             </div>
           </div>
@@ -149,7 +148,6 @@ export function AIUsageDetailsCard({ className }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span>{getAIUsageResetLabel()}</span>
 
           {tier !== "pro_max" &&
             (PAID_PLANS_COMING_SOON ? (

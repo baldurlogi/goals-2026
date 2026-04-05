@@ -373,7 +373,3 @@ export function useAIUsageSnapshotState(expectedTier?: Tier) {
 export function useAIUsageSnapshot(expectedTier?: Tier) {
   return useAIUsageSnapshotState(expectedTier).snapshot;
 }
-
-export function getAIUsageResetLabel() {
-  return "Resets on the 1st of each month";
-}

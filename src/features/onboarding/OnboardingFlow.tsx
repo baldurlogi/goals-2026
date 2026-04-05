@@ -250,31 +250,11 @@ export function OnboardingFlow({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-dashed bg-muted/20 py-4 shadow-none">
-          <CardContent className="space-y-2 pt-0 text-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium text-foreground">Save status</p>
-              <span
-                className={cn(
-                  "text-xs",
-                  saving ? "text-primary" : "text-muted-foreground",
-                )}
-              >
-                {saving
-                  ? "Saving your onboarding details…"
-                  : "Everything is saved together when you finish setup."}
-              </span>
-            </div>
-            <p className="text-muted-foreground">
-              After setup, your dashboard will open with your profile and selected
-              modules ready. Your first goal can be created from the dashboard when
-              you are ready.
-            </p>
-            {error ? (
-              <p className="text-sm font-medium text-destructive">{error}</p>
-            ) : null}
-          </CardContent>
-        </Card>
+        {error ? (
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive">
+            {error}
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-between gap-3">
           <Button
