@@ -1,7 +1,15 @@
 import { getAISystemContext } from "@/features/ai/buildAIContext";
 import { loadRecentSleepRecoveryEntries } from "@/features/sleep/sleepStorage";
 import { writeAIUsageCache } from "@/features/subscription/aiUsageCache";
+import {
+  AI_ACTION_CREDIT_COSTS,
+  BETA_MONTHLY_AI_CREDITS,
+  coerceAIUsage as coerceAIUsagePayload,
+  type AILimitPayload,
+  type AIUsage,
+} from "@/features/subscription/aiCredits";
 import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
+import { capture } from "@/lib/analytics";
 import { DAY_KEYS, REST_LABELS } from "./constants";
 import { getWeekStartISO } from "./date";
 import type {
@@ -13,31 +21,15 @@ import { loadWeeklySplit, todayDayKey } from "./weeklySplitStorage";
 
 const EDGE_FN_URL = getSupabaseFunctionUrl("hyper-responder");
 
-export type AIUsage = {
-  prompts_used: number;
-  monthly_limit: number;
-  remaining: number;
-  tier: string;
-};
-
-type AILimitPayload = {
-  error: "monthly_limit_reached";
-  message: string;
-  tier: string;
-  monthly_limit: number;
-  prompts_used: number;
-  upgrade_required: boolean;
-};
-
 export class AILimitError extends Error {
   tier: string;
   limit: number;
 
   constructor(payload: AILimitPayload) {
-    super(payload.message);
+    super(payload.message ?? "Monthly AI credit limit reached.");
     this.name = "AILimitError";
-    this.tier = payload.tier;
-    this.limit = payload.monthly_limit;
+    this.tier = typeof payload.tier === "string" ? payload.tier : "free";
+    this.limit = payload.monthly_limit ?? BETA_MONTHLY_AI_CREDITS;
   }
 }
 
@@ -116,6 +108,16 @@ export async function generateFitnessWeeklyPlanFromAI(
 
   const usage = coerceAIUsage(data.usage);
   writeAIUsageCache(usage);
+  capture("ai_credits_used", {
+    feature: "fitness_weekly_plan",
+    source: "fitness_weekly_plan",
+    route: window.location.pathname,
+    credits_used: usage.credits_used,
+    monthly_limit: usage.monthly_limit,
+    remaining: usage.remaining,
+    credits_cost: usage.credits_cost ?? AI_ACTION_CREDIT_COSTS.fitnessWeeklyPlan,
+    tier: usage.tier,
+  });
 
   return {
     plan: coerceGeneratedPlan(
@@ -466,29 +468,13 @@ function readEdgeFunctionError(status: number, raw: string): string {
 }
 
 function coerceAIUsage(value: unknown): AIUsage {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {
-      prompts_used: 1,
-      monthly_limit: 10,
-      remaining: 9,
-      tier: "free",
-    };
-  }
-
-  const record = value as Record<string, unknown>;
-
-  return {
-    prompts_used:
-      typeof record.prompts_used === "number" ? record.prompts_used : 1,
-    monthly_limit:
-      typeof record.monthly_limit === "number" ? record.monthly_limit : 10,
-    remaining:
-      typeof record.remaining === "number" ? record.remaining : 9,
-    tier:
-      typeof record.tier === "string" && record.tier.trim()
-        ? record.tier
-        : "free",
-  };
+  return coerceAIUsagePayload(value, {
+    credits_used: AI_ACTION_CREDIT_COSTS.fitnessWeeklyPlan,
+    monthly_limit: BETA_MONTHLY_AI_CREDITS,
+    remaining: BETA_MONTHLY_AI_CREDITS - AI_ACTION_CREDIT_COSTS.fitnessWeeklyPlan,
+    tier: "free",
+    credits_cost: AI_ACTION_CREDIT_COSTS.fitnessWeeklyPlan,
+  });
 }
 
 function coerceGeneratedPlan(

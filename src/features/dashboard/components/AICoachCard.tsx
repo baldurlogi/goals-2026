@@ -11,8 +11,19 @@ import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { useAIUsage } from "@/features/subscription/useAIUsage";
 import { writeAIUsageCache } from "@/features/subscription/aiUsageCache";
+import {
+  AI_ACTION_CREDIT_COSTS,
+  formatCreditCost,
+  coerceAIUsage,
+} from "@/features/subscription/aiCredits";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
 import { capture } from "@/lib/analytics";
+import {
+  getActiveUserId,
+  getScopedStorageItem,
+  removeScopedStorageItem,
+  writeScopedStorageItem,
+} from "@/lib/activeUser";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
@@ -28,6 +39,11 @@ type CacheEntry = {
   builtAt: number;
 };
 
+type CompletedSuggestionEntry = {
+  suggestion: CoachSuggestion;
+  completedAt: number;
+};
+
 class AIUsageLimitError extends Error {
   constructor(message: string) {
     super(message);
@@ -38,6 +54,7 @@ class AIUsageLimitError extends Error {
 const CACHE_KEY        = "cache:ai-coach:v1";
 const LAST_MODULE_KEY  = "cache:ai-coach:last-module";
 const LAST_SESSION_KEY = "cache:ai-coach:last-session:v1";
+const COMPLETED_SUGGESTION_KEY = "cache:ai-coach:completed:v1";
 const CACHE_TTL        = 60 * 60 * 1000;
 const SUPABASE_FN      = getSupabaseFunctionUrl("hyper-responder");
 
@@ -78,6 +95,75 @@ function readLastSession(): LastSession | null {
   } catch { return null; }
 }
 
+function suggestionSignature(suggestion: CoachSuggestion): string {
+  return [
+    suggestion.action.trim().toLowerCase(),
+    suggestion.reason.trim().toLowerCase(),
+    suggestion.href.trim().toLowerCase(),
+    (suggestion.module ?? "").trim().toLowerCase(),
+  ].join("::");
+}
+
+function readCompletedSuggestion(): CompletedSuggestionEntry | null {
+  const userId = getActiveUserId();
+  if (!userId) return null;
+
+  try {
+    const raw = getScopedStorageItem(COMPLETED_SUGGESTION_KEY, userId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CompletedSuggestionEntry>;
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !parsed.suggestion ||
+      typeof parsed.completedAt !== "number"
+    ) {
+      return null;
+    }
+
+    const suggestion = parsed.suggestion as CoachSuggestion;
+    if (!suggestion.action || !suggestion.href || !suggestion.reason || !suggestion.emoji) {
+      return null;
+    }
+
+    return {
+      suggestion,
+      completedAt: parsed.completedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCompletedSuggestion(suggestion: CoachSuggestion) {
+  const userId = getActiveUserId();
+  if (!userId) return;
+
+  try {
+    writeScopedStorageItem(
+      COMPLETED_SUGGESTION_KEY,
+      userId,
+      JSON.stringify({
+        suggestion,
+        completedAt: Date.now(),
+      } satisfies CompletedSuggestionEntry),
+    );
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function clearCompletedSuggestion() {
+  const userId = getActiveUserId();
+  if (!userId) return;
+
+  try {
+    removeScopedStorageItem(COMPLETED_SUGGESTION_KEY, userId);
+  } catch {
+    // ignore storage failures
+  }
+}
+
 // ── Fetch from edge function ──────────────────────────────────────────────────
 
 async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
@@ -109,7 +195,7 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
       throw new Error(data.message ?? "Too many requests. Please wait a moment.");
     }
     throw new AIUsageLimitError(
-      data.message ?? "Monthly AI limit reached. Upgrade for more AI suggestions.",
+      data.message ?? "Monthly AI credit limit reached. Your balance resets on the 1st.",
     );
   }
 
@@ -121,15 +207,23 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   const data = await res.json();
 
   if (data.usage) {
-    writeAIUsageCache(data.usage);
-    capture("ai_prompt_used", {
+    const usage = coerceAIUsage(data.usage, {
+      credits_used: AI_ACTION_CREDIT_COSTS.coachSuggestion,
+      monthly_limit: 1000,
+      remaining: 1000 - AI_ACTION_CREDIT_COSTS.coachSuggestion,
+      tier: "free",
+      credits_cost: AI_ACTION_CREDIT_COSTS.coachSuggestion,
+    });
+    writeAIUsageCache(usage);
+    capture("ai_credits_used", {
       feature: "coach_refresh",
       source: "ai_coach_card",
       route: window.location.pathname,
-      prompts_used: data.usage.prompts_used,
-      monthly_limit: data.usage.monthly_limit,
-      remaining: data.usage.remaining,
-      tier: data.usage.tier,
+      credits_used: usage.credits_used,
+      monthly_limit: usage.monthly_limit,
+      remaining: usage.remaining,
+      credits_cost: usage.credits_cost ?? AI_ACTION_CREDIT_COSTS.coachSuggestion,
+      tier: usage.tier,
     });
   }
 
@@ -331,7 +425,7 @@ function UsagePill() {
           />
         </div>
         <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
-          {used}/{limit} prompts
+          {used}/{limit} credits
         </span>
       </div>
 
@@ -340,7 +434,7 @@ function UsagePill() {
           to="/app/upgrade"
           className="shrink-0 text-[10px] font-medium text-violet-400 hover:text-violet-300 transition-colors"
         >
-          Upgrade →
+          Pricing preview →
         </Link>
       )}
     </div>
@@ -356,8 +450,20 @@ function AICoachCardInner() {
   const [isAI, setIsAI]             = useState(false);
   const [limitHit, setLimitHit]     = useState(false);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const [completedSuggestion, setCompletedSuggestion] =
+    useState<CompletedSuggestionEntry | null>(() => readCompletedSuggestion());
+
+  const isCompleted =
+    Boolean(
+      suggestion &&
+      completedSuggestion &&
+      suggestionSignature(suggestion) ===
+        suggestionSignature(completedSuggestion.suggestion),
+    );
 
   const loadStatic = useCallback(async () => {
+    clearCompletedSuggestion();
+    setCompletedSuggestion(null);
     setLoading(true);
     setError(null);
     setIsAI(false);
@@ -376,6 +482,8 @@ function AICoachCardInner() {
   }, []);
 
   const loadAI = useCallback(async () => {
+    clearCompletedSuggestion();
+    setCompletedSuggestion(null);
     setLoading(true);
     setError(null);
     setLimitHit(false);
@@ -399,14 +507,36 @@ function AICoachCardInner() {
   }, []);
 
   useEffect(() => {
+    if (completedSuggestion) {
+      setSuggestion(completedSuggestion.suggestion);
+      setLoading(false);
+      return;
+    }
+
     void loadStatic();
     const handleReadingChanged = () => { clearCache(); void loadStatic(); };
     window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
     return () => window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
-  }, [loadStatic]);
+  }, [completedSuggestion, loadStatic]);
 
   function handleRefresh() {
     clearCache();
+    void loadAI();
+  }
+
+  function handleMarkCompleted() {
+    if (!suggestion) return;
+    writeCompletedSuggestion(suggestion);
+    setCompletedSuggestion({
+      suggestion,
+      completedAt: Date.now(),
+    });
+  }
+
+  function handleGenerateNextMove() {
+    clearCache();
+    clearCompletedSuggestion();
+    setCompletedSuggestion(null);
     void loadAI();
   }
 
@@ -468,24 +598,70 @@ function AICoachCardInner() {
           />
         )}
 
-        {suggestion && (
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-2xl">
-              {suggestion.emoji}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-semibold leading-snug">
-                {loading ? <span className="text-muted-foreground">Refreshing…</span> : suggestion.action}
-              </p>
-              {suggestion.reason && !loading && (
-                <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{suggestion.reason}</p>
+        {suggestion && !isCompleted && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-2xl">
+                {suggestion.emoji}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold leading-snug">
+                  {loading ? <span className="text-muted-foreground">Refreshing…</span> : suggestion.action}
+                </p>
+                {suggestion.reason && !loading && (
+                  <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{suggestion.reason}</p>
+                )}
+              </div>
+              {!loading && (
+                <Button asChild size="sm" className="shrink-0 gap-1.5">
+                  <Link to={suggestion.href}>Go <ArrowRight className="h-3.5 w-3.5" /></Link>
+                </Button>
               )}
             </div>
+
             {!loading && (
-              <Button asChild size="sm" className="shrink-0 gap-1.5">
-                <Link to={suggestion.href}>Go <ArrowRight className="h-3.5 w-3.5" /></Link>
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMarkCompleted}
+                >
+                  Completed it
+                </Button>
+              </div>
             )}
+          </div>
+        )}
+
+        {suggestion && isCompleted && (
+          <div className="space-y-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-2xl">
+                {suggestion.emoji}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">
+                  You completed your last move
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Nice work. Your last completed step was <span className="font-medium text-foreground">{suggestion.action}</span>.
+                  Generate another suggestion only when you want to spend the next {formatCreditCost(AI_ACTION_CREDIT_COSTS.coachSuggestion)}.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleGenerateNextMove}
+                className="gap-1.5"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Generate next move
+              </Button>
+            </div>
           </div>
         )}
 
@@ -493,7 +669,14 @@ function AICoachCardInner() {
         <div className="mt-2 border-t border-border/40 pt-3">
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground/40 mb-1.5">
             <Zap className="h-2.5 w-2.5" />
-            <span>{isAI ? "AI-powered suggestion" : "Smart suggestion · hit ↻ for AI"} · uses your goals, fitness, reading & nutrition data</span>
+            <span>
+              {isCompleted
+                ? `Next move completed · generating another uses ${formatCreditCost(AI_ACTION_CREDIT_COSTS.coachSuggestion)}`
+                : isAI
+                  ? `AI-powered suggestion · refresh uses ${formatCreditCost(AI_ACTION_CREDIT_COSTS.coachSuggestion)}`
+                  : "Smart suggestion · hit ↻ for AI"}
+              {" "}· uses your goals, fitness, reading & nutrition data
+            </span>
           </div>
           <UsagePill />
         </div>

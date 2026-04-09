@@ -629,8 +629,8 @@ export function UpgradePage() {
               a: "Yes — cancel anytime with no questions asked. You'll keep Pro access until the end of your billing period.",
             },
             {
-              q: "What counts as an AI prompt?",
-              a: "Each AI action uses one prompt: generating a goal, getting a coach suggestion, improving a goal plan, or receiving a weekly report.",
+              q: "What counts as an AI credit?",
+              a: "Goal generation uses 3 credits, goal improvement uses 2, coach suggestions use 1, and weekly reports use 4.",
             },
             {
               q: "What happens when I hit my limit?",

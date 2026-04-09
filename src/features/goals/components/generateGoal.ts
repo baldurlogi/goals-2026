@@ -1,16 +1,15 @@
 import { getSupabaseFunctionUrl, supabase } from '@/lib/supabaseClient';
 import { writeAIUsageCache } from '@/features/subscription/aiUsageCache';
+import {
+  AI_ACTION_CREDIT_COSTS,
+  BETA_MONTHLY_AI_CREDITS,
+  coerceAIUsage,
+  type AILimitPayload,
+  type AIUsage,
+} from '@/features/subscription/aiCredits';
 import { getAISystemContext } from '@/features/ai/buildAIContext';
 import { createBlankGoal, createBlankStep } from '../userGoalStorage';
 import { type UserGoal } from '@/features/goals/goalTypes';
-// ── Types ─────────────────────────────────────────────────────────────────
-
-export type AIUsage = {
-  prompts_used: number;
-  monthly_limit: number;
-  remaining: number;
-  tier: string;
-};
 
 export type ClarifyingQuestion = {
   id: string;
@@ -19,23 +18,14 @@ export type ClarifyingQuestion = {
   placeholder?: string;
 };
 
-type AILimitPayload = {
-  error: 'monthly_limit_reached';
-  message: string;
-  tier: string;
-  monthly_limit: number;
-  prompts_used: number;
-  upgrade_required: boolean;
-};
-
 export class AILimitError extends Error {
   tier: string;
   limit: number;
   constructor(payload: AILimitPayload) {
-    super(payload.message);
+    super(payload.message ?? 'Monthly AI credit limit reached.');
     this.name = 'AILimitError';
-    this.tier = payload.tier;
-    this.limit = payload.monthly_limit;
+    this.tier = typeof payload.tier === 'string' ? payload.tier : 'free';
+    this.limit = payload.monthly_limit ?? BETA_MONTHLY_AI_CREDITS;
   }
 }
 
@@ -140,7 +130,13 @@ export async function generateGoalFromPrompt(
           links: [],
         })),
       },
-      usage: { prompts_used: 1, monthly_limit: 10, remaining: 9, tier: 'free' },
+      usage: {
+        credits_used: AI_ACTION_CREDIT_COSTS.goalGeneration,
+        monthly_limit: BETA_MONTHLY_AI_CREDITS,
+        remaining: BETA_MONTHLY_AI_CREDITS - AI_ACTION_CREDIT_COSTS.goalGeneration,
+        tier: 'free',
+        credits_cost: AI_ACTION_CREDIT_COSTS.goalGeneration,
+      },
     };
   }
 
@@ -209,12 +205,13 @@ export async function generateGoalFromPrompt(
   }
 
   const result = (data.goal ?? data) as Record<string, unknown>;
-  const usage = (data.usage ?? {
-    prompts_used: 1,
-    monthly_limit: 10,
-    remaining: 9,
+  const usage = coerceAIUsage(data.usage, {
+    credits_used: AI_ACTION_CREDIT_COSTS.goalGeneration,
+    monthly_limit: BETA_MONTHLY_AI_CREDITS,
+    remaining: BETA_MONTHLY_AI_CREDITS - AI_ACTION_CREDIT_COSTS.goalGeneration,
     tier: 'free',
-  }) as AIUsage;
+    credits_cost: AI_ACTION_CREDIT_COSTS.goalGeneration,
+  });
 
   const blank = createBlankGoal();
   const goal: UserGoal = {

@@ -175,11 +175,22 @@ type RequestBody = GenerateGoalRequest & {
 };
 
 type UsageReservation = {
-  prompts_used: number;
+  credits_used: number;
   monthly_limit: number;
   remaining: number;
   tier: string;
   allowed: boolean;
+  credits_cost?: number;
+};
+
+const BETA_MONTHLY_AI_CREDITS = 1000;
+
+const ACTION_CREDIT_COSTS: Record<ChargedAction, number> = {
+  goal: 3,
+  coach: 1,
+  improve: 2,
+  "weekly-report": 4,
+  "fitness-plan": 4,
 };
 
 function actionNeedsAnthropic(
@@ -234,10 +245,11 @@ type FitnessPlannerOutput = {
 };
 
 function monthlyLimitForTier(tier: string): number {
-  if (tier === "free") return 200;
-  if (tier === "pro") return 200;
-  if (tier === "pro_max") return 1000;
-  return 10;
+  if (tier === "free" || tier === "pro" || tier === "pro_max") {
+    return BETA_MONTHLY_AI_CREDITS;
+  }
+
+  return BETA_MONTHLY_AI_CREDITS;
 }
 
 function tierHasBetaProAccess(tier: string): boolean {
@@ -257,6 +269,17 @@ function normalizeText(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function serializeUsageReservation(usage: UsageReservation) {
+  return {
+    credits_used: usage.credits_used,
+    prompts_used: usage.credits_used,
+    monthly_limit: usage.monthly_limit,
+    remaining: usage.remaining,
+    tier: usage.tier,
+    credits_cost: usage.credits_cost,
+  };
 }
 
 function normalizeStringArray(value: unknown): string[] {
@@ -948,22 +971,22 @@ Deno.serve(async (req: Request) => {
 
         if (error) continue;
 
-        const prompts_used =
+        const credits_used =
           typeof data?.prompts_used === "number"
             ? Math.max(0, Number(data.prompts_used))
             : 0;
 
         return {
-          prompts_used,
+          credits_used,
           monthly_limit,
-          remaining: Math.max(0, monthly_limit - prompts_used),
+          remaining: Math.max(0, monthly_limit - credits_used),
           tier,
-          allowed: prompts_used < monthly_limit,
+          allowed: credits_used < monthly_limit,
         };
       }
 
       return {
-        prompts_used: 0,
+        credits_used: 0,
         monthly_limit,
         remaining: monthly_limit,
         tier,
@@ -971,48 +994,72 @@ Deno.serve(async (req: Request) => {
       };
     }
 
-    async function reservePrompt(): Promise<UsageReservation> {
-      const { data, error } = await supabase.rpc("reserve_ai_prompt", {
-        p_user_id: user.id,
-        p_month: month,
-      });
-
-      if (error) {
-        throw new Error(`Failed to reserve AI prompt: ${error.message}`);
+    async function reserveCredits(creditsCost: number): Promise<UsageReservation> {
+      const currentUsage = await readCurrentUsage();
+      if (currentUsage.remaining < creditsCost) {
+        return {
+          ...currentUsage,
+          allowed: false,
+          credits_cost: creditsCost,
+        };
       }
 
-      const row = Array.isArray(data) ? data[0] : data;
+      let latestRow: Record<string, unknown> | null = null;
 
-      if (!row) {
-        throw new Error("Failed to reserve AI prompt: empty response");
+      for (let index = 0; index < creditsCost; index += 1) {
+        const { data, error } = await supabase.rpc("reserve_ai_prompt", {
+          p_user_id: user.id,
+          p_month: month,
+        });
+
+        if (error) {
+          throw new Error(`Failed to reserve AI credits: ${error.message}`);
+        }
+
+        const row = Array.isArray(data) ? data[0] : data;
+
+        if (!row || typeof row !== "object") {
+          throw new Error("Failed to reserve AI credits: empty response");
+        }
+
+        latestRow = row as Record<string, unknown>;
       }
 
-      const prompts_used = Number(row.prompts_used ?? 0);
+      const credits_used = Number(latestRow?.prompts_used ?? 0);
       const monthly_limit = monthlyLimitForTier(tier);
 
       return {
-        prompts_used,
+        credits_used,
         monthly_limit,
-        remaining: Math.max(0, monthly_limit - prompts_used),
+        remaining: Math.max(0, monthly_limit - credits_used),
         tier,
-        allowed: prompts_used < monthly_limit,
+        allowed: credits_used <= monthly_limit,
+        credits_cost: creditsCost,
       };
     }
 
     async function reserveChargedActionOrReturn(
       chargedAction: ChargedAction,
     ): Promise<{ usage: UsageReservation } | { response: Response }> {
-      const usage = await reservePrompt();
+      const creditsCost = ACTION_CREDIT_COSTS[chargedAction];
+      const usage = await reserveCredits(creditsCost);
 
       if (!usage.allowed) {
+        const message =
+          usage.remaining > 0
+            ? `${chargedAction === "coach" ? "This coach suggestion" : "This AI action"} needs ${creditsCost} credits, but only ${usage.remaining} remain this month.`
+            : `You've used all ${usage.monthly_limit} AI credits for this month on the ${usage.tier} plan.`;
+
         return {
           response: jsonResponse(
             {
               error: "monthly_limit_reached",
-              message: `You've used all ${usage.monthly_limit} AI prompts for this month on the ${usage.tier} plan.`,
-              prompts_used: usage.prompts_used,
+              message,
+              credits_used: usage.credits_used,
+              prompts_used: usage.credits_used,
               monthly_limit: usage.monthly_limit,
               tier: usage.tier,
+              credits_cost: creditsCost,
               upgrade_required: usage.tier !== "pro_max",
               action: chargedAction,
             },
@@ -1460,14 +1507,14 @@ Rules:
           normalizedPlan,
           exerciseCandidateContext.items,
         ),
-        usage,
+        usage: serializeUsageReservation(usage),
       });
     }
 
     // ── USAGE action (no usage charge) ───────────────────────────────────
     if (action === "usage") {
       const usage = await readCurrentUsage();
-      return jsonResponse({ usage });
+      return jsonResponse({ usage: serializeUsageReservation(usage) });
     }
 
     // ── COACH action ──────────────────────────────────────────────────────
@@ -1539,7 +1586,7 @@ Rules:
 
       return jsonResponse({
         suggestion: parsed.value,
-        usage,
+        usage: serializeUsageReservation(usage),
       });
     }
 
@@ -1664,7 +1711,7 @@ Rules:
 
       return jsonResponse({
         improved: parsed.value,
-        usage,
+        usage: serializeUsageReservation(usage),
       });
     }
 
@@ -1857,7 +1904,7 @@ Rules:
       return jsonResponse({
         report: parsed.value,
         weekStart: d.weekStart,
-        usage,
+        usage: serializeUsageReservation(usage),
       });
     }
 
@@ -2006,7 +2053,7 @@ PERSONALISATION: If userContext or follow-up answers are provided above, tailor 
 
     return jsonResponse({
       goal: parsedGoal,
-      usage,
+      usage: serializeUsageReservation(usage),
     });
   } catch (error) {
     return jsonResponse(

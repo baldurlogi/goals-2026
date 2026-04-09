@@ -17,11 +17,15 @@ import { useAuth } from "@/features/auth/authContext";
 import { capture, captureOnce } from "@/lib/analytics";
 import { seedGoalCache } from "../userGoalStorage";
 import {
+  AI_ACTION_CREDIT_COSTS,
+  formatCreditCost,
+  type AIUsage,
+} from "@/features/subscription/aiCredits";
+import {
   generateGoalFromPrompt,
   getClarifyingQuestions,
   AILimitError,
   PROMPT_EXAMPLES,
-  type AIUsage,
   type ClarifyingQuestion,
 } from "./generateGoal";
 
@@ -88,14 +92,15 @@ export function AIPromptScreen({
         finalAnswers,
       );
 
-      capture("ai_prompt_used", {
+      capture("ai_credits_used", {
         feature: "goal_generation",
         source: "goal_ai_prompt",
         route: window.location.pathname,
         had_clarifying_questions: Object.keys(finalAnswers).length > 0,
-        prompts_used: u.prompts_used,
+        credits_used: u.credits_used,
         monthly_limit: u.monthly_limit,
         remaining: u.remaining,
+        credits_cost: u.credits_cost ?? AI_ACTION_CREDIT_COSTS.goalGeneration,
         tier: u.tier,
       });
 
@@ -290,7 +295,7 @@ export function AIPromptScreen({
           )}
 
           <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            Uses 1 AI prompt
+            Uses {formatCreditCost(AI_ACTION_CREDIT_COSTS.goalGeneration)}
             {usage && (
               <>
                 {" "}
@@ -393,7 +398,7 @@ export function AIPromptScreen({
         )}
 
         <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          Uses 1 AI prompt · Claude will turn this into ordered steps with “done
+          Uses {formatCreditCost(AI_ACTION_CREDIT_COSTS.goalGeneration)} · Claude will turn this into ordered steps with “done
           when” criteria.
         </div>
 
@@ -402,13 +407,13 @@ export function AIPromptScreen({
             <Sparkles className="h-3 w-3 shrink-0 text-primary" />
             <span>
               <span className="font-semibold text-foreground">{usage.remaining}</span>{" "}
-              AI prompts remaining this month
+              AI credits remaining this month
               {usage.tier !== "pro_max" && (
                 <>
                   {" "}
                   ·{" "}
                   <Link to="/app/upgrade" className="underline hover:text-foreground">
-                    Upgrade for more
+                    Pricing preview
                   </Link>
                 </>
               )}

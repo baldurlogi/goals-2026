@@ -73,6 +73,9 @@ export function TermsPage() {
           <p className="mb-3">
             {APP_NAME} offers the following plans:
           </p>
+          <p className="mb-4 text-sm text-muted-foreground">
+            During the current beta, all users receive 1,000 AI credits per month and access to all live features while paid plans remain in preview.
+          </p>
           <div className="space-y-3">
             <PlanRow name="Free" price="€0/month" features="10 AI credits per month, all core tracking features" />
             <PlanRow name="Pro" price="€9/month" features="200 AI credits per month, AI Weekly Report, AI Goal Optimisation" />
@@ -100,7 +103,7 @@ export function TermsPage() {
             <li>AI-generated content is for informational and motivational purposes only.</li>
             <li>AI output does not constitute medical, nutritional, financial, or professional advice.</li>
             <li>AI responses may occasionally be inaccurate — always use your own judgment.</li>
-            <li>AI prompts are limited per month based on your plan. Unused prompts do not roll over.</li>
+            <li>AI credits are limited per month based on your plan. Unused credits do not roll over.</li>
           </ul>
         </Section>
 
@@ -135,7 +138,7 @@ export function TermsPage() {
 
         <Section title="7. Intellectual Property">
           <p>
-            The {APP_NAME} application, including its design, code, branding, and AI prompts, is owned
+            The {APP_NAME} application, including its design, code, branding, and AI prompt templates, is owned
             by {CONTROLLER} and protected by copyright and other intellectual property laws. You may not
             copy, reproduce, or create derivative works without our express written permission.
           </p>

@@ -79,7 +79,7 @@ export function PrivacyPage() {
           </SubSection>
           <SubSection title="Usage data">
             <p>
-              We count the number of AI prompts you use per month to enforce plan limits. If you have
+              We count the number of AI credits you use per month to enforce plan limits. If you have
               analytics enabled, we collect anonymous, aggregated page-view data (no personal identifiers)
               via Plausible Analytics.
             </p>

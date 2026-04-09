@@ -23,7 +23,7 @@ export function useAIUsage(): AIUsageState {
   const snapshot = useAIUsageSnapshot();
 
   const limit = snapshot?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
-  const used = snapshot?.promptsUsed ?? 0;
+  const used = snapshot?.creditsUsed ?? 0;
   const remaining = snapshot?.remaining ?? limit;
   const pct = Math.min(100, Math.round((used / limit) * 100));
 

@@ -12,12 +12,13 @@ import {
   type Tier,
 } from "./useTier";
 import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
+import { BETA_MONTHLY_AI_CREDITS } from "./aiCredits";
 
 export type AIUsageSnapshot = {
   monthKey: string;
   tier: Tier;
   monthlyLimit: number;
-  promptsUsed: number;
+  creditsUsed: number;
   remaining: number;
   updatedAt: number;
 };
@@ -26,6 +27,8 @@ type UsageLike = {
   tier?: unknown;
   monthly_limit?: number;
   monthlyLimit?: number;
+  credits_used?: number;
+  creditsUsed?: number;
   prompts_used?: number;
   promptsUsed?: number;
   remaining?: number;
@@ -40,6 +43,8 @@ function isUsageLike(value: unknown): value is UsageLike {
     "tier" in record ||
     "monthly_limit" in record ||
     "monthlyLimit" in record ||
+    "credits_used" in record ||
+    "creditsUsed" in record ||
     "prompts_used" in record ||
     "promptsUsed" in record ||
     "remaining" in record
@@ -65,14 +70,6 @@ function coerceTier(value: unknown): Tier | null {
   return null;
 }
 
-function inferTierFromMonthlyLimit(monthlyLimit: number | null): Tier | null {
-  if (monthlyLimit === null) return null;
-  if (monthlyLimit >= 1000) return "pro_max";
-  if (monthlyLimit >= 200) return "pro";
-  if (monthlyLimit >= 1) return "free";
-  return null;
-}
-
 function resolveTier(
   input: UsageLike,
   existingSnapshot: AIUsageSnapshot | null,
@@ -80,12 +77,6 @@ function resolveTier(
 ): Tier {
   return (
     coerceTier(input.tier) ??
-    inferTierFromMonthlyLimit(
-      typeof (input.monthlyLimit ?? input.monthly_limit) === "number" &&
-        Number.isFinite(input.monthlyLimit ?? input.monthly_limit)
-        ? Math.max(1, Number(input.monthlyLimit ?? input.monthly_limit))
-        : null,
-    ) ??
     existingSnapshot?.tier ??
     fallbackTier ??
     "free"
@@ -94,10 +85,11 @@ function resolveTier(
 
 export function defaultMonthlyLimitForTier(tier: Tier): number {
   const effectiveTier = effectiveTierForFeatureAccess(tier);
+  if (effectiveTier === "free" || effectiveTier === "pro" || effectiveTier === "pro_max") {
+    return BETA_MONTHLY_AI_CREDITS;
+  }
 
-  if (effectiveTier === "pro") return 200;
-  if (effectiveTier === "pro_max") return 1000;
-  return 10;
+  return BETA_MONTHLY_AI_CREDITS;
 }
 
 function emitUsageUpdated() {
@@ -124,35 +116,33 @@ export function readAIUsageCache(): AIUsageSnapshot | null {
       return null;
     }
 
-    const parsedTier =
-      coerceTier(parsed.tier) ??
-      inferTierFromMonthlyLimit(
-        typeof parsed.monthlyLimit === "number" && Number.isFinite(parsed.monthlyLimit)
-          ? Math.max(1, parsed.monthlyLimit)
-          : null,
-      ) ??
-      "free";
+    const parsedTier = coerceTier(parsed.tier) ?? "free";
 
-    const monthlyLimit =
+    const monthlyLimit = Math.max(
+      defaultMonthlyLimitForTier(parsedTier),
       typeof parsed.monthlyLimit === "number" && Number.isFinite(parsed.monthlyLimit)
         ? Math.max(1, parsed.monthlyLimit)
-        : defaultMonthlyLimitForTier(parsedTier);
+        : 0,
+    );
 
-    const promptsUsed =
-      typeof parsed.promptsUsed === "number" && Number.isFinite(parsed.promptsUsed)
-        ? Math.max(0, parsed.promptsUsed)
+    const creditsUsed =
+      typeof parsed.creditsUsed === "number" && Number.isFinite(parsed.creditsUsed)
+        ? Math.max(0, parsed.creditsUsed)
+        : typeof (parsed as { promptsUsed?: unknown }).promptsUsed === "number" &&
+            Number.isFinite((parsed as { promptsUsed?: number }).promptsUsed)
+          ? Math.max(0, (parsed as { promptsUsed?: number }).promptsUsed ?? 0)
         : 0;
 
     const remaining =
       typeof parsed.remaining === "number" && Number.isFinite(parsed.remaining)
         ? Math.max(0, parsed.remaining)
-        : Math.max(0, monthlyLimit - promptsUsed);
+        : Math.max(0, monthlyLimit - creditsUsed);
 
     return {
       monthKey: currentMonth,
       tier: parsedTier,
       monthlyLimit,
-      promptsUsed,
+      creditsUsed,
       remaining,
       updatedAt:
         typeof parsed.updatedAt === "number" && Number.isFinite(parsed.updatedAt)
@@ -175,31 +165,38 @@ export function writeAIUsageCache(
   const tier = resolveTier(input, existingSnapshot, fallbackTier);
 
   const monthlyLimitRaw = input.monthlyLimit ?? input.monthly_limit;
-  const promptsUsedRaw = input.promptsUsed ?? input.prompts_used;
+  const creditsUsedRaw =
+    input.creditsUsed ??
+    input.credits_used ??
+    input.promptsUsed ??
+    input.prompts_used;
   const remainingRaw = input.remaining;
 
   const monthlyLimit =
-    typeof monthlyLimitRaw === "number" && Number.isFinite(monthlyLimitRaw)
-      ? Math.max(1, monthlyLimitRaw)
-      : existingSnapshot?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
+    Math.max(
+      defaultMonthlyLimitForTier(tier),
+      typeof monthlyLimitRaw === "number" && Number.isFinite(monthlyLimitRaw)
+        ? Math.max(1, monthlyLimitRaw)
+        : existingSnapshot?.monthlyLimit ?? 0,
+    );
 
-  const promptsUsed =
-    typeof promptsUsedRaw === "number" && Number.isFinite(promptsUsedRaw)
-      ? Math.max(0, promptsUsedRaw)
+  const creditsUsed =
+    typeof creditsUsedRaw === "number" && Number.isFinite(creditsUsedRaw)
+      ? Math.max(0, creditsUsedRaw)
       : typeof remainingRaw === "number" && Number.isFinite(remainingRaw)
         ? Math.max(0, monthlyLimit - remainingRaw)
-        : existingSnapshot?.promptsUsed ?? 0;
+        : existingSnapshot?.creditsUsed ?? 0;
 
   const remaining =
     typeof remainingRaw === "number" && Number.isFinite(remainingRaw)
       ? Math.max(0, remainingRaw)
-      : Math.max(0, monthlyLimit - promptsUsed);
+      : Math.max(0, monthlyLimit - creditsUsed);
 
   const snapshot: AIUsageSnapshot = {
     monthKey: getMonthKey(),
     tier,
     monthlyLimit,
-    promptsUsed,
+    creditsUsed,
     remaining,
     updatedAt: Date.now(),
   };
@@ -271,18 +268,24 @@ export async function hydrateAIUsageCache(
   return inFlightUsageHydration;
 }
 
-export function bumpAIUsageCache(fallbackTier?: Tier): AIUsageSnapshot | null {
+export function bumpAIUsageCache(
+  creditsCost = 1,
+  fallbackTier?: Tier,
+): AIUsageSnapshot | null {
   const existing = readAIUsageCache();
   const tier = existing?.tier ?? fallbackTier ?? "free";
   const monthlyLimit = existing?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
-  const promptsUsed = Math.min(monthlyLimit, (existing?.promptsUsed ?? 0) + 1);
-  const remaining = Math.max(0, monthlyLimit - promptsUsed);
+  const creditsUsed = Math.min(
+    monthlyLimit,
+    (existing?.creditsUsed ?? 0) + Math.max(0, Math.round(creditsCost)),
+  );
+  const remaining = Math.max(0, monthlyLimit - creditsUsed);
 
   return writeAIUsageCache(
     {
       tier,
       monthlyLimit,
-      promptsUsed,
+      creditsUsed,
       remaining,
     },
     tier,
@@ -297,23 +300,30 @@ export function markAIUsageLimitReached(
   const tier = resolveTier(input, existingSnapshot, fallbackTier);
 
   const monthlyLimitRaw = input.monthlyLimit ?? input.monthly_limit;
-  const promptsUsedRaw = input.promptsUsed ?? input.prompts_used;
+  const creditsUsedRaw =
+    input.creditsUsed ??
+    input.credits_used ??
+    input.promptsUsed ??
+    input.prompts_used;
 
   const monthlyLimit =
-    typeof monthlyLimitRaw === "number" && Number.isFinite(monthlyLimitRaw)
-      ? Math.max(1, monthlyLimitRaw)
-      : existingSnapshot?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
+    Math.max(
+      defaultMonthlyLimitForTier(tier),
+      typeof monthlyLimitRaw === "number" && Number.isFinite(monthlyLimitRaw)
+        ? Math.max(1, monthlyLimitRaw)
+        : existingSnapshot?.monthlyLimit ?? 0,
+    );
 
-  const promptsUsed =
-    typeof promptsUsedRaw === "number" && Number.isFinite(promptsUsedRaw)
-      ? Math.max(0, promptsUsedRaw)
+  const creditsUsed =
+    typeof creditsUsedRaw === "number" && Number.isFinite(creditsUsedRaw)
+      ? Math.max(0, creditsUsedRaw)
       : monthlyLimit;
 
   return writeAIUsageCache(
     {
       tier,
       monthlyLimit,
-      promptsUsed,
+      creditsUsed,
       remaining: 0,
     },
     tier,

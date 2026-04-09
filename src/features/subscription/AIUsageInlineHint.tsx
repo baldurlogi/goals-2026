@@ -6,6 +6,9 @@ import {
   defaultMonthlyLimitForTier,
   useAIUsageSnapshot,
 } from "@/features/subscription/aiUsageCache";
+import {
+  PAID_PLANS_COMING_SOON,
+} from "@/features/subscription/subscriptionConfig";
 
 type Props = {
   actionLabel?: string;
@@ -14,7 +17,7 @@ type Props = {
 };
 
 export function AIUsageInlineHint({
-  actionLabel = "Uses 1 AI prompt",
+  actionLabel = "Uses 1 AI credit",
   className,
   showUpgrade = true,
 }: Props) {
@@ -62,7 +65,7 @@ export function AIUsageInlineHint({
           to="/app/upgrade"
           className="ml-auto inline-flex items-center gap-1 font-medium text-primary hover:underline"
         >
-          Upgrade
+          {PAID_PLANS_COMING_SOON ? "Pricing preview" : "Upgrade"}
           <ArrowRight className="h-3 w-3" />
         </Link>
       )}

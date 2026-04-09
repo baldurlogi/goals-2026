@@ -14,6 +14,10 @@ import { getAISystemContext } from "@/features/ai/buildAIContext";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { AIUsageInlineHint } from "@/features/subscription/AIUsageInlineHint";
+import {
+  AI_ACTION_CREDIT_COSTS,
+  type AILimitPayload,
+} from "@/features/subscription/aiCredits";
 import type { Tier } from "@/features/subscription/useTier";
 import {
   markAIUsageLimitReached,
@@ -41,12 +45,7 @@ type ImproveResult = {
   summary: string;
 };
 
-type ImproveLimitPayload = {
-  error?: string;
-  message?: string;
-  tier?: Tier;
-  monthly_limit?: number;
-  prompts_used?: number;
+type ImproveLimitPayload = AILimitPayload & {
   details?: string;
   raw_text?: string;
 };
@@ -56,8 +55,10 @@ type ImproveResponse = {
   usage?: {
     tier?: Tier;
     monthly_limit?: number;
+    credits_used?: number;
     prompts_used?: number;
     remaining?: number;
+    credits_cost?: number;
   };
 };
 
@@ -121,12 +122,14 @@ async function fetchImprovedSteps(
     markAIUsageLimitReached({
       tier: data.tier,
       monthly_limit: data.monthly_limit,
-      prompts_used: data.prompts_used,
+      credits_used: data.credits_used ?? data.prompts_used,
     });
 
     throw new AIUsageLimitError(
-      data.message ?? "Monthly AI limit reached. Upgrade for more AI improvements.",
-      data.tier,
+      data.message ?? "Monthly AI credit limit reached. Your balance resets on the 1st.",
+      data.tier === "free" || data.tier === "pro" || data.tier === "pro_max"
+        ? data.tier
+        : undefined,
     );
   }
 
@@ -145,15 +148,18 @@ async function fetchImprovedSteps(
   const data = (await res.json()) as ImproveResponse;
   if (data.usage) {
     writeAIUsageCache(data.usage);
-    capture("ai_prompt_used", {
+    capture("ai_credits_used", {
       feature: "goal_improve",
       source: "improve_goal_modal",
       route: window.location.pathname,
       goal_id: goal.id,
       goal_title: goal.title,
-      prompts_used: data.usage.prompts_used,
+      credits_used:
+        data.usage.credits_used ?? data.usage.prompts_used,
       monthly_limit: data.usage.monthly_limit,
       remaining: data.usage.remaining,
+      credits_cost:
+        data.usage.credits_cost ?? AI_ACTION_CREDIT_COSTS.goalImprove,
       tier: data.usage.tier,
     });
   }
@@ -584,7 +590,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
         {phase === "prompt" && (
           <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
             <AIUsageInlineHint
-              actionLabel="Generating improvements uses 1 AI prompt"
+              actionLabel={`Generating improvements uses ${AI_ACTION_CREDIT_COSTS.goalImprove} credits`}
               className="max-w-fit"
             />
 
@@ -626,7 +632,7 @@ export function ImproveGoalModal({ goal, onApply, onClose }: Props) {
                 Regenerate
               </Button>
               <AIUsageInlineHint
-                actionLabel="Regenerating uses 1 AI prompt"
+                actionLabel={`Regenerating uses ${AI_ACTION_CREDIT_COSTS.goalImprove} credits`}
                 className="max-w-fit"
               />
             </div>
