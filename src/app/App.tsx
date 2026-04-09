@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { AuthProvider } from "./providers/AuthProvider";
@@ -7,6 +7,12 @@ import { RequireAuth } from "@/features/auth/RequireAuth";
 import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
 import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
 import { Skeleton, WidgetCardSkeleton } from "@/features/dashboard/skeletons";
+import { CookieConsentBanner } from "@/features/legal/CookieConsentBanner";
+import {
+  readCookieConsent,
+  subscribeCookieConsent,
+} from "@/features/legal/cookieConsent";
+import { syncAnalyticsConsent } from "@/lib/analyticsClient";
 
 const AppLayout = lazy(async () => ({
   default: (await import("@/app/AppLayout")).AppLayout,
@@ -154,11 +160,39 @@ function AppRouteFallback() {
   );
 }
 
+function ConsentAwareAnalytics() {
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(
+    () => readCookieConsent()?.analytics === true,
+  );
+
+  useEffect(() => {
+    syncAnalyticsConsent(analyticsEnabled);
+  }, [analyticsEnabled]);
+
+  useEffect(
+    () =>
+      subscribeCookieConsent((state) => {
+        setAnalyticsEnabled(state?.analytics === true);
+      }),
+    [],
+  );
+
+  if (!analyticsEnabled) {
+    return null;
+  }
+
+  return (
+    <>
+      <Analytics />
+      <SpeedInsights />
+    </>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Analytics />
-      <SpeedInsights />
+      <ConsentAwareAnalytics />
       <AuthProvider>
         <Routes>
           <Route
@@ -387,6 +421,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <CookieConsentBanner />
       </AuthProvider>
     </BrowserRouter>
   );
