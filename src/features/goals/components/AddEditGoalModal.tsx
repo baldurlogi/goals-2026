@@ -121,6 +121,18 @@ export function AddEditGoalModal({
       goal_title: savedGoal.title,
       steps_count: savedGoal.steps.length,
       creation_mode: mode,
+      goal_creation_method: mode,
+      is_first_goal: true,
+      source: "goal_modal",
+      route: window.location.pathname,
+    });
+
+    captureOnce("first_goal_created", userId, {
+      goal_id: savedGoal.id,
+      goal_title: savedGoal.title,
+      steps_count: savedGoal.steps.length,
+      creation_mode: mode,
+      goal_creation_method: mode,
       is_first_goal: true,
       source: "goal_modal",
       route: window.location.pathname,
@@ -131,6 +143,7 @@ export function AddEditGoalModal({
       goal_title: savedGoal.title,
       steps_count: savedGoal.steps.length,
       creation_mode: mode,
+      goal_creation_method: mode,
       is_first_goal: true,
       source: "goal_modal",
       route: window.location.pathname,

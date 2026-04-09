@@ -96,11 +96,15 @@ export function captureReturnedNextDay(userId: string | null | undefined): void 
     const diff = getDayDifference(lastSeenDate, today);
 
     if (diff === 1) {
-      capture("returned_next_day", {
+      const payload = {
         userId,
         lastSeenDate,
         returnedDate: today,
-      });
+      };
+
+      // Keep the legacy name for continuity, and emit the beta funnel name too.
+      capture("returned_next_day", payload);
+      capture("session_day_2_return", payload);
     }
   }
 

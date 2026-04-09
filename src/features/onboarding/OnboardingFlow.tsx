@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   Loader2,
   User,
+  Target,
   Dumbbell,
   CalendarDays,
   BookOpen,
@@ -15,11 +16,15 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
 import { completeOnboarding } from "./profileStorage";
+import { saveUserGoal } from "@/features/goals/userGoalStorage";
+import { queueAIContextNudge } from "@/features/goals/components/AIContextNudge.utils";
+import type { UserGoal } from "@/features/goals/goalTypes";
 import {
   Card,
   CardContent,
 } from "@/components/ui/card";
 import { StepProfile } from "./components/StepProfile";
+import { StepGoalPlanner } from "./components/StepGoalPlanner";
 import { StepModules } from "./components/StepModules";
 import { StepMacros } from "./components/StepMacros";
 import { StepSchedule } from "./components/StepSchedule";
@@ -29,37 +34,46 @@ import {
   type OnboardingData,
 } from "./components/types";
 
-type OnboardingStep = 0 | 1 | 2 | 3 | 4;
+type ExpandedOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
 
-const STEP_ICONS: Record<OnboardingStep, typeof User> = {
+const STEP_ICONS: Record<ExpandedOnboardingStep, typeof User> = {
   0: User,
-  1: LayoutGrid,
-  2: Dumbbell,
-  3: CalendarDays,
-  4: BookOpen,
+  1: Target,
+  2: LayoutGrid,
+  3: Dumbbell,
+  4: CalendarDays,
+  5: BookOpen,
 };
 
-const STEP_CONTENT: Record<OnboardingStep, { label: string; subtitle: string }> =
+const STEP_CONTENT: Record<
+  ExpandedOnboardingStep,
+  { label: string; subtitle: string }
+> =
   {
     0: {
       label: "Profile",
       subtitle: "This helps us personalize recommendations right from the start.",
     },
     1: {
+      label: "Goal",
+      subtitle:
+        "Describe the one thing you want to achieve and let AI turn it into a realistic plan.",
+    },
+    2: {
       label: "Modules",
       subtitle:
         "Pick only the parts of the app you actually want to use right now.",
     },
-    2: {
+    3: {
       label: "Nutrition",
       subtitle:
         "Enter your own targets or answer a few questions to get a smarter suggestion.",
     },
-    3: {
+    4: {
       label: "Schedule",
       subtitle: "Set your weekly defaults once so daily planning matches real life.",
     },
-    4: {
+    5: {
       label: "Reading",
       subtitle: "A daily reading target helps you build a consistent learning habit.",
     },
@@ -78,12 +92,13 @@ export function OnboardingFlow({
   onComplete,
   onCancel,
 }: {
-  onComplete: () => void;
+  onComplete: (redirectTo?: string) => void | Promise<void>;
   onCancel?: () => void;
 }) {
   const { userId } = useAuth();
-  const [step, setStep] = useState<OnboardingStep>(0);
+  const [step, setStep] = useState<ExpandedOnboardingStep>(0);
   const [data, setData] = useState<OnboardingData>(INITIAL_ONBOARDING_DATA);
+  const [generatedGoal, setGeneratedGoal] = useState<UserGoal | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,15 +111,18 @@ export function OnboardingFlow({
 
   function update(patch: Partial<OnboardingData>) {
     setError(null);
+    if ("main_goal" in patch || "goal_why" in patch) {
+      setGeneratedGoal(null);
+    }
     setData((prev) => ({ ...prev, ...patch }));
   }
 
   const visibleSteps = useMemo(
     () =>
-      ([0, 1, 2, 3, 4] as OnboardingStep[]).filter((s) => {
-        if (s === 2) return data.enabled_modules.includes("nutrition");
-        if (s === 3) return data.enabled_modules.includes("schedule");
-        if (s === 4) return data.enabled_modules.includes("reading");
+      ([0, 1, 2, 3, 4, 5] as ExpandedOnboardingStep[]).filter((s) => {
+        if (s === 3) return data.enabled_modules.includes("nutrition");
+        if (s === 4) return data.enabled_modules.includes("schedule");
+        if (s === 5) return data.enabled_modules.includes("reading");
         return true;
       }),
     [data.enabled_modules],
@@ -117,8 +135,8 @@ export function OnboardingFlow({
 
   function canAdvance(): boolean {
     if (step === 0) return !!data.display_name.trim();
-    if (step === 1) return data.enabled_modules.length > 0;
-    if (step === 2) return hasValidNutritionTarget(data);
+    if (step === 1) return Boolean(generatedGoal);
+    if (step === 2) return data.enabled_modules.length > 0;
     return true;
   }
 
@@ -137,6 +155,43 @@ export function OnboardingFlow({
     setError(null);
 
     try {
+      let redirectTo: string | undefined;
+
+      if (generatedGoal) {
+        const goalToSave: UserGoal = {
+          ...generatedGoal,
+          userId: userId ?? generatedGoal.userId,
+        };
+        const status = await saveUserGoal(userId, goalToSave);
+
+        queueAIContextNudge();
+        redirectTo = `/app/goals/${goalToSave.id}`;
+
+        if (status.isFirstGoalCreated) {
+          captureOnce("first_goal_completed", userId, {
+            goal_id: goalToSave.id,
+            goal_title: goalToSave.title,
+            steps_count: goalToSave.steps.length,
+            creation_mode: "ai_onboarding",
+            goal_creation_method: "ai_onboarding",
+            is_first_goal: true,
+            source: "onboarding_flow",
+            route: "/app",
+          });
+
+          captureOnce("first_goal_created", userId, {
+            goal_id: goalToSave.id,
+            goal_title: goalToSave.title,
+            steps_count: goalToSave.steps.length,
+            creation_mode: "ai_onboarding",
+            goal_creation_method: "ai_onboarding",
+            is_first_goal: true,
+            source: "onboarding_flow",
+            route: "/app",
+          });
+        }
+      }
+
       await completeOnboarding({
         display_name: data.display_name.trim(),
         sex: data.sex,
@@ -164,7 +219,7 @@ export function OnboardingFlow({
         route: "/app",
       });
 
-      onComplete();
+      await onComplete(redirectTo);
     } catch (e) {
       setError(
         "We couldn't finish setup yet. Please retry — your answers are still here.",
@@ -175,12 +230,20 @@ export function OnboardingFlow({
     }
   }
 
-  const stepComponents: Record<OnboardingStep, ReactNode> = {
+  const stepComponents: Record<ExpandedOnboardingStep, ReactNode> = {
     0: <StepProfile data={data} onChange={update} />,
-    1: <StepModules data={data} onChange={update} />,
-    2: <StepMacros data={data} onChange={update} />,
-    3: <StepSchedule data={data} onChange={update} />,
-    4: <StepReading data={data} onChange={update} />,
+    1: (
+      <StepGoalPlanner
+        data={data}
+        onChange={update}
+        generatedGoal={generatedGoal}
+        onGoalGenerated={setGeneratedGoal}
+      />
+    ),
+    2: <StepModules data={data} onChange={update} />,
+    3: <StepMacros data={data} onChange={update} />,
+    4: <StepSchedule data={data} onChange={update} />,
+    5: <StepReading data={data} onChange={update} />,
   };
 
   return (
@@ -288,15 +351,27 @@ export function OnboardingFlow({
               )}
             </Button>
           ) : (
-            <Button
-              type="button"
-              onClick={goNext}
-              disabled={!canAdvance() || saving}
-              className="gap-2"
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {step === 2 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={goNext}
+                  disabled={saving}
+                >
+                  Skip for now
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                onClick={goNext}
+                disabled={!canAdvance() || saving}
+                className="gap-2"
+              >
+                {step === 2 && !hasValidNutritionTarget(data) ? "Continue" : "Next"}
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </div>
       </div>

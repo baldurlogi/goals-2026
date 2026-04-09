@@ -66,6 +66,15 @@ export function RequireOnboarding({ children }: Props) {
     }
   }
 
+  async function handleOnboardingComplete(redirectTo?: string) {
+    clearCancelledOnboarding();
+    await refetch();
+
+    if (redirectTo) {
+      navigate(redirectTo, { replace: true });
+    }
+  }
+
   if (isAuthLoading) {
     return (
       <ProfileStateCard
@@ -102,10 +111,7 @@ export function RequireOnboarding({ children }: Props) {
   if (isMissingProfile) {
     return (
       <OnboardingFlow
-        onComplete={() => {
-          clearCancelledOnboarding();
-          void refetch();
-        }}
+        onComplete={handleOnboardingComplete}
         onCancel={handleCancelOnboarding}
       />
     );
@@ -198,10 +204,7 @@ export function RequireOnboarding({ children }: Props) {
 
     return (
       <OnboardingFlow
-        onComplete={() => {
-          clearCancelledOnboarding();
-          void refetch();
-        }}
+        onComplete={handleOnboardingComplete}
         onCancel={handleCancelOnboarding}
       />
     );
