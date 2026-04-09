@@ -1,5 +1,9 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, ScrollText } from "lucide-react";
+import {
+  BETA_ACCESS_SUMMARY,
+  SUBSCRIPTION_PLAN_DEFINITIONS,
+} from "@/features/subscription/subscriptionConfig";
 
 const LAST_UPDATED = "March 2025";
 const CONTACT_EMAIL = "legal@begyn.app";
@@ -74,12 +78,22 @@ export function TermsPage() {
             {APP_NAME} offers the following plans:
           </p>
           <p className="mb-4 text-sm text-muted-foreground">
-            During the current beta, all users receive 1,000 AI credits per month and access to all live features while paid plans remain in preview.
+            {BETA_ACCESS_SUMMARY}
           </p>
           <div className="space-y-3">
-            <PlanRow name="Free" price="€0/month" features="10 AI credits per month, all core tracking features" />
-            <PlanRow name="Pro" price="€9/month" features="200 AI credits per month, AI Weekly Report, AI Goal Optimisation" />
-            <PlanRow name="Pro Max" price="€19/month" features="1,000 AI credits per month, all Pro features" />
+            {(
+              ["free", "pro", "pro_max"] as const
+            ).map((tier) => {
+              const plan = SUBSCRIPTION_PLAN_DEFINITIONS[tier];
+              return (
+                <PlanRow
+                  key={plan.id}
+                  name={plan.label}
+                  price={`${plan.monthlyPriceLabel}/month`}
+                  features={plan.termSummary}
+                />
+              );
+            })}
           </div>
           <p className="mt-4">
             Paid subscriptions are billed monthly via Stripe. You may cancel at any time from your

@@ -4,7 +4,10 @@ import { TOKENS } from "../theme/tokens";
 import type { BillingMode, ThemeMode } from "../types";
 import { BillingToggle } from "./BillingToggle";
 import { PricingCard } from "./PricingCard";
-import { PAID_PLANS_PREVIEW_MESSAGE } from "@/features/subscription/subscriptionConfig";
+import {
+  BETA_ACCESS_SUMMARY,
+  PAID_PLANS_PREVIEW_MESSAGE,
+} from "@/features/subscription/subscriptionConfig";
 
 type PricingSectionProps = {
   theme: ThemeMode;
@@ -65,6 +68,13 @@ export function PricingSection({
         >
           Use the full beta for free right now, and preview how paid plans may
           expand later as Begyn grows.
+        </p>
+
+        <p
+          className="mx-auto mb-6 max-w-3xl text-xs leading-6 sm:text-sm"
+          style={{ color: t.faint }}
+        >
+          {BETA_ACCESS_SUMMARY}
         </p>
 
         <BillingToggle

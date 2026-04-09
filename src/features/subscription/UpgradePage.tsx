@@ -28,9 +28,12 @@ import {
 import { capture } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import {
+  BETA_ACCESS_SUMMARY,
   PAID_PLANS_COMING_SOON,
   PAID_PLANS_COMING_SOON_LABEL,
   PAID_PLANS_PREVIEW_MESSAGE,
+  SUBSCRIPTION_COMPARISON_ROWS,
+  SUBSCRIPTION_PLAN_DEFINITIONS,
 } from "@/features/subscription/subscriptionConfig";
 
 const STRIPE_DISABLED = PAID_PLANS_COMING_SOON;
@@ -63,90 +66,55 @@ type Plan = {
   features: { text: string; included: boolean }[];
 };
 
-const PLANS: Plan[] = [
-  {
-    id: "free",
-    name: "Free",
-    monthlyPrice: "€0",
-    yearlyPrice: "€0",
-    yearlySaving: "",
-    period: "forever",
-    description: "Everything you need to start tracking your life.",
+const PLAN_UI: Record<
+  Tier,
+  Pick<Plan, "icon" | "color" | "borderClass" | "glowClass" | "buttonClass">
+> = {
+  free: {
     icon: <Zap className="h-5 w-5" />,
     color: "text-muted-foreground",
     borderClass: "border-border",
     glowClass: "",
     buttonClass: "bg-muted text-muted-foreground cursor-default",
-    features: [
-      {
-        text: "All life modules (goals, fitness, nutrition, reading, todos, schedule)",
-        included: true,
-      },
-      { text: "Progress visualization", included: true },
-      { text: "Achievements & badges", included: true },
-      { text: "PWA — install on any device", included: true },
-      { text: "10 AI credits per month", included: true },
-      { text: "AI Coach Card on dashboard", included: false },
-      { text: "AI goal optimization", included: false },
-      { text: "AI Weekly Life Report", included: false },
-    ],
   },
-  {
-    id: "pro",
-    name: "Pro",
-    monthlyPrice: "€9",
-    yearlyPrice: "€7.50",
-    yearlySaving: "Save €18/yr",
-    period: "per month",
-    description: "Unlock AI coaching to hit your goals faster.",
+  pro: {
     icon: <Sparkles className="h-5 w-5" />,
     color: "text-violet-400",
     borderClass: "border-violet-500/50",
     glowClass: "shadow-[0_0_24px_2px_rgba(139,92,246,0.15)]",
     buttonClass: "bg-violet-600 text-white hover:bg-violet-500",
-    badge: "Most popular",
-    features: [
-      { text: "Everything in Free", included: true },
-      { text: "200 AI credits per month", included: true },
-      { text: "AI Coach Card — daily smart suggestions", included: true },
-      { text: "AI goal optimization (Improve with AI)", included: true },
-      { text: "AI Weekly Life Report", included: true },
-      { text: "Priority support", included: true },
-      { text: "1,000 AI credits per month", included: false },
-    ],
   },
-  {
-    id: "pro_max",
-    name: "Pro Max",
-    monthlyPrice: "€19",
-    yearlyPrice: "€15.75",
-    yearlySaving: "Save €39/yr",
-    period: "per month",
-    description: "Maximum AI power for serious goal achievers.",
+  pro_max: {
     icon: <Crown className="h-5 w-5" />,
     color: "text-amber-400",
     borderClass: "border-amber-400/50",
     glowClass: "shadow-[0_0_24px_2px_rgba(251,191,36,0.15)]",
     buttonClass:
       "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90",
-    features: [
-      { text: "Everything in Pro", included: true },
-      { text: "1,000 AI credits per month", included: true },
-      { text: "Early access to new AI features", included: true },
-      { text: "Priority support", included: true },
-    ],
   },
-];
+};
 
-const COMPARISON_ROWS = [
-  { feature: "Life modules", free: true, pro: true, pro_max: true },
-  { feature: "Progress visualization", free: true, pro: true, pro_max: true },
-  { feature: "Achievements", free: true, pro: true, pro_max: true },
-  { feature: "AI credits / month", free: "10", pro: "200", pro_max: "1000" },
-  { feature: "AI Coach Card", free: false, pro: true, pro_max: true },
-  { feature: "AI goal optimization", free: false, pro: true, pro_max: true },
-  { feature: "AI Weekly Report", free: false, pro: true, pro_max: true },
-];
+const PLANS: Plan[] = (["free", "pro", "pro_max"] as const).map((tier) => {
+  const plan = SUBSCRIPTION_PLAN_DEFINITIONS[tier];
+  const ui = PLAN_UI[tier];
+
+  return {
+    id: plan.id,
+    name: plan.label,
+    monthlyPrice: plan.monthlyPriceLabel,
+    yearlyPrice: plan.yearlyPriceLabel,
+    yearlySaving: plan.yearlySavingLabel,
+    period: plan.periodLabel,
+    description: plan.upgradeDescription,
+    icon: ui.icon,
+    color: ui.color,
+    borderClass: ui.borderClass,
+    glowClass: ui.glowClass,
+    buttonClass: ui.buttonClass,
+    badge: plan.badge,
+    features: plan.upgradeFeatures,
+  };
+});
 
 async function redirectToCheckout(priceKey: PriceKey) {
   const {
@@ -433,7 +401,7 @@ function ComparisonTable({ currentTier }: { currentTier: Tier }) {
           </tr>
         </thead>
         <tbody>
-          {COMPARISON_ROWS.map((row, i) => (
+          {SUBSCRIPTION_COMPARISON_ROWS.map((row, i) => (
             <tr
               key={i}
               className="border-b transition-colors hover:bg-muted/20 last:border-0"
@@ -525,6 +493,10 @@ export function UpgradePage() {
           <p className="mx-auto max-w-md text-muted-foreground">
             The full beta is open right now. This page previews how paid plans
             may look later as Begyn grows.
+          </p>
+
+          <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
+            {BETA_ACCESS_SUMMARY}
           </p>
 
           {STRIPE_DISABLED && (
