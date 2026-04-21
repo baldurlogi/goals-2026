@@ -10,6 +10,14 @@ import {
 const WELLBEING_ENTRY_SELECT =
   "user_id, log_date, mood_score, stress_level, energy_level, journal_entry, gratitude_entry, created_at, updated_at";
 
+export const WELLBEING_CHANGED_EVENT = "wellbeing:changed";
+
+function emitWellbeingChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(WELLBEING_CHANGED_EVENT));
+  }
+}
+
 export async function loadMentalWellbeingEntry(
   userId: string,
   logDate: string,
@@ -63,7 +71,9 @@ export async function saveMentalWellbeingEntry(
     throw new Error("Couldn't save your wellbeing check-in.");
   }
 
-  return mapMentalWellbeingEntryRow(data as MentalWellbeingEntryRow);
+  const saved = mapMentalWellbeingEntryRow(data as MentalWellbeingEntryRow);
+  emitWellbeingChanged();
+  return saved;
 }
 
 export async function loadLatestMentalWellbeingEntry(

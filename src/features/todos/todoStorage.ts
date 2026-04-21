@@ -119,6 +119,12 @@ function readTodoCompletionHistory(
   }
 }
 
+export function loadTodoCompletionHistory(
+  userId: string | null = getActiveUserId(),
+): TodoCompletionHistoryEntry[] {
+  return readTodoCompletionHistory(userId);
+}
+
 function writeTodoCompletionHistory(
   entries: TodoCompletionHistoryEntry[],
   userId: string | null = getActiveUserId(),

@@ -10,6 +10,14 @@ import {
 const SLEEP_ENTRY_SELECT =
   "user_id, log_date, sleep_duration_minutes, sleep_quality_score, bedtime, wake_time, energy_level, recovery_score, notes, source, sync_metadata, created_at, updated_at";
 
+export const SLEEP_CHANGED_EVENT = "sleep:changed";
+
+function emitSleepChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SLEEP_CHANGED_EVENT));
+  }
+}
+
 export async function loadSleepRecoveryEntry(
   userId: string,
   logDate: string,
@@ -63,7 +71,9 @@ export async function saveSleepRecoveryEntry(
     throw new Error("Couldn't save your sleep entry.");
   }
 
-  return mapSleepRecoveryEntryRow(data as SleepRecoveryEntryRow);
+  const saved = mapSleepRecoveryEntryRow(data as SleepRecoveryEntryRow);
+  emitSleepChanged();
+  return saved;
 }
 
 export async function loadLatestSleepRecoveryEntry(

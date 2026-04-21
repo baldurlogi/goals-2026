@@ -1,11 +1,11 @@
+import { m } from "framer-motion";
 import { PRICING_PLANS } from "../data/pricing";
-import { useReveal } from "../hooks/useReveal";
+import { fadeUp, landingViewport } from "../motion";
 import { TOKENS } from "../theme/tokens";
 import type { BillingMode, ThemeMode } from "../types";
 import { BillingToggle } from "./BillingToggle";
 import { PricingCard } from "./PricingCard";
 import {
-  BETA_ACCESS_SUMMARY,
   PAID_PLANS_PREVIEW_MESSAGE,
 } from "@/features/subscription/subscriptionConfig";
 
@@ -23,21 +23,20 @@ export function PricingSection({
   onChoosePlan,
 }: PricingSectionProps) {
   const t = TOKENS[theme];
-  const { ref, visible } = useReveal<HTMLDivElement>();
 
   return (
     <section
       id="pricing"
       className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8"
     >
-      <div
-        ref={ref}
+      <m.div
+        initial="hidden"
+        whileInView="visible"
+        viewport={landingViewport}
+        variants={fadeUp(18)}
         style={{
           textAlign: "center",
           marginBottom: 44,
-          opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0)" : "translateY(18px)",
-          transition: "opacity 0.55s ease, transform 0.55s ease",
         }}
       >
         <div
@@ -70,13 +69,6 @@ export function PricingSection({
           expand later as Begyn grows.
         </p>
 
-        <p
-          className="mx-auto mb-6 max-w-3xl text-xs leading-6 sm:text-sm"
-          style={{ color: t.faint }}
-        >
-          {BETA_ACCESS_SUMMARY}
-        </p>
-
         <BillingToggle
           billing={billing}
           setBilling={setBilling}
@@ -95,15 +87,16 @@ export function PricingSection({
             </span>
           )}
         </div>
-      </div>
+      </m.div>
 
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 md:grid-cols-2">
-        {PRICING_PLANS.map((plan) => (
+        {PRICING_PLANS.map((plan, index) => (
           <PricingCard
             key={plan.name}
             theme={theme}
             billing={billing}
             onChoosePlan={onChoosePlan}
+            index={index}
             {...plan}
           />
         ))}

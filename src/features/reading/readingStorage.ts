@@ -217,6 +217,12 @@ function readReadingHistoryCache(
   }
 }
 
+export function loadReadingHistory(
+  userId: string | null = getActiveUserId(),
+): ReadingHistoryEntry[] {
+  return readReadingHistoryCache(userId);
+}
+
 function writeReadingHistoryCache(
   entries: ReadingHistoryEntry[],
   userId: string | null = getActiveUserId(),

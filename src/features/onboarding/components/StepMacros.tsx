@@ -416,7 +416,8 @@ export const StepMacros = memo(function StepMacros({ data, onChange }: Props) {
         <h2 className="text-xl font-bold">Set your nutrition targets</h2>
         <p className="text-sm text-muted-foreground">
           Add your own calorie and macro targets, or answer a few questions to get
-          a smarter suggestion you can edit before saving.
+          a smarter suggestion you can edit before saving. You can also skip this
+          for now and set it later from Nutrition.
         </p>
       </div>
 

@@ -352,14 +352,14 @@ export function OnboardingFlow({
             </Button>
           ) : (
             <div className="flex items-center gap-2">
-              {step === 2 ? (
+              {step === 2 || (step === 3 && !hasValidNutritionTarget(data)) ? (
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={goNext}
                   disabled={saving}
                 >
-                  Skip for now
+                  {step === 3 ? "Skip nutrition for now" : "Skip for now"}
                 </Button>
               ) : null}
               <Button
@@ -368,7 +368,7 @@ export function OnboardingFlow({
                 disabled={!canAdvance() || saving}
                 className="gap-2"
               >
-                {step === 2 && !hasValidNutritionTarget(data) ? "Continue" : "Next"}
+                {step === 3 && !hasValidNutritionTarget(data) ? "Continue without macros" : "Next"}
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

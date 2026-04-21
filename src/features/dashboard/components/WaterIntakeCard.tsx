@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { ChevronRight, Droplets, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { useWaterDashboard } from "@/hooks/useWaterDashboard";
 
@@ -80,7 +82,33 @@ function WaterIntakeCardInner() {
     goalHit,
     addQuick,
     resetToday,
+    setTarget,
   } = useWaterDashboard();
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [draftTarget, setDraftTarget] = useState("");
+
+  function startEditingGoal() {
+    setDraftTarget(String(log.targetMl));
+    setIsEditingGoal(true);
+  }
+
+  async function submitGoal() {
+    const nextTarget = Number(draftTarget.replace(",", "."));
+    if (!Number.isFinite(nextTarget) || nextTarget <= 0) {
+      setDraftTarget(String(log.targetMl));
+      setIsEditingGoal(false);
+      return;
+    }
+
+    await setTarget(nextTarget);
+    setDraftTarget("");
+    setIsEditingGoal(false);
+  }
+
+  function cancelGoalEdit() {
+    setDraftTarget("");
+    setIsEditingGoal(false);
+  }
 
   return (
     <Card className="relative overflow-hidden lg:col-span-4">
@@ -130,6 +158,69 @@ function WaterIntakeCardInner() {
                   ? "Hydration target completed for today."
                   : `${progressPct}% complete • ${glasses} glasses`}
               </p>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-muted/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Daily goal
+                </span>
+                {!isEditingGoal ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px]"
+                    onClick={startEditingGoal}
+                  >
+                    Edit
+                  </Button>
+                ) : null}
+              </div>
+
+              {!isEditingGoal ? (
+                <p className="mt-1 text-sm font-semibold tabular-nums">
+                  {log.targetMl} ml
+                </p>
+              ) : (
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    inputMode="numeric"
+                    value={draftTarget}
+                    onChange={(event) => setDraftTarget(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void submitGoal();
+                      }
+                      if (event.key === "Escape") {
+                        cancelGoalEdit();
+                      }
+                    }}
+                    className="h-8 text-sm"
+                    aria-label="Daily water target in milliliters"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => {
+                      void submitGoal();
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={cancelGoalEdit}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-2">

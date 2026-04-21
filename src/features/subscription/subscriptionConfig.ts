@@ -4,10 +4,7 @@ export const PAID_PLANS_COMING_SOON = true;
 
 export const PAID_PLANS_COMING_SOON_LABEL = "Coming soon";
 export const PAID_PLANS_PREVIEW_MESSAGE =
-  "Paid plans are not available to purchase yet, but you can preview what they unlock.";
-
-export const BETA_ACCESS_SUMMARY =
-  "During the current beta, all users receive 1,000 AI credits per month and access to all live features while paid plans remain in preview.";
+  "Paid plans are not available to purchase yet, but you can preview what they unlock. During the current beta, all users receive 1,000 AI credits per month and access to all live features while paid plans remain in preview.";
 
 export const TIER_LABELS: Record<Tier, string> = {
   free: "Free",

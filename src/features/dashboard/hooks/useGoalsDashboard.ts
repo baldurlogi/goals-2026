@@ -4,7 +4,6 @@ import { useGoalsState } from '@/features/goals/useGoalsQuery';
 import type { UserGoal } from '@/features/goals/goalTypes';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
 
-const HORIZON = 14;
 const PREVIEW_LIMIT = 6;
 
 export type UpcomingItem = {
@@ -35,7 +34,6 @@ function diffDays(isoA: string, isoB: string) {
 function getUpcomingItems(
   goals: UserGoal[],
   doneMap: Record<string, Record<string, boolean>>,
-  horizonDays: number,
 ): UpcomingItem[] {
   const today = todayISO();
   const items: UpcomingItem[] = [];
@@ -45,7 +43,7 @@ function getUpcomingItems(
       if (!step.idealFinish) continue;
       if (doneMap[goal.id]?.[step.id]) continue;
       const days = diffDays(today, step.idealFinish);
-      if (days > horizonDays) continue; // too far in future
+      if (days > 0) continue;
       items.push({
         goalId: goal.id,
         goalTitle: goal.title,
@@ -64,7 +62,7 @@ export function useGoalsDashboard() {
   const { goals, isGoalsLoading } = useGoalsState();
 
   const upcomingItems = useMemo<UpcomingItem[]>(
-    () => getUpcomingItems(goals, goalProgress, HORIZON),
+    () => getUpcomingItems(goals, goalProgress),
     [goalProgress, goals],
   );
 
@@ -82,7 +80,6 @@ export function useGoalsDashboard() {
     overdueCount,
     hasMore,
     extraCount,
-    horizon: HORIZON,
     totalCount: upcomingItems.length,
     loading: isGoalsLoading || isGoalProgressLoading,
   };

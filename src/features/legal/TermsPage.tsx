@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, ScrollText } from "lucide-react";
 import {
-  BETA_ACCESS_SUMMARY,
   SUBSCRIPTION_PLAN_DEFINITIONS,
 } from "@/features/subscription/subscriptionConfig";
 
@@ -76,9 +75,6 @@ export function TermsPage() {
         <Section title="3. Subscription Plans and Payments">
           <p className="mb-3">
             {APP_NAME} offers the following plans:
-          </p>
-          <p className="mb-4 text-sm text-muted-foreground">
-            {BETA_ACCESS_SUMMARY}
           </p>
           <div className="space-y-3">
             {(

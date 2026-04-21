@@ -17,13 +17,17 @@ import {
   coerceAIUsage,
 } from "@/features/subscription/aiCredits";
 import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
+import { WATER_CHANGED_EVENT } from "@/features/water/waterStorage";
+import { SCHEDULE_CHANGED_EVENT } from "@/features/schedule/scheduleStorage";
+import { FITNESS_CHANGED_EVENT } from "@/features/fitness/constants";
 import { capture } from "@/lib/analytics";
 import {
-  getActiveUserId,
   getScopedStorageItem,
   removeScopedStorageItem,
   writeScopedStorageItem,
 } from "@/lib/activeUser";
+import { useAuth } from "@/features/auth/authContext";
+import { GOAL_MODULE_CHANGED_EVENT } from "@/lib/goalModuleStorage";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
@@ -104,8 +108,15 @@ function suggestionSignature(suggestion: CoachSuggestion): string {
   ].join("::");
 }
 
-function readCompletedSuggestion(): CompletedSuggestionEntry | null {
-  const userId = getActiveUserId();
+function suggestionActionKey(suggestion: CoachSuggestion): string {
+  return [
+    suggestion.action.trim().toLowerCase(),
+    suggestion.href.trim().toLowerCase(),
+    (suggestion.module ?? "").trim().toLowerCase(),
+  ].join("::");
+}
+
+function readCompletedSuggestion(userId: string | null): CompletedSuggestionEntry | null {
   if (!userId) return null;
 
   try {
@@ -135,8 +146,7 @@ function readCompletedSuggestion(): CompletedSuggestionEntry | null {
   }
 }
 
-function writeCompletedSuggestion(suggestion: CoachSuggestion) {
-  const userId = getActiveUserId();
+function writeCompletedSuggestion(userId: string | null, suggestion: CoachSuggestion) {
   if (!userId) return;
 
   try {
@@ -153,8 +163,7 @@ function writeCompletedSuggestion(suggestion: CoachSuggestion) {
   }
 }
 
-function clearCompletedSuggestion() {
-  const userId = getActiveUserId();
+function clearCompletedSuggestion(userId: string | null) {
   if (!userId) return;
 
   try {
@@ -166,7 +175,31 @@ function clearCompletedSuggestion() {
 
 // ── Fetch from edge function ──────────────────────────────────────────────────
 
-async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
+function buildAlternativeSuggestion(
+  signals: Awaited<ReturnType<typeof buildAISignals>>,
+  blockedSignatures: string[],
+): CoachSuggestion | null {
+  const blocked = new Set(blockedSignatures);
+
+  const starter = buildStarterSuggestion(signals);
+  if (starter && !blocked.has(suggestionSignature(starter))) {
+    return starter;
+  }
+
+  const candidates = buildSuggestionCandidates(signals);
+  for (const candidate of candidates) {
+    const nextSuggestion = candidateToCoachSuggestion(candidate);
+    if (!blocked.has(suggestionSignature(nextSuggestion))) {
+      return nextSuggestion;
+    }
+  }
+
+  return null;
+}
+
+async function fetchCoachSuggestion(
+  avoidSignature?: string | null,
+): Promise<CoachSuggestion> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -230,7 +263,12 @@ async function fetchCoachSuggestion(): Promise<CoachSuggestion> {
   const s = data.suggestion as CoachSuggestion;
   if (!s?.action || !s?.href) throw new Error("Invalid suggestion shape");
 
-  return normalizeCoachSuggestion(s, signals);
+  const normalized = normalizeCoachSuggestion(s, signals);
+  if (avoidSignature && suggestionSignature(normalized) === avoidSignature) {
+    return buildAlternativeSuggestion(signals, [avoidSignature]) ?? normalized;
+  }
+
+  return normalized;
 }
 
 // ── Starter + static suggestion builders ─────────────────────────────────────
@@ -270,6 +308,9 @@ function candidateToCoachSuggestion(
     fitness: "💪",
     todos: "✅",
     schedule: "📅",
+    sleep: "😴",
+    wellbeing: "💚",
+    skincare: "✨",
   };
 
   return {
@@ -373,10 +414,40 @@ function normalizeCoachSuggestion(
   return suggestion;
 }
 
-async function buildStaticSuggestion(): Promise<CoachSuggestion> {
-  const signals = await buildAISignals(true);
+function buildCurrentSuggestionActionKeys(
+  signals: Awaited<ReturnType<typeof buildAISignals>>,
+): Set<string> {
+  const keys = new Set<string>();
   const starter = buildStarterSuggestion(signals);
-  if (starter) return starter;
+  if (starter) {
+    keys.add(suggestionActionKey(starter));
+  }
+
+  const candidates = buildSuggestionCandidates(signals);
+  for (const candidate of candidates) {
+    keys.add(suggestionActionKey(candidateToCoachSuggestion(candidate)));
+  }
+
+  return keys;
+}
+
+async function shouldAutoCompleteSuggestion(
+  suggestion: CoachSuggestion | null,
+): Promise<boolean> {
+  if (!suggestion) return false;
+
+  const signals = await buildAISignals(true);
+  const currentActionKeys = buildCurrentSuggestionActionKeys(signals);
+
+  return !currentActionKeys.has(suggestionActionKey(suggestion));
+}
+
+async function buildStaticSuggestion(
+  blockedSignatures: string[] = [],
+): Promise<CoachSuggestion> {
+  const signals = await buildAISignals(true);
+  const alternate = buildAlternativeSuggestion(signals, blockedSignatures);
+  if (alternate) return alternate;
 
   const candidates = buildSuggestionCandidates(signals);
   const top = candidates[0];
@@ -385,7 +456,17 @@ async function buildStaticSuggestion(): Promise<CoachSuggestion> {
     return { action: "Review your goals", reason: "Start with one goal so your coach can suggest the best next move.", href: "/app/goals", emoji: "🎯", module: "goals" };
   }
 
-  const EMOJI: Record<string, string> = { goals: "🎯", reading: "📖", nutrition: "🥗", fitness: "💪", todos: "✅", schedule: "📅" };
+  const EMOJI: Record<string, string> = {
+    goals: "🎯",
+    reading: "📖",
+    nutrition: "🥗",
+    fitness: "💪",
+    todos: "✅",
+    schedule: "📅",
+    sleep: "😴",
+    wellbeing: "💚",
+    skincare: "✨",
+  };
 
   const yesterday = (() => {
     const d = new Date(); d.setDate(d.getDate() - 1);
@@ -444,6 +525,7 @@ function UsagePill() {
 // ── Card inner ────────────────────────────────────────────────────────────────
 
 function AICoachCardInner() {
+  const { userId, authReady } = useAuth();
   const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
@@ -451,7 +533,7 @@ function AICoachCardInner() {
   const [limitHit, setLimitHit]     = useState(false);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [completedSuggestion, setCompletedSuggestion] =
-    useState<CompletedSuggestionEntry | null>(() => readCompletedSuggestion());
+    useState<CompletedSuggestionEntry | null>(() => readCompletedSuggestion(userId));
 
   const isCompleted =
     Boolean(
@@ -462,8 +544,6 @@ function AICoachCardInner() {
     );
 
   const loadStatic = useCallback(async () => {
-    clearCompletedSuggestion();
-    setCompletedSuggestion(null);
     setLoading(true);
     setError(null);
     setIsAI(false);
@@ -481,15 +561,15 @@ function AICoachCardInner() {
     }
   }, []);
 
-  const loadAI = useCallback(async () => {
-    clearCompletedSuggestion();
+  const loadAI = useCallback(async (avoidSignature?: string | null) => {
+    clearCompletedSuggestion(userId);
     setCompletedSuggestion(null);
     setLoading(true);
     setError(null);
     setLimitHit(false);
     setLimitMessage(null);
     try {
-      const s = await fetchCoachSuggestion();
+      const s = await fetchCoachSuggestion(avoidSignature);
       writeCache(s);
       setSuggestion(s);
       setIsAI(true);
@@ -504,11 +584,38 @@ function AICoachCardInner() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
+
+  const syncCompletionFromLiveState = useCallback(async () => {
+    if (!authReady || !userId || !suggestion || completedSuggestion) return;
+
+    try {
+      const isAutoCompleted = await shouldAutoCompleteSuggestion(suggestion);
+      if (!isAutoCompleted) return;
+
+      writeCompletedSuggestion(userId, suggestion);
+      setCompletedSuggestion({
+        suggestion,
+        completedAt: Date.now(),
+      });
+    } catch {
+      // ignore signal refresh failures
+    }
+  }, [authReady, completedSuggestion, suggestion, userId]);
 
   useEffect(() => {
-    if (completedSuggestion) {
-      setSuggestion(completedSuggestion.suggestion);
+    if (!authReady) {
+      return;
+    }
+
+    const storedCompletedSuggestion =
+      completedSuggestion ?? readCompletedSuggestion(userId);
+
+    if (storedCompletedSuggestion) {
+      if (!completedSuggestion) {
+        setCompletedSuggestion(storedCompletedSuggestion);
+      }
+      setSuggestion(storedCompletedSuggestion.suggestion);
       setLoading(false);
       return;
     }
@@ -517,16 +624,59 @@ function AICoachCardInner() {
     const handleReadingChanged = () => { clearCache(); void loadStatic(); };
     window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
     return () => window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
-  }, [completedSuggestion, loadStatic]);
+  }, [authReady, completedSuggestion, loadStatic, userId]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    setCompletedSuggestion(readCompletedSuggestion(userId));
+  }, [authReady, userId]);
+
+  useEffect(() => {
+    void syncCompletionFromLiveState();
+  }, [syncCompletionFromLiveState]);
+
+  useEffect(() => {
+    if (!authReady || completedSuggestion) return;
+
+    const sync = () => {
+      void syncCompletionFromLiveState();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        sync();
+      }
+    };
+
+    window.addEventListener("focus", sync);
+    window.addEventListener(READING_CHANGED_EVENT, sync);
+    window.addEventListener(WATER_CHANGED_EVENT, sync);
+    window.addEventListener(SCHEDULE_CHANGED_EVENT, sync);
+    window.addEventListener(FITNESS_CHANGED_EVENT, sync);
+    window.addEventListener(GOAL_MODULE_CHANGED_EVENT, sync);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", sync);
+      window.removeEventListener(READING_CHANGED_EVENT, sync);
+      window.removeEventListener(WATER_CHANGED_EVENT, sync);
+      window.removeEventListener(SCHEDULE_CHANGED_EVENT, sync);
+      window.removeEventListener(FITNESS_CHANGED_EVENT, sync);
+      window.removeEventListener(GOAL_MODULE_CHANGED_EVENT, sync);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [authReady, completedSuggestion, syncCompletionFromLiveState]);
 
   function handleRefresh() {
     clearCache();
-    void loadAI();
+    clearCompletedSuggestion(userId);
+    setCompletedSuggestion(null);
+    void loadAI(suggestion ? suggestionSignature(suggestion) : null);
   }
 
   function handleMarkCompleted() {
-    if (!suggestion) return;
-    writeCompletedSuggestion(suggestion);
+    if (!suggestion || !userId) return;
+    writeCompletedSuggestion(userId, suggestion);
     setCompletedSuggestion({
       suggestion,
       completedAt: Date.now(),
@@ -535,7 +685,7 @@ function AICoachCardInner() {
 
   function handleGenerateNextMove() {
     clearCache();
-    clearCompletedSuggestion();
+    clearCompletedSuggestion(userId);
     setCompletedSuggestion(null);
     void loadAI();
   }
@@ -642,10 +792,10 @@ function AICoachCardInner() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-foreground">
-                  You completed your last move
+                  Done!
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  Nice work. Your last completed step was <span className="font-medium text-foreground">{suggestion.action}</span>.
+                  You completed <span className="font-medium text-foreground">{suggestion.action}</span>.
                   Generate another suggestion only when you want to spend the next {formatCreditCost(AI_ACTION_CREDIT_COSTS.coachSuggestion)}.
                 </p>
               </div>

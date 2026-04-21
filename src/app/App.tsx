@@ -102,6 +102,8 @@ const WeeklyReportPage = lazy(async () => ({
     .WeeklyReportPage,
 }));
 
+const LifeProgressPage = lazy(() => import("@/features/dashboard/LifeProgressPage"));
+
 function RouteFallback() {
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -413,6 +415,14 @@ export default function App() {
               element={
                 <Suspense fallback={<AppRouteFallback />}>
                   <WeeklyReportPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="progress"
+              element={
+                <Suspense fallback={<AppRouteFallback />}>
+                  <LifeProgressPage />
                 </Suspense>
               }
             />

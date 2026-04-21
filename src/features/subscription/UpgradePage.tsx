@@ -28,7 +28,6 @@ import {
 import { capture } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import {
-  BETA_ACCESS_SUMMARY,
   PAID_PLANS_COMING_SOON,
   PAID_PLANS_COMING_SOON_LABEL,
   PAID_PLANS_PREVIEW_MESSAGE,
@@ -493,10 +492,6 @@ export function UpgradePage() {
           <p className="mx-auto max-w-md text-muted-foreground">
             The full beta is open right now. This page previews how paid plans
             may look later as Begyn grows.
-          </p>
-
-          <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
-            {BETA_ACCESS_SUMMARY}
           </p>
 
           {STRIPE_DISABLED && (

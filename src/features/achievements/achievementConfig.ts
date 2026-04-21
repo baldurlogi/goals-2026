@@ -49,6 +49,11 @@ export const CATEGORY_CONFIG: Record<
   nutrition: { label: "Nutrition", emoji: "🥗" },
   reading: { label: "Reading", emoji: "📚" },
   todos: { label: "To-do", emoji: "✅" },
+  water: { label: "Water", emoji: "💧" },
+  sleep: { label: "Sleep", emoji: "😴" },
+  wellbeing: { label: "Wellbeing", emoji: "💚" },
+  skincare: { label: "Skincare", emoji: "✨" },
+  finance: { label: "Finance", emoji: "💸" },
   streaks: { label: "Streaks", emoji: "🔥" },
   meta: { label: "Meta", emoji: "⭐" },
 };

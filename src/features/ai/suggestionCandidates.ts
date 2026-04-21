@@ -5,6 +5,8 @@ import {
   Rocket,
   BookOpen,
   Library,
+  Moon,
+  Heart,
   Salad,
   Utensils,
   GlassWater,
@@ -13,13 +15,22 @@ import {
   CheckSquare,
   CalendarDays,
   Lightbulb,
+  Sparkles,
 } from "lucide-react";
 import type { ModuleId } from "@/features/modules/modules";
 import type { AISignals } from "@/features/ai/aiSignals";
 
 export type SuggestionModule = Extract<
   ModuleId,
-  "goals" | "reading" | "nutrition" | "fitness" | "schedule" | "todos"
+  | "goals"
+  | "reading"
+  | "nutrition"
+  | "fitness"
+  | "schedule"
+  | "todos"
+  | "sleep"
+  | "wellbeing"
+  | "skincare"
 >;
 
 export type SuggestionCandidate = {
@@ -64,6 +75,47 @@ function hasModule(signals: AISignals, module: ModuleId): boolean {
   return signals.modules.includes(module);
 }
 
+function getCurrentHour(): number {
+  return new Date().getHours();
+}
+
+function getExpectedWaterProgressPct(hour: number): number {
+  if (hour < 8) return 0.1;
+  if (hour < 10) return 0.22;
+  if (hour < 12) return 0.34;
+  if (hour < 14) return 0.45;
+  if (hour < 16) return 0.57;
+  if (hour < 18) return 0.68;
+  if (hour < 20) return 0.78;
+  if (hour < 22) return 0.9;
+  return 1;
+}
+
+function getWaterPacingSnapshot(signals: AISignals): {
+  hour: number;
+  expectedMl: number;
+  hydrationGap: number;
+  behindForTime: boolean;
+  suggestedAmountMl: 250 | 500;
+} {
+  const hour = getCurrentHour();
+  const expectedMl = Math.round(
+    signals.water.targetMl * getExpectedWaterProgressPct(hour),
+  );
+  const hydrationGap = Math.max(expectedMl - signals.water.ml, 0);
+  const behindForTime = hydrationGap >= 250;
+  const suggestedAmountMl: 250 | 500 =
+    hydrationGap >= 500 && signals.water.remainingMl >= 500 ? 500 : 250;
+
+  return {
+    hour,
+    expectedMl,
+    hydrationGap,
+    behindForTime,
+    suggestedAmountMl,
+  };
+}
+
 function getNutritionSuggestion(
   signals: AISignals,
 ): SuggestionCandidate | null {
@@ -104,13 +156,16 @@ function getWaterSuggestion(
 ): SuggestionCandidate | null {
   if (signals.water.goalHit) return null;
 
-  const amount = signals.water.remainingMl >= 500 ? 500 : 250;
+  const { expectedMl, behindForTime, suggestedAmountMl } =
+    getWaterPacingSnapshot(signals);
 
   return {
     module: "nutrition",
-    priority: 66,
-    action: `Drink ${amount}ml of water`,
-    reason: `${signals.water.remainingMl}ml left to hit today's hydration target.`,
+    priority: behindForTime ? 78 : 66,
+    action: `Drink ${suggestedAmountMl}ml of water`,
+    reason: behindForTime
+      ? `${signals.water.remainingMl}ml left, and by now you'd usually be around ${expectedMl}ml.`
+      : `${signals.water.remainingMl}ml left to hit today's hydration target.`,
     href: "/app/nutrition",
     icon: GlassWater,
   };
@@ -222,16 +277,21 @@ export function buildSuggestionCandidates(
 
   if (hasModule(signals, "reading")) {
     if (signals.reading.currentBookTitle) {
-      items.push({
-        module: "reading",
-        priority: 72, // below overdue steps (96) and next goal step (84), above nutrition (62)
-        action: `Read ${signals.reading.targetPages} pages of ${signals.reading.currentBookTitle}`,
-        reason: signals.reading.streak > 0
-          ? `Keep your ${signals.reading.streak}-day streak alive.`
-          : "Start a reading streak today.",
-        href: "/app/reading",
-        icon: BookOpen,
-      });
+      if (!signals.reading.goalHitToday) {
+        items.push({
+          module: "reading",
+          priority: 58,
+          action: `Read ${signals.reading.targetPages} pages of ${signals.reading.currentBookTitle}`,
+          reason:
+            signals.reading.pagesReadToday > 0
+              ? `${signals.reading.pagesReadToday}/${signals.reading.targetPages} pages done so far today.`
+              : signals.reading.streak > 0
+                ? `Keep your ${signals.reading.streak}-day streak alive.`
+                : "Start a reading streak today.",
+          href: "/app/reading",
+          icon: BookOpen,
+        });
+      }
     } else {
       items.push({
         module: "reading",
@@ -278,12 +338,15 @@ export function buildSuggestionCandidates(
   }
 
   if (hasModule(signals, "todos") && signals.todos) {
-    if (signals.todos.totalToday > 0 && signals.todos.doneToday === 0) {
+    if (signals.todos.openCount > 0) {
       items.push({
         module: "todos",
-        priority: 60,
+        priority: signals.todos.doneToday === 0 ? 60 : 54,
         action: "Finish one quick to-do",
-        reason: "A small completed task can unlock momentum fast.",
+        reason:
+          signals.todos.doneToday === 0
+            ? "A small completed task can unlock momentum fast."
+            : `${signals.todos.openCount} to-do${signals.todos.openCount === 1 ? "" : "s"} still open today.`,
         href: "/app/todos",
         icon: CheckSquare,
       });
@@ -297,11 +360,63 @@ export function buildSuggestionCandidates(
     ) {
       items.push({
         module: "schedule",
-        priority: 44,
+        priority: 56,
         action: "Review your next schedule block",
-        reason: "Seeing the next block clearly lowers startup friction.",
+        reason: `${signals.schedule.completedBlocks}/${signals.schedule.totalBlocks} schedule blocks completed today.`,
         href: "/app/schedule",
         icon: CalendarDays,
+      });
+    }
+  }
+
+  if (hasModule(signals, "sleep") && !signals.sleep.loggedToday && getCurrentHour() >= 18) {
+    items.push({
+      module: "sleep",
+      priority: 57,
+      action: "Log last night's sleep",
+      reason: "A quick sleep log helps your recovery view stay useful.",
+      href: "/app/sleep",
+      icon: Moon,
+    });
+  }
+
+  if (
+    hasModule(signals, "wellbeing") &&
+    !signals.wellbeing.loggedToday &&
+    getCurrentHour() >= 18
+  ) {
+    items.push({
+      module: "wellbeing",
+      priority: 53,
+      action: "Write a quick journal check-in",
+      reason: "One short reflection helps you close the day with context.",
+      href: "/app/wellbeing",
+      icon: Heart,
+    });
+  }
+
+  if (hasModule(signals, "skincare") && signals.skincare) {
+    const hour = getCurrentHour();
+
+    if (!signals.skincare.amDone && hour >= 6 && hour < 14) {
+      items.push({
+        module: "skincare",
+        priority: 52,
+        action: "Complete your AM skincare routine",
+        reason: "A quick morning routine keeps the streak easier to maintain.",
+        href: "/app/skincare",
+        icon: Sparkles,
+      });
+    }
+
+    if (!signals.skincare.pmDone && hour >= 18) {
+      items.push({
+        module: "skincare",
+        priority: 52,
+        action: "Complete your PM skincare routine",
+        reason: "Closing your routine tonight makes tomorrow easier to restart.",
+        href: "/app/skincare",
+        icon: Sparkles,
       });
     }
   }

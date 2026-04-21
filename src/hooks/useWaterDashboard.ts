@@ -90,6 +90,14 @@ export function useWaterDashboard() {
     });
   }
 
+  async function setTarget(targetMl: number) {
+    const current = logRef.current;
+    await persist({
+      ...current,
+      targetMl: Math.max(250, Math.round(targetMl)),
+    });
+  }
+
   return {
     log,
     loading,
@@ -100,5 +108,6 @@ export function useWaterDashboard() {
     goalHit,
     addQuick,
     resetToday,
+    setTarget,
   };
 }
