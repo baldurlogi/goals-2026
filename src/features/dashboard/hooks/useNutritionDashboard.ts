@@ -4,11 +4,13 @@ import {
   loadPhase,
   getLoggedMacros,
   seedNutritionCache,
+  seedNutritionPhase,
   NUTRITION_CHANGED_EVENT,
   type NutritionLog,
 } from "@/features/nutrition/nutritionStorage";
 import {
   getTargets,
+  normalizeNutritionPhase,
   type NutritionPhase,
 } from "@/features/nutrition/nutritionData";
 import { useTodayDate } from "@/hooks/useTodayDate";
@@ -23,10 +25,6 @@ function clamp(v: number, lo = 0, hi = 100) {
 
 function pct(value: number, target: number) {
   return clamp(target > 0 ? Math.round((value / target) * 100) : 0);
-}
-
-function normalizePhase(raw: string): NutritionPhase {
-  return raw === "cut" || raw === "maintain" ? raw : "maintain";
 }
 
 function ensureTodayLog(log: NutritionLog, today: string): NutritionLog {
@@ -49,7 +47,9 @@ export function useNutritionDashboard() {
   const [log, setLog] = useState<NutritionLog>(() =>
     authReady && userId ? ensureTodayLog(seedNutritionCache(userId), today) : emptyLog,
   );
-  const [phase, setPhase] = useState<NutritionPhase>("maintain");
+  const [phase, setPhase] = useState<NutritionPhase>(() =>
+    authReady && userId ? seedNutritionPhase(userId) : "maintain",
+  );
   const [loading, setLoading] = useState(() =>
     authReady ? Boolean(userId) : true,
   );
@@ -68,7 +68,7 @@ export function useNutritionDashboard() {
     }
 
     setLog(ensureTodayLog(seedNutritionCache(userId), today));
-    setPhase("maintain");
+    setPhase(seedNutritionPhase(userId));
     setLoading(true);
   }, [authReady, emptyLog, today, userId]);
 
@@ -89,7 +89,7 @@ export function useNutritionDashboard() {
       ]);
 
       setLog(ensureTodayLog(freshLog, today));
-      setPhase(normalizePhase(freshPhase));
+      setPhase(normalizeNutritionPhase(freshPhase));
     } catch (e) {
       console.warn("nutrition dashboard load failed", e);
     } finally {

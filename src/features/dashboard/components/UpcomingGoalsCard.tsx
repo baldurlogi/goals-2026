@@ -48,7 +48,7 @@ function GoalRow({
 }
 
 function UpcomingGoalsCardInner() {
-  const { previewItems, overdueCount, hasMore, extraCount, horizon, totalCount, loading } =
+  const { previewItems, overdueCount, hasMore, extraCount, totalCount, loading } =
     useGoalsDashboard();
 
   const cacheEmpty = previewItems.length === 0 && overdueCount === 0 && totalCount === 0;
@@ -73,10 +73,9 @@ function UpcomingGoalsCardInner() {
           )}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Next <span className="font-semibold text-foreground">{horizon} days</span>
           {totalCount > 0 && (
             <span className="text-muted-foreground">
-              {" "}· {totalCount} step{totalCount !== 1 ? "s" : ""}
+              {totalCount} step{totalCount !== 1 ? "s" : ""}
             </span>
           )}
         </p>
@@ -87,7 +86,7 @@ function UpcomingGoalsCardInner() {
           <div className="rounded-lg bg-muted/40 px-3 py-4 text-center">
             <p className="text-sm font-medium">All clear 🎉</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Nothing due in the next {horizon} days.
+              No overdue steps or goals due today.
             </p>
           </div>
         ) : (

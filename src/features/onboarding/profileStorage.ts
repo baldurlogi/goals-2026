@@ -9,6 +9,11 @@ import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import type { ModuleId } from "@/features/modules/modules";
 import { clampNumberValue } from "@/lib/numericInput";
 import {
+  DEFAULT_VISIBLE_NUTRITION_PHASES,
+  normalizeNutritionGoalFocuses,
+  type NutritionPhase,
+} from "@/features/nutrition/nutritionData";
+import {
   DEFAULT_USER_PREFERENCES,
   normalizeDateFormatPreference,
   normalizeMeasurementSystem,
@@ -75,6 +80,10 @@ export type UserProfile = {
   onboarding_done: boolean;
   macro_maintain: MacroTargets | null;
   macro_cut: MacroTargets | null;
+  macro_recomp: MacroTargets | null;
+  macro_muscle_gain: MacroTargets | null;
+  macro_performance: MacroTargets | null;
+  nutrition_goal_focuses: NutritionPhase[] | null;
   default_schedule_view: LegacyScheduleView;
   weekly_schedule: WeeklySchedule;
   daily_reading_goal: number;
@@ -87,6 +96,40 @@ export type UserProfile = {
 
 const LEGACY_CACHE_KEY = "cache:profile:v1";
 const PROFILE_CACHE_KEY = CACHE_KEYS.PROFILE;
+const NUTRITION_GOAL_FOCUSES_CACHE_KEY = CACHE_KEYS.NUTRITION_GOAL_FOCUSES;
+
+function readNutritionGoalFocusesCache(
+  userId: string | null | undefined,
+): NutritionPhase[] | null {
+  if (!userId) return null;
+
+  try {
+    const raw = getScopedStorageItem(NUTRITION_GOAL_FOCUSES_CACHE_KEY, userId);
+    if (!raw) return null;
+
+    return normalizeNutritionGoalFocuses(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function writeNutritionGoalFocusesCache(
+  userId: string | null | undefined,
+  focuses: NutritionPhase[] | null | undefined,
+): void {
+  if (!userId) return;
+
+  try {
+    const normalized = normalizeNutritionGoalFocuses(focuses);
+    writeScopedStorageItem(
+      NUTRITION_GOAL_FOCUSES_CACHE_KEY,
+      userId,
+      JSON.stringify(normalized),
+    );
+  } catch {
+    // ignore storage failures
+  }
+}
 
 export function mapLegacyScheduleToWeekly(
   legacy: LegacyScheduleView | null | undefined,
@@ -159,10 +202,15 @@ export function normalizeUserProfile(raw: UserProfile): UserProfile {
     (raw as UserProfile & { weekly_schedule?: WeeklySchedule | null }).weekly_schedule,
     raw.default_schedule_view,
   );
+  const nutritionGoalFocuses = normalizeNutritionGoalFocuses(
+    (raw as UserProfile & { nutrition_goal_focuses?: NutritionPhase[] | null })
+      .nutrition_goal_focuses,
+  );
 
   return {
     ...raw,
     weekly_schedule: weeklySchedule,
+    nutrition_goal_focuses: nutritionGoalFocuses,
     default_schedule_view: deriveLegacyScheduleView(weeklySchedule),
     measurement_system: normalizeMeasurementSystem(raw.measurement_system),
     date_format: normalizeDateFormatPreference(raw.date_format),
@@ -249,6 +297,10 @@ function defaultProfile(id: string): UserProfile {
     onboarding_done: false,
     macro_maintain: null,
     macro_cut: null,
+    macro_recomp: null,
+    macro_muscle_gain: null,
+    macro_performance: null,
+    nutrition_goal_focuses: [...DEFAULT_VISIBLE_NUTRITION_PHASES],
     default_schedule_view: "office",
     weekly_schedule: { ...DEFAULT_WEEKLY_SCHEDULE },
     daily_reading_goal: 20,
@@ -342,6 +394,7 @@ function getMissingProfileColumn(error: unknown): string | null {
 
 function writeProfileCache(profile: UserProfile) {
   try {
+    writeNutritionGoalFocusesCache(profile.id, profile.nutrition_goal_focuses);
     writeScopedStorageItem(
       PROFILE_CACHE_KEY,
       profile.id,
@@ -413,9 +466,36 @@ export async function loadProfile(
       return null;
     }
 
-    const profile = normalizeUserProfile(data as UserProfile);
-    writeProfileCache(profile);
-    return profile;
+    const serverProfile = data as UserProfile & {
+      macro_recomp?: MacroTargets | null;
+      macro_muscle_gain?: MacroTargets | null;
+      macro_performance?: MacroTargets | null;
+      nutrition_goal_focuses?: NutritionPhase[] | null;
+    };
+    const profile = normalizeUserProfile(serverProfile as UserProfile);
+    const cachedGoalFocuses = readNutritionGoalFocusesCache(userId);
+    const mergedProfile = normalizeUserProfile({
+      ...profile,
+      macro_recomp:
+        serverProfile.macro_recomp === undefined
+          ? cached?.macro_recomp ?? null
+          : profile.macro_recomp,
+      macro_muscle_gain:
+        serverProfile.macro_muscle_gain === undefined
+          ? cached?.macro_muscle_gain ?? null
+          : profile.macro_muscle_gain,
+      macro_performance:
+        serverProfile.macro_performance === undefined
+          ? cached?.macro_performance ?? null
+          : profile.macro_performance,
+      nutrition_goal_focuses:
+        serverProfile.nutrition_goal_focuses &&
+        serverProfile.nutrition_goal_focuses.length > 0
+          ? profile.nutrition_goal_focuses
+          : (cachedGoalFocuses ?? profile.nutrition_goal_focuses),
+    });
+    writeProfileCache(mergedProfile);
+    return mergedProfile;
   })();
 
   inFlightProfileLoads.set(userId, loadPromise);
@@ -497,6 +577,26 @@ export async function saveProfile(
   if ("macro_cut" in normalizedPatch) {
     normalizedPatch.macro_cut = normalizeMacros(normalizedPatch.macro_cut);
   }
+  if ("macro_recomp" in normalizedPatch) {
+    normalizedPatch.macro_recomp = normalizeMacros(
+      normalizedPatch.macro_recomp,
+    );
+  }
+  if ("macro_muscle_gain" in normalizedPatch) {
+    normalizedPatch.macro_muscle_gain = normalizeMacros(
+      normalizedPatch.macro_muscle_gain,
+    );
+  }
+  if ("macro_performance" in normalizedPatch) {
+    normalizedPatch.macro_performance = normalizeMacros(
+      normalizedPatch.macro_performance,
+    );
+  }
+  if ("nutrition_goal_focuses" in normalizedPatch) {
+    normalizedPatch.nutrition_goal_focuses = normalizeNutritionGoalFocuses(
+      normalizedPatch.nutrition_goal_focuses,
+    );
+  }
 
   if (normalizedPatch.weekly_schedule) {
     normalizedPatch.weekly_schedule = normalizeWeeklySchedule(
@@ -516,6 +616,13 @@ export async function saveProfile(
     ...normalizedPatch,
   };
 
+  if ("nutrition_goal_focuses" in normalizedPatch) {
+    writeNutritionGoalFocusesCache(
+      userId,
+      normalizedPatch.nutrition_goal_focuses,
+    );
+  }
+
   while (true) {
     const { error } = await supabase
       .from("profiles")
@@ -529,7 +636,15 @@ export async function saveProfile(
     }
 
     delete upsertPayload[missingColumn];
-    delete persistedPatch[missingColumn as keyof Omit<UserProfile, "id">];
+
+    if (
+      missingColumn !== "nutrition_goal_focuses" &&
+      missingColumn !== "macro_recomp" &&
+      missingColumn !== "macro_muscle_gain" &&
+      missingColumn !== "macro_performance"
+    ) {
+      delete persistedPatch[missingColumn as keyof Omit<UserProfile, "id">];
+    }
 
     if (import.meta.env.DEV) {
       console.warn("[profile] retrying save without missing column", {
@@ -576,6 +691,12 @@ export async function completeOnboarding(
     ...profile,
     macro_maintain: profile.macro_maintain ?? null,
     macro_cut: profile.macro_cut ?? null,
+    macro_recomp: profile.macro_recomp ?? null,
+    macro_muscle_gain: profile.macro_muscle_gain ?? null,
+    macro_performance: profile.macro_performance ?? null,
+    nutrition_goal_focuses:
+      profile.nutrition_goal_focuses ??
+      [...DEFAULT_VISIBLE_NUTRITION_PHASES],
     onboarding_done: true,
   });
 }

@@ -74,6 +74,11 @@ const ALL_CATEGORIES: (AchievementCategory | "all")[] = [
   "nutrition",
   "reading",
   "todos",
+  "water",
+  "sleep",
+  "wellbeing",
+  "skincare",
+  "finance",
   "streaks",
   "meta",
 ];

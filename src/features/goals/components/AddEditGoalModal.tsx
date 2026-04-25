@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Plus, Sparkles, ChevronDown, GripVertical } from "lucide-react";
+import { Trash2, Plus, Sparkles, ChevronDown, GripVertical, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { queueAIContextNudge } from "./AIContextNudge.utils";
 import { useAuth } from "@/features/auth/authContext";
 import { capture, captureOnce } from "@/lib/analytics";
 import { buildStepNotes, parseStepDetails, parseStepLinksInput } from "../stepDetails";
+import { useGoalProgressState } from "../goalStore";
 
 const PRIORITY_OPTIONS: UserGoal["priority"][] = ["high", "medium", "low"];
 
@@ -67,6 +68,7 @@ export function AddEditGoalModal({
   initialAIPrompt = "",
 }: Props) {
   const { userId } = useAuth();
+  const { doneState } = useGoalProgressState();
   const isEdit = !!initial;
   const [mode, setMode] = useState<Mode>(
     isEdit ? "manual" : startWithAI ? "ai" : "manual",
@@ -78,12 +80,33 @@ export function AddEditGoalModal({
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
   const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const stepsListRef = useRef<HTMLDivElement>(null);
+  const stepItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pendingScrollStepIdRef = useRef<string | null>(null);
   const creationStartTrackedRef = useRef(false);
   const initialGoalCountRef = useRef<number>(isEdit ? 1 : seedGoalCache(userId).length);
 
   useEffect(() => {
     if (mode === "manual") titleRef.current?.focus();
   }, [mode]);
+
+  useEffect(() => {
+    const pendingStepId = pendingScrollStepIdRef.current;
+    if (!pendingStepId) return;
+
+    const stepCard = stepItemRefs.current[pendingStepId];
+    if (!stepCard) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      stepCard.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+      pendingScrollStepIdRef.current = null;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [goal.steps.length, openStepId]);
 
   useEffect(() => {
     if (isEdit || creationStartTrackedRef.current) return;
@@ -121,6 +144,18 @@ export function AddEditGoalModal({
       goal_title: savedGoal.title,
       steps_count: savedGoal.steps.length,
       creation_mode: mode,
+      goal_creation_method: mode,
+      is_first_goal: true,
+      source: "goal_modal",
+      route: window.location.pathname,
+    });
+
+    captureOnce("first_goal_created", userId, {
+      goal_id: savedGoal.id,
+      goal_title: savedGoal.title,
+      steps_count: savedGoal.steps.length,
+      creation_mode: mode,
+      goal_creation_method: mode,
       is_first_goal: true,
       source: "goal_modal",
       route: window.location.pathname,
@@ -131,6 +166,7 @@ export function AddEditGoalModal({
       goal_title: savedGoal.title,
       steps_count: savedGoal.steps.length,
       creation_mode: mode,
+      goal_creation_method: mode,
       is_first_goal: true,
       source: "goal_modal",
       route: window.location.pathname,
@@ -144,6 +180,7 @@ export function AddEditGoalModal({
 
   function addStep() {
     const step = createBlankStep(goal.steps.length);
+    pendingScrollStepIdRef.current = step.id;
     updateGoal({ steps: [...goal.steps, step] });
     setOpenStepId(step.id);
   }
@@ -375,10 +412,14 @@ export function AddEditGoalModal({
                   Keep it simple: add a step title first. Details are optional. Drag by the grip to reorder.
                 </p>
 
-                <div className="space-y-2">
+                <div
+                  ref={stepsListRef}
+                  className="max-h-[min(42dvh,420px)] space-y-2 overflow-y-auto pr-1"
+                >
                   {goal.steps.map((step, idx) => {
                     const isOpen = openStepId === step.id;
                     const isDragTarget = dragOverStepId === step.id;
+                    const isCompleted = Boolean(goal.id && doneState[goal.id]?.[step.id]);
                     const details = parseStepDetails(step);
                     const guidanceText = details.guidance.join("\n");
                     const linksText = (step.links?.length ? step.links : details.links).join("\n");
@@ -386,10 +427,16 @@ export function AddEditGoalModal({
                     return (
                       <div
                         key={step.id}
+                        ref={(element) => {
+                          stepItemRefs.current[step.id] = element;
+                        }}
                         className={cn(
                           "overflow-hidden rounded-xl border transition-colors",
                           draggingStepId === step.id && "opacity-60",
                           isDragTarget && "border-primary bg-primary/5",
+                          isCompleted &&
+                            !isDragTarget &&
+                            "border-emerald-500/35 bg-emerald-500/8 shadow-[0_0_0_1px_rgba(16,185,129,0.08)]",
                         )}
                         onDragOver={(event) => {
                           event.preventDefault();
@@ -411,7 +458,14 @@ export function AddEditGoalModal({
                         }}
                       >
                         <div className="flex items-center gap-3 px-3 py-3">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                          <div
+                            className={cn(
+                              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                              isCompleted
+                                ? "bg-emerald-500/15 text-emerald-500"
+                                : "bg-muted text-foreground",
+                            )}
+                          >
                             {idx + 1}
                           </div>
 
@@ -437,16 +491,29 @@ export function AddEditGoalModal({
                               updateStep(step.id, { label: e.target.value })
                             }
                             placeholder="Step label"
-                            className="h-9 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                            className={cn(
+                              "h-9 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0",
+                              isCompleted && "font-medium text-emerald-100/95",
+                            )}
                           />
 
                           <div className="flex items-center gap-2">
+                            {isCompleted && (
+                              <div className="hidden items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-400 sm:inline-flex">
+                                <Check className="h-3 w-3" />
+                                Completed
+                              </div>
+                            )}
                             <button
                               type="button"
                               onClick={() => setOpenStepId(isOpen ? null : step.id)}
                               title={isOpen ? "Hide details" : "Show details"}
                               aria-label={isOpen ? "Hide details" : "Show details"}
-                              className="inline-flex h-10 min-w-20 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                              className={cn(
+                                "inline-flex h-10 min-w-20 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
+                                isCompleted &&
+                                  "border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200",
+                              )}
                             >
                               <span>Details</span>
                               <ChevronDown
@@ -470,7 +537,12 @@ export function AddEditGoalModal({
                         </div>
 
                         {isOpen && (
-                          <div className="space-y-2 border-t px-3 pb-3 pt-3">
+                          <div
+                            className={cn(
+                              "space-y-2 border-t px-3 pb-3 pt-3",
+                              isCompleted && "border-emerald-500/15 bg-emerald-500/5",
+                            )}
+                          >
                             <div className="space-y-1">
                               <div className="text-xs text-muted-foreground">
                                 How

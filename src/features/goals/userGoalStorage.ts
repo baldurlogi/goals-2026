@@ -5,6 +5,12 @@ import { getLocalDateKey } from '@/hooks/useTodayDate';
 import { getActiveUserId, getScopedStorageItem, writeScopedStorageItem } from '@/lib/activeUser';
 
 const CACHE_KEY = CACHE_KEYS.USER_GOALS;
+const GOALS_CHANGED_EVENT = 'goals:changed';
+
+function emitGoalsChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(GOALS_CHANGED_EVENT));
+}
 
 function scopedCacheKey(userId: string) {
   return `${CACHE_KEY}:${userId}`;
@@ -129,6 +135,9 @@ export async function saveUserGoal(userId: string | null, goal: UserGoal): Promi
   if (idx >= 0) cached[idx] = goal;
   else cached.push(goal);
   const localCacheWriteSucceeded = writeCache(userId, cached);
+  if (localCacheWriteSucceeded) {
+    emitGoalsChanged();
+  }
 
   const { error } = await supabase
     .from("user_goals")
@@ -160,6 +169,9 @@ export async function deleteUserGoal(userId: string | null, goalId: string): Pro
     userId,
     readCache(userId).filter((g) => g.id !== goalId),
   );
+  if (localCacheWriteSucceeded) {
+    emitGoalsChanged();
+  }
 
   const { error } = await supabase
     .from("user_goals")

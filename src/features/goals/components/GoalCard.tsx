@@ -16,6 +16,7 @@ type Props = {
   goal: UserGoal;
   doneMap?: Record<string, boolean>;
   overdueCount?: number;
+  isCompleted?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
   onImprove?: () => void;
@@ -25,6 +26,7 @@ export function GoalCard({
   goal,
   doneMap = {},
   overdueCount = 0,
+  isCompleted = false,
   onEdit,
   onDelete,
   onImprove,
@@ -39,9 +41,12 @@ export function GoalCard({
     (s) => s.idealFinish && s.idealFinish < today && !doneMap[s.id],
   ).length;
   const displayOverdue = overdueCount || overdueSteps;
+  const cardClassName = isCompleted
+    ? 'border-emerald-500/30 bg-linear-to-br from-emerald-500/10 via-card to-emerald-400/5 shadow-[0_18px_45px_-28px_rgba(16,185,129,0.45)]'
+    : 'border bg-card shadow-sm';
 
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+    <div className={`rounded-2xl p-5 space-y-4 ${cardClassName}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -57,7 +62,13 @@ export function GoalCard({
               {goal.priority}
             </span>
 
-            {displayOverdue > 0 && (
+            {isCompleted && (
+              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                completed
+              </span>
+            )}
+
+            {!isCompleted && displayOverdue > 0 && (
               <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
                 {displayOverdue} overdue
               </span>
@@ -84,7 +95,11 @@ export function GoalCard({
           <span>Progress</span>
           <span className="tabular-nums">{pct}%</span>
         </div>
-        <Progress value={pct} className="h-2" />
+        <Progress
+          value={pct}
+          className={isCompleted ? 'h-2 bg-emerald-500/10' : 'h-2'}
+          indicatorClassName={isCompleted ? 'bg-emerald-500' : undefined}
+        />
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

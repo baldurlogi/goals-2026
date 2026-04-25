@@ -8,6 +8,7 @@ import {
   useAIUsageSnapshotState,
 } from "@/features/subscription/aiUsageCache";
 import { TIER_BADGE, TIER_LABELS, useTier } from "@/features/subscription/useTier";
+import { AI_ACTION_CREDIT_COSTS } from "@/features/subscription/aiCredits";
 import {
   PAID_PLANS_COMING_SOON,
   PAID_PLANS_COMING_SOON_LABEL,
@@ -27,9 +28,9 @@ export function AIUsageDetailsCard({ className }: Props) {
 
   const known = Boolean(snapshot);
   const monthlyLimit = snapshot?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
-  const promptsUsed = snapshot?.promptsUsed ?? null;
+  const creditsUsed = snapshot?.creditsUsed ?? null;
   const remaining = snapshot?.remaining ?? null;
-  const fillPct = clampPercent((((promptsUsed ?? 0) / monthlyLimit) * 100));
+  const fillPct = clampPercent((((creditsUsed ?? 0) / monthlyLimit) * 100));
   const exhausted = known && remaining === 0;
   const low =
     known &&
@@ -51,9 +52,9 @@ export function AIUsageDetailsCard({ className }: Props) {
               <Sparkles className="h-4 w-4 text-violet-400" />
             </div>
             <div>
-              <CardTitle className="text-base">AI usage</CardTitle>
+              <CardTitle className="text-base">AI credits</CardTitle>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Your monthly AI prompt allowance and current usage. Resets on the 1st of each month.
+                Your monthly AI credit balance and current usage. Resets on the 1st of each month.
               </p>
             </div>
           </div>
@@ -70,9 +71,9 @@ export function AIUsageDetailsCard({ className }: Props) {
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
               Used
             </div>
-            <div className="mt-1 text-2xl font-bold">{promptsUsed ?? "—"}</div>
+            <div className="mt-1 text-2xl font-bold">{creditsUsed ?? "—"}</div>
             <div className="text-xs text-muted-foreground">
-              {known ? "prompts this month" : hydrating ? "syncing your usage" : "usage unavailable"}
+              {known ? "credits this month" : hydrating ? "syncing your usage" : "usage unavailable"}
             </div>
           </div>
 
@@ -99,7 +100,7 @@ export function AIUsageDetailsCard({ className }: Props) {
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="font-medium text-foreground">This month</span>
             <span className="text-muted-foreground">
-              {known ? `${promptsUsed}/${monthlyLimit} used · ${Math.round(fillPct)}%` : `—/${monthlyLimit} used`}
+              {known ? `${creditsUsed}/${monthlyLimit} used · ${Math.round(fillPct)}%` : `—/${monthlyLimit} used`}
             </span>
           </div>
 
@@ -120,25 +121,26 @@ export function AIUsageDetailsCard({ className }: Props) {
           <p className="text-xs text-muted-foreground">
             {known
               ? exhausted
-                ? "You've used all available prompts for this month. Non-AI features still work normally."
-                : `${remaining} prompts are still available this month.`
+                ? "You've used all available credits for this month. Non-AI features still work normally."
+                : `${remaining} credits are still available this month.`
               : hydrating
-                ? "Syncing your current month's AI usage."
-                : "Current usage could not be synced yet. It will update after the next successful AI action."}
+                ? "Syncing your current month's AI credits."
+                : "Current credit usage could not be synced yet. It will update after the next successful AI action."}
           </p>
         </div>
 
         <div className="rounded-xl border bg-background/70 p-3">
           <div className="mb-2 flex items-center gap-2 text-sm font-medium">
             <Zap className="h-3.5 w-3.5 text-violet-400" />
-            What uses a prompt
+            What spends credits
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             {[
-              "Generate a goal plan",
-              "Improve with AI",
-              "AI coach refresh",
-              "AI weekly report",
+              `Goal generation · ${AI_ACTION_CREDIT_COSTS.goalGeneration} credits`,
+              `Improve goal · ${AI_ACTION_CREDIT_COSTS.goalImprove} credits`,
+              `Coach suggestion · ${AI_ACTION_CREDIT_COSTS.coachSuggestion} credit`,
+              `Weekly report · ${AI_ACTION_CREDIT_COSTS.weeklyReport} credits`,
+              `Workout plan · ${AI_ACTION_CREDIT_COSTS.fitnessWeeklyPlan} credits`,
             ].map((item) => (
               <span key={item} className="rounded-full border bg-muted/40 px-2.5 py-1">
                 {item}

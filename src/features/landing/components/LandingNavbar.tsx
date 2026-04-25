@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AnimatePresence, m } from "framer-motion";
+import { fadeUp, landingEase, staggerContainer } from "../motion";
 import { TOKENS } from "../theme/tokens";
 import type { ThemeMode } from "../types";
 
@@ -61,8 +63,11 @@ export function LandingNavbar({
   }
 
   return (
-    <nav
+    <m.nav
       className="fixed inset-x-0 top-0 z-50 h-16 px-4 sm:px-6 lg:px-8"
+      initial={{ opacity: 0, y: -18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, ease: landingEase }}
       style={{
         backdropFilter: "blur(14px)",
         background: scrolled
@@ -158,49 +163,68 @@ export function LandingNavbar({
         </div>
       </div>
 
-      {isMobileMenuOpen ? (
-        <div
-          id="landing-mobile-menu"
-          className="mx-auto mt-2 w-full max-w-7xl rounded-2xl border p-2 md:hidden"
-          style={{
-            background: theme === "dark" ? "rgba(6,11,20,0.96)" : "rgba(255,255,255,0.97)",
-            borderColor: t.border,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => handleMobileScrollTo("how-it-works")}
-            className="w-full rounded-xl px-3 py-2 text-left text-sm"
-            style={{ color: t.textSoft }}
+      <AnimatePresence initial={false}>
+        {isMobileMenuOpen ? (
+          <m.div
+            id="landing-mobile-menu"
+            className="mx-auto mt-2 w-full max-w-7xl rounded-2xl border p-2 md:hidden"
+            initial={{ opacity: 0, y: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.985 }}
+            transition={{ duration: 0.22, ease: landingEase }}
+            style={{
+              background:
+                theme === "dark"
+                  ? "rgba(6,11,20,0.96)"
+                  : "rgba(255,255,255,0.97)",
+              borderColor: t.border,
+            }}
           >
-            How it works
-          </button>
-          <button
-            type="button"
-            onClick={() => handleMobileScrollTo("features")}
-            className="w-full rounded-xl px-3 py-2 text-left text-sm"
-            style={{ color: t.textSoft }}
-          >
-            Why it sticks
-          </button>
-          <button
-            type="button"
-            onClick={() => handleMobileScrollTo("pricing")}
-            className="w-full rounded-xl px-3 py-2 text-left text-sm"
-            style={{ color: t.textSoft }}
-          >
-            Pricing
-          </button>
-          <button
-            type="button"
-            onClick={handleMobileSignIn}
-            className="w-full rounded-xl px-3 py-2 text-left text-sm"
-            style={{ color: t.textSoft }}
-          >
-            Log in
-          </button>
-        </div>
-      ) : null}
-    </nav>
+            <m.div
+              initial="hidden"
+              animate="visible"
+              variants={staggerContainer(0.06, 0.02)}
+            >
+              <m.button
+                type="button"
+                onClick={() => handleMobileScrollTo("how-it-works")}
+                className="w-full rounded-xl px-3 py-2 text-left text-sm"
+                variants={fadeUp(10)}
+                style={{ color: t.textSoft }}
+              >
+                How it works
+              </m.button>
+              <m.button
+                type="button"
+                onClick={() => handleMobileScrollTo("features")}
+                className="w-full rounded-xl px-3 py-2 text-left text-sm"
+                variants={fadeUp(10)}
+                style={{ color: t.textSoft }}
+              >
+                Why it sticks
+              </m.button>
+              <m.button
+                type="button"
+                onClick={() => handleMobileScrollTo("pricing")}
+                className="w-full rounded-xl px-3 py-2 text-left text-sm"
+                variants={fadeUp(10)}
+                style={{ color: t.textSoft }}
+              >
+                Pricing
+              </m.button>
+              <m.button
+                type="button"
+                onClick={handleMobileSignIn}
+                className="w-full rounded-xl px-3 py-2 text-left text-sm"
+                variants={fadeUp(10)}
+                style={{ color: t.textSoft }}
+              >
+                Log in
+              </m.button>
+            </m.div>
+          </m.div>
+        ) : null}
+      </AnimatePresence>
+    </m.nav>
   );
 }

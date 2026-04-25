@@ -50,6 +50,16 @@ type GoalRouteState = { openGoalModal?: 'new' | 'ai' } | null;
 
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
+function isGoalCompleted(
+  goal: UserGoal,
+  doneState: Record<string, Record<string, boolean>>,
+) {
+  return (
+    goal.steps.length > 0 &&
+    goal.steps.every((step) => Boolean(doneState[goal.id]?.[step.id]))
+  );
+}
+
 export function GoalsPage() {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
@@ -139,6 +149,19 @@ export function GoalsPage() {
     });
   }, [goals, sort, overdueCountByGoal]);
 
+  const activeGoals = useMemo(
+    () => sorted.filter((goal) => !isGoalCompleted(goal, done)),
+    [done, sorted],
+  );
+
+  const completedGoals = useMemo(
+    () =>
+      sorted
+        .filter((goal) => isGoalCompleted(goal, done))
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [done, sorted],
+  );
+
   async function handleDelete(goalId: string) {
     if (!confirm("Delete this goal? This can't be undone.")) return;
 
@@ -173,7 +196,9 @@ export function GoalsPage() {
           <p className="text-sm text-muted-foreground">
             {goals.length === 0
               ? 'Add your first goal to get started.'
-              : 'Check off steps to update progress automatically.'}
+              : activeGoals.length === 0
+                ? 'All your current goals are complete. Start a new one when you are ready.'
+                : 'Check off steps to update progress automatically.'}
           </p>
         </div>
 
@@ -243,20 +268,70 @@ export function GoalsPage() {
         </div>
       )}
 
-      {!loading && sorted.length > 0 && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {sorted.map((goal) => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              doneMap={done[goal.id]}
-              overdueCount={overdueCountByGoal[goal.id] ?? 0}
-              onEdit={() => setLocalModal(goal)}
-              onDelete={() => handleDelete(goal.id)}
-              onImprove={isPro ? () => setImprovingGoal(goal) : undefined}
-            />
-          ))}
+      {!loading && activeGoals.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-widest text-sky-700 dark:text-sky-300">
+                Active goals
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {activeGoals.length} goal{activeGoals.length === 1 ? '' : 's'} in progress
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {activeGoals.map((goal) => (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                doneMap={done[goal.id]}
+                overdueCount={overdueCountByGoal[goal.id] ?? 0}
+                onEdit={() => setLocalModal(goal)}
+                onDelete={() => handleDelete(goal.id)}
+                onImprove={isPro ? () => setImprovingGoal(goal) : undefined}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!loading && activeGoals.length === 0 && completedGoals.length > 0 && (
+        <div className="rounded-2xl border border-dashed p-8 text-center">
+          <div className="text-3xl">🏁</div>
+          <div className="mt-3 text-lg font-semibold">All current goals completed</div>
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+            Your finished goals are saved below. Start a new goal whenever you want to build fresh momentum.
+          </p>
         </div>
+      )}
+
+      {!loading && completedGoals.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400">
+              Completed goals
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground text-amber-500 dark:text-amber-200">
+              {completedGoals.length} goal{completedGoals.length === 1 ? '' : 's'} finished
+            </p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {completedGoals.map((goal) => (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                doneMap={done[goal.id]}
+                isCompleted
+                onEdit={() => setLocalModal(goal)}
+                onDelete={() => handleDelete(goal.id)}
+                onImprove={isPro ? () => setImprovingGoal(goal) : undefined}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {modal !== null && (

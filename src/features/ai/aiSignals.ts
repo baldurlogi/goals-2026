@@ -11,13 +11,37 @@ import {
   getWeakestLiftLabel,
   loadPRGoals,
 } from "@/features/fitness/fitnessStorage";
+import { loadWeeklySplit } from "@/features/fitness/weeklySplitStorage";
 import { loadRecentSleepRecoveryEntries } from "@/features/sleep/sleepStorage";
 import { loadRecentMentalWellbeingEntries } from "@/features/wellbeing/wellbeingStorage";
+import {
+  DEFAULT_READING_INPUTS,
+  getTodayReadingProgress,
+} from "@/features/reading/readingStorage";
+import type { ReadingDailyProgress } from "@/features/reading/readingTypes";
 import {
   loadNutritionLog,
   loadPhase,
 } from "@/features/nutrition/nutritionStorage";
+import {
+  getTargets,
+  type NutritionPhase,
+} from "@/features/nutrition/nutritionData";
 import { loadWaterLog } from "@/features/water/waterStorage";
+import {
+  loadScheduleLog,
+  loadScheduleTemplates,
+  getScheduleSummary,
+} from "@/features/schedule/scheduleStorage";
+import {
+  DEFAULT_USER_SCHEDULE,
+  buildScheduleConfig,
+} from "@/features/schedule/scheduleData";
+import {
+  getRoutineItems,
+  getRoutineTemplate,
+  isRoutineSectionComplete,
+} from "@/features/skincare/skincareStorage";
 import {
   getActiveUserId,
   getScopedStorageItem,
@@ -49,6 +73,8 @@ type ReadingState = {
   totalPages: number | null;
   streak: number;
   targetPages: number;
+  pagesReadToday: number;
+  goalHitToday: boolean;
 };
 
 type TodoSignal = {
@@ -92,7 +118,7 @@ export type AISignals = {
     }>;
   };
   nutrition: {
-    phase: "maintain" | "cut";
+    phase: NutritionPhase;
     mealsLoggedToday: number;
     calorieTarget: number | null;
     proteinTarget: number | null;
@@ -111,6 +137,7 @@ export type AISignals = {
   };
   sleep: {
     lastLogDate: string | null;
+    loggedToday: boolean;
     lastSleepDurationMinutes: number | null;
     lastSleepQualityScore: number | null;
     averageSleepDurationMinutes: number | null;
@@ -120,6 +147,8 @@ export type AISignals = {
   };
   wellbeing: {
     lastLogDate: string | null;
+    loggedToday: boolean;
+    journaledToday: boolean;
     lastMoodScore: number | null;
     lastStressLevel: number | null;
     averageMoodScore: number | null;
@@ -132,6 +161,12 @@ export type AISignals = {
   schedule: {
     completedBlocks: number;
     totalBlocks: number;
+  } | null;
+  skincare: {
+    amDone: boolean;
+    pmDone: boolean;
+    completedSteps: number;
+    totalSteps: number;
   } | null;
 };
 
@@ -349,6 +384,30 @@ function countOverdueIncompleteSteps(
   }, 0);
 }
 
+function normalizeReadingDailyProgress(
+  value: unknown,
+): ReadingDailyProgress | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const source = value as Partial<ReadingDailyProgress>;
+
+  if (
+    typeof source.date !== "string" ||
+    typeof source.bookKey !== "string" ||
+    typeof source.baselinePage !== "number" ||
+    typeof source.latestPage !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    date: source.date,
+    bookKey: source.bookKey,
+    baselinePage: source.baselinePage,
+    latestPage: source.latestPage,
+  };
+}
+
 function readReadingState(): ReadingState {
   try {
     const raw = getScopedStorageItem(
@@ -363,6 +422,8 @@ function readReadingState(): ReadingState {
         totalPages: null,
         streak: 0,
         targetPages: 20,
+        pagesReadToday: 0,
+        goalHitToday: false,
       };
     }
 
@@ -376,9 +437,31 @@ function readReadingState(): ReadingState {
       streak?: number;
       lastReadDate?: string | null;
       dailyGoalPages?: string | number;
+      dailyProgress?: unknown;
     };
 
     const book = parsed.current;
+    const readingInputs = {
+      ...DEFAULT_READING_INPUTS,
+      current: {
+        ...DEFAULT_READING_INPUTS.current,
+        title: typeof book?.title === "string" ? book.title : "",
+        author: typeof book?.author === "string" ? book.author : "",
+        currentPage:
+          book?.currentPage != null ? String(book.currentPage) : "",
+        totalPages:
+          book?.totalPages != null ? String(book.totalPages) : "",
+      },
+      dailyGoalPages:
+        parsed.dailyGoalPages != null
+          ? String(parsed.dailyGoalPages)
+          : DEFAULT_READING_INPUTS.dailyGoalPages,
+      dailyProgress: normalizeReadingDailyProgress(parsed.dailyProgress),
+      streak: typeof parsed.streak === "number" ? parsed.streak : 0,
+      lastReadDate:
+        typeof parsed.lastReadDate === "string" ? parsed.lastReadDate : null,
+    };
+    const progress = getTodayReadingProgress(readingInputs, getActiveUserId());
 
     return {
       currentBookTitle:
@@ -408,6 +491,11 @@ function readReadingState(): ReadingState {
         parsed.dailyGoalPages != null
           ? parseInt(String(parsed.dailyGoalPages), 10) || 20
           : 20,
+      pagesReadToday: progress.pagesRead,
+      goalHitToday:
+        progress.goalPages > 0
+          ? progress.pagesRead >= progress.goalPages
+          : progress.pagesRead > 0,
     };
   } catch {
     return {
@@ -417,6 +505,8 @@ function readReadingState(): ReadingState {
       totalPages: null,
       streak: 0,
       targetPages: 20,
+      pagesReadToday: 0,
+      goalHitToday: false,
     };
   }
 }
@@ -515,6 +605,25 @@ function computeTrend(values: number[]): ScoreTrend {
   return delta > 0 ? "up" : "down";
 }
 
+function getDaysSinceWeeklySplitWorkout(
+  split: Awaited<ReturnType<typeof loadWeeklySplit>> | null,
+): number | null {
+  if (!split) return null;
+
+  const completedDates = Object.values(split.days ?? {})
+    .map((day) => day.completedDate ?? null)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+
+  const latest = completedDates.at(-1) ?? null;
+  if (!latest) return null;
+
+  const time = new Date(`${latest}T00:00:00`).getTime();
+  if (Number.isNaN(time)) return null;
+
+  return Math.floor((Date.now() - time) / 86400000);
+}
+
 export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
   const cached = !forceRefresh ? readCache() : null;
 
@@ -547,11 +656,14 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
 
   const activeUserId = getActiveUserId();
 
-  const [profile, goals, prGoals, nutritionPhase, recentSleepEntries, recentWellbeingEntries] =
+  const [profile, goals, prGoals, weeklySplit, nutritionPhase, recentSleepEntries, recentWellbeingEntries, scheduleSignal, skincareSignal] =
     await Promise.all([
     Promise.resolve(loadProfile()).catch(() => null),
     Promise.resolve(loadUserGoals()).catch(() => []),
     Promise.resolve(loadPRGoals()).catch(() => []),
+    activeUserId
+      ? Promise.resolve(loadWeeklySplit(activeUserId)).catch(() => null)
+      : Promise.resolve(null),
     Promise.resolve(loadPhase()).catch(() => "maintain" as const),
     activeUserId
       ? Promise.resolve(loadRecentSleepRecoveryEntries(activeUserId, 7)).catch(
@@ -563,11 +675,44 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
           () => [],
         )
       : Promise.resolve([]),
+    activeUserId
+      ? Promise.all([
+          loadScheduleLog(activeUserId),
+          loadScheduleTemplates(activeUserId),
+        ])
+          .then(([scheduleLog, templates]) => {
+            const blocks =
+              templates[scheduleLog.view] ?? DEFAULT_USER_SCHEDULE[scheduleLog.view];
+            const config = buildScheduleConfig(scheduleLog.view, blocks);
+            const summary = getScheduleSummary(scheduleLog, config.blocks.length);
+
+            return {
+              completedBlocks: summary.done,
+              totalBlocks: summary.total,
+            };
+          })
+          .catch(() => null)
+      : Promise.resolve(null),
+    activeUserId
+      ? Promise.all([
+          getRoutineTemplate("skincare"),
+          getRoutineItems("skincare"),
+        ])
+          .then(([routine, items]) => ({
+            amDone: isRoutineSectionComplete("am", routine, items),
+            pmDone: isRoutineSectionComplete("pm", routine, items),
+            completedSteps:
+              routine.am.filter((step) => Boolean(items.items.am[step.id])).length +
+              routine.pm.filter((step) => Boolean(items.items.pm[step.id])).length,
+            totalSteps: routine.am.length + routine.pm.length,
+          }))
+          .catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const reading = readReadingState();
   const todos = readTodosSignal();
-  const schedule = readScheduleSignal();
+  const schedule = scheduleSignal ?? readScheduleSignal();
   const doneMap = readGoalDoneMap();
 
   const modules = normalizeModules(profile?.enabled_modules);
@@ -619,8 +764,7 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
 
   const overdueSteps = countOverdueIncompleteSteps(goalList, doneMap, today);
 
-  const profileMacros =
-    nutritionPhase === "cut" ? profile?.macro_cut : profile?.macro_maintain;
+  const nutritionTargets = getTargets(nutritionPhase, profile);
 
   const sleepDurations = recentSleepEntries
     .map((entry) => entry.sleepDurationMinutes)
@@ -675,20 +819,22 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
       }),
     },
     nutrition: {
-      phase: nutritionPhase === "cut" ? "cut" : "maintain",
+      phase: nutritionPhase,
       mealsLoggedToday,
-      calorieTarget: profileMacros?.cal ?? null,
-      proteinTarget: profileMacros?.protein ?? null,
+      calorieTarget: nutritionTargets.cal ?? null,
+      proteinTarget: nutritionTargets.protein ?? null,
     },
     water,
     reading,
     fitness: {
-      daysSinceWorkout: getDaysSinceWorkout(prGoals),
+      daysSinceWorkout:
+        getDaysSinceWeeklySplitWorkout(weeklySplit) ?? getDaysSinceWorkout(prGoals),
       strongestLift: getStrongestLiftLabel(prGoals),
       weakestLift: getWeakestLiftLabel(prGoals),
     },
     sleep: {
       lastLogDate: latestSleepEntry?.logDate ?? null,
+      loggedToday: latestSleepEntry?.logDate === today,
       lastSleepDurationMinutes: latestSleepEntry?.sleepDurationMinutes ?? null,
       lastSleepQualityScore: latestSleepEntry?.sleepQualityScore ?? null,
       averageSleepDurationMinutes: averageNumber(sleepDurations),
@@ -700,6 +846,10 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
     },
     wellbeing: {
       lastLogDate: latestWellbeingEntry?.logDate ?? null,
+      loggedToday: latestWellbeingEntry?.logDate === today,
+      journaledToday:
+        latestWellbeingEntry?.logDate === today &&
+        (latestWellbeingEntry?.journalEntry?.trim() ?? "") !== "",
       lastMoodScore: latestWellbeingEntry?.moodScore ?? null,
       lastStressLevel: latestWellbeingEntry?.stressLevel ?? null,
       averageMoodScore: averageNumber(wellbeingMoodScores),
@@ -712,6 +862,7 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
     },
     todos,
     schedule,
+    skincare: skincareSignal,
   };
 
   writeCache(signals);

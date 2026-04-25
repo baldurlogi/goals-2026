@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MacrosCardSkeleton } from '@/features/dashboard/skeletons';
+import {
+  NUTRITION_PHASE_OPTIONS,
+  type NutritionPhase,
+} from '@/features/nutrition/nutritionData';
 import { isMacroSuccessful } from '@/features/nutrition/nutritionStatus';
 import { useNutritionDashboard } from '../hooks/useNutritionDashboard';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
@@ -13,6 +17,41 @@ function pct(value: number, target: number) {
     Math.max(target > 0 ? Math.round((value / target) * 100) : 0, 0),
     100,
   );
+}
+
+function getPhaseBadge(phase: NutritionPhase) {
+  const label =
+    NUTRITION_PHASE_OPTIONS.find((option) => option.value === phase)?.label ??
+    'Maintain';
+
+  switch (phase) {
+    case 'fat_loss':
+      return {
+        label: `✂️ ${label}`,
+        className: 'bg-rose-500/10 text-rose-500',
+      };
+    case 'recomp':
+      return {
+        label: `🔁 ${label}`,
+        className: 'bg-sky-500/10 text-sky-500',
+      };
+    case 'muscle_gain':
+      return {
+        label: `💪 ${label}`,
+        className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      };
+    case 'performance':
+      return {
+        label: `⚡ ${label}`,
+        className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      };
+    case 'maintain':
+    default:
+      return {
+        label: `⚖️ ${label}`,
+        className: 'bg-slate-500/10 text-slate-300 dark:text-slate-300',
+      };
+  }
 }
 
 function MacroPill({
@@ -77,6 +116,8 @@ function MacrosCardInner() {
   const cacheEmpty = logged.cal === 0 && itemsLogged === 0;
   if (loading && cacheEmpty) return <MacrosCardSkeleton />;
 
+  const phaseBadge = getPhaseBadge(phase);
+
   return (
     <Card className="relative overflow-hidden lg:col-span-7">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-400" />
@@ -91,12 +132,10 @@ function MacrosCardInner() {
             <span
               className={[
                 'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                phase === 'cut'
-                  ? 'bg-rose-500/10 text-rose-500'
-                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+                phaseBadge.className,
               ].join(' ')}
             >
-              {phase === 'cut' ? '✂️ Cut' : '💪 Maintain'}
+              {phaseBadge.label}
             </span>
           </div>
           <span className="text-[10px] text-muted-foreground">

@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, ScrollText } from "lucide-react";
+import {
+  SUBSCRIPTION_PLAN_DEFINITIONS,
+} from "@/features/subscription/subscriptionConfig";
 
 const LAST_UPDATED = "March 2025";
 const CONTACT_EMAIL = "legal@begyn.app";
@@ -74,9 +77,19 @@ export function TermsPage() {
             {APP_NAME} offers the following plans:
           </p>
           <div className="space-y-3">
-            <PlanRow name="Free" price="€0/month" features="10 AI credits per month, all core tracking features" />
-            <PlanRow name="Pro" price="€9/month" features="200 AI credits per month, AI Weekly Report, AI Goal Optimisation" />
-            <PlanRow name="Pro Max" price="€19/month" features="1,000 AI credits per month, all Pro features" />
+            {(
+              ["free", "pro", "pro_max"] as const
+            ).map((tier) => {
+              const plan = SUBSCRIPTION_PLAN_DEFINITIONS[tier];
+              return (
+                <PlanRow
+                  key={plan.id}
+                  name={plan.label}
+                  price={`${plan.monthlyPriceLabel}/month`}
+                  features={plan.termSummary}
+                />
+              );
+            })}
           </div>
           <p className="mt-4">
             Paid subscriptions are billed monthly via Stripe. You may cancel at any time from your
@@ -100,7 +113,7 @@ export function TermsPage() {
             <li>AI-generated content is for informational and motivational purposes only.</li>
             <li>AI output does not constitute medical, nutritional, financial, or professional advice.</li>
             <li>AI responses may occasionally be inaccurate — always use your own judgment.</li>
-            <li>AI prompts are limited per month based on your plan. Unused prompts do not roll over.</li>
+            <li>AI credits are limited per month based on your plan. Unused credits do not roll over.</li>
           </ul>
         </Section>
 
@@ -135,7 +148,7 @@ export function TermsPage() {
 
         <Section title="7. Intellectual Property">
           <p>
-            The {APP_NAME} application, including its design, code, branding, and AI prompts, is owned
+            The {APP_NAME} application, including its design, code, branding, and AI prompt templates, is owned
             by {CONTROLLER} and protected by copyright and other intellectual property laws. You may not
             copy, reproduce, or create derivative works without our express written permission.
           </p>

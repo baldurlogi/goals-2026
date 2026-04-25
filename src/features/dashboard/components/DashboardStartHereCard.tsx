@@ -22,21 +22,33 @@ export function DashboardStartHereCard() {
 
         <div className="space-y-2">
           <h2 className="text-2xl font-bold tracking-tight">
-            What's one big thing you want to achieve?
+            Start with one goal that actually matters to you
           </h2>
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-            Type it in plain language — AI will turn it into a clear,
-            step-by-step plan in seconds.
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+            Describe it in plain language and Begyn will turn it into a clear
+            step-by-step plan, so you can stop overthinking and know what to do
+            first.
           </p>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
+          {["Get leaner by summer", "Read every day", "Save for a trip"].map((example) => (
+            <span
+              key={example}
+              className="rounded-full border bg-muted/40 px-3 py-1.5"
+            >
+              {example}
+            </span>
+          ))}
         </div>
 
         <Button onClick={handleGenerate} size="lg" className="gap-2 px-8">
           <Sparkles className="h-4 w-4" />
-          Create my first goal
+          Build my first plan with AI
         </Button>
 
         <p className="text-xs text-muted-foreground/60">
-          Takes about 30 seconds
+          Takes about 30 seconds and gives you a clear next step
         </p>
       </CardContent>
     </Card>

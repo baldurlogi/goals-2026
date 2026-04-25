@@ -37,7 +37,13 @@ import {
   markAIUsageLimitReached,
   writeAIUsageCache,
 } from "@/features/subscription/aiUsageCache";
-import { useTier, type Tier } from "@/features/subscription/useTier";
+import {
+  AI_ACTION_CREDIT_COSTS,
+  coerceAIUsage,
+  type AILimitPayload,
+  type AIUsage,
+} from "@/features/subscription/aiCredits";
+import { useTier } from "@/features/subscription/useTier";
 import { capture } from "@/lib/analytics";
 import { loadSleepRecoveryEntriesInRange } from "@/features/sleep/sleepStorage";
 import { loadMentalWellbeingEntriesInRange } from "@/features/wellbeing/wellbeingStorage";
@@ -187,20 +193,10 @@ type WeeklyReportDbRow = {
 
 type WeeklyReportFnResponse = {
   report: WeeklyReport;
-  usage?: {
-    prompts_used: number;
-    monthly_limit: number;
-    remaining: number;
-    tier?: Tier;
-  };
+  usage?: AIUsage;
 };
 
-type WeeklyReportLimitPayload = {
-  message?: string;
-  tier?: Tier;
-  monthly_limit?: number;
-  prompts_used?: number;
-};
+type WeeklyReportLimitPayload = AILimitPayload;
 
 const REPORT_MODULE_META = {
   goals: { label: "Goals", emoji: "🎯" },
@@ -336,35 +332,15 @@ function toWeeklyReportDbRow(row: unknown): WeeklyReportDbRow | null {
 function toWeeklyReportFnResponse(value: unknown): WeeklyReportFnResponse | null {
   if (!isRecord(value) || !isRecord(value.report)) return null;
 
-  let usage:
-    | {
-        prompts_used: number;
-        monthly_limit: number;
-        remaining: number;
-        tier?: Tier;
-      }
-    | undefined;
-
-  if (
-    isRecord(value.usage) &&
-    typeof value.usage.prompts_used === "number" &&
-    typeof value.usage.monthly_limit === "number" &&
-    typeof value.usage.remaining === "number"
-  ) {
-    const usageTier: Tier | undefined =
-      value.usage.tier === "free" ||
-      value.usage.tier === "pro" ||
-      value.usage.tier === "pro_max"
-        ? value.usage.tier
-        : undefined;
-
-    usage = {
-      prompts_used: value.usage.prompts_used,
-      monthly_limit: value.usage.monthly_limit,
-      remaining: value.usage.remaining,
-      tier: usageTier,
-    };
-  }
+  const usage = isRecord(value.usage)
+    ? coerceAIUsage(value.usage, {
+        credits_used: AI_ACTION_CREDIT_COSTS.weeklyReport,
+        monthly_limit: 1000,
+        remaining: 1000 - AI_ACTION_CREDIT_COSTS.weeklyReport,
+        tier: "free",
+        credits_cost: AI_ACTION_CREDIT_COSTS.weeklyReport,
+      })
+    : undefined;
 
   return {
     report: value.report as WeeklyReport,
@@ -1363,7 +1339,7 @@ export function useWeeklyReport(modules: Set<string>) {
   );
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<{
-    prompts_used: number;
+    credits_used: number;
     monthly_limit: number;
     remaining: number;
   } | null>(null);
@@ -1484,7 +1460,7 @@ export function useWeeklyReport(modules: Set<string>) {
           {
             tier: d.tier ?? tier,
             monthly_limit: d.monthly_limit,
-            prompts_used: d.prompts_used,
+            credits_used: d.credits_used ?? d.prompts_used,
           },
           tier,
         );
@@ -1529,13 +1505,15 @@ export function useWeeklyReport(modules: Set<string>) {
           },
           tier,
         );
-        capture("ai_prompt_used", {
+        capture("ai_credits_used", {
           feature: "weekly_report",
           source: "weekly_report",
           route: window.location.pathname,
-          prompts_used: data.usage.prompts_used,
+          credits_used: data.usage.credits_used,
           monthly_limit: data.usage.monthly_limit,
           remaining: data.usage.remaining,
+          credits_cost:
+            data.usage.credits_cost ?? AI_ACTION_CREDIT_COSTS.weeklyReport,
           tier: data.usage.tier ?? tier,
         });
       }

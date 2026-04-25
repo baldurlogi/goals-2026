@@ -12,6 +12,11 @@ export type AchievementCategory =
   | "nutrition"
   | "reading"
   | "todos"
+  | "water"
+  | "sleep"
+  | "wellbeing"
+  | "skincare"
+  | "finance"
   | "streaks"
   | "meta";
 
@@ -39,14 +44,47 @@ export type AchievementDefinition = {
 
 export type AchievementCheckData = {
   goals: UserGoal[];
+  goalsCompletedTotal: number;
+  goalStepCompletionsTotal: number;
   fitness: AchievementFitnessStore | null;
+  fitnessCompletedWorkoutDays: number;
+  fitnessWorkoutStreak: number;
   nutritionLog: NutritionLog | null;
   nutritionLogsThisWeek: number;
+  nutritionLoggedDaysTotal: number;
+  nutritionProteinTargetHitDays: number;
+  nutritionOnTargetDays: number;
+  nutritionLongestLoggedStreak: number;
+  nutritionRepeatedCustomMealCount: number;
+  nutritionBalancedOnTargetDays: number;
   reading: ReadingInputs | null;
   readingStreak: number;
+  readingGoalHitDays: number;
+  readingPagesTotal: number;
   readingBooksCompleted: number;
   todos: Todo[];
   todosCompletedTotal: number;
+  todoCompletionEventsTotal: number;
+  todoBestDayCompletions: number;
+  todoCompletionStreak: number;
+  waterGoalHitDays: number;
+  waterLoggedTotalMl: number;
+  sleepLoggedDaysTotal: number;
+  sleepSevenHourNights: number;
+  sleepHighQualityNights: number;
+  wellbeingCheckInsTotal: number;
+  wellbeingJournalDays: number;
+  wellbeingGratitudeDays: number;
+  skincareAmCompletedEver: boolean;
+  skincarePmCompletedEver: boolean;
+  skincareFullDaysCompletedEver: boolean;
+  skincareStreak: number;
+  skincareSkinLogsTotal: number;
+  financeHasBudgetSet: boolean;
+  financeHasExpenseLogged: boolean;
+  financeMonthlyPlansBuilt: number;
+  financeUnderBudgetCategoryWins: number;
+  financeSavingsTotal: number;
   enabledModules: string[];
   accountAgeDays: number;
 };

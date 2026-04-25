@@ -1,25 +1,12 @@
 import type { Tier } from "./useTierTypes";
 import { useTierQuery, clearTierCache } from "./useTierQuery";
+import {
+  TIER_BADGE,
+  TIER_COLORS,
+  TIER_LABELS,
+} from "./subscriptionConfig";
 
 export type { Tier } from "./useTierTypes";
-
-export const TIER_LABELS: Record<Tier, string> = {
-  free: "Free",
-  pro: "Pro",
-  pro_max: "Pro Max",
-};
-
-export const TIER_COLORS: Record<Tier, string> = {
-  free: "text-muted-foreground",
-  pro: "text-violet-400",
-  pro_max: "text-amber-400",
-};
-
-export const TIER_BADGE: Record<Tier, string> = {
-  free: "bg-muted text-muted-foreground",
-  pro: "bg-violet-500/15 text-violet-400 border border-violet-500/30",
-  pro_max: "bg-amber-400/15 text-amber-400 border border-amber-400/30",
-};
 
 export const BETA_FREE_TIER_UNLOCKS_PRO = true;
 
@@ -42,3 +29,4 @@ export function useTier(): Tier {
 }
 
 export { clearTierCache };
+export { TIER_LABELS, TIER_COLORS, TIER_BADGE };

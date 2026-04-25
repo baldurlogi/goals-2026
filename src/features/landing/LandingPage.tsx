@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from "react";
+import { LazyMotion, MotionConfig, domAnimation } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { LandingNavbar } from "./components/LandingNavbar";
 import { HeroSection } from "./components/HeroSection";
@@ -118,77 +119,81 @@ export function LandingPage() {
   const showStageTwo = useDeferredMount(700);
 
   return (
-    <LandingShell theme={theme}>
-      <LandingNavbar
-        theme={theme}
-        onSignIn={() => navigate("/login")}
-        onGetStarted={() => navigate("/signup")}
-      />
+    <LazyMotion features={domAnimation}>
+      <MotionConfig reducedMotion="user">
+        <LandingShell theme={theme}>
+          <LandingNavbar
+            theme={theme}
+            onSignIn={() => navigate("/login")}
+            onGetStarted={() => navigate("/signup")}
+          />
 
-      <HeroSection
-        theme={theme}
-        onGetStarted={() => navigate("/signup")}
-        onSeeHowItWorks={() =>
-          document
-            .getElementById("how-it-works")
-            ?.scrollIntoView({ behavior: "smooth" })
-        }
-      />
+          <HeroSection
+            theme={theme}
+            onGetStarted={() => navigate("/signup")}
+            onSeeHowItWorks={() =>
+              document
+                .getElementById("how-it-works")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+          />
 
-      <DeferredSection
-        when={showStageOne}
-        fallback={<SectionPlaceholder id="how-it-works" minHeight={640} />}
-      >
-        <HowItWorksSection theme={theme} />
-      </DeferredSection>
+          <DeferredSection
+            when={showStageOne}
+            fallback={<SectionPlaceholder id="how-it-works" minHeight={640} />}
+          >
+            <HowItWorksSection theme={theme} />
+          </DeferredSection>
 
-      <DeferredSection
-        when={showStageOne}
-        fallback={<SectionPlaceholder id="features" minHeight={720} />}
-      >
-        <FeaturesSection theme={theme} />
-      </DeferredSection>
+          <DeferredSection
+            when={showStageOne}
+            fallback={<SectionPlaceholder id="features" minHeight={720} />}
+          >
+            <FeaturesSection theme={theme} />
+          </DeferredSection>
 
-      <DeferredSection
-        when={showStageOne}
-        fallback={<SectionPlaceholder minHeight={640} />}
-      >
-        <DifferentiationSection theme={theme} />
-      </DeferredSection>
+          <DeferredSection
+            when={showStageOne}
+            fallback={<SectionPlaceholder minHeight={640} />}
+          >
+            <DifferentiationSection theme={theme} />
+          </DeferredSection>
 
-      <DeferredSection
-        when={showStageTwo}
-        fallback={<SectionPlaceholder id="pricing" minHeight={760} />}
-      >
-        <PricingSection
-          theme={theme}
-          billing={billing}
-          setBilling={setBilling}
-          onChoosePlan={() => navigate("/signup")}
-        />
-      </DeferredSection>
+          <DeferredSection
+            when={showStageTwo}
+            fallback={<SectionPlaceholder id="pricing" minHeight={760} />}
+          >
+            <PricingSection
+              theme={theme}
+              billing={billing}
+              setBilling={setBilling}
+              onChoosePlan={() => navigate("/signup")}
+            />
+          </DeferredSection>
 
-      <DeferredSection
-        when={showStageTwo}
-        fallback={<SectionPlaceholder minHeight={320} />}
-      >
-        <FinalCtaSection
-          theme={theme}
-          onGetStarted={() => navigate("/signup")}
-          onSeePricing={() =>
-            document
-              .getElementById("pricing")
-              ?.scrollIntoView({ behavior: "smooth" })
-          }
-        />
-      </DeferredSection>
+          <DeferredSection
+            when={showStageTwo}
+            fallback={<SectionPlaceholder minHeight={320} />}
+          >
+            <FinalCtaSection
+              theme={theme}
+              onGetStarted={() => navigate("/signup")}
+              onSeePricing={() =>
+                document
+                  .getElementById("pricing")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+            />
+          </DeferredSection>
 
-      <DeferredSection
-        when={showStageTwo}
-        fallback={<SectionPlaceholder minHeight={140} />}
-      >
-        <LandingFooter theme={theme} />
-      </DeferredSection>
-    </LandingShell>
+          <DeferredSection
+            when={showStageTwo}
+            fallback={<SectionPlaceholder minHeight={140} />}
+          >
+            <LandingFooter theme={theme} />
+          </DeferredSection>
+        </LandingShell>
+      </MotionConfig>
+    </LazyMotion>
   );
 }

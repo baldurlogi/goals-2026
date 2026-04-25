@@ -1,4 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { m } from "framer-motion";
+import { fadeUp, landingEase, popIn, staggerContainer } from "../motion";
 import { TOKENS } from "../theme/tokens";
 import type { ThemeMode } from "../types";
 
@@ -12,6 +14,17 @@ export function HeroProductPreview({
   compact = false,
 }: HeroProductPreviewProps) {
   const t = TOKENS[theme];
+  const compactProgress = [
+    { label: "Goals", pct: 72, color: t.primary },
+    { label: "Fitness", pct: 81, color: t.blue },
+    { label: "Reading", pct: 64, color: t.amber },
+  ];
+  const progressItems = [
+    ["Goals", 72, t.primary],
+    ["Fitness", 81, t.blue],
+    ["Reading", 64, t.amber],
+    ["Consistency", 76, t.purple],
+  ] as const;
 
   if (compact) {
     return (
@@ -48,9 +61,15 @@ export function HeroProductPreview({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div
+          <m.div
+            className="space-y-3"
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer(0.1, 0.12)}
+          >
+            <m.div
               className="rounded-2xl border p-3.5"
+              variants={popIn()}
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -83,10 +102,11 @@ export function HeroProductPreview({
                   30 minutes · one step that keeps your bigger goal alive
                 </div>
               </div>
-            </div>
+            </m.div>
 
-            <div
+            <m.div
               className="rounded-2xl border p-3.5"
+              variants={popIn(0.04)}
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -99,11 +119,7 @@ export function HeroProductPreview({
                 LIFE PROGRESS
               </div>
 
-              {[
-                { label: "Goals", pct: 72, color: t.primary },
-                { label: "Fitness", pct: 81, color: t.blue },
-                { label: "Reading", pct: 64, color: t.amber },
-              ].map((item) => (
+              {compactProgress.map((item, index) => (
                 <div key={item.label} className="mb-3 last:mb-0">
                   <div className="mb-1 flex justify-between text-xs">
                     <span style={{ color: t.muted }}>{item.label}</span>
@@ -117,18 +133,26 @@ export function HeroProductPreview({
                       borderColor: t.border,
                     }}
                   >
-                    <div
+                    <m.div
                       className="h-full rounded-full"
+                      initial={{ opacity: 0.6, scaleX: 0.35 }}
+                      animate={{ opacity: 1, scaleX: 1 }}
+                      transition={{
+                        duration: 0.7,
+                        delay: 0.24 + index * 0.08,
+                        ease: landingEase,
+                      }}
                       style={{
                         width: `${item.pct}%`,
                         background: item.color,
+                        transformOrigin: "0% 50%",
                       }}
                     />
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
+            </m.div>
+          </m.div>
         </CardContent>
       </Card>
     );
@@ -166,9 +190,15 @@ export function HeroProductPreview({
           </div>
         </div>
 
-        <div className="grid flex-1 gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-          <div
+        <m.div
+          className="grid flex-1 gap-4 xl:grid-cols-[1.25fr_0.95fr]"
+          initial="hidden"
+          animate="visible"
+          variants={staggerContainer(0.1, 0.12)}
+        >
+          <m.div
             className="flex h-full min-h-[560px] flex-col rounded-3xl border p-4"
+            variants={popIn()}
             style={{
               background: t.bgSoft,
               borderColor: t.border,
@@ -194,25 +224,28 @@ export function HeroProductPreview({
               consistent by summer
             </div>
 
-            <div className="mb-4 flex min-h-[36px] flex-wrap gap-2">
+            <m.div className="mb-4 flex min-h-[36px] flex-wrap gap-2" variants={fadeUp(12)}>
               {["Weekly plan", "Habits + milestones", "Adjusts as you go"].map(
                 (label, i) => (
-                <div
-                  key={label}
-                  className="rounded-full border px-3 py-1.5 text-[11px]"
-                  style={{
-                    borderColor: i === 1 ? t.primaryBorder : t.border,
-                    background: i === 1 ? t.primarySoft : t.surface,
-                    color: i === 1 ? t.primary : t.muted,
-                  }}
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
+                  <m.div
+                    key={label}
+                    className="rounded-full border px-3 py-1.5 text-[11px]"
+                    variants={fadeUp(10, i * 0.04)}
+                    style={{
+                      borderColor: i === 1 ? t.primaryBorder : t.border,
+                      background: i === 1 ? t.primarySoft : t.surface,
+                      color: i === 1 ? t.primary : t.muted,
+                    }}
+                  >
+                    {label}
+                  </m.div>
+                )
+              )}
+            </m.div>
 
-            <div
+            <m.div
               className="flex flex-1 flex-col rounded-2xl border p-4"
+              variants={popIn(0.04)}
               style={{
                 background: t.surface,
                 borderColor: t.border,
@@ -240,9 +273,10 @@ export function HeroProductPreview({
                   "Set a simple sleep cutoff so your training feels sustainable",
                   "Track weekly weigh-ins and gym consistency every Sunday",
                 ].map((item, i) => (
-                  <div
+                  <m.div
                     key={item}
                     className="flex min-h-[48px] items-center gap-3 py-2.5"
+                    variants={fadeUp(10, i * 0.04)}
                     style={{
                       borderTop: i === 0 ? "none" : `1px solid ${t.border}`,
                     }}
@@ -260,15 +294,16 @@ export function HeroProductPreview({
                     <div className="text-sm" style={{ color: t.textSoft }}>
                       {item}
                     </div>
-                  </div>
+                  </m.div>
                 ))}
               </div>
-            </div>
-          </div>
+            </m.div>
+          </m.div>
 
           <div className="grid auto-rows-fr gap-4">
-            <div
+            <m.div
               className="flex min-h-[164px] flex-col rounded-3xl border p-4"
+              variants={popIn(0.08)}
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -301,10 +336,11 @@ export function HeroProductPreview({
                   30 minutes · one step that keeps your bigger goal alive
                 </div>
               </div>
-            </div>
+            </m.div>
 
-            <div
+            <m.div
               className="flex min-h-[220px] flex-col rounded-3xl border p-4"
+              variants={popIn(0.12)}
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -318,12 +354,7 @@ export function HeroProductPreview({
               </div>
 
               <div className="flex-1">
-                {[
-                  ["Goals", 72, t.primary],
-                  ["Fitness", 81, t.blue],
-                  ["Reading", 64, t.amber],
-                  ["Consistency", 76, t.purple],
-                ].map(([label, pct, color]) => (
+                {progressItems.map(([label, pct, color], index) => (
                   <div key={label as string} className="mb-3">
                     <div className="mb-1 flex justify-between text-xs">
                       <span style={{ color: t.muted }}>{label}</span>
@@ -337,21 +368,30 @@ export function HeroProductPreview({
                         borderColor: t.border,
                       }}
                     >
-                      <div
+                      <m.div
                         className="h-full rounded-full"
+                        initial={{ opacity: 0.6, scaleX: 0.35 }}
+                        animate={{ opacity: 1, scaleX: 1 }}
+                        transition={{
+                          duration: 0.7,
+                          delay: 0.32 + index * 0.08,
+                          ease: landingEase,
+                        }}
                         style={{
                           width: `${pct}%`,
                           background: color as string,
+                          transformOrigin: "0% 50%",
                         }}
                       />
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </m.div>
 
-            <div
+            <m.div
               className="flex min-h-[176px] flex-col rounded-3xl border p-4"
+              variants={popIn(0.16)}
               style={{
                 background: t.bgSoft,
                 borderColor: t.border,
@@ -369,16 +409,20 @@ export function HeroProductPreview({
                   "You stop wondering where to start",
                   "You can see your momentum",
                   "Your days feel connected to your future",
-                ].map((line) => (
-                  <div key={line} className="flex items-start gap-2 text-sm">
+                ].map((line, index) => (
+                  <m.div
+                    key={line}
+                    className="flex items-start gap-2 text-sm"
+                    variants={fadeUp(10, index * 0.04)}
+                  >
                     <span style={{ color: t.primary }}>●</span>
                     <span style={{ color: t.textSoft }}>{line}</span>
-                  </div>
+                  </m.div>
                 ))}
               </div>
-            </div>
+            </m.div>
           </div>
-        </div>
+        </m.div>
       </CardContent>
     </Card>
   );

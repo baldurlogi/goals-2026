@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
-import posthog from "posthog-js";
 
 import { supabase } from "@/lib/supabaseClient";
 import { AuthContext } from "@/features/auth/authContext";
@@ -13,6 +12,8 @@ import {
   clearCancelledOnboarding,
   clearStoredPostLoginRedirect,
 } from "@/features/auth/authRedirect";
+import { subscribeCookieConsent } from "@/features/legal/cookieConsent";
+import { syncAnalyticsIdentity } from "@/lib/analyticsClient";
 
 function hasCachedProfileMismatch(nextUserId: string | null): boolean {
   try {
@@ -111,13 +112,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    if (nextUser) {
-      posthog.identify(nextUser.id, {
-        email: nextUser.email ?? undefined,
-      });
-    } else {
-      posthog.reset();
-    }
+    syncAnalyticsIdentity(
+      nextUser
+        ? {
+            id: nextUser.id,
+            email: nextUser.email ?? undefined,
+          }
+        : null,
+    );
 
     setActiveUserId(nextUserId);
     window.dispatchEvent(
@@ -152,6 +154,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    const syncCurrentUser = () => {
+      syncAnalyticsIdentity(
+        user
+          ? {
+              id: user.id,
+              email: user.email ?? undefined,
+            }
+          : null,
+      );
+    };
+
+    syncCurrentUser();
+    return subscribeCookieConsent(() => {
+      syncCurrentUser();
+    });
+  }, [user]);
+
   async function signOut() {
     const currentUserId = user?.id ?? previousUserIdRef.current ?? null;
 
@@ -178,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       setUser(null);
       setLoading(false);
-      posthog.reset();
+      syncAnalyticsIdentity(null);
 
       window.dispatchEvent(
         new CustomEvent(AUTH_USER_CHANGED_EVENT, {

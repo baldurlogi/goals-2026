@@ -7,6 +7,10 @@ import {
   type Tier,
 } from "@/features/subscription/useTier";
 import { Button } from "@/components/ui/button";
+import { BETA_MONTHLY_AI_CREDITS } from "@/features/subscription/aiCredits";
+import {
+  PAID_PLANS_COMING_SOON,
+} from "@/features/subscription/subscriptionConfig";
 
 type Props = {
   tier?: Tier;
@@ -27,19 +31,19 @@ function nextTierFor(tier: Tier): Tier | null {
 }
 
 function defaultMessageForTier(tier: Tier) {
-  if (tier === "free" && BETA_FREE_TIER_UNLOCKS_PRO) {
-    return "You've used all 200 beta AI prompts this month. Your limit resets on the 1st.";
+  if (BETA_FREE_TIER_UNLOCKS_PRO) {
+    return `You've used all ${BETA_MONTHLY_AI_CREDITS.toLocaleString()} beta AI credits this month. Your balance resets on the 1st.`;
   }
 
   if (tier === "free") {
-    return "You've used all 10 free AI prompts this month. Upgrade to Pro for 200 prompts/month.";
+    return "You've used all 10 free AI credits this month. Upgrade to Pro for 200 credits/month.";
   }
 
   if (tier === "pro") {
-    return "You've used all 200 Pro prompts this month. Upgrade to Pro Max for 1,000 prompts/month.";
+    return "You've used all 200 Pro AI credits this month. Upgrade to Pro Max for 1,000 credits/month.";
   }
 
-  return "You've used all 1,000 AI prompts this month. Your limit resets on the 1st.";
+  return "You've used all 1,000 AI credits this month. Your balance resets on the 1st.";
 }
 
 export function AIUsageLimitNotice({
@@ -92,7 +96,9 @@ export function AIUsageLimitNotice({
           <Button asChild size="sm" className="gap-1.5">
             <Link to="/app/upgrade">
               <Sparkles className="h-3.5 w-3.5" />
-              Upgrade to {nextTierLabel}
+              {PAID_PLANS_COMING_SOON
+                ? "Pricing preview"
+                : `Upgrade to ${nextTierLabel}`}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>

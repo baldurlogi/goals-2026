@@ -1,4 +1,8 @@
-import posthog from "posthog-js";
+import {
+  ensureAnalyticsInitialized,
+  getPosthogClient,
+} from "@/lib/analyticsClient";
+import { hasAnalyticsConsent } from "@/features/legal/cookieConsent";
 
 const ONCE_PREFIX = "analytics:once";
 const RETURNED_NEXT_DAY_PREFIX = "analytics:return-next-day";
@@ -53,8 +57,16 @@ export function capture(
   event: string,
   properties?: Record<string, unknown>,
 ): boolean {
+  if (!hasAnalyticsConsent()) {
+    return false;
+  }
+
   try {
-    posthog.capture(event, properties);
+    if (!ensureAnalyticsInitialized()) {
+      return false;
+    }
+
+    getPosthogClient().capture(event, properties);
     return true;
   } catch {
     return false;
@@ -87,6 +99,7 @@ export function resetCaptureOnce(
 
 export function captureReturnedNextDay(userId: string | null | undefined): void {
   if (!userId) return;
+  if (!hasAnalyticsConsent()) return;
 
   const key = returnedNextDayKey(userId);
   const today = getLocalDateKey();
@@ -96,11 +109,15 @@ export function captureReturnedNextDay(userId: string | null | undefined): void 
     const diff = getDayDifference(lastSeenDate, today);
 
     if (diff === 1) {
-      capture("returned_next_day", {
+      const payload = {
         userId,
         lastSeenDate,
         returnedDate: today,
-      });
+      };
+
+      // Keep the legacy name for continuity, and emit the beta funnel name too.
+      capture("returned_next_day", payload);
+      capture("session_day_2_return", payload);
     }
   }
 

@@ -12,7 +12,7 @@ export function AIUsagePill({ className = "" }: { className?: string }) {
 
   const usage = snapshot ?? null;
   const monthlyLimit = usage?.monthlyLimit ?? defaultMonthlyLimitForTier(tier);
-  const promptsUsed = usage?.promptsUsed ?? null;
+  const creditsUsed = usage?.creditsUsed ?? null;
   const remaining = usage?.remaining ?? null;
 
   const exhausted = remaining === 0;
@@ -44,12 +44,12 @@ export function AIUsagePill({ className = "" }: { className?: string }) {
       {usage ? (
         exhausted ? (
           <span className="font-medium">
-            AI limit reached · {promptsUsed}/{monthlyLimit} used
+            AI credits exhausted · {creditsUsed}/{monthlyLimit} used
           </span>
         ) : (
           <span>
             <span className="font-semibold text-foreground">{remaining}</span>{" "}
-            AI prompts left · {promptsUsed}/{monthlyLimit} used
+            AI credits left · {creditsUsed}/{monthlyLimit} used
           </span>
         )
       ) : (

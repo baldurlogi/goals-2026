@@ -41,6 +41,12 @@ type MutationContext = {
 const GOAL_PROGRESS_CACHE_KEY = CACHE_KEYS.GOALS_DONE;
 const LEGACY_GOAL_PROGRESS_CACHE_KEY = "cache:goals:v1";
 const STEP_HISTORY_KEY = CACHE_KEYS.GOALS_STEP_HISTORY;
+const GOALS_CHANGED_EVENT = "goals:changed";
+
+function emitGoalsChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(GOALS_CHANGED_EVENT));
+}
 
 function cloneDoneState(done: DoneState): DoneState {
   return Object.fromEntries(
@@ -216,7 +222,7 @@ function clearGoalHistoryForToday(userId: string, goalId: string) {
   );
 }
 
-async function loadGoalProgress(userId: string | null): Promise<DoneState> {
+export async function loadGoalProgress(userId: string | null): Promise<DoneState> {
   if (!userId) return {};
 
   const seeded = readGoalProgressSeed(userId);
@@ -346,6 +352,7 @@ export function useToggleGoalStepMutation() {
 
       if (nextValue) addStepHistory(userId, goalId, stepId);
       else removeStepHistoryForToday(userId, goalId, stepId);
+      emitGoalsChanged();
 
       return { previousDone };
     },
@@ -353,6 +360,7 @@ export function useToggleGoalStepMutation() {
       if (!userId || !context) return;
       queryClient.setQueryData(queryKeys.goalProgress(userId), context.previousDone);
       writeGoalProgressSeed(userId, context.previousDone);
+      emitGoalsChanged();
     },
     onSettled: async () => {
       if (!userId) return;
@@ -399,6 +407,7 @@ export function useResetGoalProgressMutation() {
       queryClient.setQueryData(queryKeys.goalProgress(userId), nextDone);
       writeGoalProgressSeed(userId, nextDone);
       clearGoalHistoryForToday(userId, goalId);
+      emitGoalsChanged();
 
       return { previousDone };
     },
@@ -406,6 +415,7 @@ export function useResetGoalProgressMutation() {
       if (!userId || !context) return;
       queryClient.setQueryData(queryKeys.goalProgress(userId), context.previousDone);
       writeGoalProgressSeed(userId, context.previousDone);
+      emitGoalsChanged();
     },
     onSettled: async () => {
       if (!userId) return;
