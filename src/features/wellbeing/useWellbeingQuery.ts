@@ -81,7 +81,7 @@ export function useSaveMentalWellbeingEntryMutation() {
           queryKey: queryKeys.wellbeingLog(userId, variables.value.logDate),
         }),
         queryClient.invalidateQueries({
-          queryKey: queryKeys.wellbeingHistory(userId, 7),
+          queryKey: ["wellbeing-history", userId],
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.dashboardAggregate(userId, "wellbeing"),

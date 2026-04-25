@@ -1,10 +1,10 @@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { ScheduleView } from "../scheduleTypes";
-import { SCHEDULE_CONFIG } from "../scheduleData";
+import type { ScheduleDayKey } from "../scheduleTypes";
+import { SCHEDULE_CONFIG, SCHEDULE_DAY_ORDER } from "../scheduleData";
 
 export function SchedulePicker(props: {
-  value: ScheduleView;
-  onChange: (v: ScheduleView) => void;
+  value: ScheduleDayKey;
+  onChange: (v: ScheduleDayKey) => void;
 }) {
   const { value, onChange } = props;
 
@@ -12,12 +12,14 @@ export function SchedulePicker(props: {
     <ToggleGroup
       type="single"
       value={value}
-      onValueChange={(v) => { if (v) onChange(v as ScheduleView); }}
-      className="grid min-w-[280px] w-full grid-cols-3"
+      onValueChange={(v) => {
+        if (v) onChange(v as ScheduleDayKey);
+      }}
+      className="grid min-w-[280px] w-full grid-cols-7"
     >
-      {(["wfh", "office", "weekend"] as ScheduleView[]).map((v) => (
+      {SCHEDULE_DAY_ORDER.map((v) => (
         <ToggleGroupItem key={v} value={v} className="px-2 text-[11px] sm:text-xs">
-          {SCHEDULE_CONFIG[v].label}
+          {SCHEDULE_CONFIG[v].shortLabel}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>

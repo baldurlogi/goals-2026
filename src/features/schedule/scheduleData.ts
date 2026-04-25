@@ -1,86 +1,152 @@
-import type { ScheduleConfig, ScheduleView, TimelineItem, UserScheduleTemplates } from "./scheduleTypes";
+import type {
+  ScheduleConfig,
+  ScheduleDayKey,
+  TimelineItem,
+  UserScheduleTemplates,
+} from "./scheduleTypes";
 
-// ── Generic seed blocks ───────────────────────────────────────────────────
-// These are shown to new users before they customise their schedule.
-// No personal data — just a sensible starting point.
-
-function block(id: string, time: string, label: string, detail: string, icon: string, tag?: string): TimelineItem {
+function block(
+  id: string,
+  time: string,
+  label: string,
+  detail: string,
+  icon: string,
+  tag?: string,
+): TimelineItem {
   return { id, time, label, detail, icon, ...(tag ? { tag } : {}) };
 }
 
-export const DEFAULT_WFH_BLOCKS: TimelineItem[] = [
-  block("wfh-1",  "7:00",       "Wake up",           "Start your morning routine.",              "⏰"),
-  block("wfh-2",  "7:15",       "Morning exercise",  "Walk, stretch, or workout.",               "💪"),
-  block("wfh-3",  "7:45",       "Breakfast",         "Fuel up before the day starts.",           "🥣"),
-  block("wfh-4",  "8:00",       "Start work",        "Deep work — most important task first.",   "💻"),
-  block("wfh-5",  "12:30",      "Lunch break",       "Step away from the screen.",               "🥗"),
-  block("wfh-6",  "13:00",      "Back to work",      "Meetings, reviews, lighter tasks.",        "💻"),
-  block("wfh-7",  "17:00",      "Finish work",       "Close tabs. Protect your evening.",        "✅"),
-  block("wfh-8",  "17:30",      "Exercise / walk",   "Move your body before dinner.",            "🏃"),
-  block("wfh-9",  "19:00",      "Dinner",            "Cook or prepare something nourishing.",    "🍽️"),
-  block("wfh-10", "20:00",      "Personal project",  "Side project, learning, or reading.",      "🧠"),
-  block("wfh-11", "21:30",      "Wind down",         "No screens. Journal or read.",             "📖"),
-  block("wfh-12", "22:30",      "Bed",               "Consistent bedtime matters.",              "🌙"),
+function cloneBlocks(
+  blocks: TimelineItem[],
+  prefix: ScheduleDayKey,
+): TimelineItem[] {
+  return blocks.map((item, index) => ({
+    ...item,
+    id: `${prefix}-${index + 1}`,
+  }));
+}
+
+const DEFAULT_WORKDAY_BLOCKS: TimelineItem[] = [
+  block("workday-1", "7:00", "Wake up", "Start your morning routine.", "⏰"),
+  block("workday-2", "7:15", "Morning exercise", "Walk, stretch, or workout.", "💪"),
+  block("workday-3", "7:45", "Breakfast", "Fuel up before the day starts.", "🥣"),
+  block("workday-4", "8:30", "Start work", "Deep work first while your energy is high.", "💻"),
+  block("workday-5", "12:30", "Lunch break", "Step away and reset properly.", "🥗"),
+  block("workday-6", "13:15", "Back to work", "Meetings, reviews, and lighter tasks.", "💻"),
+  block("workday-7", "17:00", "Finish work", "Wrap up and protect your evening.", "✅"),
+  block("workday-8", "17:30", "Exercise / walk", "Move before dinner if you can.", "🏃"),
+  block("workday-9", "19:00", "Dinner", "Cook or prepare something simple.", "🍽️"),
+  block("workday-10", "20:15", "Personal time", "Read, learn, or work on a project.", "🧠"),
+  block("workday-11", "22:15", "Wind down", "Screens down and slow the pace.", "🌙"),
 ];
 
-export const DEFAULT_OFFICE_BLOCKS: TimelineItem[] = [
-  block("off-1",  "6:30",       "Wake up",           "Earlier start for the commute.",           "⏰"),
-  block("off-2",  "6:45",       "Morning exercise",  "Quick workout or walk before leaving.",    "💪"),
-  block("off-3",  "7:15",       "Breakfast",         "Eat before you leave.",                    "🥣"),
-  block("off-4",  "7:45",       "Commute",           "Podcast, audiobook, or just relax.",       "🚶"),
-  block("off-5",  "8:30",       "Arrive at office",  "Get settled, check priorities.",           "🏢"),
-  block("off-6",  "12:30",      "Lunch",             "Take a real break away from your desk.",   "🥗"),
-  block("off-7",  "17:00",      "Leave office",      "Pack up, head home.",                      "🚶"),
-  block("off-8",  "18:00",      "Exercise",          "Gym or walk after commute.",               "🏋️"),
-  block("off-9",  "19:30",      "Dinner",            "Keep it simple on busy days.",             "🍽️"),
-  block("off-10", "20:30",      "Personal project",  "Even 30 min of focused work counts.",      "🧠"),
-  block("off-11", "22:00",      "Wind down & bed",   "Consistent bedtime.",                      "🌙"),
+const DEFAULT_SATURDAY_BLOCKS: TimelineItem[] = [
+  block("saturday-1", "8:00", "Wake up", "Easier start than weekdays.", "⏰"),
+  block("saturday-2", "8:30", "Breakfast", "Take your time this morning.", "🥣"),
+  block("saturday-3", "10:00", "Workout", "Run, swim, gym, or something outdoors.", "🏋️"),
+  block("saturday-4", "12:30", "Lunch", "Recharge before the afternoon.", "🥗"),
+  block("saturday-5", "14:00", "Errands or chores", "Clear a few things off your list.", "🏠"),
+  block("saturday-6", "17:00", "Social / free time", "Make room for fun and recovery.", "🎉"),
+  block("saturday-7", "19:30", "Dinner", "Enjoy a slower evening meal.", "🍽️"),
+  block("saturday-8", "22:30", "Bed", "Reset for tomorrow.", "🌙"),
 ];
 
-export const DEFAULT_WEEKEND_BLOCKS: TimelineItem[] = [
-  block("wkd-1",  "8:00",       "Wake up",           "Slightly later — you've earned it.",       "⏰"),
-  block("wkd-2",  "8:15",       "Breakfast",         "Take your time. Enjoy the morning.",       "🥣"),
-  block("wkd-3",  "9:00",       "Workout",           "Run, swim, gym — whatever you enjoy.",     "🏃"),
-  block("wkd-4",  "11:00",      "Errands or chores", "Batch them so the week stays clean.",      "🏠"),
-  block("wkd-5",  "13:00",      "Lunch",             "Flexible — eat with family or friends.",   "🥗"),
-  block("wkd-6",  "14:00",      "Deep focus (1 hr)", "Side project, learning, or planning.",     "🧠"),
-  block("wkd-7",  "17:00",      "Social / free time","Protect this time.",                       "🎉"),
-  block("wkd-8",  "19:00",      "Dinner",            "Cook something you enjoy.",                "🍽️"),
-  block("wkd-9",  "21:00",      "Weekly review",     "Plan next week. Journal.",                 "📝"),
-  block("wkd-10", "22:30",      "Bed",               "Reset for the week ahead.",                "🌙"),
+const DEFAULT_SUNDAY_BLOCKS: TimelineItem[] = [
+  block("sunday-1", "8:30", "Wake up", "Keep the morning gentle.", "⏰"),
+  block("sunday-2", "9:00", "Breakfast", "Start the day slowly.", "🥣"),
+  block("sunday-3", "11:00", "Walk or recovery", "Move a little and clear your head.", "🚶"),
+  block("sunday-4", "13:00", "Lunch", "Keep it simple.", "🥗"),
+  block("sunday-5", "15:00", "Weekly review", "Look ahead before the week starts.", "📝"),
+  block("sunday-6", "16:00", "Prep for the week", "Food, calendar, and priorities.", "📅"),
+  block("sunday-7", "19:00", "Dinner", "Settle into the evening.", "🍽️"),
+  block("sunday-8", "21:30", "Wind down", "Make Monday easier on yourself.", "📖"),
+  block("sunday-9", "22:30", "Bed", "Consistent sleep helps all week.", "🌙"),
+];
+
+export const SCHEDULE_DAY_ORDER: ScheduleDayKey[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
 ];
 
 export const DEFAULT_USER_SCHEDULE: UserScheduleTemplates = {
-  wfh:     DEFAULT_WFH_BLOCKS,
-  office:  DEFAULT_OFFICE_BLOCKS,
-  weekend: DEFAULT_WEEKEND_BLOCKS,
+  monday: cloneBlocks(DEFAULT_WORKDAY_BLOCKS, "monday"),
+  tuesday: cloneBlocks(DEFAULT_WORKDAY_BLOCKS, "tuesday"),
+  wednesday: cloneBlocks(DEFAULT_WORKDAY_BLOCKS, "wednesday"),
+  thursday: cloneBlocks(DEFAULT_WORKDAY_BLOCKS, "thursday"),
+  friday: cloneBlocks(DEFAULT_WORKDAY_BLOCKS, "friday"),
+  saturday: cloneBlocks(DEFAULT_SATURDAY_BLOCKS, "saturday"),
+  sunday: cloneBlocks(DEFAULT_SUNDAY_BLOCKS, "sunday"),
 };
 
-// ── Static schedule config (colours, labels) ─────────────────────────────
-// Blocks come from Supabase; only the visual config is hardcoded here.
-
-export const SCHEDULE_CONFIG: Record<ScheduleView, Omit<ScheduleConfig, "blocks">> = {
-  wfh: {
-    label: "Work From Home",
-    colorClass: "text-emerald-600 dark:text-emerald-400",
-    accentClass: "border-emerald-200/60 dark:border-emerald-900/60",
-  },
-  office: {
-    label: "Office Day",
-    colorClass: "text-amber-600 dark:text-amber-400",
-    accentClass: "border-amber-200/60 dark:border-amber-900/60",
-  },
-  weekend: {
-    label: "Weekend",
+export const SCHEDULE_CONFIG: Record<
+  ScheduleDayKey,
+  Omit<ScheduleConfig, "blocks">
+> = {
+  monday: {
+    dayKey: "monday",
+    label: "Monday",
+    shortLabel: "Mon",
     colorClass: "text-sky-600 dark:text-sky-400",
     accentClass: "border-sky-200/60 dark:border-sky-900/60",
   },
+  tuesday: {
+    dayKey: "tuesday",
+    label: "Tuesday",
+    shortLabel: "Tue",
+    colorClass: "text-indigo-600 dark:text-indigo-400",
+    accentClass: "border-indigo-200/60 dark:border-indigo-900/60",
+  },
+  wednesday: {
+    dayKey: "wednesday",
+    label: "Wednesday",
+    shortLabel: "Wed",
+    colorClass: "text-violet-600 dark:text-violet-400",
+    accentClass: "border-violet-200/60 dark:border-violet-900/60",
+  },
+  thursday: {
+    dayKey: "thursday",
+    label: "Thursday",
+    shortLabel: "Thu",
+    colorClass: "text-emerald-600 dark:text-emerald-400",
+    accentClass: "border-emerald-200/60 dark:border-emerald-900/60",
+  },
+  friday: {
+    dayKey: "friday",
+    label: "Friday",
+    shortLabel: "Fri",
+    colorClass: "text-amber-600 dark:text-amber-400",
+    accentClass: "border-amber-200/60 dark:border-amber-900/60",
+  },
+  saturday: {
+    dayKey: "saturday",
+    label: "Saturday",
+    shortLabel: "Sat",
+    colorClass: "text-fuchsia-600 dark:text-fuchsia-400",
+    accentClass: "border-fuchsia-200/60 dark:border-fuchsia-900/60",
+  },
+  sunday: {
+    dayKey: "sunday",
+    label: "Sunday",
+    shortLabel: "Sun",
+    colorClass: "text-rose-600 dark:text-rose-400",
+    accentClass: "border-rose-200/60 dark:border-rose-900/60",
+  },
 };
 
-// Helper to merge config + user blocks into a full ScheduleConfig
-export function buildScheduleConfig(view: ScheduleView, blocks: TimelineItem[]): ScheduleConfig {
-  return { ...SCHEDULE_CONFIG[view], blocks };
+export function getScheduleDayLabel(dayKey: ScheduleDayKey) {
+  return SCHEDULE_CONFIG[dayKey].label;
 }
 
-// Re-export for legacy references
+export function buildScheduleConfig(
+  dayKey: ScheduleDayKey,
+  blocks: TimelineItem[],
+): ScheduleConfig {
+  return { ...SCHEDULE_CONFIG[dayKey], blocks };
+}
+
 export type { UserScheduleTemplates } from "./scheduleTypes";

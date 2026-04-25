@@ -20,6 +20,8 @@ import { READING_CHANGED_EVENT } from "@/features/reading/readingStorage";
 import { WATER_CHANGED_EVENT } from "@/features/water/waterStorage";
 import { SCHEDULE_CHANGED_EVENT } from "@/features/schedule/scheduleStorage";
 import { FITNESS_CHANGED_EVENT } from "@/features/fitness/constants";
+import { SLEEP_CHANGED_EVENT } from "@/features/sleep/sleepStorage";
+import { WELLBEING_CHANGED_EVENT } from "@/features/wellbeing/wellbeingStorage";
 import { capture } from "@/lib/analytics";
 import {
   getScopedStorageItem,
@@ -180,6 +182,7 @@ function buildAlternativeSuggestion(
   blockedSignatures: string[],
 ): CoachSuggestion | null {
   const blocked = new Set(blockedSignatures);
+  const lastSuggestedModule = readLastModule();
 
   const starter = buildStarterSuggestion(signals);
   if (starter && !blocked.has(suggestionSignature(starter))) {
@@ -187,7 +190,18 @@ function buildAlternativeSuggestion(
   }
 
   const candidates = buildSuggestionCandidates(signals);
-  for (const candidate of candidates) {
+  const sortedCandidates = [...candidates].sort((left, right) => right.priority - left.priority);
+  const topPriority = sortedCandidates[0]?.priority ?? 0;
+  const preferredCandidates =
+    lastSuggestedModule
+      ? sortedCandidates.filter(
+          (candidate) =>
+            candidate.module !== lastSuggestedModule &&
+            topPriority - candidate.priority <= 8,
+        )
+      : [];
+
+  for (const candidate of [...preferredCandidates, ...sortedCandidates]) {
     const nextSuggestion = candidateToCoachSuggestion(candidate);
     if (!blocked.has(suggestionSignature(nextSuggestion))) {
       return nextSuggestion;
@@ -373,6 +387,7 @@ function normalizeCoachSuggestion(
   const candidates = buildSuggestionCandidates(signals);
   const topCandidate = candidates[0] ?? null;
   const topPriority = topCandidate?.priority ?? 0;
+  const lastSuggestedModule = readLastModule();
   const urgentGoalCandidate =
     topCandidate && topCandidate.module === "goals" && topPriority >= 86
       ? candidateToCoachSuggestion(topCandidate)
@@ -409,6 +424,18 @@ function normalizeCoachSuggestion(
     suggestion.action.trim().toLowerCase() !== topCandidate.action.trim().toLowerCase()
   ) {
     return urgentGoalCandidate;
+  }
+
+  if (suggestion.module && suggestion.module === lastSuggestedModule) {
+    const alternativeCandidate = candidates.find(
+      (candidate) =>
+        candidate.module !== lastSuggestedModule &&
+        topPriority - candidate.priority <= 8,
+    );
+
+    if (alternativeCandidate) {
+      return candidateToCoachSuggestion(alternativeCandidate);
+    }
   }
 
   return suggestion;
@@ -622,8 +649,15 @@ function AICoachCardInner() {
 
     void loadStatic();
     const handleReadingChanged = () => { clearCache(); void loadStatic(); };
+    const handleCoachRelevantChange = () => { clearCache(); void loadStatic(); };
     window.addEventListener(READING_CHANGED_EVENT, handleReadingChanged);
-    return () => window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+    window.addEventListener(SLEEP_CHANGED_EVENT, handleCoachRelevantChange);
+    window.addEventListener(WELLBEING_CHANGED_EVENT, handleCoachRelevantChange);
+    return () => {
+      window.removeEventListener(READING_CHANGED_EVENT, handleReadingChanged);
+      window.removeEventListener(SLEEP_CHANGED_EVENT, handleCoachRelevantChange);
+      window.removeEventListener(WELLBEING_CHANGED_EVENT, handleCoachRelevantChange);
+    };
   }, [authReady, completedSuggestion, loadStatic, userId]);
 
   useEffect(() => {
@@ -653,6 +687,8 @@ function AICoachCardInner() {
     window.addEventListener(WATER_CHANGED_EVENT, sync);
     window.addEventListener(SCHEDULE_CHANGED_EVENT, sync);
     window.addEventListener(FITNESS_CHANGED_EVENT, sync);
+    window.addEventListener(SLEEP_CHANGED_EVENT, sync);
+    window.addEventListener(WELLBEING_CHANGED_EVENT, sync);
     window.addEventListener(GOAL_MODULE_CHANGED_EVENT, sync);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
@@ -662,6 +698,8 @@ function AICoachCardInner() {
       window.removeEventListener(WATER_CHANGED_EVENT, sync);
       window.removeEventListener(SCHEDULE_CHANGED_EVENT, sync);
       window.removeEventListener(FITNESS_CHANGED_EVENT, sync);
+      window.removeEventListener(SLEEP_CHANGED_EVENT, sync);
+      window.removeEventListener(WELLBEING_CHANGED_EVENT, sync);
       window.removeEventListener(GOAL_MODULE_CHANGED_EVENT, sync);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
@@ -826,6 +864,7 @@ function AICoachCardInner() {
                   ? `AI-powered suggestion · refresh uses ${formatCreditCost(AI_ACTION_CREDIT_COSTS.coachSuggestion)}`
                   : "Smart suggestion · hit ↻ for AI"}
               {" "}· uses your goals, fitness, reading & nutrition data
+              {" "}· plus sleep and wellbeing check-ins
             </span>
           </div>
           <UsagePill />

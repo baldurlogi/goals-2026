@@ -4,6 +4,7 @@ import {
   loadScheduleLog,
   loadScheduleTemplates,
   getScheduleSummary,
+  getScheduleDayKeyForDate,
   seedScheduleLog,
   seedScheduleTemplates,
   SCHEDULE_CHANGED_EVENT,
@@ -13,6 +14,7 @@ import {
 import {
   DEFAULT_USER_SCHEDULE,
   buildScheduleConfig,
+  getScheduleDayLabel,
 } from "@/features/schedule/scheduleData";
 import type {
   TimelineItem,
@@ -23,8 +25,9 @@ import { useTodayDate } from "@/hooks/useTodayDate";
 function emptyScheduleLogForToday(today: string): ScheduleLog {
   return {
     date: today,
-    view: "wfh",
+    dayKey: getScheduleDayKeyForDate(today),
     completed: [],
+    totalBlocks: 0,
   };
 }
 
@@ -108,8 +111,8 @@ export function useScheduleDashboard() {
   }, [authReady, load]);
 
   const blocks =
-    templates[scheduleLog.view] ?? DEFAULT_USER_SCHEDULE[scheduleLog.view];
-  const config = buildScheduleConfig(scheduleLog.view, blocks);
+    templates[scheduleLog.dayKey] ?? DEFAULT_USER_SCHEDULE[scheduleLog.dayKey];
+  const config = buildScheduleConfig(scheduleLog.dayKey, blocks);
 
   const completedSet = useMemo(
     () => new Set(scheduleLog.completed),
@@ -129,12 +132,7 @@ export function useScheduleDashboard() {
   const nextBlock = nextBlockIndex >= 0 ? config.blocks[nextBlockIndex] : null;
   const previewBlocks = config.blocks.slice(0, 5);
 
-  const viewLabel =
-    scheduleLog.view === "wfh"
-      ? "WFH day"
-      : scheduleLog.view === "office"
-        ? "Office day"
-        : "Weekend";
+  const viewLabel = getScheduleDayLabel(scheduleLog.dayKey);
 
   return {
     scheduleLog,

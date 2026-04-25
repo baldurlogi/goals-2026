@@ -1,5 +1,5 @@
 export type TimelineItem = {
-  id: string;        // uuid for stable keys + reordering
+  id: string;
   time: string;
   label: string;
   detail: string;
@@ -7,20 +7,26 @@ export type TimelineItem = {
   tag?: string;
 };
 
-export type ScheduleView = "wfh" | "office" | "weekend";
+export type ScheduleDayKey =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+export type ScheduleView = ScheduleDayKey;
 
 export type ScheduleConfig = {
+  dayKey: ScheduleDayKey;
   label: string;
+  shortLabel: string;
   colorClass: string;
   accentClass: string;
   blocks: TimelineItem[];
 };
 
-export type DailySchedule = Record<ScheduleView, ScheduleConfig>;
+export type DailySchedule = Record<ScheduleDayKey, ScheduleConfig>;
 
-// What gets stored in Supabase per user
-export type UserScheduleTemplates = {
-  wfh: TimelineItem[];
-  office: TimelineItem[];
-  weekend: TimelineItem[];
-};
+export type UserScheduleTemplates = Record<ScheduleDayKey, TimelineItem[]>;

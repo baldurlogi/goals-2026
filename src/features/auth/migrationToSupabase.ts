@@ -63,6 +63,7 @@ export async function migrateLocalStorageToSupabase() {
           name: m.name,
           macros: m.macros,
           emoji: m.emoji,
+          category: m.category ?? 'other',
         },
         'id',
       );

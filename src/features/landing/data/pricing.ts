@@ -5,6 +5,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   SUBSCRIPTION_PLAN_DEFINITIONS.free,
   SUBSCRIPTION_PLAN_DEFINITIONS.pro,
 ].map((plan) => ({
+  id: plan.id,
   name: plan.label,
   sub: plan.landingSub,
   monthly: plan.monthlyPriceValue,

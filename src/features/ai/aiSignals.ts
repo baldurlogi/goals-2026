@@ -682,8 +682,8 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
         ])
           .then(([scheduleLog, templates]) => {
             const blocks =
-              templates[scheduleLog.view] ?? DEFAULT_USER_SCHEDULE[scheduleLog.view];
-            const config = buildScheduleConfig(scheduleLog.view, blocks);
+              templates[scheduleLog.dayKey] ?? DEFAULT_USER_SCHEDULE[scheduleLog.dayKey];
+            const config = buildScheduleConfig(scheduleLog.dayKey, blocks);
             const summary = getScheduleSummary(scheduleLog, config.blocks.length);
 
             return {

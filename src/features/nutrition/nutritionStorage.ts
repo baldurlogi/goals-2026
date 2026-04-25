@@ -52,18 +52,67 @@ export type CustomEntry = {
   loggedAt: number;
 };
 
+export type MealCategory =
+  | "breakfast"
+  | "lunch"
+  | "dinner"
+  | "snack"
+  | "other";
+
 export type SavedMeal = {
   id: string;
   name: string;
   macros: Macros;
   emoji: string;
+  category: MealCategory;
 };
+
+export const SAVED_MEAL_CATEGORY_MIGRATION_MESSAGE =
+  "Saved meal categories need the latest Supabase migration before they can be changed.";
+export const SAVED_MEAL_UPDATE_POLICY_MESSAGE =
+  "Saved meal edits need an UPDATE policy on saved_meals in Supabase before they can be saved.";
 
 export type NutritionLog = {
   date: string;
   eaten: Partial<Record<MealKey, boolean>>;
   customEntries: CustomEntry[];
 };
+
+function normalizeMealCategory(value: unknown): MealCategory {
+  switch (value) {
+    case "breakfast":
+    case "lunch":
+    case "dinner":
+    case "snack":
+    case "other":
+      return value;
+    default:
+      return "other";
+  }
+}
+
+function isMissingSavedMealCategoryColumn(error: {
+  code?: string;
+  message?: string;
+} | null | undefined) {
+  if (!error) return false;
+
+  const message = error.message?.toLowerCase() ?? "";
+  return error.code === "PGRST204" || message.includes("category");
+}
+
+function isSavedMealsUpdatePolicyError(error: {
+  message?: string;
+} | null | undefined) {
+  if (!error) return false;
+
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    message.includes("row-level security") ||
+    message.includes("permission denied") ||
+    message.includes("not allowed")
+  );
+}
 
 function emptyLog(date = todayKey()): NutritionLog {
   return { date, eaten: {}, customEntries: [] };
@@ -338,22 +387,47 @@ export async function loadSavedMeals(): Promise<SavedMeal[]> {
 
   const { data, error } = await supabase
     .from("saved_meals")
-    .select("id, name, emoji, macros")
+    .select("id, name, emoji, macros, category")
     .eq("user_id", user.id)
     .order("created_at");
 
   if (error) {
+    if (isMissingSavedMealCategoryColumn(error)) {
+      const fallback = await supabase
+        .from("saved_meals")
+        .select("id, name, emoji, macros")
+        .eq("user_id", user.id)
+        .order("created_at");
+
+      if (fallback.error) {
+        console.warn("loadSavedMeals error:", fallback.error);
+        return [];
+      }
+
+      return ((fallback.data ?? []) as Array<Omit<SavedMeal, "category">>).map((meal) => ({
+        ...meal,
+        category: "other",
+      }));
+    }
+
     console.warn("loadSavedMeals error:", error);
     return [];
   }
 
-  return (data ?? []) as SavedMeal[];
+  return ((data ?? []) as Array<Partial<SavedMeal>>).map((meal) => ({
+    id: meal.id ?? crypto.randomUUID(),
+    name: meal.name?.trim() ?? "Saved meal",
+    macros: meal.macros ?? { cal: 0, protein: 0, carbs: 0, fat: 0 },
+    emoji: meal.emoji ?? "🍽️",
+    category: normalizeMealCategory(meal.category),
+  }));
 }
 
 export async function saveNewMeal(
   name: string,
   macros: Macros,
   emoji = "🍽️",
+  category: MealCategory = "other",
 ): Promise<SavedMeal> {
   const {
     data: { user },
@@ -364,14 +438,132 @@ export async function saveNewMeal(
     name: name.trim(),
     macros,
     emoji,
+    category: normalizeMealCategory(category),
   };
 
   if (user) {
-    await supabase.from("saved_meals").insert({ ...meal, user_id: user.id });
+    const { data, error } = await supabase
+      .from("saved_meals")
+      .insert({ ...meal, user_id: user.id })
+      .select("id, name, emoji, macros, category")
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingSavedMealCategoryColumn(error)) {
+        if (meal.category !== "other") {
+          throw new Error(SAVED_MEAL_CATEGORY_MIGRATION_MESSAGE);
+        }
+
+        const { error: fallbackError } = await supabase.from("saved_meals").insert({
+          id: meal.id,
+          user_id: user.id,
+          name: meal.name,
+          macros: meal.macros,
+          emoji: meal.emoji,
+        });
+
+        if (fallbackError) {
+          throw fallbackError;
+        }
+      } else {
+        throw error;
+      }
+    }
+
     emit();
+
+    if (data) {
+      return {
+        id: data.id ?? meal.id,
+        name: data.name?.trim() ?? meal.name,
+        macros: data.macros ?? meal.macros,
+        emoji: data.emoji ?? meal.emoji,
+        category: normalizeMealCategory(data.category),
+      };
+    }
   }
 
   return meal;
+}
+
+export async function updateSavedMeal(
+  meal: SavedMeal,
+): Promise<SavedMeal> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const normalized: SavedMeal = {
+    ...meal,
+    name: meal.name.trim(),
+    emoji: meal.emoji || "🍽️",
+    category: normalizeMealCategory(meal.category),
+  };
+
+  if (user) {
+    const { data, error } = await supabase
+      .from("saved_meals")
+      .update({
+        name: normalized.name,
+        macros: normalized.macros,
+        emoji: normalized.emoji,
+        category: normalized.category,
+      })
+      .eq("id", normalized.id)
+      .eq("user_id", user.id)
+      .select("id, name, emoji, macros, category")
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingSavedMealCategoryColumn(error)) {
+        if (normalized.category !== "other") {
+          throw new Error(SAVED_MEAL_CATEGORY_MIGRATION_MESSAGE);
+        }
+
+        const { error: fallbackError } = await supabase
+          .from("saved_meals")
+          .update({
+            name: normalized.name,
+            macros: normalized.macros,
+            emoji: normalized.emoji,
+          })
+          .eq("id", normalized.id)
+          .eq("user_id", user.id);
+
+        if (fallbackError) {
+          if (isSavedMealsUpdatePolicyError(fallbackError)) {
+            throw new Error(SAVED_MEAL_UPDATE_POLICY_MESSAGE);
+          }
+          throw fallbackError;
+        }
+      } else if (isSavedMealsUpdatePolicyError(error)) {
+        throw new Error(SAVED_MEAL_UPDATE_POLICY_MESSAGE);
+      } else {
+        throw error;
+      }
+    }
+
+    if (!data) {
+      throw new Error(SAVED_MEAL_UPDATE_POLICY_MESSAGE);
+    }
+
+    const persisted: SavedMeal = {
+      id: data.id ?? normalized.id,
+      name: data.name?.trim() ?? normalized.name,
+      macros: data.macros ?? normalized.macros,
+      emoji: data.emoji ?? normalized.emoji,
+      category: normalizeMealCategory(data.category),
+    };
+
+    if (persisted.category !== normalized.category) {
+      throw new Error(SAVED_MEAL_CATEGORY_MIGRATION_MESSAGE);
+    }
+
+    emit();
+    return persisted;
+  }
+
+  return normalized;
 }
 
 export async function deleteSavedMeal(id: string): Promise<void> {

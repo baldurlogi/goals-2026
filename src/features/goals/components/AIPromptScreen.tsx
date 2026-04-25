@@ -25,6 +25,7 @@ import {
   generateGoalFromPrompt,
   getClarifyingQuestions,
   AILimitError,
+  GoalGenerationError,
   PROMPT_EXAMPLES,
   type ClarifyingQuestion,
 } from "./generateGoal";
@@ -52,7 +53,7 @@ export function AIPromptScreen({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [loadingGoal, setLoadingGoal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<GoalGenerationError | null>(null);
   const [limitHit, setLimitHit] = useState(false);
   const [limitTier, setLimitTier] = useState("free");
   const [usage, setUsage] = useState<AIUsage | null>(null);
@@ -122,9 +123,14 @@ export function AIPromptScreen({
         const fallbackScreen = questions.length > 0 ? "clarifying" : "prompt";
         const returnScreen = sourceScreen === "generating" ? fallbackScreen : sourceScreen;
         setError(
-          e instanceof Error
-            ? e.message
-            : "Something went wrong while generating. Review your input and retry.",
+          e instanceof GoalGenerationError
+            ? e
+            : new GoalGenerationError(
+                "service",
+                e instanceof Error
+                  ? e.message
+                  : "Something went wrong while generating. Review your input and retry.",
+              ),
         );
         setScreen(returnScreen);
       }
@@ -169,6 +175,65 @@ export function AIPromptScreen({
 
   const activeStep: ActiveStep = screen === "generating" ? "generating" : screen;
   const hasActionableError = Boolean(error);
+
+  const errorContent = (() => {
+    if (!error) return null;
+
+    if (screen === "clarifying") {
+      if (error.reason === "incomplete_goal") {
+        return {
+          title: "We still don’t have a usable goal plan yet",
+          body:
+            "Claude didn’t return complete goal steps this time. Answer any helpful question below and try again, or generate without answers if you’d rather keep moving.",
+          next:
+            error.missingParts.length > 0
+              ? `Still missing: ${error.missingParts.join(", ")}.`
+              : "Still missing: usable goal steps.",
+        };
+      }
+
+      if (error.reason === "network") {
+        return {
+          title: "We couldn’t reach AI goal generation",
+          body:
+            "Your goal and answers are still here. Try again now, or generate without answers if you want to skip the follow-up questions.",
+          next: "Nothing below is required. Any extra detail just makes the plan better.",
+        };
+      }
+
+      return {
+        title: "Goal generation didn’t finish",
+        body:
+          "Your goal and answers are still saved on this screen. Try again, or generate without answers if you want to keep moving.",
+        next: "Nothing below is required. Fill in only what helps.",
+      };
+    }
+
+    if (error.reason === "incomplete_goal") {
+      return {
+        title: "We couldn’t turn that into a usable step-by-step goal yet",
+        body:
+          "Try making the goal a bit more specific so Claude can produce real steps.",
+        next:
+          "Best additions: your deadline, current level, and how much time you can realistically give it each week.",
+      };
+    }
+
+    if (error.reason === "network") {
+      return {
+        title: "We couldn’t reach AI goal generation",
+        body: "Check your connection, then try again.",
+        next: "Your prompt is still here and nothing was lost.",
+      };
+    }
+
+    return {
+      title: "Goal generation didn’t finish",
+      body: "Review your goal text and try again.",
+      next:
+        "If it keeps failing, make the goal more concrete with a target date or clearer outcome.",
+    };
+  })();
 
   function StepIndicator() {
     const steps: { key: ActiveStep; label: string }[] = [
@@ -258,8 +323,8 @@ export function AIPromptScreen({
               <span className="text-sm font-semibold">A few quick questions</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Answer these so Claude can make your plan specific to you. Skip any
-              you’re not sure about.
+              Nothing below is required. Answer what you can so Claude can make
+              your plan more specific, or leave any question blank and still generate.
             </p>
           </div>
 
@@ -287,10 +352,11 @@ export function AIPromptScreen({
             ))}
           </div>
 
-          {error && (
+          {error && errorContent && (
             <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error} You’re still on clarifying questions. Update any response and retry,
-              or skip and generate.
+              <p className="font-medium">{errorContent.title}</p>
+              <p className="mt-1">{errorContent.body}</p>
+              <p className="mt-1 text-xs">{errorContent.next}</p>
             </div>
           )}
 
@@ -334,7 +400,7 @@ export function AIPromptScreen({
               className="gap-1.5 text-muted-foreground"
             >
               <SkipForward className="h-3.5 w-3.5" />
-              Skip
+              Generate without answers
             </Button>
 
             <Button
@@ -350,7 +416,7 @@ export function AIPromptScreen({
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  {hasActionableError ? "Retry" : "Generate plan"}
+                  {hasActionableError ? "Try again" : "Generate plan"}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </>
               )}
@@ -391,15 +457,17 @@ export function AIPromptScreen({
           }}
         />
 
-        {error && (
+        {error && errorContent && (
           <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error} You’re still on your prompt. Edit your goal details, then retry.
+            <p className="font-medium">{errorContent.title}</p>
+            <p className="mt-1">{errorContent.body}</p>
+            <p className="mt-1 text-xs">{errorContent.next}</p>
           </div>
         )}
 
         <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           Uses {formatCreditCost(AI_ACTION_CREDIT_COSTS.goalGeneration)} · Claude will turn this into ordered steps with “done
-          when” criteria.
+          when” criteria. Strong prompts usually include the outcome, timing, and your starting point.
         </div>
 
         {usage && (
@@ -460,7 +528,7 @@ export function AIPromptScreen({
             </>
           ) : (
             <>
-              {hasActionableError ? "Retry" : "Continue"}
+              {hasActionableError ? "Try again" : "Continue"}
               <ArrowRight className="h-3.5 w-3.5" />
             </>
           )}

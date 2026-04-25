@@ -1,10 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { m } from "framer-motion";
+import { useState, type FormEvent } from "react";
 import { TOKENS } from "../theme/tokens";
 import type { BillingMode, PricingPlan, ThemeMode } from "../types";
 import { PAID_PLANS_COMING_SOON_LABEL } from "@/features/subscription/subscriptionConfig";
 import { fadeUp, landingViewport } from "../motion";
+import {
+  joinLaunchWaitlist,
+  LaunchWaitlistError,
+} from "@/features/landing/waitlist";
 
 type PricingCardProps = PricingPlan & {
   theme: ThemeMode;
@@ -18,6 +24,7 @@ function formatMonthlyEquivalent(yearly: number) {
 }
 
 export function PricingCard({
+  id,
   theme,
   billing,
   onChoosePlan,
@@ -37,6 +44,41 @@ export function PricingCard({
   const displayPrice = isYearly ? yearly : monthly;
   const equivalentMonthly = !isFree ? formatMonthlyEquivalent(yearly) : null;
   const isPreviewOnly = Boolean(comingSoon);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistState, setWaitlistState] = useState<"idle" | "success" | "error">("idle");
+  const [waitlistMessage, setWaitlistMessage] = useState<string | null>(null);
+  const [isJoiningWaitlist, setIsJoiningWaitlist] = useState(false);
+
+  async function handleJoinWaitlist(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isPreviewOnly || isJoiningWaitlist) return;
+
+    setIsJoiningWaitlist(true);
+    setWaitlistState("idle");
+    setWaitlistMessage(null);
+
+    try {
+      const result = await joinLaunchWaitlist({
+        email: waitlistEmail,
+        planId: id,
+      });
+      setWaitlistState("success");
+      setWaitlistMessage(
+        result.message ??
+          "Check your inbox and confirm your email to join the waitlist.",
+      );
+      setWaitlistEmail("");
+    } catch (error) {
+      const message =
+        error instanceof LaunchWaitlistError
+          ? error.message
+          : "Couldn't save your email just now. Please try again.";
+      setWaitlistState("error");
+      setWaitlistMessage(message);
+    } finally {
+      setIsJoiningWaitlist(false);
+    }
+  }
 
   return (
     <m.div
@@ -165,23 +207,71 @@ export function PricingCard({
           </div>
 
           <div className="mt-auto">
-            <Button
-              type="button"
-              onClick={isPreviewOnly ? undefined : onChoosePlan}
-              disabled={isPreviewOnly}
-              className="w-full rounded-xl font-semibold"
-              style={{
-                background: isPreviewOnly ? t.surface : featured ? t.primary : t.text,
-                color: isPreviewOnly ? t.faint : featured ? "#052e16" : t.bg,
-                border: isPreviewOnly ? `1px solid ${t.border}` : undefined,
-              }}
-            >
-              {cta}
-            </Button>
-            {isPreviewOnly && (
-              <p className="mt-3 text-center text-xs" style={{ color: t.faint }}>
-                Preview what Pro includes. Checkout opens later.
-              </p>
+            {isPreviewOnly ? (
+              <form className="space-y-3" onSubmit={handleJoinWaitlist}>
+                <Input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="Enter your email"
+                  value={waitlistEmail}
+                  onChange={(event) => {
+                    setWaitlistEmail(event.target.value);
+                    if (waitlistState !== "idle") {
+                      setWaitlistState("idle");
+                      setWaitlistMessage(null);
+                    }
+                  }}
+                  disabled={isJoiningWaitlist}
+                  aria-label={`Email for ${name} launch waitlist`}
+                  className="h-11 rounded-xl border px-4 text-sm"
+                  style={{
+                    borderColor: t.borderStrong,
+                    background: t.surface,
+                    color: t.text,
+                  }}
+                />
+
+                <Button
+                  type="submit"
+                  disabled={isJoiningWaitlist}
+                  className="w-full rounded-xl font-semibold"
+                  style={{
+                    background: t.surface,
+                    color: t.text,
+                    border: `1px solid ${t.borderStrong}`,
+                  }}
+                >
+                  {isJoiningWaitlist ? "Saving..." : "Notify me when Pro launches"}
+                </Button>
+
+                <p className="text-center text-xs" style={{ color: t.faint }}>
+                  Preview what Pro includes now. We&apos;ll send a confirmation email first so only real inboxes join the list.
+                </p>
+
+                {waitlistMessage && (
+                  <p
+                    className="text-center text-xs leading-5"
+                    style={{
+                      color: waitlistState === "success" ? t.primary : t.rose,
+                    }}
+                  >
+                    {waitlistMessage}
+                  </p>
+                )}
+              </form>
+            ) : (
+              <Button
+                type="button"
+                onClick={onChoosePlan}
+                className="w-full rounded-xl font-semibold"
+                style={{
+                  background: featured ? t.primary : t.text,
+                  color: featured ? "#052e16" : t.bg,
+                }}
+              >
+                {cta}
+              </Button>
             )}
           </div>
         </CardContent>

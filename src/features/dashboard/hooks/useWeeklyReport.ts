@@ -31,7 +31,10 @@ import {
   getStrongestLiftLabel,
 } from "@/features/fitness/selectors";
 import { REST_LABELS } from "@/features/fitness/constants";
-import { loadScheduleTemplates } from "@/features/schedule/scheduleStorage";
+import {
+  getScheduleDayKeyForDate,
+  loadScheduleTemplates,
+} from "@/features/schedule/scheduleStorage";
 import { getTodoWeeklySummary, type Todo } from "@/features/todos/todoStorage";
 import {
   markAIUsageLimitReached,
@@ -180,8 +183,8 @@ type TodoRow = Todo;
 
 type ScheduleLogRow = {
   log_date: string;
-  view: "office" | "weekend" | "wfh" | null;
   completed: unknown[];
+  total_blocks: number | null;
 };
 
 type WeeklyReportDbRow = {
@@ -298,15 +301,13 @@ function toTodoRow(row: unknown): TodoRow | null {
 function toScheduleLogRow(row: unknown): ScheduleLogRow | null {
   if (!isRecord(row) || typeof row.log_date !== "string") return null;
 
-  const view =
-    row.view === "office" || row.view === "weekend" || row.view === "wfh"
-      ? row.view
-      : null;
-
   return {
     log_date: row.log_date,
-    view,
     completed: Array.isArray(row.completed) ? row.completed : [],
+    total_blocks:
+      typeof row.total_blocks === "number" && Number.isFinite(row.total_blocks)
+        ? row.total_blocks
+        : null,
   };
 }
 
@@ -1089,13 +1090,38 @@ async function collectScheduleData(
     };
   }
 
-  const { data, error } = await supabase
+  const baseQuery = supabase
     .from("schedule_logs")
-    .select("log_date, view, completed")
+    .select("log_date, completed, total_blocks")
     .eq("user_id", user.id)
     .gte("log_date", weekStart)
     .lte("log_date", weekEnd)
     .order("log_date", { ascending: true });
+
+  let { data, error } = await baseQuery;
+
+  if (error) {
+    const missingTotalBlocks =
+      error.code === "PGRST204" ||
+      error.message.toLowerCase().includes("total_blocks");
+
+    if (missingTotalBlocks) {
+      const fallback = await supabase
+        .from("schedule_logs")
+        .select("log_date, completed")
+        .eq("user_id", user.id)
+        .gte("log_date", weekStart)
+        .lte("log_date", weekEnd)
+        .order("log_date", { ascending: true });
+
+      data =
+        fallback.data?.map((row) => ({
+          ...row,
+          total_blocks: null,
+        })) ?? null;
+      error = fallback.error;
+    }
+  }
 
   if (error) {
     console.warn("collectScheduleData error:", error);
@@ -1115,13 +1141,8 @@ async function collectScheduleData(
     .filter((row): row is ScheduleLogRow => row !== null);
 
   for (const row of scheduleRows) {
-    const rawView = row.view;
-    const view: keyof typeof templates =
-      rawView === "office" || rawView === "weekend" || rawView === "wfh"
-        ? rawView
-        : "wfh";
-
-    const blocks = templates[view]?.length ?? 0;
+    const dayKey = getScheduleDayKeyForDate(row.log_date);
+    const blocks = row.total_blocks ?? templates[dayKey]?.length ?? 0;
     const completed = row.completed.length;
 
     totalBlocksThisWeek += blocks;
