@@ -319,9 +319,11 @@ function buildScheduleProgress(
   log: Awaited<ReturnType<typeof loadScheduleLog>>,
   templates: Awaited<ReturnType<typeof loadScheduleTemplates>>,
 ): ModuleProgress {
-  const blocks = templates[log.view] ?? [];
-  const total = blocks.length;
+  const blocks = templates[log.dayKey] ?? [];
+  const total = log.totalBlocks || blocks.length;
   const done = log.completed.length;
+  const dayLabel =
+    log.dayKey.charAt(0).toUpperCase() + log.dayKey.slice(1);
 
   return {
     id: "schedule",
@@ -330,8 +332,7 @@ function buildScheduleProgress(
     icon: <CalendarDays className="h-3.5 w-3.5" />,
     pct: total === 0 ? 100 : clampPct((done / total) * 100),
     primaryStat: total === 0 ? "No blocks today" : `${done}/${total} blocks`,
-    secondaryStat:
-      log.view === "wfh" ? "WFH day" : log.view === "office" ? "Office day" : "Weekend",
+    secondaryStat: `${dayLabel} plan`,
     color: "amber",
     accentClass: "bg-amber-500",
   };

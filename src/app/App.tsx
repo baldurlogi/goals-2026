@@ -22,6 +22,8 @@ const LandingPage = lazy(async () => ({
   default: (await import("@/features/landing/LandingPage")).LandingPage,
 }));
 
+const WaitlistConfirmPage = lazy(() => import("@/features/landing/WaitlistConfirmPage"));
+
 const LoginPage = lazy(async () => ({
   default: (await import("@/features/auth/LoginPage")).LoginPage,
 }));
@@ -211,6 +213,15 @@ export default function App() {
           <Route
             path="/auth"
             element={<Navigate to="/login" replace />}
+          />
+
+          <Route
+            path="/waitlist/confirm"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <WaitlistConfirmPage />
+              </Suspense>
+            }
           />
 
           <Route

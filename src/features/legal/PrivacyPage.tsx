@@ -89,6 +89,16 @@ export function PrivacyPage() {
             </p>
           </SubSection>
 
+          <SubSection title="Waitlist and launch notification data">
+            <p>
+              If you join a launch waitlist, we store the email address you
+              submitted, confirmation metadata, and limited anti-abuse signals
+              such as a hashed network identifier and request timing so we can
+              verify the signup, prevent spam, and notify you when the selected
+              plan becomes available.
+            </p>
+          </SubSection>
+
           <SubSection title="Profile and planning data">
             <p>
               Information you add to your profile, goals, tasks, schedule,
@@ -143,6 +153,7 @@ export function PrivacyPage() {
             <li>To measure AI credit usage and enforce beta limits</li>
             <li>To improve reliability, security, and product quality</li>
             <li>To process billing and account administration if plans go live</li>
+            <li>To manage confirmed waitlists and send launch notifications you requested</li>
             <li>To comply with legal obligations and handle user-rights requests</li>
           </ul>
         </Section>

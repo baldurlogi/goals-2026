@@ -50,6 +50,7 @@ export type DifferenceItem = {
 };
 
 export type PricingPlan = {
+  id: string;
   name: string;
   sub: string;
   monthly: number;

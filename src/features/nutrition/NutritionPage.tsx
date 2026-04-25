@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, X, Trash2, BookMarked, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, X, Trash2, BookMarked, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,11 +19,13 @@ import {
   loadSavedMeals,
   savePhase,
   saveNewMeal,
+  updateSavedMeal,
   deleteSavedMeal,
   logSavedMeal,
   addCustomEntry,
   removeCustomEntry,
   getLoggedMacros,
+  type MealCategory,
   type SavedMeal,
   type CustomEntry,
   type NutritionLog,
@@ -72,21 +74,65 @@ function macroBadge(m: Macros) {
   return `${m.cal} kcal · ${m.protein}g P · ${m.carbs}g C · ${m.fat}g F`;
 }
 
+const MEAL_CATEGORY_OPTIONS: Array<{ value: MealCategory; label: string }> = [
+  { value: "breakfast", label: "Breakfast" },
+  { value: "lunch", label: "Lunch" },
+  { value: "dinner", label: "Dinner" },
+  { value: "snack", label: "Snack" },
+  { value: "other", label: "Other" },
+];
+
+function getMealCategoryLabel(category: MealCategory) {
+  return (
+    MEAL_CATEGORY_OPTIONS.find((option) => option.value === category)?.label ??
+    "Other"
+  );
+}
+
+type SavedMealsFilter = "all" | MealCategory;
+
 // ── Manual entry form ─────────────────────────────────────────────────────────
 
 function ManualEntryForm({
-  onAdd, onSaveAndAdd,
+  initialMeal,
+  onAdd,
+  onSaveAndAdd,
+  onUpdate,
+  onCancelEdit,
 }: {
-  onAdd: (name: string, macros: Macros) => void;
-  onSaveAndAdd: (name: string, macros: Macros, emoji: string) => void;
+  initialMeal?: SavedMeal | null;
+  onAdd: (name: string, macros: Macros) => Promise<boolean>;
+  onSaveAndAdd: (
+    name: string,
+    macros: Macros,
+    emoji: string,
+    category: MealCategory,
+  ) => Promise<boolean>;
+  onUpdate: (
+    meal: SavedMeal,
+  ) => Promise<boolean>;
+  onCancelEdit: () => void;
 }) {
-  const [name, setName]       = useState("");
-  const [cal, setCal]         = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs]     = useState("");
-  const [fat, setFat]         = useState("");
-  const [emoji, setEmoji]     = useState("🍽️");
+  const [name, setName]       = useState(initialMeal?.name ?? "");
+  const [cal, setCal]         = useState(initialMeal ? String(initialMeal.macros.cal || "") : "");
+  const [protein, setProtein] = useState(initialMeal ? String(initialMeal.macros.protein || "") : "");
+  const [carbs, setCarbs]     = useState(initialMeal ? String(initialMeal.macros.carbs || "") : "");
+  const [fat, setFat]         = useState(initialMeal ? String(initialMeal.macros.fat || "") : "");
+  const [emoji, setEmoji]     = useState(initialMeal?.emoji ?? "🍽️");
+  const [category, setCategory] = useState<MealCategory>(initialMeal?.category ?? "other");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const isEditMode = Boolean(initialMeal);
+
+  useEffect(() => {
+    setName(initialMeal?.name ?? "");
+    setCal(initialMeal ? String(initialMeal.macros.cal || "") : "");
+    setProtein(initialMeal ? String(initialMeal.macros.protein || "") : "");
+    setCarbs(initialMeal ? String(initialMeal.macros.carbs || "") : "");
+    setFat(initialMeal ? String(initialMeal.macros.fat || "") : "");
+    setEmoji(initialMeal?.emoji ?? "🍽️");
+    setCategory(initialMeal?.category ?? "other");
+  }, [initialMeal]);
 
   const macros: Macros = {
     cal:     Number(cal)     || 0,
@@ -98,7 +144,50 @@ function ManualEntryForm({
 
   function reset() {
     setName(""); setCal(""); setProtein(""); setCarbs(""); setFat("");
+    setEmoji("🍽️");
+    setCategory("other");
     nameRef.current?.focus();
+  }
+
+  async function submitLogNow() {
+    setIsSubmitting(true);
+    try {
+      const didSave = await onAdd(name || "Custom meal", macros);
+      if (didSave) {
+        reset();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function submitSaveAndLog() {
+    setIsSubmitting(true);
+    try {
+      const didSave = await onSaveAndAdd(name, macros, emoji, category);
+      if (didSave) {
+        reset();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function submitEdit() {
+    if (!initialMeal) return;
+
+    setIsSubmitting(true);
+    try {
+      await onUpdate({
+        ...initialMeal,
+        name,
+        macros,
+        emoji,
+        category,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -120,6 +209,26 @@ function ManualEntryForm({
           className="flex-1 rounded-md border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
+      <div className="flex flex-wrap gap-2">
+        {MEAL_CATEGORY_OPTIONS.map((option) => {
+          const selected = option.value === category;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setCategory(option.value)}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                selected
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-background text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MacroInputRow label="Calories" value={cal}     unit="kcal" onChange={setCal}     />
         <MacroInputRow label="Protein"  value={protein} unit="g"    onChange={setProtein} />
@@ -127,22 +236,50 @@ function ManualEntryForm({
         <MacroInputRow label="Fat"      value={fat}     unit="g"    onChange={setFat}     />
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          disabled={!valid}
-          onClick={() => { onAdd(name || "Custom meal", macros); reset(); }}
-        >
-          Log now
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!valid || !name.trim()}
-          onClick={() => { onSaveAndAdd(name, macros, emoji); reset(); }}
-        >
-          <BookMarked className="mr-1.5 h-3.5 w-3.5" />
-          Save & log
-        </Button>
+        {isEditMode ? (
+          <>
+            <Button
+              size="sm"
+              disabled={!valid || !name.trim() || !initialMeal || isSubmitting}
+              onClick={() => {
+                void submitEdit();
+              }}
+            >
+              {isSubmitting ? "Saving..." : "Save changes"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={onCancelEdit}
+            >
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              disabled={!valid || isSubmitting}
+              onClick={() => {
+                void submitLogNow();
+              }}
+            >
+              {isSubmitting ? "Saving..." : "Log now"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!valid || !name.trim() || isSubmitting}
+              onClick={() => {
+                void submitSaveAndLog();
+              }}
+            >
+              <BookMarked className="mr-1.5 h-3.5 w-3.5" />
+              {isSubmitting ? "Saving..." : "Save & log"}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -151,12 +288,21 @@ function ManualEntryForm({
 // ── Saved meal pill ───────────────────────────────────────────────────────────
 
 function SavedMealPill({
-  meal, onAdd, onDelete,
+  meal, isEditing, onAdd, onEdit, onDelete,
 }: {
-  meal: SavedMeal; onAdd: (m: SavedMeal) => void; onDelete: (id: string) => void;
+  meal: SavedMeal;
+  isEditing: boolean;
+  onAdd: (m: SavedMeal) => void;
+  onEdit: (meal: SavedMeal) => void;
+  onDelete: (id: string) => void;
 }) {
   return (
-    <div className="group flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 transition-colors hover:bg-muted/30">
+    <div
+      className={cn(
+        "group flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 transition-colors hover:bg-muted/30",
+        isEditing ? "border-foreground/40 bg-muted/30" : undefined,
+      )}
+    >
       <button
         type="button"
         className="flex min-w-0 flex-1 items-center gap-2 text-left"
@@ -165,17 +311,31 @@ function SavedMealPill({
         <span className="text-base leading-none">{meal.emoji}</span>
         <div className="min-w-0">
           <div className="truncate text-sm font-medium">{meal.name}</div>
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
+            {getMealCategoryLabel(meal.category)}
+          </div>
           <div className="text-[10px] text-muted-foreground">{macroBadge(meal.macros)}</div>
         </div>
         <Plus className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </button>
-      <button
-        type="button"
-        onClick={() => onDelete(meal.id)}
-        className="shrink-0 text-muted-foreground/40 hover:text-destructive sm:invisible sm:group-hover:visible"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      <div className="flex shrink-0 items-center gap-1 sm:invisible sm:group-hover:visible">
+        <button
+          type="button"
+          onClick={() => onEdit(meal)}
+          className="text-muted-foreground/50 hover:text-foreground"
+          aria-label={`Edit ${meal.name}`}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(meal.id)}
+          className="text-muted-foreground/40 hover:text-destructive"
+          aria-label={`Delete ${meal.name}`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -212,6 +372,8 @@ export function NutritionPage() {
   const [savedMeals,  setSavedMeals]  = useState<SavedMeal[]>([]);
   const [showManual,  setShowManual]  = useState(false);
   const [showLibrary, setShowLibrary] = useState(true);
+  const [savedMealsFilter, setSavedMealsFilter] = useState<SavedMealsFilter>("all");
+  const [editingSavedMeal, setEditingSavedMeal] = useState<SavedMeal | null>(null);
   const profile = useProfile();
 
   const reloadNutritionState = useCallback(async () => {
@@ -250,13 +412,42 @@ export function NutritionPage() {
     await addCustomEntry(name, macros);
     await reloadNutritionState();
     toast.success(`${name} added`);
+    return true;
   };
 
-  const handleSaveAndAdd = async (name: string, macros: Macros, emoji: string) => {
-    saveNewMeal(name, macros, emoji);
-    await addCustomEntry(name, macros);
-    await reloadNutritionState();
-    toast.success(`${name} saved to meals`);
+  const handleSaveAndAdd = async (
+    name: string,
+    macros: Macros,
+    emoji: string,
+    category: MealCategory,
+  ) => {
+    try {
+      await saveNewMeal(name, macros, emoji, category);
+      await addCustomEntry(name, macros);
+      await reloadNutritionState();
+      toast.success(`${name} saved to meals`);
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Couldn't save that meal right now.";
+      toast.error(message);
+      return false;
+    }
+  };
+
+  const handleUpdateSavedMeal = async (meal: SavedMeal) => {
+    try {
+      await updateSavedMeal(meal);
+      await reloadNutritionState();
+      setEditingSavedMeal(null);
+      toast.success(`${meal.name} updated`);
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Couldn't update that meal right now.";
+      toast.error(message);
+      return false;
+    }
   };
 
   const handleQuickAdd = async (meal: SavedMeal) => {
@@ -271,6 +462,9 @@ export function NutritionPage() {
   };
 
   const handleDeleteSaved = async (id: string) => {
+    if (editingSavedMeal?.id === id) {
+      setEditingSavedMeal(null);
+    }
     await deleteSavedMeal(id);
     await reloadNutritionState();
   };
@@ -306,6 +500,13 @@ export function NutritionPage() {
       visiblePhaseOptions[0] ??
       NUTRITION_PHASE_OPTIONS[1],
     [phase, visiblePhaseOptions],
+  );
+  const filteredSavedMeals = useMemo(
+    () =>
+      savedMeals
+        .filter((meal) => savedMealsFilter === "all" || meal.category === savedMealsFilter)
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    [savedMeals, savedMealsFilter],
   );
 
   return (
@@ -373,7 +574,10 @@ export function NutritionPage() {
                   size="sm"
                   variant={showManual ? "secondary" : "outline"}
                   className="h-7 text-xs"
-                  onClick={() => setShowManual((s) => !s)}
+                  onClick={() => {
+                    setEditingSavedMeal(null);
+                    setShowManual((s) => !s);
+                  }}
                 >
                   {showManual ? "Close" : <><Plus className="mr-1 h-3 w-3" />Add</>}
                 </Button>
@@ -385,7 +589,12 @@ export function NutritionPage() {
 
             {showManual && (
               <CardContent className="pb-4">
-                <ManualEntryForm onAdd={handleManualAdd} onSaveAndAdd={handleSaveAndAdd} />
+                <ManualEntryForm
+                  onAdd={handleManualAdd}
+                  onSaveAndAdd={handleSaveAndAdd}
+                  onUpdate={handleUpdateSavedMeal}
+                  onCancelEdit={() => {}}
+                />
               </CardContent>
             )}
 
@@ -420,19 +629,75 @@ export function NutritionPage() {
             </CardHeader>
             {showLibrary && (
               <CardContent className="space-y-2 pb-4">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSavedMealsFilter("all")}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                      savedMealsFilter === "all"
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    All
+                  </button>
+                  {MEAL_CATEGORY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSavedMealsFilter(option.value)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                        savedMealsFilter === option.value
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border bg-background text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
                 {savedMeals.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
                     No saved meals yet — use "Save &amp; log" above to build your library.
                   </p>
+                ) : filteredSavedMeals.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No saved meals in {savedMealsFilter === "all" ? "this view" : getMealCategoryLabel(savedMealsFilter).toLowerCase()} yet.
+                  </p>
                 ) : (
-                  savedMeals.map((m) => (
-                    <SavedMealPill
-                      key={m.id}
-                      meal={m}
-                      onAdd={handleQuickAdd}
-                      onDelete={handleDeleteSaved}
-                    />
+                  filteredSavedMeals.map((m) => (
+                    <div key={m.id} className="space-y-2">
+                      <SavedMealPill
+                        meal={m}
+                        isEditing={editingSavedMeal?.id === m.id}
+                        onAdd={handleQuickAdd}
+                        onEdit={(meal) => {
+                          setEditingSavedMeal((current) =>
+                            current?.id === meal.id ? null : meal,
+                          );
+                        }}
+                        onDelete={handleDeleteSaved}
+                      />
+                      {editingSavedMeal?.id === m.id ? (
+                        <ManualEntryForm
+                          initialMeal={editingSavedMeal}
+                          onAdd={handleManualAdd}
+                          onSaveAndAdd={handleSaveAndAdd}
+                          onUpdate={handleUpdateSavedMeal}
+                          onCancelEdit={() => {
+                            setEditingSavedMeal(null);
+                          }}
+                        />
+                      ) : null}
+                    </div>
                   ))
+                )}
+                {savedMeals.length > 0 && savedMealsFilter !== "all" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    If changing a meal moves it to another category, it will disappear from this filtered view after save.
+                  </p>
                 )}
               </CardContent>
             )}

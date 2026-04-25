@@ -151,6 +151,49 @@ function getNutritionSuggestion(
   };
 }
 
+function getReadingSuggestion(
+  signals: AISignals,
+): SuggestionCandidate | null {
+  if (!signals.reading.currentBookTitle) {
+    return {
+      module: "reading",
+      priority: 40,
+      action: "Choose your next book",
+      reason: "Setting a current book makes reading easier to start.",
+      href: "/app/reading",
+      icon: Library,
+    };
+  }
+
+  if (signals.reading.goalHitToday) return null;
+
+  const pagesRemaining = Math.max(
+    signals.reading.targetPages - signals.reading.pagesReadToday,
+    0,
+  );
+  const hour = getCurrentHour();
+  const streakPressure = signals.reading.streak >= 3 ? 2 : 0;
+  const lateDayBonus = hour >= 20 ? 4 : hour >= 17 ? 2 : 0;
+  const startedTodayPenalty = signals.reading.pagesReadToday > 0 ? 6 : 0;
+
+  return {
+    module: "reading",
+    priority: 44 + streakPressure + lateDayBonus - startedTodayPenalty,
+    action:
+      pagesRemaining > 0
+        ? `Read ${pagesRemaining} more page${pagesRemaining === 1 ? "" : "s"} of ${signals.reading.currentBookTitle}`
+        : `Open ${signals.reading.currentBookTitle}`,
+    reason:
+      signals.reading.pagesReadToday > 0
+        ? `${signals.reading.pagesReadToday}/${signals.reading.targetPages} pages done so far today.`
+        : signals.reading.streak > 0
+          ? `Keep your ${signals.reading.streak}-day streak alive.`
+          : "Start a reading streak today.",
+    href: "/app/reading",
+    icon: BookOpen,
+  };
+}
+
 function getWaterSuggestion(
   signals: AISignals,
 ): SuggestionCandidate | null {
@@ -276,32 +319,8 @@ export function buildSuggestionCandidates(
   }
 
   if (hasModule(signals, "reading")) {
-    if (signals.reading.currentBookTitle) {
-      if (!signals.reading.goalHitToday) {
-        items.push({
-          module: "reading",
-          priority: 58,
-          action: `Read ${signals.reading.targetPages} pages of ${signals.reading.currentBookTitle}`,
-          reason:
-            signals.reading.pagesReadToday > 0
-              ? `${signals.reading.pagesReadToday}/${signals.reading.targetPages} pages done so far today.`
-              : signals.reading.streak > 0
-                ? `Keep your ${signals.reading.streak}-day streak alive.`
-                : "Start a reading streak today.",
-          href: "/app/reading",
-          icon: BookOpen,
-        });
-      }
-    } else {
-      items.push({
-        module: "reading",
-        priority: 48,
-        action: "Choose your next book",
-        reason: "Setting a current book makes reading easier to start.",
-        href: "/app/reading",
-        icon: Library,
-      });
-    }
+    const readingSuggestion = getReadingSuggestion(signals);
+    if (readingSuggestion) items.push(readingSuggestion);
   }
 
   if (hasModule(signals, "nutrition")) {
@@ -369,30 +388,63 @@ export function buildSuggestionCandidates(
     }
   }
 
-  if (hasModule(signals, "sleep") && !signals.sleep.loggedToday && getCurrentHour() >= 18) {
+  if (hasModule(signals, "sleep") && !signals.sleep.loggedToday && getCurrentHour() >= 10) {
+    const hour = getCurrentHour();
     items.push({
       module: "sleep",
-      priority: 57,
+      priority: hour >= 20 ? 66 : hour >= 15 ? 61 : 56,
       action: "Log last night's sleep",
-      reason: "A quick sleep log helps your recovery view stay useful.",
+      reason:
+        hour >= 20
+          ? "You still haven’t logged sleep today, and that recovery data is now missing from the day."
+          : "A quick sleep log helps your recovery view stay useful.",
       href: "/app/sleep",
       icon: Moon,
     });
   }
 
-  if (
-    hasModule(signals, "wellbeing") &&
-    !signals.wellbeing.loggedToday &&
-    getCurrentHour() >= 18
-  ) {
-    items.push({
-      module: "wellbeing",
-      priority: 53,
-      action: "Write a quick journal check-in",
-      reason: "One short reflection helps you close the day with context.",
-      href: "/app/wellbeing",
-      icon: Heart,
-    });
+  if (hasModule(signals, "wellbeing")) {
+    const hour = getCurrentHour();
+
+    if (!signals.wellbeing.loggedToday && hour >= 12) {
+      items.push({
+        module: "wellbeing",
+        priority: hour >= 20 ? 64 : hour >= 17 ? 60 : 54,
+        action: "Do a quick mental wellbeing check-in",
+        reason:
+          hour >= 20
+            ? "Close the day with a simple mood check and short note."
+            : "A quick check-in gives your coach better context than guessing how the day felt.",
+        href: "/app/wellbeing",
+        icon: Heart,
+      });
+    } else if (
+      signals.wellbeing.loggedToday &&
+      !signals.wellbeing.journaledToday &&
+      hour >= 16
+    ) {
+      items.push({
+        module: "wellbeing",
+        priority: hour >= 20 ? 59 : 55,
+        action: "Add a short journal note",
+        reason:
+          "You already checked in today. One sentence about how the day felt makes the log much more useful later.",
+        href: "/app/wellbeing",
+        icon: Heart,
+      });
+    } else if (
+      signals.wellbeing.journalDaysLast7 <= 1 &&
+      hour >= 18
+    ) {
+      items.push({
+        module: "wellbeing",
+        priority: 52,
+        action: "Write a quick reflection tonight",
+        reason: "Your journal has been quiet lately. A short note is enough.",
+        href: "/app/wellbeing",
+        icon: Heart,
+      });
+    }
   }
 
   if (hasModule(signals, "skincare") && signals.skincare) {

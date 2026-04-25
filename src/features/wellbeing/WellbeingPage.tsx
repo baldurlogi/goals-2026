@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Heart, LoaderCircle, RotateCcw, Save } from "lucide-react";
+import { BookOpenText, Heart, LoaderCircle, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/features/auth/authContext";
 import { getLocalDateKey, useTodayDate } from "@/hooks/useTodayDate";
@@ -279,12 +279,30 @@ function getEntryPresenceLabel(value: string | null): string {
   return value ? "Added" : "Not added";
 }
 
+function truncateNotebookText(value: string, maxLength = 220): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength).trimEnd()}…`;
+}
+
+function hasNotebookContent(entry: MentalWellbeingEntry): boolean {
+  return (
+    (entry.journalEntry?.trim() ?? "") !== "" ||
+    (entry.gratitudeEntry?.trim() ?? "") !== ""
+  );
+}
+
+function getNotebookEntries(entries: MentalWellbeingEntry[]) {
+  return entries.filter(hasNotebookContent);
+}
+
 export default function WellbeingPage() {
   const { userId, authReady } = useAuth();
   const today = useTodayDate();
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
   const wellbeingEntryQuery = useMentalWellbeingEntryQuery(selectedDate);
   const wellbeingHistoryQuery = useRecentMentalWellbeingHistoryQuery(7);
+  const wellbeingNotebookQuery = useRecentMentalWellbeingHistoryQuery(60);
   const saveWellbeingMutation = useSaveMentalWellbeingEntryMutation();
 
   const hydratedEntry = useMemo(
@@ -318,6 +336,10 @@ export default function WellbeingPage() {
       ? wellbeingEntryQuery.error.message
       : "Couldn't load this wellbeing check-in.";
   const recentEntries = wellbeingHistoryQuery.data ?? [];
+  const notebookEntries = useMemo(
+    () => getNotebookEntries(wellbeingNotebookQuery.data ?? []),
+    [wellbeingNotebookQuery.data],
+  );
   const wellbeingHistorySummary = useMemo(
     () => getWellbeingHistorySummary(recentEntries),
     [recentEntries],
@@ -692,6 +714,95 @@ export default function WellbeingPage() {
                     </div>
                   </div>
                 ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BookOpenText className="h-4 w-4 text-pink-500" />
+                <CardTitle className="text-lg">Journal notebook</CardTitle>
+              </div>
+              <CardDescription>
+                Your recent reflections and gratitude notes in one place, so you
+                can look back through them like a notebook.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {wellbeingNotebookQuery.isLoading && notebookEntries.length === 0 ? (
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                  Loading notebook entries...
+                </div>
+              ) : notebookEntries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No journal notes yet. Once you add reflections or gratitude
+                  notes, they&apos;ll build up here like a simple notebook.
+                </p>
+              ) : (
+                notebookEntries.map((entry) => {
+                  const hasJournal = (entry.journalEntry?.trim() ?? "") !== "";
+                  const hasGratitude = (entry.gratitudeEntry?.trim() ?? "") !== "";
+
+                  return (
+                    <button
+                      key={entry.logDate}
+                      type="button"
+                      onClick={() => setSelectedDate(entry.logDate)}
+                      className="w-full rounded-xl border bg-muted/20 px-4 py-3 text-left transition-colors hover:bg-muted/35"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-medium">
+                              {formatSelectedDate(entry.logDate)}
+                            </p>
+                            {entry.logDate === selectedDate ? (
+                              <Badge variant="secondary">Open day</Badge>
+                            ) : null}
+                          </div>
+
+                          {hasJournal ? (
+                            <div className="space-y-1">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                Reflection
+                              </p>
+                              <p className="text-sm text-foreground/90">
+                                {truncateNotebookText(entry.journalEntry ?? "")}
+                              </p>
+                            </div>
+                          ) : null}
+
+                          {hasGratitude ? (
+                            <div className="space-y-1">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                Gratitude
+                              </p>
+                              <p className="text-sm text-foreground/90">
+                                {truncateNotebookText(entry.gratitudeEntry ?? "", 160)}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <Badge variant="outline">
+                            {entry.moodScore !== null
+                              ? `Mood ${entry.moodScore}/5`
+                              : "No mood"}
+                          </Badge>
+                          {hasJournal ? (
+                            <Badge variant="outline">Journal</Badge>
+                          ) : null}
+                          {hasGratitude ? (
+                            <Badge variant="outline">Gratitude</Badge>
+                          ) : null}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
               )}
             </CardContent>
           </Card>
