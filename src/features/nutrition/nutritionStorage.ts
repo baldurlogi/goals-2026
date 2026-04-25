@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabaseClient";
-import type { NutritionPhase } from "@/features/nutrition/nutritionData";
+import {
+  getFallbackNutritionPhaseForServer,
+  normalizeNutritionPhase,
+  type NutritionPhase,
+  type StoredNutritionPhase,
+} from "@/features/nutrition/nutritionData";
 import type { Macros } from "@/features/nutrition/nutritionTypes";
 import { meals } from "@/features/nutrition/nutritionData";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
@@ -98,10 +103,16 @@ function readPhaseCache(
 ): NutritionPhase | null {
   try {
     const raw = getScopedStorageItem(NUTRITION_PHASE_CACHE_KEY, userId);
-    return raw === "cut" || raw === "maintain" ? raw : null;
+    return raw ? normalizeNutritionPhase(raw) : null;
   } catch {
     return null;
   }
+}
+
+export function seedNutritionPhase(
+  userId: string | null = getActiveUserId(),
+): NutritionPhase {
+  return readPhaseCache(userId) ?? "maintain";
 }
 
 function writePhaseCache(
@@ -147,7 +158,7 @@ export async function loadPhase(userId: string | null = getActiveUserId()): Prom
     return "maintain";
   }
 
-  const phase = (data.phase as NutritionPhase) ?? "maintain";
+  const phase = normalizeNutritionPhase(data.phase as string | null | undefined);
   writePhaseCache(phase, userId);
   return phase;
 }
@@ -166,9 +177,23 @@ export async function savePhase(
 
   writePhaseCache(phase, userId);
 
-  await supabase
+  const { error } = await supabase
     .from("nutrition_phase")
-    .upsert({ user_id: userId, phase }, { onConflict: "user_id" });
+    .upsert(
+      { user_id: userId, phase: phase as StoredNutritionPhase },
+      { onConflict: "user_id" },
+    );
+
+  if (error) {
+    const fallbackPhase = getFallbackNutritionPhaseForServer(phase);
+    const { error: fallbackError } = await supabase
+      .from("nutrition_phase")
+      .upsert({ user_id: userId, phase: fallbackPhase }, { onConflict: "user_id" });
+
+    if (fallbackError) {
+      console.warn("savePhase error:", fallbackError);
+    }
+  }
 
   emit();
 }

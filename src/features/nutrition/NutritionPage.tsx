@@ -4,8 +4,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
-import { getTargets, type NutritionPhase } from "./nutritionData";
+import {
+  getTargets,
+  NUTRITION_PHASE_OPTIONS,
+  normalizeNutritionGoalFocuses,
+  type NutritionPhase,
+} from "./nutritionData";
 import { MacroRow } from "./components/MacroRow";
 import {
   loadNutritionLog,
@@ -232,11 +238,12 @@ export function NutritionPage() {
     };
   }, [reloadNutritionState]);
 
-  const handlePhaseToggle = async () => {
-    const next: NutritionPhase = phase === "maintain" ? "cut" : "maintain";
+  const handlePhaseSelect = async (next: NutritionPhase) => {
+    if (next === phase) return;
     await savePhase(next);
     setPhase(next);
-    toast.success(`Switched to ${next} phase`);
+    const option = NUTRITION_PHASE_OPTIONS.find((item) => item.value === next);
+    toast.success(`${option?.label ?? "Nutrition goal"} selected`);
   };
 
   const handleManualAdd = async (name: string, macros: Macros) => {
@@ -268,37 +275,87 @@ export function NutritionPage() {
     await reloadNutritionState();
   };
 
+  const visibleGoalFocuses = useMemo(
+    () => normalizeNutritionGoalFocuses(profile?.nutrition_goal_focuses),
+    [profile?.nutrition_goal_focuses],
+  );
+  const visiblePhaseOptions = useMemo(
+    () =>
+      NUTRITION_PHASE_OPTIONS.filter((option) =>
+        visibleGoalFocuses.includes(option.value),
+      ),
+    [visibleGoalFocuses],
+  );
+
+  useEffect(() => {
+    if (visibleGoalFocuses.includes(phase)) return;
+
+    const fallbackPhase = visiblePhaseOptions[0]?.value ?? "maintain";
+    setPhase(fallbackPhase);
+    void savePhase(fallbackPhase);
+  }, [phase, visibleGoalFocuses, visiblePhaseOptions]);
+
   const targets = useMemo(() => getTargets(phase, profile), [phase, profile]);
   const logged       = useMemo(() => getLoggedMacros(log), [log]);
   const totalEntries = log.customEntries.length;
 
+  const activePhaseOption = useMemo(
+    () =>
+      visiblePhaseOptions.find((option) => option.value === phase) ??
+      NUTRITION_PHASE_OPTIONS.find((option) => option.value === phase) ??
+      visiblePhaseOptions[0] ??
+      NUTRITION_PHASE_OPTIONS[1],
+    [phase, visiblePhaseOptions],
+  );
+
   return (
     <div className="space-y-6">
 
-      {/* Phase toggle — full width */}
-      <div className="flex flex-col gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
+      {/* Goal selection */}
+      <div className="rounded-2xl border bg-card p-4">
+        <div className="space-y-1">
           <p className="text-sm font-semibold">
-            {phase === "cut" ? "✂️ Cut phase" : "💪 Maintain / Lean bulk"}
+            {activePhaseOption.emoji} {activePhaseOption.label}
           </p>
           <p className="text-xs text-muted-foreground">{targets.note}</p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={phase === "cut"}
-          onClick={handlePhaseToggle}
-          className={[
-            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent",
-            "transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-            phase === "cut" ? "bg-rose-500" : "bg-muted",
-          ].join(" ")}
-        >
-          <span className={[
-            "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transform transition-transform duration-200",
-            phase === "cut" ? "translate-x-5" : "translate-x-0",
-          ].join(" ")} />
-        </button>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {visiblePhaseOptions.map((option) => {
+            const selected = option.value === phase;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  void handlePhaseSelect(option.value);
+                }}
+                className={cn(
+                  "rounded-xl border px-3 py-3 text-left transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                  selected
+                    ? "border-violet-400/60 bg-violet-500/10 shadow-[0_0_0_1px_rgba(167,139,250,0.18)]"
+                    : "border-border bg-background hover:bg-muted/40",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">
+                      {option.emoji} {option.label}
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      {option.helper}
+                    </p>
+                  </div>
+                  {selected ? (
+                    <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-200">
+                      Active
+                    </span>
+                  ) : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Two-column layout */}

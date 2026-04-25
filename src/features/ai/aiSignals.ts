@@ -23,6 +23,10 @@ import {
   loadNutritionLog,
   loadPhase,
 } from "@/features/nutrition/nutritionStorage";
+import {
+  getTargets,
+  type NutritionPhase,
+} from "@/features/nutrition/nutritionData";
 import { loadWaterLog } from "@/features/water/waterStorage";
 import {
   loadScheduleLog,
@@ -114,7 +118,7 @@ export type AISignals = {
     }>;
   };
   nutrition: {
-    phase: "maintain" | "cut";
+    phase: NutritionPhase;
     mealsLoggedToday: number;
     calorieTarget: number | null;
     proteinTarget: number | null;
@@ -760,8 +764,7 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
 
   const overdueSteps = countOverdueIncompleteSteps(goalList, doneMap, today);
 
-  const profileMacros =
-    nutritionPhase === "cut" ? profile?.macro_cut : profile?.macro_maintain;
+  const nutritionTargets = getTargets(nutritionPhase, profile);
 
   const sleepDurations = recentSleepEntries
     .map((entry) => entry.sleepDurationMinutes)
@@ -816,10 +819,10 @@ export async function buildAISignals(forceRefresh = false): Promise<AISignals> {
       }),
     },
     nutrition: {
-      phase: nutritionPhase === "cut" ? "cut" : "maintain",
+      phase: nutritionPhase,
       mealsLoggedToday,
-      calorieTarget: profileMacros?.cal ?? null,
-      proteinTarget: profileMacros?.protein ?? null,
+      calorieTarget: nutritionTargets.cal ?? null,
+      proteinTarget: nutritionTargets.protein ?? null,
     },
     water,
     reading,

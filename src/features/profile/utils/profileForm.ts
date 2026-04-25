@@ -5,6 +5,7 @@ import type {
   UserProfile,
   WeeklySchedule,
 } from "@/features/onboarding/profileStorage";
+import type { NutritionPhase } from "@/features/nutrition/nutritionData";
 import { normalizeWeeklySchedule } from "@/features/onboarding/profileStorage";
 import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
 import { clampNumberValue } from "@/lib/numericInput";
@@ -25,6 +26,10 @@ export type EditableProfileFields = Pick<
   | "onboarding_done"
   | "macro_maintain"
   | "macro_cut"
+  | "macro_recomp"
+  | "macro_muscle_gain"
+  | "macro_performance"
+  | "nutrition_goal_focuses"
   | "weekly_schedule"
   | "daily_reading_goal"
   | "enabled_modules"
@@ -42,6 +47,10 @@ export type ProfileForm = {
   activity_level: ActivityLevel;
   macro_maintain: MacroTargets | null;
   macro_cut: MacroTargets | null;
+  macro_recomp: MacroTargets | null;
+  macro_muscle_gain: MacroTargets | null;
+  macro_performance: MacroTargets | null;
+  nutrition_goal_focuses: NutritionPhase[];
   weekly_schedule: WeeklySchedule;
   daily_reading_goal: string;
   enabled_modules: ModuleId[];
@@ -68,6 +77,10 @@ export function profileToForm(p: UserProfile): ProfileForm {
     activity_level: p.activity_level ?? "active",
     macro_maintain: p.macro_maintain ?? null,
     macro_cut: p.macro_cut ?? null,
+    macro_recomp: p.macro_recomp ?? null,
+    macro_muscle_gain: p.macro_muscle_gain ?? null,
+    macro_performance: p.macro_performance ?? null,
+    nutrition_goal_focuses: p.nutrition_goal_focuses ?? [],
     weekly_schedule: normalizeWeeklySchedule(p.weekly_schedule, p.default_schedule_view),
     daily_reading_goal: (p.daily_reading_goal ?? 20).toString(),
     enabled_modules: normalizeEnabledModules(p.enabled_modules),
@@ -101,6 +114,10 @@ export function formToFullPatch(f: ProfileForm): EditableProfileFields {
     onboarding_done: true,
     macro_maintain: normalizeMacros(f.macro_maintain),
     macro_cut: normalizeMacros(f.macro_cut),
+    macro_recomp: normalizeMacros(f.macro_recomp),
+    macro_muscle_gain: normalizeMacros(f.macro_muscle_gain),
+    macro_performance: normalizeMacros(f.macro_performance),
+    nutrition_goal_focuses: [...f.nutrition_goal_focuses],
     weekly_schedule: normalizeWeeklySchedule(f.weekly_schedule, null),
     daily_reading_goal:
       clampNumberValue(f.daily_reading_goal, { min: 1, max: 200, integer: true }) ?? 20,

@@ -16,6 +16,10 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
 import { completeOnboarding } from "./profileStorage";
+import {
+  DEFAULT_VISIBLE_NUTRITION_PHASES,
+  type NutritionPhase,
+} from "@/features/nutrition/nutritionData";
 import { saveUserGoal } from "@/features/goals/userGoalStorage";
 import { queueAIContextNudge } from "@/features/goals/components/AIContextNudge.utils";
 import type { UserGoal } from "@/features/goals/goalTypes";
@@ -33,6 +37,26 @@ import {
   INITIAL_ONBOARDING_DATA,
   type OnboardingData,
 } from "./components/types";
+
+function getVisibleNutritionGoalFocuses(
+  data: OnboardingData,
+): NutritionPhase[] {
+  switch (data.nutrition_goal_type) {
+    case "fat_loss":
+      return ["fat_loss", "maintain"];
+    case "maintain":
+      return ["maintain", "fat_loss"];
+    case "recomp":
+      return ["recomp", "maintain", "fat_loss"];
+    case "muscle_gain":
+      return ["muscle_gain", "maintain"];
+    case "performance":
+      return ["performance", "maintain"];
+    case "custom":
+    default:
+      return [...DEFAULT_VISIBLE_NUTRITION_PHASES];
+  }
+}
 
 type ExpandedOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -201,6 +225,10 @@ export function OnboardingFlow({
         activity_level: data.activity_level,
         macro_maintain: hasValidNutritionTarget(data) ? data.macro_maintain : null,
         macro_cut: data.macro_cut ?? null,
+        macro_recomp: null,
+        macro_muscle_gain: null,
+        macro_performance: null,
+        nutrition_goal_focuses: getVisibleNutritionGoalFocuses(data),
         weekly_schedule: data.weekly_schedule,
         daily_reading_goal: Number(data.daily_reading_goal) || 20,
         enabled_modules: data.enabled_modules,

@@ -9,8 +9,14 @@ import {
 } from "@/features/goals/goalStore";
 import { useGoalsState } from "@/features/goals/useGoalsQuery";
 import { getTargets, meals } from "@/features/nutrition/nutritionData";
-import { loadNutritionLog, loadPhase, seedNutritionCache } from "@/features/nutrition/nutritionStorage";
+import {
+  loadNutritionLog,
+  loadPhase,
+  seedNutritionCache,
+  seedNutritionPhase,
+} from "@/features/nutrition/nutritionStorage";
 import { isMacroSuccessful } from "@/features/nutrition/nutritionStatus";
+import { useProfile } from "@/features/onboarding/useProfile";
 import {
   getTodayReadingProgress,
   loadReadingInputs,
@@ -335,7 +341,11 @@ function sortModules(results: ModuleProgress[]) {
   return [...results].sort((left, right) => MODULE_ORDER.indexOf(left.id) - MODULE_ORDER.indexOf(right.id));
 }
 
-function seedProgress(enabledModules: Set<string>, activeUserId: string | null): ModuleProgress[] {
+function seedProgress(
+  enabledModules: Set<string>,
+  activeUserId: string | null,
+  profile: ReturnType<typeof useProfile>,
+): ModuleProgress[] {
   const results: ModuleProgress[] = [];
 
   try {
@@ -343,7 +353,12 @@ function seedProgress(enabledModules: Set<string>, activeUserId: string | null):
       results.push(buildFitnessProgress(readSplitCache()));
     }
     if (enabledModules.has("nutrition")) {
-      results.push(buildNutritionProgress(seedNutritionCache(activeUserId), getTargets("maintain")));
+      results.push(
+        buildNutritionProgress(
+          seedNutritionCache(activeUserId),
+          getTargets(seedNutritionPhase(activeUserId), profile),
+        ),
+      );
     }
     if (enabledModules.has("reading")) {
       results.push(buildReadingProgress(seedReadingCache(activeUserId)));
@@ -363,7 +378,11 @@ function seedProgress(enabledModules: Set<string>, activeUserId: string | null):
   return sortModules(results);
 }
 
-async function fetchProgress(enabledModules: Set<string>, activeUserId: string | null) {
+async function fetchProgress(
+  enabledModules: Set<string>,
+  activeUserId: string | null,
+  profile: ReturnType<typeof useProfile>,
+) {
   if (enabledModules.size === 0) return [];
 
   const results: ModuleProgress[] = [];
@@ -380,7 +399,7 @@ async function fetchProgress(enabledModules: Set<string>, activeUserId: string |
           loadNutritionLog(activeUserId),
           loadPhase(activeUserId),
         ]);
-        results.push(buildNutritionProgress(log, getTargets(phase)));
+        results.push(buildNutritionProgress(log, getTargets(phase, profile)));
       }
     })(),
     (async () => {
@@ -414,6 +433,7 @@ export function calculateOverallScore(modules: ModuleProgress[]) {
 
 export function useLifeProgress() {
   const { userId } = useAuth();
+  const profile = useProfile();
   const { modules: enabledModules } = useEnabledModules();
   const { doneState, isGoalProgressLoading } = useGoalProgressState();
   const { goals, isGoalsLoading } = useGoalsState();
@@ -422,13 +442,16 @@ export function useLifeProgress() {
     seedGoalStepHistory(scopedUserId),
   );
 
-  const initialProgress = useMemo(() => seedProgress(enabledModules, scopedUserId), [enabledModules, scopedUserId]);
+  const initialProgress = useMemo(
+    () => seedProgress(enabledModules, scopedUserId, profile),
+    [enabledModules, profile, scopedUserId],
+  );
   const [progress, setProgress] = useState<ModuleProgress[]>(initialProgress);
   const [loading, setLoading] = useState(initialProgress.length === 0);
 
   useEffect(() => {
-    setProgress(seedProgress(enabledModules, scopedUserId));
-  }, [enabledModules, scopedUserId]);
+    setProgress(seedProgress(enabledModules, scopedUserId, profile));
+  }, [enabledModules, profile, scopedUserId]);
 
   useEffect(() => {
     const syncGoalHistory = () => {
@@ -449,7 +472,7 @@ export function useLifeProgress() {
     let cancelled = false;
 
     async function refresh() {
-      const data = await fetchProgress(enabledModules, scopedUserId);
+      const data = await fetchProgress(enabledModules, scopedUserId, profile);
       if (cancelled) return;
       setProgress(data);
       setLoading(false);
@@ -477,7 +500,7 @@ export function useLifeProgress() {
       cancelled = true;
       events.forEach((eventName) => window.removeEventListener(eventName, handleChange));
     };
-  }, [enabledModules, scopedUserId]);
+  }, [enabledModules, profile, scopedUserId]);
 
   const modulesProgress = useMemo(() => {
     const withoutGoals = progress.filter((item) => item.id !== "goals");

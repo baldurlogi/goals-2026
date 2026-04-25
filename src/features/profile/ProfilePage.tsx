@@ -17,6 +17,7 @@ import {
   type WeekdayKey,
   type WeeklyScheduleValue,
 } from "@/features/onboarding/profileStorage";
+import { getPhaseTargetsForEditor } from "@/features/nutrition/nutritionData";
 import { useProfileState, useSaveProfileMutation } from "@/features/onboarding/useProfileQuery";
 import { loadAIProfile, saveAIProfile, type PreferredTone } from "@/features/ai/aiUserProfile";
 import { toast } from "sonner";
@@ -80,7 +81,14 @@ const PROFILE_SECTION_FIELDS: Record<
     "time_format",
   ],
   modules: ["enabled_modules"],
-  macros: ["macro_maintain", "macro_cut"],
+  macros: [
+    "macro_maintain",
+    "macro_cut",
+    "macro_recomp",
+    "macro_muscle_gain",
+    "macro_performance",
+    "nutrition_goal_focuses",
+  ],
   schedule: ["weekly_schedule"],
   reading: ["daily_reading_goal"],
 };
@@ -220,6 +228,10 @@ export function ProfilePage() {
       onboarding_done: profile.onboarding_done,
       macro_maintain: profile.macro_maintain,
       macro_cut: profile.macro_cut,
+      macro_recomp: profile.macro_recomp,
+      macro_muscle_gain: profile.macro_muscle_gain,
+      macro_performance: profile.macro_performance,
+      nutrition_goal_focuses: profile.nutrition_goal_focuses,
       weekly_schedule: profile.weekly_schedule,
       daily_reading_goal: profile.daily_reading_goal,
       enabled_modules: normalizeEnabledModules(profile.enabled_modules),
@@ -513,12 +525,55 @@ export function ProfilePage() {
           <MacrosSection
             macroMaintain={form.macro_maintain}
             macroCut={form.macro_cut}
+            macroRecomp={form.macro_recomp}
+            macroMuscleGain={form.macro_muscle_gain}
+            macroPerformance={form.macro_performance}
+            nutritionGoalFocuses={form.nutrition_goal_focuses}
             calculated={calculated}
             onMacroMaintainChange={(targets) => update({ macro_maintain: targets })}
             onMacroCutChange={(targets) => update({ macro_cut: targets })}
+            onMacroRecompChange={(targets) => update({ macro_recomp: targets })}
+            onMacroMuscleGainChange={(targets) =>
+              update({ macro_muscle_gain: targets })
+            }
+            onMacroPerformanceChange={(targets) =>
+              update({ macro_performance: targets })
+            }
+            onNutritionGoalFocusesChange={(focuses) =>
+              update({ nutrition_goal_focuses: focuses })
+            }
             onRecalculate={() => {
               if (!calculated) return;
-              update({ macro_maintain: calculated.maintain, macro_cut: calculated.cut });
+              const maintain = calculated.maintain;
+              const fatLoss = calculated.cut;
+              update({
+                macro_maintain: maintain,
+                macro_cut: fatLoss,
+                macro_recomp: getPhaseTargetsForEditor("recomp", {
+                  display_name: null,
+                  macro_maintain: maintain,
+                  macro_cut: fatLoss,
+                  macro_recomp: null,
+                  macro_muscle_gain: null,
+                  macro_performance: null,
+                }),
+                macro_muscle_gain: getPhaseTargetsForEditor("muscle_gain", {
+                  display_name: null,
+                  macro_maintain: maintain,
+                  macro_cut: fatLoss,
+                  macro_recomp: null,
+                  macro_muscle_gain: null,
+                  macro_performance: null,
+                }),
+                macro_performance: getPhaseTargetsForEditor("performance", {
+                  display_name: null,
+                  macro_maintain: maintain,
+                  macro_cut: fatLoss,
+                  macro_recomp: null,
+                  macro_muscle_gain: null,
+                  macro_performance: null,
+                }),
+              });
             }}
           />
         </CardContent>
