@@ -6,6 +6,7 @@ import { AuthContext } from "@/features/auth/authContext";
 import { clearUserCache } from "@/lib/clearUserCache";
 import { getActiveUserId, setActiveUserId } from "@/lib/activeUser";
 import { AUTH_USER_CHANGED_EVENT } from "@/lib/queryKeys";
+import { CACHE_KEYS } from "@/lib/cacheRegistry";
 import { clearUserBoundQueries } from "@/lib/queryClient";
 import { clearProfileState } from "@/features/onboarding/profileStorage";
 import {
@@ -105,11 +106,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearProfileState();
     }
 
-    if (userChanged || cachedMismatch) {
+    if (userChanged) {
       clearUserCache(previousUserId ?? nextUserId);
       if (nextUserId && nextUserId !== previousUserId) {
         clearUserCache(nextUserId);
       }
+    } else if (cachedMismatch) {
+      clearUserCache(previousUserId ?? nextUserId, {
+        excludeExactKeys: [CACHE_KEYS.LIFE_PROGRESS_HISTORY],
+      });
     }
 
     syncAnalyticsIdentity(

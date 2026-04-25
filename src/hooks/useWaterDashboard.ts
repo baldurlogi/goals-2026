@@ -11,16 +11,22 @@ import { useTodayDate } from "@/hooks/useTodayDate";
 
 export function useWaterDashboard() {
   const date = useTodayDate();
-  const cached = readWaterCache(date);
+  const initialCached = readWaterCache(date);
 
-  const [log, setLog] = useState<WaterLog>(() => cached ?? defaultWaterLog(date));
-  const [loading, setLoading] = useState<boolean>(() => cached === null);
+  const [log, setLog] = useState<WaterLog>(() => initialCached ?? defaultWaterLog(date));
+  const [loading, setLoading] = useState<boolean>(() => initialCached === null);
 
   const logRef = useRef(log);
 
   useEffect(() => {
     logRef.current = log;
   }, [log]);
+
+  useEffect(() => {
+    const cached = readWaterCache(date);
+    setLog(cached ?? defaultWaterLog(date));
+    setLoading(cached === null);
+  }, [date]);
 
   useEffect(() => {
     let cancelled = false;
