@@ -10,13 +10,22 @@ import {
   legacyScopedKey,
 } from "@/lib/activeUser";
 
-export function clearUserCache(userId: string | null = getActiveUserId()) {
+type ClearUserCacheOptions = {
+  excludeExactKeys?: string[];
+};
+
+export function clearUserCache(
+  userId: string | null = getActiveUserId(),
+  options: ClearUserCacheOptions = {},
+) {
   // Query-seed / rollback caches and local-only UX state are the only supported localStorage data here.
   try {
     const namespace = getUserCacheNamespace(userId);
     const keysToRemove = new Set<string>();
+    const excluded = new Set(options.excludeExactKeys ?? []);
 
     for (const key of USER_SCOPED_CACHE_KEYS) {
+      if (excluded.has(key)) continue;
       if (namespace) {
         keysToRemove.add(`${key}:${namespace}`);
       }
@@ -28,6 +37,7 @@ export function clearUserCache(userId: string | null = getActiveUserId()) {
 
     if (userId) {
       for (const key of USER_SCOPED_CACHE_KEYS) {
+        if (excluded.has(key)) continue;
         keysToRemove.add(legacyScopedKey(key, userId));
       }
     }

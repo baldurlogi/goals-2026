@@ -155,13 +155,15 @@ export function seedScheduleLog(
 
 export async function loadScheduleLog(
   userId: string | null = getActiveUserId(),
+  options?: { preferCache?: boolean },
 ): Promise<ScheduleLog> {
   const date = todayKey();
   const empty: ScheduleLog = { ...DEFAULT_SCHEDULE_LOG, date };
+  const preferCache = options?.preferCache ?? true;
 
   if (!userId) return empty;
 
-  const cached = readLogCache(userId);
+  const cached = preferCache ? readLogCache(userId) : null;
   if (cached) return cached;
 
   const { data, error } = await supabase

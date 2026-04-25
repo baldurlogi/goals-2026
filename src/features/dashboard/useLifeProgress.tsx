@@ -415,7 +415,7 @@ async function fetchProgress(
     (async () => {
       if (enabledModules.has("schedule")) {
         const [log, templates] = await Promise.all([
-          loadScheduleLog(activeUserId),
+          loadScheduleLog(activeUserId, { preferCache: false }),
           loadScheduleTemplates(activeUserId),
         ]);
         results.push(buildScheduleProgress(log, templates));
@@ -448,9 +448,11 @@ export function useLifeProgress() {
   );
   const [progress, setProgress] = useState<ModuleProgress[]>(initialProgress);
   const [loading, setLoading] = useState(initialProgress.length === 0);
+  const [hasFreshProgress, setHasFreshProgress] = useState(enabledModules.size === 0);
 
   useEffect(() => {
     setProgress(seedProgress(enabledModules, scopedUserId, profile));
+    setHasFreshProgress(enabledModules.size === 0);
   }, [enabledModules, profile, scopedUserId]);
 
   useEffect(() => {
@@ -476,6 +478,7 @@ export function useLifeProgress() {
       if (cancelled) return;
       setProgress(data);
       setLoading(false);
+      setHasFreshProgress(true);
     }
 
     void refresh();
@@ -483,6 +486,16 @@ export function useLifeProgress() {
     const handleChange = () => {
       void refresh();
     };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, 30_000);
 
     const events = [
       "fitness:changed",
@@ -495,10 +508,15 @@ export function useLifeProgress() {
     ];
 
     events.forEach((eventName) => window.addEventListener(eventName, handleChange));
+    window.addEventListener("focus", handleChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
       events.forEach((eventName) => window.removeEventListener(eventName, handleChange));
+      window.removeEventListener("focus", handleChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [enabledModules, profile, scopedUserId]);
 
@@ -525,13 +543,13 @@ export function useLifeProgress() {
       modulesProgress.length === 0);
 
   useEffect(() => {
-    if (showLoading || !scopedUserId || modulesProgress.length === 0) return;
+    if (showLoading || !hasFreshProgress || !scopedUserId || modulesProgress.length === 0) return;
 
     saveLifeProgressSnapshot(scopedUserId, {
       date: getLocalDateKey(),
       score: overallScore,
     });
-  }, [modulesProgress, overallScore, scopedUserId, showLoading]);
+  }, [hasFreshProgress, modulesProgress, overallScore, scopedUserId, showLoading]);
 
   return {
     modulesProgress,

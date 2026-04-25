@@ -19,6 +19,7 @@ import {
   buildLifeProgressChartSeries,
   useLifeProgressHistory,
 } from "@/features/dashboard/lifeProgressHistory";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 
 type RangeOption = 7 | 30 | 90;
 
@@ -72,6 +73,11 @@ export default function LifeProgressPage() {
   const { modulesProgress, overallScore, loading } = useLifeProgress();
   const history = useLifeProgressHistory(range);
   const chartData = buildLifeProgressChartSeries(history);
+  const syncedTodayScore = useMemo(() => {
+    const today = getLocalDateKey();
+    return history.find((item) => item.date === today)?.score ?? null;
+  }, [history]);
+  const displayedCurrentScore = syncedTodayScore ?? overallScore;
   const singleDayView = history.filter((item) => item.score != null).length === 1;
   const renderDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: LifeProgressChartPoint }) => {
     if (payload?.synthetic || cx == null || cy == null) return null;
@@ -165,7 +171,7 @@ export default function LifeProgressPage() {
             </div>
 
             <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-right">
-              <div className="text-2xl font-bold tabular-nums text-violet-400">{overallScore}%</div>
+              <div className="text-2xl font-bold tabular-nums text-violet-400">{displayedCurrentScore}%</div>
               <div className="text-xs text-muted-foreground">Current daily score</div>
             </div>
           </div>
