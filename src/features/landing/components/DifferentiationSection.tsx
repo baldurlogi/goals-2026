@@ -15,7 +15,7 @@ export function DifferentiationSection({
 
   return (
     <section
-      className="relative mx-auto max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-8"
+      className="relative mx-auto max-w-7xl px-3 pb-24 pt-10 sm:px-6 lg:px-8"
     >
       <m.div
         initial="hidden"
@@ -43,7 +43,7 @@ export function DifferentiationSection({
         />
 
         <div className="relative grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10">
-          <div className="lg:pr-4">
+          <div className="text-center lg:pr-4 lg:text-left">
             <div
               className="mb-4 font-mono text-[11px] tracking-[0.18em]"
               style={{ color: t.faint }}
@@ -52,7 +52,7 @@ export function DifferentiationSection({
             </div>
 
             <h2
-              className="max-w-[12ch] text-[clamp(30px,4.6vw,50px)] leading-[0.98] tracking-[-0.04em] sm:max-w-none"
+              className="mx-auto max-w-none text-[clamp(30px,4.6vw,50px)] leading-[0.98] tracking-[-0.04em] lg:mx-0 lg:max-w-[12ch]"
               style={{
                 fontFamily: "'Instrument Serif', serif",
                 fontWeight: 400,
@@ -67,7 +67,7 @@ export function DifferentiationSection({
             </h2>
 
             <p
-              className="mt-4 max-w-xl text-sm leading-7 sm:text-[15px] sm:leading-8"
+              className="mx-auto mt-4 max-w-xl text-sm leading-7 sm:text-[15px] sm:leading-8 lg:mx-0"
               style={{ color: t.textSoft }}
             >
               Most tools are good at collecting intentions. This one is designed
@@ -76,7 +76,7 @@ export function DifferentiationSection({
             </p>
 
             <div
-              className="mt-6 rounded-[26px] border p-5"
+              className="mt-6 rounded-[26px] border p-5 text-center lg:text-left"
               style={{
                 borderColor: t.border,
                 background: t.surface3,

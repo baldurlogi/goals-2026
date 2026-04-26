@@ -9,12 +9,14 @@ type LandingNavbarProps = {
   theme: ThemeMode;
   onSignIn: () => void;
   onGetStarted: () => void;
+  onJoinWaitlist: () => void;
 };
 
 export function LandingNavbar({
   theme,
   onSignIn,
   onGetStarted,
+  onJoinWaitlist,
 }: LandingNavbarProps) {
   const t = TOKENS[theme];
   const [scrolled, setScrolled] = useState(false);
@@ -138,6 +140,20 @@ export function LandingNavbar({
           <Button
             type="button"
             variant="ghost"
+            onClick={onJoinWaitlist}
+            className="hidden rounded-xl border px-4 md:inline-flex"
+            style={{
+              background: "transparent",
+              borderColor: t.primaryBorder,
+              color: t.primary,
+            }}
+          >
+            Pro waitlist
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
             onClick={onSignIn}
             className="hidden rounded-xl border px-4 md:inline-flex"
             style={{
@@ -211,6 +227,15 @@ export function LandingNavbar({
                 style={{ color: t.textSoft }}
               >
                 Pricing
+              </m.button>
+              <m.button
+                type="button"
+                onClick={() => handleMobileScrollTo("pricing")}
+                className="w-full rounded-xl px-3 py-2 text-left text-sm"
+                variants={fadeUp(10)}
+                style={{ color: t.primary }}
+              >
+                Join Pro waitlist
               </m.button>
               <m.button
                 type="button"

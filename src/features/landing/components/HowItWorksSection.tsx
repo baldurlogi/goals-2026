@@ -16,7 +16,7 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
   return (
     <section
       id="how-it-works"
-      className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8"
+      className="relative mx-auto max-w-7xl px-3 py-24 sm:px-6 lg:px-8"
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-10 h-64 blur-3xl"
@@ -35,7 +35,7 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
         variants={fadeUp(18)}
         className="relative mb-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end"
       >
-        <div>
+        <div className="text-center lg:text-left">
           <div
             className="mb-4 font-mono text-[11px] tracking-[0.18em]"
             style={{ color: t.faint }}
@@ -44,7 +44,7 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
           </div>
 
           <h2
-            className="max-w-[12ch] text-[clamp(32px,5vw,54px)] leading-[0.98] tracking-[-0.04em] sm:max-w-none"
+            className="mx-auto max-w-none text-[clamp(32px,5vw,54px)] leading-[0.98] tracking-[-0.04em] lg:mx-0 lg:max-w-[12ch]"
             style={{
               fontFamily: "'Instrument Serif', serif",
               fontWeight: 400,
@@ -60,7 +60,7 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
         </div>
 
         <div
-          className="rounded-[30px] border p-5 sm:p-6"
+          className="rounded-[30px] border p-5 text-center sm:p-6 lg:text-left"
           style={{
             background:
               theme === "dark"
@@ -79,7 +79,7 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
             can actually act on.
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-2.5">
+          <div className="mt-5 flex flex-wrap justify-center gap-2.5 lg:justify-start">
             {checkpoints.map((label) => (
               <span
                 key={label}

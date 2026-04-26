@@ -103,30 +103,45 @@ export function PricingCard({
         }}
       >
         <CardContent className="flex h-full min-h-0 flex-col p-5 sm:min-h-[560px] sm:p-6">
-          {featured && (
-            <div
-              className="absolute right-4 top-4 rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]"
-              style={{
-                background: t.primarySoft,
-                border: `1px solid ${t.primaryBorder}`,
-                color: t.primary,
-              }}
-            >
-              MOST POPULAR
+          <div className="mb-5 flex min-h-[28px] items-start justify-between gap-3">
+            <div>
+              {isPreviewOnly ? (
+                <div
+                  className="rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]"
+                  style={{
+                    background: t.surface,
+                    border: `1px solid ${t.border}`,
+                    color: t.primary,
+                  }}
+                >
+                  {PAID_PLANS_COMING_SOON_LABEL.toUpperCase()}
+                </div>
+              ) : (
+                <div className="invisible rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]">
+                  placeholder
+                </div>
+              )}
             </div>
-          )}
-          {isPreviewOnly && (
-            <div
-              className="absolute left-4 top-4 rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]"
-              style={{
-                background: t.surface,
-                border: `1px solid ${t.border}`,
-                color: t.primary,
-              }}
-            >
-              {PAID_PLANS_COMING_SOON_LABEL.toUpperCase()}
+
+            <div>
+              {featured ? (
+                <div
+                  className="rounded-full px-3 py-1 text-right font-mono text-[10px] tracking-[0.08em]"
+                  style={{
+                    background: t.primarySoft,
+                    border: `1px solid ${t.primaryBorder}`,
+                    color: t.primary,
+                  }}
+                >
+                  MOST POPULAR
+                </div>
+              ) : (
+                <div className="invisible rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]">
+                  placeholder
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="mb-1 text-xl font-bold" style={{ color: t.text }}>
             {name}
@@ -140,9 +155,9 @@ export function PricingCard({
           </div>
 
           <div className="mb-4 min-h-0 sm:min-h-[108px]">
-            <div className="mb-2 flex min-h-0 items-end gap-1.5 sm:min-h-[52px]">
+            <div className="mb-2 flex min-h-[52px] items-end gap-2">
               <div
-                className="min-w-[92px] text-[38px] leading-none sm:min-w-[110px] sm:text-[42px]"
+                className="text-[38px] leading-none sm:text-[42px]"
                 style={{
                   color: t.text,
                   fontFamily: "'Instrument Serif', serif",
@@ -152,7 +167,7 @@ export function PricingCard({
               </div>
 
               {!isFree && (
-                <div className="mb-1 text-sm" style={{ color: t.faint }}>
+                <div className="pb-1 text-sm" style={{ color: t.faint }}>
                   /{isYearly ? "yr" : "mo"}
                 </div>
               )}

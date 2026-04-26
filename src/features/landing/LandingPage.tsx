@@ -117,6 +117,10 @@ export function LandingPage() {
 
   const showStageOne = useDeferredMount(120);
   const showStageTwo = useDeferredMount(700);
+  const scrollToPricing = () =>
+    document
+      .getElementById("pricing")
+      ?.scrollIntoView({ behavior: "smooth" });
 
   return (
     <LazyMotion features={domAnimation}>
@@ -126,11 +130,13 @@ export function LandingPage() {
             theme={theme}
             onSignIn={() => navigate("/login")}
             onGetStarted={() => navigate("/signup")}
+            onJoinWaitlist={scrollToPricing}
           />
 
           <HeroSection
             theme={theme}
             onGetStarted={() => navigate("/signup")}
+            onJoinWaitlist={scrollToPricing}
             onSeeHowItWorks={() =>
               document
                 .getElementById("how-it-works")
@@ -178,11 +184,7 @@ export function LandingPage() {
             <FinalCtaSection
               theme={theme}
               onGetStarted={() => navigate("/signup")}
-              onSeePricing={() =>
-                document
-                  .getElementById("pricing")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
+              onSeePricing={scrollToPricing}
             />
           </DeferredSection>
 

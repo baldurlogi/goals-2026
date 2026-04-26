@@ -9,18 +9,20 @@ type HeroSectionProps = {
   theme: ThemeMode;
   onGetStarted: () => void;
   onSeeHowItWorks: () => void;
+  onJoinWaitlist: () => void;
 };
 
 export function HeroSection({
   theme,
   onGetStarted,
   onSeeHowItWorks,
+  onJoinWaitlist,
 }: HeroSectionProps) {
   const t = TOKENS[theme];
 
   return (
     <section
-      className="relative overflow-hidden px-4 pb-12 pt-20 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8"
+      className="relative overflow-hidden px-3 pb-12 pt-20 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8"
       style={{ background: t.bg }}
     >
       <m.div
@@ -33,13 +35,13 @@ export function HeroSection({
 
       <div className="relative mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-2 lg:items-center lg:gap-14">
         <m.div
-          className="flex min-h-0 flex-col justify-center sm:min-h-[460px]"
+          className="flex min-h-0 flex-col items-center justify-center text-center lg:items-start lg:text-left sm:min-h-[460px]"
           initial="hidden"
           animate="visible"
           variants={staggerContainer(0.12, 0.05)}
         >
           <m.h1
-            className="mb-4 max-w-[11ch] text-[clamp(34px,10vw,80px)] leading-[0.98] tracking-[-0.04em] sm:max-w-none"
+            className="mb-4 max-w-[13ch] text-[clamp(34px,10vw,80px)] leading-[0.98] tracking-[-0.04em] sm:max-w-none"
             variants={fadeUp(24)}
             style={{
               fontFamily: "'Instrument Serif', serif",
@@ -65,7 +67,7 @@ export function HeroSection({
           </m.p>
 
           <m.div
-            className="mb-4 flex flex-col gap-3 sm:min-h-[64px] sm:flex-row sm:flex-wrap"
+            className="mb-4 flex w-full flex-col gap-3 sm:min-h-[64px] sm:w-auto sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start"
             variants={fadeUp(16)}
           >
             <Button
@@ -83,6 +85,20 @@ export function HeroSection({
             <Button
               type="button"
               variant="ghost"
+              onClick={onJoinWaitlist}
+              className="min-h-12 w-full rounded-xl border px-5 py-3.5 text-sm font-semibold sm:w-auto sm:py-6"
+              style={{
+                background: "transparent",
+                borderColor: t.primaryBorder,
+                color: t.primary,
+              }}
+            >
+              Join Pro waitlist
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
               onClick={onSeeHowItWorks}
               className="min-h-12 w-full rounded-xl border px-5 py-3.5 text-sm font-semibold sm:w-auto sm:py-6"
               style={{
@@ -94,6 +110,15 @@ export function HeroSection({
               See how it works
             </Button>
           </m.div>
+
+          <m.p
+            className="max-w-xl text-xs leading-6 sm:text-sm"
+            variants={fadeUp(14)}
+            style={{ color: t.faint }}
+          >
+            Pro launches soon. Join the waitlist if you want the launch email,
+            or start free today.
+          </m.p>
         </m.div>
 
         <m.div
