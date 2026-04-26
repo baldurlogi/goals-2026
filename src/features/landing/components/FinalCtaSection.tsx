@@ -18,7 +18,7 @@ export function FinalCtaSection({
   const t = TOKENS[theme];
 
   return (
-    <section className="relative px-4 pb-24 pt-20 text-center sm:px-6 sm:pb-28 sm:pt-24 lg:px-8">
+    <section className="relative px-3 pb-24 pt-20 text-center sm:px-6 sm:pb-28 sm:pt-24 lg:px-8">
       <m.div
         className="pointer-events-none absolute inset-0"
         initial={{ opacity: 0 }}

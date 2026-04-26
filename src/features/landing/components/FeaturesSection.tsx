@@ -21,7 +21,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
   return (
     <section
       id="features"
-      className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8"
+      className="relative mx-auto max-w-7xl px-3 py-24 sm:px-6 lg:px-8"
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-24 h-72 blur-3xl"
@@ -40,7 +40,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
         variants={fadeUp(18)}
         className="relative mb-10 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end"
       >
-        <div>
+        <div className="text-center lg:text-left">
           <div
             className="mb-4 font-mono text-[11px] tracking-[0.18em]"
             style={{ color: t.faint }}
@@ -49,7 +49,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
           </div>
 
           <h2
-            className="max-w-[13ch] text-[clamp(32px,5vw,54px)] leading-[0.98] tracking-[-0.04em] sm:max-w-none"
+            className="mx-auto max-w-none text-[clamp(32px,5vw,54px)] leading-[0.98] tracking-[-0.04em] lg:mx-0 lg:max-w-[13ch]"
             style={{
               fontFamily: "'Instrument Serif', serif",
               fontWeight: 400,
@@ -62,16 +62,16 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
           </h2>
         </div>
 
-        <div>
+        <div className="text-center lg:text-left">
           <p
-            className="max-w-2xl text-sm leading-7 sm:text-[15px] sm:leading-8"
+            className="mx-auto max-w-2xl text-sm leading-7 sm:text-[15px] sm:leading-8 lg:mx-0"
             style={{ color: t.textSoft }}
           >
             The product is designed to reduce drift, make your next move obvious,
             and keep your goals, routines, and energy pointed in the same direction.
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-2.5">
+          <div className="mt-5 flex flex-wrap justify-center gap-2.5 lg:justify-start">
             {outcomes.map((item) => (
               <span
                 key={item}
