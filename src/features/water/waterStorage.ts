@@ -26,6 +26,29 @@ export function defaultWaterLog(date = todayKey()): WaterLog {
   };
 }
 
+async function loadLatestSavedWaterTarget(
+  userId: string,
+  date = todayKey(),
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('water_logs')
+    .select('target_ml, log_date')
+    .eq('user_id', userId)
+    .lte('log_date', date)
+    .order('log_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('loadLatestSavedWaterTarget error:', error);
+    return null;
+  }
+
+  if (!data) return null;
+
+  return Math.max(250, Math.round(Number(data.target_ml ?? 2500) || 2500));
+}
+
 function cacheKey(date: string) {
   return cacheKeyBuilders.water(date);
 }
@@ -74,6 +97,12 @@ export async function loadWaterLog(date = todayKey()): Promise<WaterLog> {
     return cached ?? defaultWaterLog(date);
   }
 
+  const fallbackTargetMl = cached?.targetMl ??
+    (await loadLatestSavedWaterTarget(user.id, date)) ??
+    2500;
+  const fallbackLog = defaultWaterLog(date);
+  fallbackLog.targetMl = fallbackTargetMl;
+
   const { data, error } = await supabase
     .from('water_logs')
     .select('log_date, ml, target_ml')
@@ -83,11 +112,11 @@ export async function loadWaterLog(date = todayKey()): Promise<WaterLog> {
 
   if (error) {
     console.warn('loadWaterLog error:', error);
-    return cached ?? defaultWaterLog(date);
+    return cached ?? fallbackLog;
   }
 
   if (!data) {
-    return cached ?? defaultWaterLog(date);
+    return cached ?? fallbackLog;
   }
 
   const normalized = normalizeWaterLog(

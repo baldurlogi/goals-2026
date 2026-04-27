@@ -13,12 +13,20 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useAuth } from "@/features/auth/authContext";
 import { useLifeProgress } from "@/features/dashboard/useLifeProgress";
 import {
   type LifeProgressChartPoint,
   buildLifeProgressChartSeries,
   useLifeProgressHistory,
 } from "@/features/dashboard/lifeProgressHistory";
+import {
+  getAvailableOptionalLifeProgressMetrics,
+  type OptionalLifeProgressMetricId,
+  useSaveOptionalLifeProgressMetricsMutation,
+  useOptionalLifeProgressMetrics,
+} from "@/features/dashboard/lifeProgressOptionalMetrics";
+import { useEnabledModules } from "@/features/modules/useEnabledModules";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 
 type RangeOption = 7 | 30 | 90;
@@ -68,8 +76,57 @@ function TrendTooltip({
   );
 }
 
+function MetricToggle({
+  active,
+  label,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+        active
+          ? "border-violet-400 bg-violet-500/10"
+          : "border-border bg-card/40 hover:border-foreground/20"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold">{label}</span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+            active
+              ? "bg-violet-500 text-white"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {active ? "On" : "Off"}
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+        {description}
+      </p>
+    </button>
+  );
+}
+
 export default function LifeProgressPage() {
   const [range, setRange] = useState<RangeOption>(30);
+  const { userId } = useAuth();
+  const { modules: enabledModules } = useEnabledModules();
+  const { data: selectedOptionalMetrics = [] } =
+    useOptionalLifeProgressMetrics(userId);
+  const saveOptionalMetricsMutation = useSaveOptionalLifeProgressMetricsMutation();
+  const availableOptionalMetrics = useMemo(
+    () => getAvailableOptionalLifeProgressMetrics(enabledModules),
+    [enabledModules],
+  );
   const { modulesProgress, overallScore, loading } = useLifeProgress();
   const history = useLifeProgressHistory(range);
   const chartData = buildLifeProgressChartSeries(history);
@@ -128,6 +185,16 @@ export default function LifeProgressPage() {
   }, [history]);
 
   const hasHistoryData = history.some((item) => item.score != null);
+
+  function handleToggleOptionalMetric(metricId: OptionalLifeProgressMetricId) {
+    if (!userId) return;
+
+    const next = selectedOptionalMetrics.includes(metricId)
+      ? selectedOptionalMetrics.filter((id) => id !== metricId)
+      : [...selectedOptionalMetrics, metricId];
+
+    saveOptionalMetricsMutation.mutate(next);
+  }
 
   return (
     <div className="space-y-6">
@@ -282,9 +349,42 @@ export default function LifeProgressPage() {
       <Card>
         <CardHeader className="pb-3 pt-5">
           <div>
-            <p className="text-sm font-semibold">Today&apos;s module mix</p>
+            <p className="text-sm font-semibold">Optional score metrics</p>
             <p className="text-xs text-muted-foreground">
-              Your overall score is the average of these active module scores.
+              Add extra daily metrics if you want them counted in today&apos;s score and future trend snapshots.
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3 pb-5">
+          {availableOptionalMetrics.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              No optional metrics are available with your current enabled modules yet.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {availableOptionalMetrics.map((metric) => (
+                <MetricToggle
+                  key={metric.id}
+                  active={selectedOptionalMetrics.includes(metric.id)}
+                  label={metric.label}
+                  description={metric.description}
+                  onClick={() => handleToggleOptionalMetric(metric.id)}
+                />
+              ))}
+            </div>
+          )}
+          <p className="text-xs leading-5 text-muted-foreground">
+            This selection syncs with your account. Past saved days stay as originally scored, and changes apply from today onward.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3 pt-5">
+          <div>
+            <p className="text-sm font-semibold">Today&apos;s score mix</p>
+            <p className="text-xs text-muted-foreground">
+              Your overall score is the average of your active modules plus any optional metrics you&apos;ve added.
             </p>
           </div>
         </CardHeader>

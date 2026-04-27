@@ -168,6 +168,15 @@ export function normalizeNutritionGoalFocuses(
     : [...DEFAULT_VISIBLE_NUTRITION_PHASES];
 }
 
+export function getPreferredNutritionPhase(
+  focuses: NutritionPhase[] | null | undefined,
+  fallback: NutritionPhase = "maintain",
+): NutritionPhase {
+  return Array.isArray(focuses) && focuses.length > 0
+    ? normalizeNutritionGoalFocuses(focuses)[0] ?? fallback
+    : fallback;
+}
+
 export function getFallbackNutritionPhaseForServer(
   phase: NutritionPhase,
 ): "maintain" | "cut" {

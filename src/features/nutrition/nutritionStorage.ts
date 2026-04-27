@@ -1,10 +1,12 @@
 import { supabase } from "@/lib/supabaseClient";
 import {
+  getPreferredNutritionPhase,
   getFallbackNutritionPhaseForServer,
   normalizeNutritionPhase,
   type NutritionPhase,
   type StoredNutritionPhase,
 } from "@/features/nutrition/nutritionData";
+import { seedNutritionGoalFocuses } from "@/features/onboarding/profileStorage";
 import type { Macros } from "@/features/nutrition/nutritionTypes";
 import { meals } from "@/features/nutrition/nutritionData";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
@@ -161,7 +163,10 @@ function readPhaseCache(
 export function seedNutritionPhase(
   userId: string | null = getActiveUserId(),
 ): NutritionPhase {
-  return readPhaseCache(userId) ?? "maintain";
+  const cachedPhase = readPhaseCache(userId);
+  if (cachedPhase) return cachedPhase;
+
+  return getPreferredNutritionPhase(seedNutritionGoalFocuses(userId), "maintain");
 }
 
 function writePhaseCache(
@@ -185,7 +190,12 @@ export async function loadPhase(userId: string | null = getActiveUserId()): Prom
   const cached = readPhaseCache(userId);
   if (cached) return cached;
 
-  if (!userId) return "maintain";
+  const preferredPhase = getPreferredNutritionPhase(
+    seedNutritionGoalFocuses(userId),
+    "maintain",
+  );
+
+  if (!userId) return preferredPhase;
 
   const { data, error } = await supabase
     .from("nutrition_phase")
@@ -195,16 +205,19 @@ export async function loadPhase(userId: string | null = getActiveUserId()): Prom
 
   if (error) {
     console.warn("loadPhase error:", error);
-    return "maintain";
+    return preferredPhase;
   }
 
   if (!data) {
     await supabase
       .from("nutrition_phase")
-      .insert({ user_id: userId, phase: "maintain" });
+      .insert({
+        user_id: userId,
+        phase: getFallbackNutritionPhaseForServer(preferredPhase),
+      });
 
-    writePhaseCache("maintain", userId);
-    return "maintain";
+    writePhaseCache(preferredPhase, userId);
+    return preferredPhase;
   }
 
   const phase = normalizeNutritionPhase(data.phase as string | null | undefined);

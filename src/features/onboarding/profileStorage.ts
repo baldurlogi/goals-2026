@@ -113,6 +113,12 @@ function readNutritionGoalFocusesCache(
   }
 }
 
+export function seedNutritionGoalFocuses(
+  userId: string | null | undefined = getActiveUserId(),
+): NutritionPhase[] | null {
+  return readNutritionGoalFocusesCache(userId);
+}
+
 function writeNutritionGoalFocusesCache(
   userId: string | null | undefined,
   focuses: NutritionPhase[] | null | undefined,

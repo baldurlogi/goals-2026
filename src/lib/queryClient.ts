@@ -27,6 +27,7 @@ const USER_BOUND_QUERY_ROOTS = new Set([
   "wellbeing-history",
   "tier",
   "dashboard",
+  "life-progress-optional-metrics",
   "ai-usage",
 ]);
 
