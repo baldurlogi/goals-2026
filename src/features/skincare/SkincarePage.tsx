@@ -13,10 +13,15 @@ export default function SkincarePage() {
         description="Keep your routine, streak, and skin notes in one dedicated place."
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <RoutineStreakCard goalId={SKINCARE_PAGE_ID} />
-        <RoutineChecklistCard goalId={SKINCARE_PAGE_ID} />
-        <SkinLogCard goalId={SKINCARE_PAGE_ID} />
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+        <div className="lg:col-span-7 xl:col-span-8">
+          <RoutineChecklistCard goalId={SKINCARE_PAGE_ID} />
+        </div>
+
+        <div className="space-y-6 lg:col-span-5 xl:col-span-4">
+          <RoutineStreakCard goalId={SKINCARE_PAGE_ID} />
+          <SkinLogCard goalId={SKINCARE_PAGE_ID} />
+        </div>
       </div>
     </PageScaffold>
   );

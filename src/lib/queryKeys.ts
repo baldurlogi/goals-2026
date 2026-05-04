@@ -71,6 +71,8 @@ export const queryKeys = {
   dashboardReading: (userId: string | null) => ["dashboard", userId, "reading"] as const,
   dashboardLifeProgress: (userId: string | null) => ["dashboard", userId, "life-progress"] as const,
   dashboardTier: (userId: string | null) => ["dashboard", userId, "tier"] as const,
+  lifeProgressOptionalMetrics: (userId: string | null) =>
+    ["life-progress-optional-metrics", userId] as const,
   aiUsage: (userId: string | null) => ["ai-usage", userId] as const,
 };
 

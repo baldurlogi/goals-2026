@@ -27,6 +27,15 @@ import {
   useSaveSleepEntryMutation,
   useSleepEntryQuery,
 } from "./useSleepQuery";
+import {
+  useProfileQuery,
+  useSaveProfileMutation,
+} from "@/features/onboarding/useProfileQuery";
+import {
+  formatSleepGoalDuration,
+  getPersonalizedSleepGoalMinutes,
+  normalizeSleepGoalMinutes,
+} from "./sleepGoal";
 
 type SleepDraft = {
   hours: string;
@@ -308,6 +317,8 @@ export default function SleepPage() {
   const sleepEntryQuery = useSleepEntryQuery(selectedDate);
   const sleepHistoryQuery = useRecentSleepHistoryQuery(7);
   const saveSleepEntryMutation = useSaveSleepEntryMutation();
+  const profileQuery = useProfileQuery();
+  const saveProfileMutation = useSaveProfileMutation();
 
   const hydratedEntry = useMemo(
     () =>
@@ -318,6 +329,9 @@ export default function SleepPage() {
 
   const [draft, setDraft] = useState<SleepDraft>(() => toDraft(hydratedEntry));
   const [formError, setFormError] = useState<string | null>(null);
+  const [sleepGoalHours, setSleepGoalHours] = useState("");
+  const [sleepGoalMinutes, setSleepGoalMinutes] = useState("");
+  const [sleepGoalError, setSleepGoalError] = useState<string | null>(null);
 
   const hydrationKey = sleepEntryQuery.data
     ? `${sleepEntryQuery.data.logDate}:${sleepEntryQuery.data.updatedAt}`
@@ -344,6 +358,17 @@ export default function SleepPage() {
     () => getSleepHistorySummary(recentEntries),
     [recentEntries],
   );
+  const sleepGoalMinutesValue = useMemo(
+    () => getPersonalizedSleepGoalMinutes(profileQuery.data),
+    [profileQuery.data],
+  );
+  const hasManualSleepGoal =
+    normalizeSleepGoalMinutes(profileQuery.data?.sleep_goal_minutes) !== null;
+
+  useEffect(() => {
+    setSleepGoalHours(String(Math.floor(sleepGoalMinutesValue / 60)));
+    setSleepGoalMinutes(String(sleepGoalMinutesValue % 60));
+  }, [sleepGoalMinutesValue]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -373,6 +398,35 @@ export default function SleepPage() {
   function handleReset() {
     setDraft(savedDraft);
     setFormError(null);
+  }
+
+  async function handleSaveSleepGoal() {
+    const builtGoal = parseSleepDurationMinutes(sleepGoalHours, sleepGoalMinutes);
+    if (typeof builtGoal === "string" || builtGoal === null) {
+      const message =
+        typeof builtGoal === "string"
+          ? builtGoal
+          : "Add a sleep goal before saving.";
+      setSleepGoalError(message);
+      toast.error(message);
+      return;
+    }
+
+    setSleepGoalError(null);
+
+    try {
+      await saveProfileMutation.mutateAsync({
+        sleep_goal_minutes: builtGoal,
+      });
+      toast.success("Sleep goal updated");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Couldn't save your sleep goal.";
+      setSleepGoalError(message);
+      toast.error(message);
+    }
   }
 
   return (
@@ -651,6 +705,76 @@ export default function SleepPage() {
             </Card>
 
             <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Sleep goal</CardTitle>
+                  <CardDescription>
+                    Set the duration you want to aim for. You can change it whenever your goal changes.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <SummaryRow
+                    label="Current target"
+                    value={formatSleepGoalDuration(sleepGoalMinutesValue)}
+                  />
+                  <SummaryRow
+                    label="Source"
+                    value={hasManualSleepGoal ? "Manual goal" : "Personalized default"}
+                  />
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <FieldLabel hint="Whole hours only.">
+                        Goal hours
+                      </FieldLabel>
+                      <Input
+                        className="mt-2"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="8"
+                        value={sleepGoalHours}
+                        onChange={(event) => setSleepGoalHours(event.target.value)}
+                        disabled={saveProfileMutation.isPending}
+                      />
+                    </div>
+
+                    <div>
+                      <FieldLabel hint="Optional extra minutes.">
+                        Goal minutes
+                      </FieldLabel>
+                      <Input
+                        className="mt-2"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="0"
+                        value={sleepGoalMinutes}
+                        onChange={(event) => setSleepGoalMinutes(event.target.value)}
+                        disabled={saveProfileMutation.isPending}
+                      />
+                    </div>
+                  </div>
+
+                  {sleepGoalError ? (
+                    <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      {sleepGoalError}
+                    </div>
+                  ) : null}
+
+                  <Button
+                    type="button"
+                    onClick={handleSaveSleepGoal}
+                    disabled={saveProfileMutation.isPending}
+                  >
+                    {saveProfileMutation.isPending ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    {saveProfileMutation.isPending ? "Saving..." : "Save sleep goal"}
+                  </Button>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Saved snapshot</CardTitle>

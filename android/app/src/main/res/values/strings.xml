@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Begyn</string>
+    <string name="title_activity_main">Begyn</string>
+    <string name="package_name">app.begyn</string>
+    <string name="custom_url_scheme">app.begyn</string>
+</resources>

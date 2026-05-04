@@ -23,19 +23,12 @@ const SCALE_LABELS: Record<number, string> = {
   5: "High",
 };
 
-function formatLogDate(dateKey: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(`${dateKey}T12:00:00`));
-}
-
 function WellbeingCardInner() {
   const { latest, hasEntry, checkedInToday, loading } = useWellbeingDashboard();
 
   if (loading && !latest) return <WellbeingCardSkeleton />;
 
-  const entry = hasEntry ? latest : null;
+  const entry = hasEntry && checkedInToday ? latest : null;
 
   return (
     <Card className="relative overflow-hidden lg:col-span-6 min-h-[220px]">
@@ -50,7 +43,7 @@ function WellbeingCardInner() {
             </span>
           </div>
           <Badge variant={checkedInToday ? "secondary" : "outline"}>
-            {checkedInToday ? "Checked in today" : entry ? `Last ${formatLogDate(entry.logDate)}` : "No check-in yet"}
+            {checkedInToday ? "Checked in today" : "Not logged today"}
           </Badge>
         </div>
       </CardHeader>
@@ -58,9 +51,9 @@ function WellbeingCardInner() {
       <CardContent className="space-y-4 pb-5">
         {!entry ? (
           <div className="rounded-lg bg-muted/40 px-3 py-4 text-center">
-            <p className="text-sm font-medium">No check-ins yet</p>
+            <p className="text-sm font-medium">Not logged today</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Add a quick mood check-in to make this part of your daily rhythm.
+              Add today&apos;s mood check-in or journal entry to see it here.
             </p>
           </div>
         ) : (

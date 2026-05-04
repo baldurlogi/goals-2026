@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import { buildAIContext } from "@/features/ai/buildAIContext";
 import { buildAISignals } from "@/features/ai/aiSignals";
-import { buildSuggestionCandidates } from "@/features/ai/suggestionCandidates";
+import {
+  buildSuggestionCandidateActionKey,
+  buildSuggestionCandidates,
+} from "@/features/ai/suggestionCandidates";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { useAIUsage } from "@/features/subscription/useAIUsage";
@@ -30,6 +33,7 @@ import {
 } from "@/lib/activeUser";
 import { useAuth } from "@/features/auth/authContext";
 import { GOAL_MODULE_CHANGED_EVENT } from "@/lib/goalModuleStorage";
+import { getLocalDateKey } from "@/hooks/useTodayDate";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
@@ -61,6 +65,7 @@ const CACHE_KEY        = "cache:ai-coach:v1";
 const LAST_MODULE_KEY  = "cache:ai-coach:last-module";
 const LAST_SESSION_KEY = "cache:ai-coach:last-session:v1";
 const COMPLETED_SUGGESTION_KEY = "cache:ai-coach:completed:v1";
+const DEFERRED_GOAL_SUGGESTIONS_KEY = "cache:ai-coach:deferred-goals:v1";
 const CACHE_TTL        = 60 * 60 * 1000;
 const SUPABASE_FN      = getSupabaseFunctionUrl("hyper-responder");
 
@@ -92,6 +97,7 @@ function readLastModule(): string | null {
 }
 
 type LastSession = { date: string; goalId: string; goalTitle: string; stepLabel: string };
+type DeferredGoalSuggestionsEntry = { date: string; actionKeys: string[] };
 
 function readLastSession(): LastSession | null {
   try {
@@ -116,6 +122,62 @@ function suggestionActionKey(suggestion: CoachSuggestion): string {
     suggestion.href.trim().toLowerCase(),
     (suggestion.module ?? "").trim().toLowerCase(),
   ].join("::");
+}
+
+function isOverdueGoalSuggestion(suggestion: CoachSuggestion | null): boolean {
+  if (!suggestion) return false;
+
+  return (
+    suggestion.module === "goals" &&
+    suggestion.href === "/app/goals" &&
+    suggestion.reason.trim().toLowerCase().startsWith("overdue step for")
+  );
+}
+
+function readDeferredGoalSuggestionKeys(userId: string | null): Set<string> {
+  if (!userId) return new Set();
+
+  try {
+    const raw = getScopedStorageItem(DEFERRED_GOAL_SUGGESTIONS_KEY, userId);
+    if (!raw) return new Set();
+
+    const parsed = JSON.parse(raw) as Partial<DeferredGoalSuggestionsEntry>;
+    const today = getLocalDateKey();
+
+    if (
+      !parsed ||
+      parsed.date !== today ||
+      !Array.isArray(parsed.actionKeys)
+    ) {
+      return new Set();
+    }
+
+    return new Set(
+      parsed.actionKeys.filter((value): value is string => typeof value === "string" && value.length > 0),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDeferredGoalSuggestionKeys(
+  userId: string | null,
+  actionKeys: Set<string>,
+): void {
+  if (!userId) return;
+
+  try {
+    writeScopedStorageItem(
+      DEFERRED_GOAL_SUGGESTIONS_KEY,
+      userId,
+      JSON.stringify({
+        date: getLocalDateKey(),
+        actionKeys: [...actionKeys],
+      } satisfies DeferredGoalSuggestionsEntry),
+    );
+  } catch {
+    // ignore storage failures
+  }
 }
 
 function readCompletedSuggestion(userId: string | null): CompletedSuggestionEntry | null {
@@ -180,6 +242,7 @@ function clearCompletedSuggestion(userId: string | null) {
 function buildAlternativeSuggestion(
   signals: Awaited<ReturnType<typeof buildAISignals>>,
   blockedSignatures: string[],
+  deferredActionKeys: ReadonlySet<string> = new Set(),
 ): CoachSuggestion | null {
   const blocked = new Set(blockedSignatures);
   const lastSuggestedModule = readLastModule();
@@ -189,7 +252,7 @@ function buildAlternativeSuggestion(
     return starter;
   }
 
-  const candidates = buildSuggestionCandidates(signals);
+  const candidates = buildSuggestionCandidates(signals, { deferredActionKeys });
   const sortedCandidates = [...candidates].sort((left, right) => right.priority - left.priority);
   const topPriority = sortedCandidates[0]?.priority ?? 0;
   const preferredCandidates =
@@ -213,6 +276,7 @@ function buildAlternativeSuggestion(
 
 async function fetchCoachSuggestion(
   avoidSignature?: string | null,
+  deferredActionKeys: ReadonlySet<string> = new Set(),
 ): Promise<CoachSuggestion> {
   const {
     data: { session },
@@ -277,9 +341,9 @@ async function fetchCoachSuggestion(
   const s = data.suggestion as CoachSuggestion;
   if (!s?.action || !s?.href) throw new Error("Invalid suggestion shape");
 
-  const normalized = normalizeCoachSuggestion(s, signals);
+  const normalized = normalizeCoachSuggestion(s, signals, deferredActionKeys);
   if (avoidSignature && suggestionSignature(normalized) === avoidSignature) {
-    return buildAlternativeSuggestion(signals, [avoidSignature]) ?? normalized;
+    return buildAlternativeSuggestion(signals, [avoidSignature], deferredActionKeys) ?? normalized;
   }
 
   return normalized;
@@ -383,8 +447,9 @@ function getExpectedNutritionTimingSuggestion(
 function normalizeCoachSuggestion(
   suggestion: CoachSuggestion,
   signals: Awaited<ReturnType<typeof buildAISignals>>,
+  deferredActionKeys: ReadonlySet<string> = new Set(),
 ): CoachSuggestion {
-  const candidates = buildSuggestionCandidates(signals);
+  const candidates = buildSuggestionCandidates(signals, { deferredActionKeys });
   const topCandidate = candidates[0] ?? null;
   const topPriority = topCandidate?.priority ?? 0;
   const lastSuggestedModule = readLastModule();
@@ -443,6 +508,7 @@ function normalizeCoachSuggestion(
 
 function buildCurrentSuggestionActionKeys(
   signals: Awaited<ReturnType<typeof buildAISignals>>,
+  deferredActionKeys: ReadonlySet<string> = new Set(),
 ): Set<string> {
   const keys = new Set<string>();
   const starter = buildStarterSuggestion(signals);
@@ -450,7 +516,7 @@ function buildCurrentSuggestionActionKeys(
     keys.add(suggestionActionKey(starter));
   }
 
-  const candidates = buildSuggestionCandidates(signals);
+  const candidates = buildSuggestionCandidates(signals, { deferredActionKeys });
   for (const candidate of candidates) {
     keys.add(suggestionActionKey(candidateToCoachSuggestion(candidate)));
   }
@@ -460,23 +526,25 @@ function buildCurrentSuggestionActionKeys(
 
 async function shouldAutoCompleteSuggestion(
   suggestion: CoachSuggestion | null,
+  deferredActionKeys: ReadonlySet<string> = new Set(),
 ): Promise<boolean> {
   if (!suggestion) return false;
 
   const signals = await buildAISignals(true);
-  const currentActionKeys = buildCurrentSuggestionActionKeys(signals);
+  const currentActionKeys = buildCurrentSuggestionActionKeys(signals, deferredActionKeys);
 
   return !currentActionKeys.has(suggestionActionKey(suggestion));
 }
 
 async function buildStaticSuggestion(
   blockedSignatures: string[] = [],
+  deferredActionKeys: ReadonlySet<string> = new Set(),
 ): Promise<CoachSuggestion> {
   const signals = await buildAISignals(true);
-  const alternate = buildAlternativeSuggestion(signals, blockedSignatures);
+  const alternate = buildAlternativeSuggestion(signals, blockedSignatures, deferredActionKeys);
   if (alternate) return alternate;
 
-  const candidates = buildSuggestionCandidates(signals);
+  const candidates = buildSuggestionCandidates(signals, { deferredActionKeys });
   const top = candidates[0];
 
   if (!top) {
@@ -508,6 +576,7 @@ async function buildStaticSuggestion(
   return normalizeCoachSuggestion(
     { action: top.action, reason, href: top.href, emoji: EMOJI[top.module] ?? "💡", module: top.module },
     signals,
+    deferredActionKeys,
   );
 }
 
@@ -577,7 +646,8 @@ function AICoachCardInner() {
     setLimitHit(false);
     setLimitMessage(null);
     try {
-      const s = await buildStaticSuggestion();
+      const deferredActionKeys = readDeferredGoalSuggestionKeys(userId);
+      const s = await buildStaticSuggestion([], deferredActionKeys);
       setSuggestion(s);
     } catch (e) {
       const cached = readCache();
@@ -586,7 +656,7 @@ function AICoachCardInner() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   const loadAI = useCallback(async (avoidSignature?: string | null) => {
     clearCompletedSuggestion(userId);
@@ -596,7 +666,8 @@ function AICoachCardInner() {
     setLimitHit(false);
     setLimitMessage(null);
     try {
-      const s = await fetchCoachSuggestion(avoidSignature);
+      const deferredActionKeys = readDeferredGoalSuggestionKeys(userId);
+      const s = await fetchCoachSuggestion(avoidSignature, deferredActionKeys);
       writeCache(s);
       setSuggestion(s);
       setIsAI(true);
@@ -617,7 +688,8 @@ function AICoachCardInner() {
     if (!authReady || !userId || !suggestion || completedSuggestion) return;
 
     try {
-      const isAutoCompleted = await shouldAutoCompleteSuggestion(suggestion);
+      const deferredActionKeys = readDeferredGoalSuggestionKeys(userId);
+      const isAutoCompleted = await shouldAutoCompleteSuggestion(suggestion, deferredActionKeys);
       if (!isAutoCompleted) return;
 
       writeCompletedSuggestion(userId, suggestion);
@@ -706,6 +778,18 @@ function AICoachCardInner() {
   }, [authReady, completedSuggestion, syncCompletionFromLiveState]);
 
   function handleRefresh() {
+    if (suggestion && isOverdueGoalSuggestion(suggestion)) {
+      const nextDeferredKeys = readDeferredGoalSuggestionKeys(userId);
+      nextDeferredKeys.add(
+        buildSuggestionCandidateActionKey({
+          action: suggestion.action,
+          href: suggestion.href,
+          module: "goals",
+        }),
+      );
+      writeDeferredGoalSuggestionKeys(userId, nextDeferredKeys);
+    }
+
     clearCache();
     clearCompletedSuggestion(userId);
     setCompletedSuggestion(null);

@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -41,6 +42,7 @@ export function ExpenseTrackerCard(props: {
   className?: string;
 }) {
   const { month, setMonth, data, setData, className } = props;
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<string[]>([]);
 
   const totals = useMemo(() => {
     const totalSpent = data.categories.reduce((acc, c) => acc + (c.spent || 0), 0);
@@ -64,18 +66,17 @@ export function ExpenseTrackerCard(props: {
     });
   }
 
-  function quickAdd(id: FinanceCategoryId, delta: number) {
-    setData({
-      ...data,
-      categories: data.categories.map((c: FinanceCategory) =>
-        c.id === id ? { ...c, spent: Math.max(0, (c.spent || 0) + delta) } : c
-      ),
-    });
-  }
-
   function resetMonth() {
     // Hard reset this month back to defaults
     setData(defaultFinanceState(month));
+  }
+
+  function toggleCategory(categoryId: FinanceCategoryId) {
+    setExpandedCategoryIds((current) =>
+      current.includes(categoryId)
+        ? current.filter((id) => id !== categoryId)
+        : [...current, categoryId],
+    );
   }
 
   return (
@@ -170,10 +171,15 @@ export function ExpenseTrackerCard(props: {
             const remaining = (c.budget || 0) - (c.spent || 0);
             const pct = c.budget > 0 ? clamp((c.spent / c.budget) * 100, 0, 100) : 0;
             const over = c.budget > 0 && c.spent > c.budget;
+            const isExpanded = expandedCategoryIds.includes(c.id);
 
             return (
               <div key={c.id} className="rounded-xl border p-4 space-y-3">
-                <div className="flex items-start justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleCategory(c.id)}
+                  className="flex w-full items-start justify-between gap-3 text-left"
+                >
                   <div className="min-w-0">
                     <div className="font-semibold">{c.name}</div>
                     <div className="text-xs text-muted-foreground">
@@ -184,62 +190,67 @@ export function ExpenseTrackerCard(props: {
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-xs text-muted-foreground">Spent</div>
-                    <div className="text-sm font-semibold">{formatDkk(c.spent)} DKK</div>
+                  <div className="flex items-start gap-3">
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">Spent</div>
+                      <div className="text-sm font-semibold">{formatDkk(c.spent)} DKK</div>
+                    </div>
+                    <span className="mt-0.5 text-muted-foreground">
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </span>
                   </div>
-                </div>
+                </button>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">Budget</div>
-                    <Input
-                      key={`budget-${month}-${c.id}`}
-                      inputMode="numeric"
-                      placeholder="0"
-                      defaultValue={c.budget ? String(c.budget) : ""}
-                      onBlur={(e) => updateCategory(c.id, { budget: toNumber(e.target.value) })}
-                    />
-                  </div>
+                {isExpanded ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Budget</div>
+                        <Input
+                          key={`budget-${month}-${c.id}`}
+                          inputMode="numeric"
+                          placeholder="0"
+                          defaultValue={c.budget ? String(c.budget) : ""}
+                          onBlur={(e) => updateCategory(c.id, { budget: toNumber(e.target.value) })}
+                        />
+                      </div>
 
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">Spent</div>
-                    <Input
-                      key={`spent-${month}-${c.id}`}
-                      inputMode="numeric"
-                      placeholder="0"
-                      defaultValue={c.spent ? String(c.spent) : ""}
-                      onBlur={(e) => updateCategory(c.id, { spent: toNumber(e.target.value) })}
-                    />
-                  </div>
-                </div>
-
-                {c.budget > 0 ? (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
-                        {formatDkk(c.spent)}/{formatDkk(c.budget)} DKK
-                      </span>
-                      <span>{Math.round((c.spent / c.budget) * 100)}%</span>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Spent</div>
+                        <Input
+                          key={`spent-${month}-${c.id}`}
+                          inputMode="numeric"
+                          placeholder="0"
+                          defaultValue={c.spent ? String(c.spent) : ""}
+                          onBlur={(e) => updateCategory(c.id, { spent: toNumber(e.target.value) })}
+                        />
+                      </div>
                     </div>
 
-                    <Progress
-                      value={pct}
-                      className="h-2"
-                      indicatorClassName={over ? "bg-destructive" : "bg-emerald-500"}
-                    />
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">Set a budget to track progress.</div>
-                )}
+                    {c.budget > 0 ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {formatDkk(c.spent)}/{formatDkk(c.budget)} DKK
+                          </span>
+                          <span>{Math.round((c.spent / c.budget) * 100)}%</span>
+                        </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 50)}>+50</Button>
-                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 100)}>+100</Button>
-                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 250)}>+250</Button>
-                  <Button variant="secondary" size="sm" onClick={() => quickAdd(c.id, 500)}>+500</Button>
-                  <Button variant="ghost" size="sm" onClick={() => quickAdd(c.id, -100)}>−100</Button>
-                </div>
+                        <Progress
+                          value={pct}
+                          className="h-2"
+                          indicatorClassName={over ? "bg-destructive" : "bg-emerald-500"}
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">Set a budget to track progress.</div>
+                    )}
+                  </>
+                ) : null}
               </div>
             );
           })}

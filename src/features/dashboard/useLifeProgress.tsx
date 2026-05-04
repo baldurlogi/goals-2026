@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Apple, BookOpen, CalendarDays, CheckSquare, Dumbbell, Target } from "lucide-react";
+import {
+  Apple,
+  BookOpen,
+  CalendarDays,
+  CheckSquare,
+  Dumbbell,
+  GlassWater,
+  Heart,
+  Moon,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import { useAuth } from "@/features/auth/authContext";
 import {
   seedGoalStepHistory,
@@ -43,6 +54,28 @@ import { getLocalDateKey } from "@/hooks/useTodayDate";
 import {
   saveLifeProgressSnapshot,
 } from "@/features/dashboard/lifeProgressHistory";
+import {
+  filterOptionalMetricsForModules,
+  type OptionalLifeProgressMetricId,
+  useOptionalLifeProgressMetrics,
+} from "@/features/dashboard/lifeProgressOptionalMetrics";
+import { loadWaterLog, readWaterCache, WATER_CHANGED_EVENT } from "@/features/water/waterStorage";
+import {
+  countCompletedRoutineSteps,
+  countRoutineSteps,
+  getRoutineItems,
+  getRoutineTemplate,
+  seedRoutineItems,
+  seedRoutineTemplate,
+} from "@/features/skincare/skincareStorage";
+import { loadMentalWellbeingEntry, WELLBEING_CHANGED_EVENT } from "@/features/wellbeing/wellbeingStorage";
+import { loadSleepRecoveryEntry, SLEEP_CHANGED_EVENT } from "@/features/sleep/sleepStorage";
+import {
+  formatSleepGoalDuration as formatDuration,
+  getPersonalizedSleepGoalMinutes,
+} from "@/features/sleep/sleepGoal";
+import type { MentalWellbeingEntry } from "@/features/wellbeing/wellbeingTypes";
+import type { SleepRecoveryEntry } from "@/features/sleep/sleepTypes";
 
 export type ModuleProgress = {
   id: string;
@@ -57,7 +90,19 @@ export type ModuleProgress = {
   accentClass: string;
 };
 
-const MODULE_ORDER = ["goals", "fitness", "nutrition", "reading", "todos", "schedule"];
+const MODULE_ORDER = [
+  "goals",
+  "fitness",
+  "nutrition",
+  "reading",
+  "todos",
+  "schedule",
+  "water_goal",
+  "skincare_routine",
+  "journaling",
+  "sleep_duration_goal",
+];
+const SKINCARE_GOAL_ID = "skincare";
 
 const MEAL_MACROS_BY_KEY = {
   breakfast1: meals.breakfast.option1.macros,
@@ -338,12 +383,194 @@ function buildScheduleProgress(
   };
 }
 
+function buildWaterGoalProgress(log: Awaited<ReturnType<typeof loadWaterLog>>): ModuleProgress {
+  const target = Math.max(log.targetMl, 250);
+  const pct = clampPct((log.ml / target) * 100);
+  const remaining = Math.max(target - log.ml, 0);
+
+  return {
+    id: "water_goal",
+    label: "Water intake",
+    href: "/app/nutrition",
+    icon: <GlassWater className="h-3.5 w-3.5" />,
+    pct,
+    primaryStat: `${log.ml}/${target} ml`,
+    secondaryStat:
+      pct >= 100 ? "Water target reached ✅" : `${remaining} ml to goal`,
+    color: "sky",
+    accentClass: "bg-sky-500",
+  };
+}
+
+function buildSkincareRoutineProgress(
+  routine: Awaited<ReturnType<typeof getRoutineTemplate>>,
+  items: Awaited<ReturnType<typeof getRoutineItems>>,
+): ModuleProgress {
+  const totalSteps = countRoutineSteps(routine);
+  const completedSteps = countCompletedRoutineSteps(routine, items);
+  const pct = totalSteps === 0 ? 100 : clampPct((completedSteps / totalSteps) * 100);
+
+  return {
+    id: "skincare_routine",
+    label: "Skincare routine",
+    href: "/app/skincare",
+    icon: <Sparkles className="h-3.5 w-3.5" />,
+    pct,
+    primaryStat: totalSteps === 0 ? "No routine set" : `${completedSteps}/${totalSteps} steps done`,
+    secondaryStat:
+      totalSteps === 0
+        ? "Set up your routine in Skincare"
+        : pct >= 100
+          ? "Routine finished ✅"
+          : "Complete your routine today",
+    color: "rose",
+    accentClass: "bg-rose-500",
+  };
+}
+
+function buildJournalingProgress(
+  entry: MentalWellbeingEntry,
+): ModuleProgress {
+  const hasJournalEntry = (entry.journalEntry?.trim() ?? "") !== "";
+
+  return {
+    id: "journaling",
+    label: "Journaling",
+    href: "/app/wellbeing",
+    icon: <Heart className="h-3.5 w-3.5" />,
+    pct: hasJournalEntry ? 100 : 0,
+    primaryStat: hasJournalEntry ? "Journaled today" : "No journal note yet",
+    secondaryStat: hasJournalEntry
+      ? "Reflection logged in Wellbeing"
+      : "Add a short reflection to count this",
+    color: "emerald",
+    accentClass: "bg-emerald-500",
+  };
+}
+
+function buildSleepDurationGoalProgress(
+  entry: SleepRecoveryEntry,
+  profile: ReturnType<typeof useProfile>,
+): ModuleProgress {
+  const goalMinutes = getPersonalizedSleepGoalMinutes(profile);
+  const durationMinutes = entry.sleepDurationMinutes ?? 0;
+  const pct =
+    entry.sleepDurationMinutes === null
+      ? 0
+      : clampPct((durationMinutes / goalMinutes) * 100);
+  const remaining = Math.max(goalMinutes - durationMinutes, 0);
+
+  return {
+    id: "sleep_duration_goal",
+    label: "Sleep duration goal",
+    href: "/app/sleep",
+    icon: <Moon className="h-3.5 w-3.5" />,
+    pct,
+    primaryStat:
+      entry.sleepDurationMinutes === null
+        ? `Goal ${formatDuration(goalMinutes)}`
+        : `${formatDuration(durationMinutes)} / ${formatDuration(goalMinutes)}`,
+    secondaryStat:
+      entry.sleepDurationMinutes === null
+        ? "Log your sleep to score this metric"
+        : pct >= 100
+          ? "Sleep goal reached ✅"
+          : `${formatDuration(remaining)} short of goal`,
+    color: "violet",
+    accentClass: "bg-violet-500",
+  };
+}
+
+function seedOptionalMetricProgress(
+  metricIds: OptionalLifeProgressMetricId[],
+): ModuleProgress[] {
+  const results: ModuleProgress[] = [];
+
+  try {
+    if (metricIds.includes("water_goal")) {
+      const waterLog = readWaterCache() ?? { date: getLocalDateKey(), ml: 0, targetMl: 2500 };
+      results.push(buildWaterGoalProgress(waterLog));
+    }
+
+    if (metricIds.includes("skincare_routine")) {
+      const routine = seedRoutineTemplate(SKINCARE_GOAL_ID);
+      const items = seedRoutineItems(SKINCARE_GOAL_ID, routine);
+      results.push(buildSkincareRoutineProgress(routine, items));
+    }
+  } catch {
+    // seed is best-effort only
+  }
+
+  return results;
+}
+
+async function fetchOptionalMetricProgress(
+  metricIds: OptionalLifeProgressMetricId[],
+  activeUserId: string | null,
+  profile: ReturnType<typeof useProfile>,
+): Promise<ModuleProgress[]> {
+  if (metricIds.length === 0) return [];
+
+  const today = getLocalDateKey();
+  const results: ModuleProgress[] = [];
+
+  await Promise.allSettled([
+    (async () => {
+      if (metricIds.includes("water_goal")) {
+        results.push(buildWaterGoalProgress(await loadWaterLog()));
+      }
+    })(),
+    (async () => {
+      if (metricIds.includes("skincare_routine")) {
+        const [routine, items] = await Promise.all([
+          getRoutineTemplate(SKINCARE_GOAL_ID),
+          getRoutineItems(SKINCARE_GOAL_ID),
+        ]);
+        results.push(buildSkincareRoutineProgress(routine, items));
+      }
+    })(),
+    (async () => {
+      if (metricIds.includes("journaling") && activeUserId) {
+        results.push(
+          buildJournalingProgress(
+            await loadMentalWellbeingEntry(activeUserId, today),
+          ),
+        );
+      }
+    })(),
+    (async () => {
+      if (metricIds.includes("sleep_duration_goal") && activeUserId) {
+        results.push(
+          buildSleepDurationGoalProgress(
+            await loadSleepRecoveryEntry(activeUserId, today),
+            profile,
+          ),
+        );
+      }
+    })(),
+  ]);
+
+  return results;
+}
+
 function sortModules(results: ModuleProgress[]) {
-  return [...results].sort((left, right) => MODULE_ORDER.indexOf(left.id) - MODULE_ORDER.indexOf(right.id));
+  return [...results].sort((left, right) => {
+    const leftIndex = MODULE_ORDER.indexOf(left.id);
+    const rightIndex = MODULE_ORDER.indexOf(right.id);
+
+    if (leftIndex === -1 && rightIndex === -1) {
+      return left.label.localeCompare(right.label);
+    }
+
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
+  });
 }
 
 function seedProgress(
   enabledModules: Set<string>,
+  optionalMetricIds: OptionalLifeProgressMetricId[],
   activeUserId: string | null,
   profile: ReturnType<typeof useProfile>,
 ): ModuleProgress[] {
@@ -376,15 +603,18 @@ function seedProgress(
     // seed is best-effort only
   }
 
+  results.push(...seedOptionalMetricProgress(optionalMetricIds));
+
   return sortModules(results);
 }
 
 async function fetchProgress(
   enabledModules: Set<string>,
+  optionalMetricIds: OptionalLifeProgressMetricId[],
   activeUserId: string | null,
   profile: ReturnType<typeof useProfile>,
 ) {
-  if (enabledModules.size === 0) return [];
+  if (enabledModules.size === 0 && optionalMetricIds.length === 0) return [];
 
   const results: ModuleProgress[] = [];
 
@@ -424,6 +654,13 @@ async function fetchProgress(
     })(),
   ]);
 
+  const optionalMetricResults = await fetchOptionalMetricProgress(
+    optionalMetricIds,
+    activeUserId,
+    profile,
+  );
+  results.push(...optionalMetricResults);
+
   return sortModules(results);
 }
 
@@ -436,25 +673,37 @@ export function useLifeProgress() {
   const { userId } = useAuth();
   const profile = useProfile();
   const { modules: enabledModules } = useEnabledModules();
+  const { data: selectedOptionalMetrics = [] } =
+    useOptionalLifeProgressMetrics(userId);
   const { doneState, isGoalProgressLoading } = useGoalProgressState();
   const { goals, isGoalsLoading } = useGoalsState();
   const scopedUserId = userId;
+  const activeOptionalMetrics = useMemo(
+    () =>
+      filterOptionalMetricsForModules(selectedOptionalMetrics, enabledModules),
+    [enabledModules, selectedOptionalMetrics],
+  );
   const [stepHistory, setStepHistory] = useState<StepHistoryEntry[]>(() =>
     seedGoalStepHistory(scopedUserId),
   );
 
   const initialProgress = useMemo(
-    () => seedProgress(enabledModules, scopedUserId, profile),
-    [enabledModules, profile, scopedUserId],
+    () =>
+      seedProgress(enabledModules, activeOptionalMetrics, scopedUserId, profile),
+    [activeOptionalMetrics, enabledModules, profile, scopedUserId],
   );
   const [progress, setProgress] = useState<ModuleProgress[]>(initialProgress);
   const [loading, setLoading] = useState(initialProgress.length === 0);
   const [hasFreshProgress, setHasFreshProgress] = useState(enabledModules.size === 0);
 
   useEffect(() => {
-    setProgress(seedProgress(enabledModules, scopedUserId, profile));
-    setHasFreshProgress(enabledModules.size === 0);
-  }, [enabledModules, profile, scopedUserId]);
+    setProgress(
+      seedProgress(enabledModules, activeOptionalMetrics, scopedUserId, profile),
+    );
+    setHasFreshProgress(
+      enabledModules.size === 0 && activeOptionalMetrics.length === 0,
+    );
+  }, [activeOptionalMetrics, enabledModules, profile, scopedUserId]);
 
   useEffect(() => {
     const syncGoalHistory = () => {
@@ -470,12 +719,17 @@ export function useLifeProgress() {
   }, [doneState, scopedUserId]);
 
   useEffect(() => {
-    if (enabledModules.size === 0) return;
+    if (enabledModules.size === 0 && activeOptionalMetrics.length === 0) return;
 
     let cancelled = false;
 
     async function refresh() {
-      const data = await fetchProgress(enabledModules, scopedUserId, profile);
+      const data = await fetchProgress(
+        enabledModules,
+        activeOptionalMetrics,
+        scopedUserId,
+        profile,
+      );
       if (cancelled) return;
       setProgress(data);
       setLoading(false);
@@ -504,6 +758,9 @@ export function useLifeProgress() {
       "todos:changed",
       "schedule:changed",
       READING_CHANGED_EVENT,
+      WATER_CHANGED_EVENT,
+      WELLBEING_CHANGED_EVENT,
+      SLEEP_CHANGED_EVENT,
       "goal_module:changed",
       "goals:changed",
     ];
@@ -519,7 +776,7 @@ export function useLifeProgress() {
       window.removeEventListener("focus", handleChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [enabledModules, profile, scopedUserId]);
+  }, [activeOptionalMetrics, enabledModules, profile, scopedUserId]);
 
   const modulesProgress = useMemo(() => {
     const withoutGoals = progress.filter((item) => item.id !== "goals");
@@ -556,6 +813,6 @@ export function useLifeProgress() {
     modulesProgress,
     overallScore,
     loading: showLoading,
-    skeletonCount: Math.max(enabledModules.size, 3),
+    skeletonCount: Math.max(enabledModules.size + activeOptionalMetrics.length, 3),
   };
 }

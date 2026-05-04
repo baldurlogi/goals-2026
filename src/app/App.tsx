@@ -8,6 +8,7 @@ import { RedirectIfAuth } from "@/features/auth/RedirectIfAuth";
 import { RequireOnboarding } from "@/features/onboarding/RequireOnboarding";
 import { Skeleton, WidgetCardSkeleton } from "@/features/dashboard/skeletons";
 import { CookieConsentBanner } from "@/features/legal/CookieConsentBanner";
+import { NativeAuthBridge } from "@/features/auth/NativeAuthBridge";
 import {
   readCookieConsent,
   subscribeCookieConsent,
@@ -196,6 +197,7 @@ function ConsentAwareAnalytics() {
 export default function App() {
   return (
     <BrowserRouter>
+      <NativeAuthBridge />
       <ConsentAwareAnalytics />
       <AuthProvider>
         <Routes>

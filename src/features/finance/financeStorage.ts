@@ -42,6 +42,12 @@ export function shiftMonth(month: string, delta: number) {
   return getMonthKey(dt);
 }
 
+export function buildMonthRange(endMonth: string, count: number): string[] {
+  return Array.from({ length: Math.max(count, 0) }, (_, index) =>
+    shiftMonth(endMonth, index - (count - 1)),
+  );
+}
+
 export function defaultFinanceState(month: string): FinanceMonthState {
   return {
     month,
@@ -151,6 +157,50 @@ export async function loadFinanceMonth(
   const merged = mergeState(month, data.state as Partial<FinanceMonthState>);
   writeCache(goalId, merged);
   return merged;
+}
+
+export async function loadFinanceHistory(
+  goalId: string,
+  endMonth: string,
+  count = 6,
+): Promise<FinanceMonthState[]> {
+  const months = buildMonthRange(endMonth, count);
+  const seeded = months.map((month) => readCache(goalId, month) ?? defaultFinanceState(month));
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return seeded;
+
+  const startMonth = months[0];
+  if (!startMonth) return seeded;
+
+  const { data, error } = await supabase
+    .from('finance_months')
+    .select('month, state')
+    .eq('user_id', user.id)
+    .eq('goal_id', goalId)
+    .gte('month', startMonth)
+    .lte('month', endMonth)
+    .order('month', { ascending: true });
+
+  if (error || !data) {
+    return seeded;
+  }
+
+  const byMonth = new Map(seeded.map((item) => [item.month, item]));
+
+  for (const row of data) {
+    const month = typeof row.month === 'string' && row.month.trim().length > 0
+      ? row.month
+      : endMonth;
+    const merged = mergeState(month, (row.state as Partial<FinanceMonthState>) ?? {});
+    writeCache(goalId, merged);
+    byMonth.set(month, merged);
+  }
+
+  return months.map((month) => byMonth.get(month) ?? defaultFinanceState(month));
 }
 
 export async function saveFinanceMonth(

@@ -1,3 +1,5 @@
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/lib/supabaseClient";
 
 const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
@@ -66,6 +68,18 @@ export function clearCancelledOnboarding(): void {
 }
 
 export function buildAuthCallbackRedirect(intent: AuthIntent): string {
+  if (Capacitor.isNativePlatform()) {
+    const callbackUrl = new URL("app.begyn://auth/callback");
+    callbackUrl.searchParams.set("intent", intent);
+
+    const nextPath = readStoredPostLoginRedirect();
+    if (nextPath) {
+      callbackUrl.searchParams.set("next", nextPath);
+    }
+
+    return callbackUrl.toString();
+  }
+
   const callbackUrl = new URL("/auth/callback", window.location.origin);
   callbackUrl.searchParams.set("intent", intent);
 
@@ -96,15 +110,33 @@ export async function startGoogleAuth(intent: AuthIntent): Promise<{
     }
   }
 
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo,
+      skipBrowserRedirect: Capacitor.isNativePlatform(),
       queryParams: forcedAccountSelection
         ? { prompt: "select_account" }
         : undefined,
     },
   });
+
+  if (!error && Capacitor.isNativePlatform()) {
+    const authUrl = data?.url;
+
+    if (!authUrl) {
+      return {
+        error: new Error("Couldn't open Google sign-in on this device."),
+        redirectTo,
+        forcedAccountSelection,
+      };
+    }
+
+    await Browser.open({
+      url: authUrl,
+      presentationStyle: "fullscreen",
+    });
+  }
 
   return {
     error,

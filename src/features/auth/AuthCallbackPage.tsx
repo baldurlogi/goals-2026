@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/authContext";
 import { captureOnce } from "@/lib/analytics";
+import { supabase } from "@/lib/supabaseClient";
 import {
   clearStoredPostLoginRedirect,
   readStoredPostLoginRedirect,
@@ -27,6 +30,45 @@ export function AuthCallbackPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isExchangingCode, setIsExchangingCode] = useState(false);
+  const hasAuthCode = useMemo(() => {
+    return new URLSearchParams(location.search).has("code");
+  }, [location.search]);
+
+  useEffect(() => {
+    if (loading || user) return;
+
+    const params = new URLSearchParams(location.search);
+    const code = params.get("code");
+    if (!code) return;
+
+    let cancelled = false;
+    setIsExchangingCode(true);
+
+    void supabase.auth.exchangeCodeForSession(code).then(async ({ error }) => {
+      if (cancelled) return;
+
+      if (error) {
+        console.warn("[auth] native code exchange failed", error);
+        setIsExchangingCode(false);
+        return;
+      }
+
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await Browser.close();
+        } catch {
+          // ignore
+        }
+      }
+
+      setIsExchangingCode(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, location.search, user]);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -83,7 +125,7 @@ export function AuthCallbackPage() {
     navigate(destination, { replace: true });
   }, [loading, user, navigate, location.search, location.state]);
 
-  if (loading) {
+  if (loading || isExchangingCode || (!user && hasAuthCode)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-sm text-muted-foreground">Signing you in…</div>

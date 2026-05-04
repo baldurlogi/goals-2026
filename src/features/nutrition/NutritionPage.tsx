@@ -33,6 +33,9 @@ import {
 import type { Macros } from "./nutritionTypes";
 import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { useProfile } from "@/features/onboarding/useProfile";
+import { seedNutritionGoalFocuses } from "@/features/onboarding/profileStorage";
+import { useAuth } from "@/features/auth/authContext";
+import { WaterIntakeCard } from "@/features/dashboard/components/WaterIntakeCard";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -375,6 +378,7 @@ export function NutritionPage() {
   const [savedMealsFilter, setSavedMealsFilter] = useState<SavedMealsFilter>("all");
   const [editingSavedMeal, setEditingSavedMeal] = useState<SavedMeal | null>(null);
   const profile = useProfile();
+  const { userId } = useAuth();
 
   const reloadNutritionState = useCallback(async () => {
     const [freshLog, freshPhase, freshMeals] = await Promise.all([
@@ -469,10 +473,18 @@ export function NutritionPage() {
     await reloadNutritionState();
   };
 
-  const visibleGoalFocuses = useMemo(
-    () => normalizeNutritionGoalFocuses(profile?.nutrition_goal_focuses),
-    [profile?.nutrition_goal_focuses],
-  );
+  const visibleGoalFocuses = useMemo(() => {
+    if (profile?.nutrition_goal_focuses?.length) {
+      return normalizeNutritionGoalFocuses(profile.nutrition_goal_focuses);
+    }
+
+    const cachedGoalFocuses = seedNutritionGoalFocuses(userId);
+    if (cachedGoalFocuses?.length) {
+      return normalizeNutritionGoalFocuses(cachedGoalFocuses);
+    }
+
+    return normalizeNutritionGoalFocuses(profile?.nutrition_goal_focuses);
+  }, [profile?.nutrition_goal_focuses, userId]);
   const visiblePhaseOptions = useMemo(
     () =>
       NUTRITION_PHASE_OPTIONS.filter((option) =>
@@ -706,7 +718,7 @@ export function NutritionPage() {
         </div>
 
         {/* Right: macros — sticky on desktop */}
-        <div className="lg:sticky lg:top-6">
+        <div className="space-y-4 lg:sticky lg:top-6">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Today's macros</CardTitle>
@@ -724,6 +736,8 @@ export function NutritionPage() {
               <MacroRow macroKey="fat"     label="Fat"      value={logged.fat}     target={targets.fat}      unit="g"    mode="range" />
             </CardContent>
           </Card>
+
+          <WaterIntakeCard />
         </div>
 
       </div>
