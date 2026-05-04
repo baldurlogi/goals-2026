@@ -77,6 +77,7 @@ export type UserProfile = {
   age: number | null;
   sex: Sex | null;
   activity_level: ActivityLevel;
+  sleep_goal_minutes: number | null;
   onboarding_done: boolean;
   macro_maintain: MacroTargets | null;
   macro_cut: MacroTargets | null;
@@ -215,6 +216,11 @@ export function normalizeUserProfile(raw: UserProfile): UserProfile {
 
   return {
     ...raw,
+    sleep_goal_minutes: clampNumberValue((raw as UserProfile & { sleep_goal_minutes?: number | null }).sleep_goal_minutes, {
+      min: 4 * 60,
+      max: 16 * 60,
+      integer: true,
+    }),
     weekly_schedule: weeklySchedule,
     nutrition_goal_focuses: nutritionGoalFocuses,
     default_schedule_view: deriveLegacyScheduleView(weeklySchedule),
@@ -300,6 +306,7 @@ function defaultProfile(id: string): UserProfile {
     age: null,
     sex: null,
     activity_level: "active",
+    sleep_goal_minutes: null,
     onboarding_done: false,
     macro_maintain: null,
     macro_cut: null,
@@ -482,6 +489,10 @@ export async function loadProfile(
     const cachedGoalFocuses = readNutritionGoalFocusesCache(userId);
     const mergedProfile = normalizeUserProfile({
       ...profile,
+      sleep_goal_minutes:
+        serverProfile.sleep_goal_minutes === undefined
+          ? cached?.sleep_goal_minutes ?? null
+          : profile.sleep_goal_minutes,
       macro_recomp:
         serverProfile.macro_recomp === undefined
           ? cached?.macro_recomp ?? null
@@ -559,6 +570,16 @@ export async function saveProfile(
         max: 200,
         integer: true,
       }) ?? 20;
+  }
+  if ("sleep_goal_minutes" in normalizedPatch) {
+    normalizedPatch.sleep_goal_minutes = clampNumberValue(
+      normalizedPatch.sleep_goal_minutes,
+      {
+        min: 4 * 60,
+        max: 16 * 60,
+        integer: true,
+      },
+    );
   }
   if ("measurement_system" in normalizedPatch) {
     normalizedPatch.measurement_system = normalizeMeasurementSystem(
@@ -644,6 +665,7 @@ export async function saveProfile(
     delete upsertPayload[missingColumn];
 
     if (
+      missingColumn !== "sleep_goal_minutes" &&
       missingColumn !== "nutrition_goal_focuses" &&
       missingColumn !== "macro_recomp" &&
       missingColumn !== "macro_muscle_gain" &&

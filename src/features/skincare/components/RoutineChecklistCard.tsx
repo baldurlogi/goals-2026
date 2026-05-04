@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -45,6 +45,10 @@ export function RoutineChecklistCard({ goalId }: { goalId: string }) {
   const [newStepLabels, setNewStepLabels] = useState<Record<RoutineSection, string>>({
     am: "",
     pm: "",
+  });
+  const [editingSections, setEditingSections] = useState<Record<RoutineSection, boolean>>({
+    am: false,
+    pm: false,
   });
 
   useEffect(() => {
@@ -219,6 +223,13 @@ export function RoutineChecklistCard({ goalId }: { goalId: string }) {
   const doneCount = countCompletedRoutineSteps(routine, items);
   const totalSteps = countRoutineSteps(routine);
 
+  function toggleEditing(kind: RoutineSection) {
+    setEditingSections((current) => ({
+      ...current,
+      [kind]: !current[kind],
+    }));
+  }
+
   function renderRoutineEditor(kind: RoutineSection) {
     return (
       <div className="space-y-2">
@@ -228,7 +239,7 @@ export function RoutineChecklistCard({ goalId }: { goalId: string }) {
           </div>
         ) : (
           routine[kind].map((step) => (
-            <div key={step.id} className="flex items-center gap-2">
+            <div key={step.id} className="flex items-center gap-2 rounded-xl border bg-background/60 p-2">
               <Input
                 value={step.label}
                 onChange={(event) =>
@@ -258,7 +269,7 @@ export function RoutineChecklistCard({ goalId }: { goalId: string }) {
           ))
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Input
             value={newStepLabels[kind]}
             onChange={(event) =>
@@ -278,7 +289,7 @@ export function RoutineChecklistCard({ goalId }: { goalId: string }) {
           <Button
             type="button"
             variant="outline"
-            className="shrink-0"
+            className="shrink-0 sm:self-auto"
             onClick={() => void addStep(kind)}
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -293,85 +304,118 @@ export function RoutineChecklistCard({ goalId }: { goalId: string }) {
     <Card className="rounded-xl">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-base">🧴 Routine (today)</CardTitle>
+          <CardTitle className="text-base">🧴 Routine</CardTitle>
           <Badge variant="secondary">{doneCount}/{totalSteps}</Badge>
         </div>
-        <div className="text-xs text-muted-foreground">{daily.dayISO}</div>
+        <div className="text-xs text-muted-foreground">Today · {daily.dayISO}</div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="space-y-3">
-          <SectionTitle title="AM" />
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">AM routine done</div>
-            <Checkbox
-              checked={daily.amDone}
-              onCheckedChange={() => void toggleSectionDone("am")}
-            />
+        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="space-y-3 rounded-2xl border bg-card/30 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <SectionTitle title="AM routine" />
+              <div className="text-xs text-muted-foreground">Morning steps and completion</div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => toggleEditing("am")}
+            >
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              {editingSections.am ? "Done editing" : "Edit"}
+            </Button>
           </div>
-          <div className="space-y-2">
-            {routine.am.map((step) => (
-              <div key={step.id} className="flex items-center justify-between">
-                <div className="text-sm">{step.label}</div>
+
+          {editingSections.am ? (
+            renderRoutineEditor("am")
+          ) : (
+            <>
+              <div className="flex items-center justify-between rounded-xl border bg-background/60 px-3 py-2.5">
+                <div className="text-sm text-muted-foreground">AM routine done</div>
                 <Checkbox
-                  checked={items.items.am[step.id]}
-                  onCheckedChange={() => void toggleItem("am", step.id)}
+                  checked={daily.amDone}
+                  onCheckedChange={() => void toggleSectionDone("am")}
                 />
               </div>
-            ))}
-          </div>
+              <div className="space-y-2">
+                {routine.am.length === 0 ? (
+                  <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                    No AM steps yet. Tap edit to add your routine.
+                  </div>
+                ) : (
+                  routine.am.map((step) => (
+                    <div key={step.id} className="flex items-center justify-between rounded-xl border bg-background/60 px-3 py-2.5">
+                      <div className="text-sm">{step.label}</div>
+                      <Checkbox
+                        checked={items.items.am[step.id]}
+                        onCheckedChange={() => void toggleItem("am", step.id)}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
 
-        <Separator />
-
-        <div className="space-y-3">
-          <SectionTitle title="PM" />
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">PM routine done</div>
-            <Checkbox
-              checked={daily.pmDone}
-              onCheckedChange={() => void toggleSectionDone("pm")}
-            />
+        <div className="space-y-3 rounded-2xl border bg-card/30 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <SectionTitle title="PM routine" />
+              <div className="text-xs text-muted-foreground">Evening steps and completion</div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => toggleEditing("pm")}
+            >
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              {editingSections.pm ? "Done editing" : "Edit"}
+            </Button>
           </div>
-          <div className="space-y-2">
-            {routine.pm.map((step) => (
-              <div key={step.id} className="flex items-center justify-between">
-                <div className="text-sm">{step.label}</div>
+
+          {editingSections.pm ? (
+            renderRoutineEditor("pm")
+          ) : (
+            <>
+              <div className="flex items-center justify-between rounded-xl border bg-background/60 px-3 py-2.5">
+                <div className="text-sm text-muted-foreground">PM routine done</div>
                 <Checkbox
-                  checked={items.items.pm[step.id]}
-                  onCheckedChange={() => void toggleItem("pm", step.id)}
+                  checked={daily.pmDone}
+                  onCheckedChange={() => void toggleSectionDone("pm")}
                 />
               </div>
-            ))}
-          </div>
+              <div className="space-y-2">
+                {routine.pm.length === 0 ? (
+                  <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                    No PM steps yet. Tap edit to add your routine.
+                  </div>
+                ) : (
+                  routine.pm.map((step) => (
+                    <div key={step.id} className="flex items-center justify-between rounded-xl border bg-background/60 px-3 py-2.5">
+                      <div className="text-sm">{step.label}</div>
+                      <Checkbox
+                        checked={items.items.pm[step.id]}
+                        onCheckedChange={() => void toggleItem("pm", step.id)}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
         </div>
 
         <Separator />
 
-        <div className="space-y-4">
-          <SectionTitle title="Routine setup" />
-          <div className="space-y-4 rounded-xl border bg-card/30 p-4">
-            <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                AM steps
-              </div>
-              {renderRoutineEditor("am")}
-            </div>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                PM steps
-              </div>
-              {renderRoutineEditor("pm")}
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        <Button variant="ghost" className="w-full" onClick={resetToday}>
+        <Button variant="ghost" className="w-full sm:w-auto" onClick={resetToday}>
           Reset today
         </Button>
       </CardContent>

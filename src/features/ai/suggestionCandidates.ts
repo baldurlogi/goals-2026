@@ -42,6 +42,16 @@ export type SuggestionCandidate = {
   icon: LucideIcon;
 };
 
+export function buildSuggestionCandidateActionKey(
+  candidate: Pick<SuggestionCandidate, "action" | "href" | "module">,
+): string {
+  return [
+    candidate.action.trim().toLowerCase(),
+    candidate.href.trim().toLowerCase(),
+    candidate.module.trim().toLowerCase(),
+  ].join("::");
+}
+
 function goalCandidatePriority(
   priority: string | null,
   stepDate: string | null,
@@ -229,8 +239,12 @@ function dedupeByModule(items: SuggestionCandidate[]): SuggestionCandidate[] {
 
 export function buildSuggestionCandidates(
   signals: AISignals,
+  options?: {
+    deferredActionKeys?: ReadonlySet<string>;
+  },
 ): SuggestionCandidate[] {
   const items: SuggestionCandidate[] = [];
+  const deferredActionKeys = options?.deferredActionKeys;
 
   if (hasModule(signals, "goals")) {
     if (signals.goals.count === 0) {
@@ -265,9 +279,17 @@ export function buildSuggestionCandidates(
               )
             : null;
 
-          items.push({
+          const overdueCandidate: SuggestionCandidate = {
             module: "goals",
-            priority: score,
+            priority: deferredActionKeys?.has(
+              buildSuggestionCandidateActionKey({
+                action: goal.overdueStepLabel,
+                href: "/app/goals",
+                module: "goals",
+              }),
+            )
+              ? 1
+              : score,
             action: goal.overdueStepLabel,
             reason: `Overdue step for "${goal.title}" · ${
               goal.overdueCount ?? 1
@@ -276,7 +298,9 @@ export function buildSuggestionCandidates(
             }.`,
             href: "/app/goals",
             icon: Clock3,
-          });
+          };
+
+          items.push(overdueCandidate);
         }
 
         // Upcoming step within 3 days, with due-today outranking any later step

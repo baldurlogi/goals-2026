@@ -6,6 +6,7 @@ import {
 import { DEFAULT_MODULES, type ModuleId } from "@/features/modules/modules";
 import { loadUserGoals } from "@/features/goals/userGoalStorage";
 import {
+  diffDays,
   getDaysSinceWorkout,
   getStrongestLiftLabel,
   getWeakestLiftLabel,
@@ -613,15 +614,15 @@ function getDaysSinceWeeklySplitWorkout(
   const completedDates = Object.values(split.days ?? {})
     .map((day) => day.completedDate ?? null)
     .filter((value): value is string => Boolean(value))
+    .concat(split.lastStreakDate ? [split.lastStreakDate] : [])
     .sort();
 
   const latest = completedDates.at(-1) ?? null;
   if (!latest) return null;
 
-  const time = new Date(`${latest}T00:00:00`).getTime();
-  if (Number.isNaN(time)) return null;
-
-  return Math.floor((Date.now() - time) / 86400000);
+  const today = todayISO();
+  const days = diffDays(latest, today);
+  return Number.isFinite(days) ? Math.max(days, 0) : null;
 }
 
 export async function buildAISignals(forceRefresh = false): Promise<AISignals> {

@@ -141,9 +141,6 @@ export function SkinLogCard({ goalId }: { goalId: string }) {
 
       <CardContent className="space-y-4">
         <div className="space-y-3">
-          <div className="text-xs text-muted-foreground">
-            Rate each one from 1 to 5.
-          </div>
           <div className="grid gap-3">
             <RatingDots
               label="Irritation"

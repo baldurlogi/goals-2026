@@ -18,19 +18,12 @@ function formatSleepDuration(totalMinutes: number | null): string {
   return `${hours}h ${minutes}m`;
 }
 
-function formatLogDate(dateKey: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(`${dateKey}T12:00:00`));
-}
-
 function SleepCardInner() {
   const { latest, hasEntry, loggedToday, loading } = useSleepDashboard();
 
   if (loading && !latest) return <SleepCardSkeleton />;
 
-  const entry = hasEntry ? latest : null;
+  const entry = hasEntry && loggedToday ? latest : null;
 
   return (
     <Card className="relative overflow-hidden lg:col-span-6 min-h-[220px]">
@@ -45,7 +38,7 @@ function SleepCardInner() {
             </span>
           </div>
           <Badge variant={loggedToday ? "secondary" : "outline"}>
-            {loggedToday ? "Logged today" : entry ? `Last ${formatLogDate(entry.logDate)}` : "No entry yet"}
+            {loggedToday ? "Logged today" : "Not logged today"}
           </Badge>
         </div>
       </CardHeader>
@@ -53,9 +46,9 @@ function SleepCardInner() {
       <CardContent className="space-y-4 pb-5">
         {!entry ? (
           <div className="rounded-lg bg-muted/40 px-3 py-4 text-center">
-            <p className="text-sm font-medium">No sleep logged yet</p>
+            <p className="text-sm font-medium">Not logged today</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Log your last night to start seeing quick recovery summaries here.
+              Log last night&apos;s sleep to see today&apos;s recovery summary here.
             </p>
           </div>
         ) : (

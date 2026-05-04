@@ -223,6 +223,7 @@ export function OnboardingFlow({
         weight_kg: data.weight_kg ? Number(data.weight_kg) : null,
         height_cm: data.height_cm ? Number(data.height_cm) : null,
         activity_level: data.activity_level,
+        sleep_goal_minutes: null,
         macro_maintain: hasValidNutritionTarget(data) ? data.macro_maintain : null,
         macro_cut: data.macro_cut ?? null,
         macro_recomp: null,

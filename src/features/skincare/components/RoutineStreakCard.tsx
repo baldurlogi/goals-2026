@@ -77,7 +77,7 @@ export function RoutineStreakCard({ goalId }: { goalId: string }) {
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Tip: completing both AM and PM today updates your streak automatically.
+          Tip: Completing both AM and PM today updates your streak automatically.
         </div>
       </CardContent>
     </Card>

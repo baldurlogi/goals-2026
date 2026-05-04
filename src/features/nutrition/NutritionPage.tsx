@@ -35,6 +35,7 @@ import { getLocalDateKey } from "@/hooks/useTodayDate";
 import { useProfile } from "@/features/onboarding/useProfile";
 import { seedNutritionGoalFocuses } from "@/features/onboarding/profileStorage";
 import { useAuth } from "@/features/auth/authContext";
+import { WaterIntakeCard } from "@/features/dashboard/components/WaterIntakeCard";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -717,7 +718,7 @@ export function NutritionPage() {
         </div>
 
         {/* Right: macros — sticky on desktop */}
-        <div className="lg:sticky lg:top-6">
+        <div className="space-y-4 lg:sticky lg:top-6">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Today's macros</CardTitle>
@@ -735,6 +736,8 @@ export function NutritionPage() {
               <MacroRow macroKey="fat"     label="Fat"      value={logged.fat}     target={targets.fat}      unit="g"    mode="range" />
             </CardContent>
           </Card>
+
+          <WaterIntakeCard />
         </div>
 
       </div>

@@ -70,6 +70,10 @@ import {
 } from "@/features/skincare/skincareStorage";
 import { loadMentalWellbeingEntry, WELLBEING_CHANGED_EVENT } from "@/features/wellbeing/wellbeingStorage";
 import { loadSleepRecoveryEntry, SLEEP_CHANGED_EVENT } from "@/features/sleep/sleepStorage";
+import {
+  formatSleepGoalDuration as formatDuration,
+  getPersonalizedSleepGoalMinutes,
+} from "@/features/sleep/sleepGoal";
 import type { MentalWellbeingEntry } from "@/features/wellbeing/wellbeingTypes";
 import type { SleepRecoveryEntry } from "@/features/sleep/sleepTypes";
 
@@ -377,43 +381,6 @@ function buildScheduleProgress(
     color: "amber",
     accentClass: "bg-amber-500",
   };
-}
-
-function formatDuration(minutes: number): string {
-  const normalized = Math.max(Math.round(minutes), 0);
-  const hours = Math.floor(normalized / 60);
-  const leftoverMinutes = normalized % 60;
-
-  if (leftoverMinutes === 0) return `${hours}h`;
-  if (hours === 0) return `${leftoverMinutes}m`;
-  return `${hours}h ${leftoverMinutes}m`;
-}
-
-function getPersonalizedSleepGoalMinutes(
-  profile: ReturnType<typeof useProfile>,
-): number {
-  let minutes = 8 * 60;
-
-  if (typeof profile?.age === "number") {
-    if (profile.age < 20) minutes = 9 * 60;
-    else if (profile.age >= 65) minutes = 7.5 * 60;
-  }
-
-  switch (profile?.activity_level) {
-    case "sedentary":
-      minutes -= 30;
-      break;
-    case "active":
-      minutes += 30;
-      break;
-    case "very_active":
-      minutes += 45;
-      break;
-    default:
-      break;
-  }
-
-  return Math.min(9 * 60, Math.max(7 * 60, Math.round(minutes / 15) * 15));
 }
 
 function buildWaterGoalProgress(log: Awaited<ReturnType<typeof loadWaterLog>>): ModuleProgress {
