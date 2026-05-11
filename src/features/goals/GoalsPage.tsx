@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Sparkles } from 'lucide-react';
+import { Plus, Sparkles, ChevronLeft, ChevronRight} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useGoalProgressState } from '@/features/goals/goalStore';
@@ -19,6 +19,8 @@ import { AIContextNudge } from './components/AIContextNudge';
 import { useAuth } from '@/features/auth/authContext';
 import { queryKeys } from '@/lib/queryKeys';
 import type { ReactNode } from 'react';
+
+const GOALS_PER_PAGE = 5;
 
 function SortButton({
   active,
@@ -76,6 +78,7 @@ export function GoalsPage() {
   const loading = isGoalsLoading || isGoalProgressLoading;
   const location = useLocation();
   const navigate = useNavigate();
+  const [activePage, setActivePage] = useState(0);
 
   const routeModal = (() => {
     const requested = (location.state as GoalRouteState | null)?.openGoalModal;
@@ -161,6 +164,13 @@ export function GoalsPage() {
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [done, sorted],
   );
+
+  const paginatedActiveGoals = useMemo(() => {
+    const start = activePage * GOALS_PER_PAGE;
+    return activeGoals.slice(start, start + GOALS_PER_PAGE);
+  }, [activeGoals, activePage]);
+
+  const maxActivePage = Math.ceil(activeGoals.length / GOALS_PER_PAGE) - 1;
 
   async function handleDelete(goalId: string) {
     if (!confirm("Delete this goal? This can't be undone.")) return;
@@ -268,7 +278,8 @@ export function GoalsPage() {
         </div>
       )}
 
-      {!loading && activeGoals.length > 0 && (
+      {!loading && 
+      activeGoals.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -280,20 +291,43 @@ export function GoalsPage() {
               </p>
             </div>
           </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              {paginatedActiveGoals.map((goal) => (
+                <GoalCard
+                  key={goal.id}
+                  goal={goal}
+                  doneMap={done[goal.id]}
+                  overdueCount={overdueCountByGoal[goal.id] ?? 0}
+                  onEdit={() => setLocalModal(goal)}
+                  onDelete={() => handleDelete(goal.id)}
+                  onImprove={isPro ? () => setImprovingGoal(goal) : undefined}
+                />
+              ))}
+            </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {activeGoals.map((goal) => (
-              <GoalCard
-                key={goal.id}
-                goal={goal}
-                doneMap={done[goal.id]}
-                overdueCount={overdueCountByGoal[goal.id] ?? 0}
-                onEdit={() => setLocalModal(goal)}
-                onDelete={() => handleDelete(goal.id)}
-                onImprove={isPro ? () => setImprovingGoal(goal) : undefined}
-              />
-            ))}
-          </div>
+            {activeGoals.length > GOALS_PER_PAGE && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                onClick={() => setActivePage(Math.max(0, activePage - 1))}
+                disabled={activePage === 0}
+                variant="ghost"
+                size="sm"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {activePage + 1} of {maxActivePage + 1}
+              </span>
+              <Button
+                onClick={() => setActivePage(Math.min(maxActivePage, activePage + 1))}
+                disabled={activePage === maxActivePage}
+                variant="ghost"
+                size="sm"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </section>
       )}
 
