@@ -38,6 +38,7 @@ type Props = {
   onBack: () => void;
   initialPrompt?: string;
   autoStart?: boolean;
+  presentation?: "modal" | "page";
 };
 
 export function AIPromptScreen({
@@ -45,6 +46,7 @@ export function AIPromptScreen({
   onBack,
   initialPrompt = "",
   autoStart = false,
+  presentation = "modal",
 }: Props) {
   const { userId } = useAuth();
   const [screen, setScreen] = useState<Screen>("prompt");
@@ -175,6 +177,7 @@ export function AIPromptScreen({
 
   const activeStep: ActiveStep = screen === "generating" ? "generating" : screen;
   const hasActionableError = Boolean(error);
+  const isPage = presentation === "page";
 
   const errorContent = (() => {
     if (!error) return null;
@@ -245,7 +248,11 @@ export function AIPromptScreen({
     const activeIndex = steps.findIndex((step) => step.key === activeStep);
 
     return (
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+      <div
+        className={`flex w-full items-center justify-center gap-2 text-muted-foreground ${
+          isPage ? "text-xs lg:text-sm" : "text-[11px]"
+        }`}
+      >
         {steps.map((step, index) => {
           const isActive = activeStep === step.key;
           const isDone = index < activeIndex;
@@ -253,7 +260,7 @@ export function AIPromptScreen({
           return (
             <div key={step.key} className="flex items-center gap-2">
               <div
-                className={`h-1.5 w-1.5 rounded-full ${
+                className={`${isPage ? "h-2 w-2" : "h-1.5 w-1.5"} rounded-full ${
                   isActive || isDone ? "bg-primary" : "bg-muted-foreground/40"
                 }`}
               />
@@ -291,19 +298,19 @@ export function AIPromptScreen({
   if (screen === "generating") {
     return (
       <div className="flex flex-1 items-center justify-center px-5 py-10">
-        <div className="flex flex-col items-center gap-4 text-center">
+        <div className="flex flex-col items-center gap-5 text-center">
           <StepIndicator />
           <div className="flex gap-1">
-            <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-violet-400 [animation-delay:0ms]" />
-            <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-fuchsia-400 [animation-delay:150ms]" />
-            <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-pink-400 [animation-delay:300ms]" />
+            <span className="h-3 w-3 animate-bounce rounded-full bg-violet-400 [animation-delay:0ms]" />
+            <span className="h-3 w-3 animate-bounce rounded-full bg-fuchsia-400 [animation-delay:150ms]" />
+            <span className="h-3 w-3 animate-bounce rounded-full bg-pink-400 [animation-delay:300ms]" />
           </div>
           <div>
-            <p className="text-sm font-semibold">Building your goal plan…</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-lg font-semibold lg:text-2xl">Building your goal plan…</p>
+            <p className="mt-2 text-sm text-muted-foreground lg:text-base">
               Claude is breaking this into concrete, actionable steps
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground lg:text-base">
               This can take around 15-30 seconds.
             </p>
           </div>
@@ -314,30 +321,36 @@ export function AIPromptScreen({
 
   if (screen === "clarifying") {
     return (
-      <div className="flex flex-1 flex-col overflow-y-auto px-5 py-5">
-      <div className="space-y-5">
+      <div
+        className={`flex flex-1 flex-col overflow-y-auto ${
+          isPage ? "px-4 pt-6 sm:px-8 lg:px-12" : "px-5 pt-5"
+        }`}
+      >
+        <div className={`w-full pb-4 ${isPage ? "mx-auto max-w-5xl space-y-7" : "space-y-5"}`}>
           <StepIndicator />
-          <div className="space-y-1">
+          <div className={isPage ? "space-y-2" : "space-y-1"}>
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">A few quick questions</span>
+              <Sparkles className={isPage ? "h-5 w-5 text-primary" : "h-4 w-4 text-primary"} />
+              <span className={isPage ? "text-2xl font-semibold lg:text-3xl" : "text-sm font-semibold"}>
+                A few quick questions
+              </span>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className={isPage ? "max-w-3xl text-base leading-relaxed text-muted-foreground" : "text-xs text-muted-foreground"}>
               Nothing below is required. Answer what you can so Claude can make
               your plan more specific, or leave any question blank and still generate.
             </p>
           </div>
 
-          <div className="rounded-xl border bg-muted/30 px-4 py-3">
-            <p className="text-xs text-muted-foreground">Your goal</p>
-            <p className="mt-0.5 whitespace-pre-wrap text-sm font-medium">{prompt}</p>
+          <div className={isPage ? "rounded-xl border bg-muted/30 px-5 py-4" : "rounded-xl border bg-muted/30 px-4 py-3"}>
+            <p className={isPage ? "text-sm text-muted-foreground" : "text-xs text-muted-foreground"}>Your goal</p>
+            <p className={isPage ? "mt-1 whitespace-pre-wrap text-lg font-medium" : "mt-0.5 whitespace-pre-wrap text-sm font-medium"}>{prompt}</p>
           </div>
 
-          <div className="space-y-4">
+          <div className={isPage ? "grid gap-5 lg:grid-cols-2" : "space-y-4"}>
             {questions.map((q) => (
-              <div key={q.id} className="space-y-1.5">
-                <label className="text-sm font-medium">{q.question}</label>
-                {q.hint && <p className="text-xs text-muted-foreground">{q.hint}</p>}
+              <div key={q.id} className={isPage ? "space-y-2" : "space-y-1.5"}>
+                <label className={isPage ? "text-base font-medium" : "text-sm font-medium"}>{q.question}</label>
+                {q.hint && <p className={isPage ? "text-sm text-muted-foreground" : "text-xs text-muted-foreground"}>{q.hint}</p>}
                 <Input
                   placeholder={q.placeholder ?? "Your answer…"}
                   value={answers[q.id] ?? ""}
@@ -360,7 +373,7 @@ export function AIPromptScreen({
             </div>
           )}
 
-          <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <div className={isPage ? "rounded-lg bg-muted/40 px-4 py-3 text-sm text-muted-foreground" : "rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground"}>
             Uses {formatCreditCost(AI_ACTION_CREDIT_COSTS.goalGeneration)}
             {usage && (
               <>
@@ -375,71 +388,82 @@ export function AIPromptScreen({
           </div>
         </div>
 
-      <div className="mt-6 space-y-2 border-t pt-4">
-        <p className="text-right text-xs text-muted-foreground">
-          Generating usually takes around 15-30 seconds.
-        </p>
-        <div className="flex items-center justify-between gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setScreen("prompt")}
-            disabled={loadingGoal}
-            className="gap-1.5"
+        <div className={`sticky bottom-0 mt-2 space-y-2 border-t bg-background/95 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 backdrop-blur ${isPage ? "-mx-4 px-4 sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12" : "-mx-5 px-5"}`}>
+          <p className={isPage ? "text-center text-sm text-muted-foreground sm:text-right" : "text-center text-xs text-muted-foreground sm:text-right"}>
+            Generating usually takes around 15-30 seconds.
+          </p>
+          <div
+            className={`flex flex-col-reverse items-center gap-2 sm:flex-row ${
+              isPage ? "sm:justify-end" : "sm:justify-between"
+            }`}
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back
-          </Button>
+            {!isPage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setScreen("prompt")}
+                disabled={loadingGoal}
+                className="w-full max-w-sm justify-center gap-1.5 sm:w-auto sm:justify-start"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back
+              </Button>
+            )}
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleGenerate({})}
-              disabled={loadingGoal}
-              className="gap-1.5 text-muted-foreground"
-            >
-              <SkipForward className="h-3.5 w-3.5" />
-              Generate without answers
-            </Button>
+            <div className="flex w-full max-w-sm flex-col-reverse gap-2 sm:w-auto sm:max-w-none sm:flex-row">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleGenerate({})}
+                disabled={loadingGoal}
+                className="w-full justify-center gap-1.5 text-muted-foreground sm:w-auto"
+              >
+                <SkipForward className="h-3.5 w-3.5" />
+                Generate without answers
+              </Button>
 
-            <Button
-              onClick={() => void handleGenerate()}
-              disabled={loadingGoal}
-              className="min-w-36 gap-2"
-            >
-              {loadingGoal ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {hasActionableError ? "Try again" : "Generate plan"}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </>
-              )}
-            </Button>
+              <Button
+                onClick={() => void handleGenerate()}
+                disabled={loadingGoal}
+                className="min-h-11 w-full min-w-36 justify-center gap-2 sm:w-auto"
+              >
+                {loadingGoal ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {hasActionableError ? "Try again" : "Generate plan"}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto px-5 py-5">
-      <div className="space-y-5">
+    <div
+      className={`flex flex-1 flex-col overflow-y-auto ${
+        isPage ? "px-4 pt-6 sm:px-8 lg:px-12" : "px-5 pt-5"
+      }`}
+    >
+      <div className={`w-full pb-4 ${isPage ? "mx-auto max-w-5xl space-y-7" : "space-y-5"}`}>
         <StepIndicator />
-        <div className="space-y-1">
+        <div className={isPage ? "space-y-2" : "space-y-1"}>
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold">Describe your goal</span>
+            <Sparkles className={isPage ? "h-5 w-5 text-primary" : "h-4 w-4 text-primary"} />
+            <span className={isPage ? "text-2xl font-semibold lg:text-3xl" : "text-sm font-semibold"}>
+              Describe your goal
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Tell Claude what you want to achieve. It will ask a couple of quick
-            questions, then build a step-by-step plan.
+          <p className={isPage ? "text-base leading-relaxed text-muted-foreground" : "text-xs text-muted-foreground"}>
+            Tell us what you want to achieve!
           </p>
         </div>
 
@@ -448,8 +472,8 @@ export function AIPromptScreen({
           placeholder="e.g. I want to run a marathon by October"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          rows={5}
-          className="resize-none text-sm"
+          rows={isPage ? 7 : 5}
+          className={isPage ? "min-h-52 resize-none text-lg leading-relaxed" : "resize-none text-sm"}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               void handleNext();
@@ -465,13 +489,12 @@ export function AIPromptScreen({
           </div>
         )}
 
-        <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          Uses {formatCreditCost(AI_ACTION_CREDIT_COSTS.goalGeneration)} · Claude will turn this into ordered steps with “done
-          when” criteria. Strong prompts usually include the outcome, timing, and your starting point.
+        <div className={isPage ? "rounded-lg bg-muted/40 px-4 py-3 text-sm text-muted-foreground" : "rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground"}>
+          Uses {formatCreditCost(AI_ACTION_CREDIT_COSTS.goalGeneration)} · Strong prompts include the outcome, timing, and your starting point.
         </div>
 
         {usage && (
-          <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <div className={isPage ? "flex items-center gap-2 rounded-lg bg-muted/40 px-4 py-3 text-sm text-muted-foreground" : "flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground"}>
             <Sparkles className="h-3 w-3 shrink-0 text-primary" />
             <span>
               <span className="font-semibold text-foreground">{usage.remaining}</span>{" "}
@@ -490,14 +513,14 @@ export function AIPromptScreen({
         )}
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Try an example</p>
+          <p className={isPage ? "text-sm font-medium text-muted-foreground" : "text-xs font-medium text-muted-foreground"}>Try an example</p>
           <div className="flex flex-wrap gap-2">
             {PROMPT_EXAMPLES.map((ex) => (
               <button
                 key={ex}
                 type="button"
                 onClick={() => setPrompt(ex)}
-                className="rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className={isPage ? "rounded-full border border-border/60 bg-muted/40 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" : "rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"}
               >
                 {ex}
               </button>
@@ -506,33 +529,44 @@ export function AIPromptScreen({
         </div>
       </div>
 
-      <div className="mt-6 space-y-2 border-t pt-4">
-        <p className="text-right text-xs text-muted-foreground">
+      <div className={`sticky bottom-0 mt-2 space-y-2 border-t bg-background/95 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 backdrop-blur ${isPage ? "-mx-4 px-4 sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12" : "-mx-5 px-5"}`}>
+        <p className={isPage ? "text-center text-sm text-muted-foreground sm:text-right" : "text-center text-xs text-muted-foreground sm:text-right"}>
           Generating usually takes around 15-30 seconds.
         </p>
-        <div className="flex items-center justify-between gap-2">
-        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back
-        </Button>
-
-        <Button
-          onClick={() => void handleNext()}
-          disabled={!prompt.trim() || loadingQuestions || loadingGoal}
-          className="min-w-28 gap-2"
+        <div
+          className={`flex flex-col-reverse items-center gap-2 sm:flex-row ${
+            isPage ? "sm:justify-end" : "sm:justify-between"
+          }`}
         >
-          {loadingQuestions ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Next…
-            </>
-          ) : (
-            <>
-              {hasActionableError ? "Try again" : "Continue"}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </>
+          {!isPage && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              className="w-full max-w-sm justify-center gap-1.5 sm:w-auto sm:justify-start"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back
+            </Button>
           )}
-        </Button>
+
+          <Button
+            onClick={() => void handleNext()}
+            disabled={!prompt.trim() || loadingQuestions || loadingGoal}
+            className="min-h-11 w-full max-w-sm justify-center gap-2 sm:w-auto sm:min-w-28"
+          >
+            {loadingQuestions ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Next…
+              </>
+            ) : (
+              <>
+                {hasActionableError ? "Try again" : "Continue"}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </div>

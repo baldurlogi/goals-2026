@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import { getAISystemContext } from "@/features/ai/buildAIContext";
+import { buildAIRetrievalContext } from "@/features/ai/retrievedAIContext";
 import type { UserGoal, UserGoalStep } from "@/features/goals/goalTypes";
 import { AIUsageLimitNotice } from "@/features/subscription/AIUsageLimitNotice";
 import { AIUsageInlineHint } from "@/features/subscription/AIUsageInlineHint";
@@ -84,7 +85,16 @@ async function fetchImprovedSteps(
 
   let userContext = "";
   try {
-    userContext = await getAISystemContext();
+    const [systemContext, retrievedContext] = await Promise.all([
+      getAISystemContext(),
+      buildAIRetrievalContext(`${goal.title}\n${goal.subtitle}\n${improveRequest}`, {
+        purpose: "improve",
+      }),
+    ]);
+
+    userContext = [systemContext, retrievedContext]
+      .filter((value) => value.trim())
+      .join("\n\n");
   } catch {
     // non-fatal
   }

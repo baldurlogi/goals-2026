@@ -8,6 +8,7 @@ import {
   type AIUsage,
 } from '@/features/subscription/aiCredits';
 import { getAISystemContext } from '@/features/ai/buildAIContext';
+import { buildAIRetrievalContext } from '@/features/ai/retrievedAIContext';
 import { createBlankGoal, createBlankStep } from '../userGoalStorage';
 import { type UserGoal } from '@/features/goals/goalTypes';
 
@@ -59,11 +60,10 @@ const EDGE_FN_URL = getSupabaseFunctionUrl('hyper-responder');
 const USE_MOCK_AI = import.meta.env.VITE_USE_MOCK_AI === 'true';
 
 export const PROMPT_EXAMPLES = [
-  'I want to run a marathon by October',
-  'Save 50,000 DKK before end of year',
-  'Launch my freelance business and get 3 clients',
-  'Read 24 books this year',
-  'Learn TypeScript and React deeply',
+  'I want to run a marathon this year',
+  'Start a daily meditation practice and stick to it',
+  'Read 12 books this year',
+  'Start and launch a business',
   'Build a consistent skincare routine',
 ];
 
@@ -230,6 +230,15 @@ export async function getClarifyingQuestions(
   }
 
   const session = await getSession();
+  let userContext = '';
+  try {
+    userContext = await buildAIRetrievalContext(prompt, {
+      purpose: 'clarify',
+      maxItems: 6,
+    });
+  } catch {
+    /* non-fatal */
+  }
 
   try {
     const res = await fetch(EDGE_FN_URL, {
@@ -238,7 +247,7 @@ export async function getClarifyingQuestions(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ action: 'clarify', prompt }),
+      body: JSON.stringify({ action: 'clarify', prompt, userContext }),
     });
 
     if (!res.ok) {
@@ -309,7 +318,16 @@ export async function generateGoalFromPrompt(
 
   let userContext = '';
   try {
-    userContext = await getAISystemContext();
+    const [systemContext, retrievedContext] = await Promise.all([
+      getAISystemContext(),
+      buildAIRetrievalContext(`${prompt}\n${Object.values(answers).join('\n')}`, {
+        purpose: 'goal',
+      }),
+    ]);
+
+    userContext = [systemContext, retrievedContext]
+      .filter((value) => value.trim())
+      .join('\n\n');
   } catch {
     /* non-fatal */
   }

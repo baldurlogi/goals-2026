@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Sparkles, ChevronLeft, ChevronRight} from 'lucide-react';
@@ -47,7 +47,7 @@ function SortButton({
 }
 
 type SortMode = 'priority' | 'overdue';
-type ModalState = UserGoal | 'new' | 'ai' | null;
+type ModalState = UserGoal | null;
 type GoalRouteState = { openGoalModal?: 'new' | 'ai' } | null;
 
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -80,19 +80,19 @@ export function GoalsPage() {
   const navigate = useNavigate();
   const [activePage, setActivePage] = useState(0);
 
-  const routeModal = (() => {
+  const routeCreateMode = (() => {
     const requested = (location.state as GoalRouteState | null)?.openGoalModal;
     return requested === 'new' || requested === 'ai' ? requested : null;
   })();
 
-  const modal = localModal ?? routeModal;
+  useEffect(() => {
+    if (!routeCreateMode) return;
+
+    navigate(`/app/goals/${routeCreateMode}`, { replace: true, state: null });
+  }, [navigate, routeCreateMode]);
 
   function closeModal() {
     setLocalModal(null);
-
-    if (routeModal) {
-      navigate(location.pathname, { replace: true, state: null });
-    }
   }
 
   function upsertGoalInCache(saved: UserGoal) {
@@ -215,14 +215,14 @@ export function GoalsPage() {
         <div className="flex w-full flex-wrap items-end justify-end gap-2 sm:w-auto">
           <div className="order-1 flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <Button
-              onClick={() => setLocalModal('new')}
+              onClick={() => navigate('/app/goals/new')}
               className="w-full gap-2 sm:w-auto"
             >
               <Plus className="h-4 w-4" /> Add goal
             </Button>
 
             <Button
-              onClick={() => setLocalModal('ai')}
+              onClick={() => navigate('/app/goals/ai')}
               className="w-full gap-2 bg-violet-600 text-white hover:bg-violet-500 hover:text-white sm:w-auto"
             >
               <Sparkles className="h-4 w-4" /> Generate with AI
@@ -262,13 +262,13 @@ export function GoalsPage() {
           </div>
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Button
-              onClick={() => setLocalModal('ai')}
+              onClick={() => navigate('/app/goals/ai')}
               className="w-full gap-2 bg-violet-600 text-white hover:bg-violet-500 hover:text-white sm:w-auto"
             >
               <Sparkles className="h-4 w-4" /> Generate with AI
             </Button>
             <Button
-              onClick={() => setLocalModal('new')}
+              onClick={() => navigate('/app/goals/new')}
               variant="ghost"
               className="w-full gap-2 sm:w-auto"
             >
@@ -368,10 +368,9 @@ export function GoalsPage() {
         </section>
       )}
 
-      {modal !== null && (
+      {localModal !== null && (
         <AddEditGoalModal
-          initial={modal === 'new' || modal === 'ai' ? undefined : modal}
-          startWithAI={modal === 'ai'}
+          initial={localModal}
           onSave={handleSaved}
           onClose={closeModal}
         />

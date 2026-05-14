@@ -65,6 +65,10 @@ const GoalsPage = lazy(async () => ({
   default: (await import("@/features/goals/GoalsPage")).GoalsPage,
 }));
 
+const GoalCreatePage = lazy(async () => ({
+  default: (await import("@/features/goals/GoalCreatePage")).GoalCreatePage,
+}));
+
 const UpcomingTasksPage = lazy(async () => ({
   default: (await import("@/features/goals/UpcomingTasksPage")).UpcomingTasksPage,
 }));
@@ -364,6 +368,22 @@ export default function App() {
               element={
                 <Suspense fallback={<AppRouteFallback />}>
                   <GoalsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="goals/new"
+              element={
+                <Suspense fallback={<AppRouteFallback />}>
+                  <GoalCreatePage mode="manual" />
+                </Suspense>
+              }
+            />
+            <Route
+              path="goals/ai"
+              element={
+                <Suspense fallback={<AppRouteFallback />}>
+                  <GoalCreatePage mode="ai" />
                 </Suspense>
               }
             />

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Browser } from "@capacitor/browser";
+import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { capture } from "@/lib/analytics";
@@ -15,6 +17,29 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let isMounted = true;
+    let listener: PluginListenerHandle | null = null;
+
+    void Browser.addListener("browserFinished", () => {
+      if (isMounted) setLoading(false);
+    }).then((handle) => {
+      if (!isMounted) {
+        void handle.remove();
+        return;
+      }
+
+      listener = handle;
+    });
+
+    return () => {
+      isMounted = false;
+      void listener?.remove();
+    };
+  }, []);
 
   async function handleGoogle() {
     if (!agreed) {

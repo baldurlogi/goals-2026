@@ -7,7 +7,7 @@ export function DashboardStartHereCard() {
   const navigate = useNavigate();
 
   function handleGenerate() {
-    navigate("/app/goals", { state: { openGoalModal: "ai" } });
+    navigate("/app/goals/ai");
   }
 
   return (

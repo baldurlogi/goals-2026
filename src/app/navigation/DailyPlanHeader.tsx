@@ -10,11 +10,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
+  CalendarDays,
   ChevronDown,
   Ellipsis,
   LayoutDashboard,
   LogOut,
   Sparkles,
+  Target,
+  TrendingUp,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -137,25 +140,36 @@ export function DailyPlanHeader() {
   const CurrentIcon = currentItem?.icon;
 
   const mobilePrimaryItems = useMemo(() => {
-    const enabledDefs = ALL_MODULES.filter((m) => modules.has(m.id));
-    const preferredOrder = ["goals", "reading", "nutrition", "schedule"];
-    const topModules = preferredOrder
-      .map((id) => enabledDefs.find((m) => m.id === id))
-      .filter((m): m is ModuleDef => Boolean(m))
-      .slice(0, 4);
+    const todayItem = modules.has("schedule")
+      ? {
+          label: "Today",
+          href: "/app/schedule",
+          icon: CalendarDays,
+        }
+      : {
+          label: "Today",
+          href: "/app/upcoming",
+          icon: CalendarDays,
+        };
 
     return [
       {
-        label: "Dashboard",
+        label: "Home",
         href: "/app",
         icon: LayoutDashboard,
       },
-      ...topModules.map((m) => ({
-        label: m.navLabel,
-        href: m.href,
-        icon: m.icon,
-      })),
-    ].slice(0, 5);
+      {
+        label: "Goals",
+        href: "/app/goals",
+        icon: Target,
+      },
+      todayItem,
+      {
+        label: "Progress",
+        href: "/app/progress",
+        icon: TrendingUp,
+      },
+    ];
   }, [modules]);
 
   const overflowMobileItems = useMemo(() => {
@@ -305,8 +319,8 @@ export function DailyPlanHeader() {
         </DropdownMenu>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-2 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:hidden">
-        <div className="mx-auto flex max-w-xl items-center justify-between gap-1">
+      <nav className="fixed inset-x-0 bottom-3 z-40 px-3 pb-[env(safe-area-inset-bottom)] md:hidden">
+        <div className="mx-auto flex max-w-[min(34rem,calc(100vw-1.5rem))] items-center justify-between gap-1 rounded-full border border-border/60 bg-background/90 p-1.5 shadow-[0_18px_48px_rgba(15,23,42,0.20)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/78">
           {mobilePrimaryItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -319,14 +333,19 @@ export function DailyPlanHeader() {
                 key={item.href}
                 to={item.href}
                 className={cn(
-                  "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-1 py-2 text-[11px] font-medium leading-none transition-colors",
+                  "group relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-full px-1 py-2 text-[10px] font-semibold leading-none transition-all duration-200 ease-out",
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
                 )}
               >
-                <Icon className="h-4 w-4" />
-                <span className="truncate">{item.label}</span>
+                <Icon
+                  className={cn(
+                    "h-4 w-4 transition-transform duration-200 group-active:scale-95",
+                    isActive && "-translate-y-0.5",
+                  )}
+                />
+                <span className="max-w-full truncate text-[9.5px]">{item.label}</span>
               </Link>
             );
           })}
@@ -337,18 +356,18 @@ export function DailyPlanHeader() {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "flex h-auto min-w-0 flex-1 flex-col gap-1 rounded-md px-1 py-2 text-[11px] font-medium leading-none",
+                  "group flex h-auto min-w-0 flex-1 flex-col gap-0.5 rounded-full px-1 py-2 text-[10px] font-semibold leading-none transition-all duration-200 ease-out",
                   overflowMobileItems.some((item) => pathname.startsWith(item.href))
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground",
+                    ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
                 )}
               >
-                <Ellipsis className="h-4 w-4" />
-                <span>More</span>
+                <Ellipsis className="h-4 w-4 transition-transform duration-200 group-active:scale-95" />
+                <span className="text-[9.5px]">More</span>
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="mb-2 w-56">
+            <DropdownMenuContent align="end" className="mb-3 w-56 rounded-2xl">
               {overflowMobileItems.length === 0 ? (
                 <DropdownMenuItem asChild>
                   <Link to="/app/profile">Configure modules</Link>

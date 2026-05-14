@@ -1032,7 +1032,12 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ error: "prompt required" }, 400);
       }
 
-      const clarifySystem = `You are a goal planning assistant. A user has described a goal and you need to ask 2-3 targeted follow-up questions to gather the context needed to build a highly personalised, detailed action plan.
+      const contextBlock =
+        userContext && typeof userContext === "string" && userContext.trim()
+          ? `${userContext.trim()}\n\n---\n\n`
+          : "";
+
+      const clarifySystem = `${contextBlock}You are a goal planning assistant. A user has described a goal and you need to ask 2-3 targeted follow-up questions to gather the context needed to build a highly personalised, detailed action plan.
 
 Return ONLY valid JSON — no markdown, no explanation:
 {

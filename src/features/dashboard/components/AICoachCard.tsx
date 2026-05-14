@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import { buildAIContext } from "@/features/ai/buildAIContext";
+import { buildAIRetrievalContext } from "@/features/ai/retrievedAIContext";
 import { buildAISignals } from "@/features/ai/aiSignals";
 import {
   buildSuggestionCandidateActionKey,
@@ -285,6 +286,15 @@ async function fetchCoachSuggestion(
   if (!session?.access_token) throw new Error("Not signed in");
 
   const { systemContext, signals } = await buildAIContext(true);
+  const retrievedContext = await buildAIRetrievalContext(
+    "daily coach next best action",
+    {
+      purpose: "coach",
+    },
+  ).catch(() => "");
+  const userContext = [systemContext, retrievedContext]
+    .filter((value) => value.trim())
+    .join("\n\n");
   const lastSuggestedModule = readLastModule();
 
   const res = await fetch(SUPABASE_FN, {
@@ -295,7 +305,7 @@ async function fetchCoachSuggestion(
     },
     body: JSON.stringify({
       action: "coach",
-      userContext: systemContext,
+      userContext,
       lastSuggestedModule,
     }),
   });

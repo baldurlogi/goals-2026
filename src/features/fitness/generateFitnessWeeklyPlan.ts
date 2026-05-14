@@ -1,4 +1,5 @@
 import { getAISystemContext } from "@/features/ai/buildAIContext";
+import { buildAIRetrievalContext } from "@/features/ai/retrievedAIContext";
 import { loadRecentSleepRecoveryEntries } from "@/features/sleep/sleepStorage";
 import { writeAIUsageCache } from "@/features/subscription/aiUsageCache";
 import {
@@ -48,7 +49,7 @@ export async function generateFitnessWeeklyPlanFromAI(
 ): Promise<{ plan: GeneratedFitnessWeeklyPlan; usage: AIUsage }> {
   const session = await getSession();
   const [userContext, adherenceContext, recoveryContext] = await Promise.all([
-    getPlannerAIContext(),
+    getPlannerAIContext(profile),
     buildRecentAdherenceContext(),
     buildRecentRecoveryContext(session.user.id),
   ]);
@@ -140,9 +141,34 @@ async function getSession() {
   return session;
 }
 
-async function getPlannerAIContext(): Promise<string> {
+async function getPlannerAIContext(
+  profile: FitnessPlanningProfile | null,
+): Promise<string> {
   try {
-    return await getAISystemContext();
+    const profileQuery = profile
+      ? [
+          profile.primaryGoal,
+          profile.experienceLevel,
+          profile.trainingLocation,
+          profile.fitnessNotes,
+          profile.injuryNotes,
+          profile.preferredMuscleGroups.join(" "),
+          profile.exercisesToAvoid.join(" "),
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : "weekly fitness plan";
+
+    const [systemContext, retrievedContext] = await Promise.all([
+      getAISystemContext(),
+      buildAIRetrievalContext(profileQuery, {
+        purpose: "fitness",
+      }),
+    ]);
+
+    return [systemContext, retrievedContext]
+      .filter((value) => value.trim())
+      .join("\n\n");
   } catch {
     return "";
   }
