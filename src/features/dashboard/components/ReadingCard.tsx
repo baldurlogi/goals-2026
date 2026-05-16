@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useReadingDashboard } from "../hooks/useReadingDashboard";
 import { ReadingCardSkeleton } from "../skeletons";
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
+import { DashboardEmptyState } from "./DashboardEmptyState";
 
 
 function Stat({ label, value, color = "text-foreground" }: {
@@ -28,7 +29,7 @@ function ReadingCardInner() {
   if (loading && cacheEmpty) return <ReadingCardSkeleton />;
 
   return (
-    <Card className="group relative overflow-hidden lg:col-span-5">
+    <Card className="ai-layer group relative overflow-hidden border-0 bg-transparent shadow-none lg:col-span-5">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500" />
 
       <CardHeader className="pb-2 pt-5">
@@ -50,9 +51,9 @@ function ReadingCardInner() {
           </>
         ) : (
           <>
-            <p className="mt-2 text-base font-bold">No book set</p>
+            <p className="mt-2 text-base font-bold">Start today's reading rhythm</p>
             <p className="text-xs text-muted-foreground">
-              Add your current book to track progress.
+              Add one book so your coach can protect a daily reading streak.
             </p>
           </>
         )}
@@ -86,9 +87,14 @@ function ReadingCardInner() {
             </div>
           </>
         ) : (
-          <Button asChild size="sm" className="w-full">
-            <Link to="/app/reading">Set up reading</Link>
-          </Button>
+          <DashboardEmptyState
+            icon={<BookOpen className="h-4 w-4 text-emerald-500" />}
+            title="Give reading a starting point"
+            message="One current book turns this from a blank module into a daily momentum signal."
+            actionLabel="Choose book"
+            href="/app/reading"
+            hint="Your coach can nudge pages when the day gets noisy."
+          />
         )}
       </CardContent>
     </Card>

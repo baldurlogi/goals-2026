@@ -9,6 +9,7 @@ import { useTodoDashboard } from '../hooks/useTodoDashboard';
 import { useAddTodoMutation, useDeleteTodoMutation, useToggleTodoMutation } from '@/features/todos/useTodosQuery';
 import { TodoCardSkeleton } from '@/features/dashboard/skeletons';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
+import { DashboardEmptyState } from './DashboardEmptyState';
 
 function TodoCardInner() {
   const { preview, hasMore, extraCount, doneCount, total, loading } =
@@ -40,7 +41,7 @@ function TodoCardInner() {
   if (loading && total === 0) return <TodoCardSkeleton />;
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-4 min-h-[240px]">
+    <Card className="ai-layer relative min-h-[240px] overflow-hidden border-0 bg-transparent shadow-none lg:col-span-4">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-sky-500 via-blue-400 to-indigo-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -61,9 +62,14 @@ function TodoCardInner() {
 
       <CardContent className="space-y-1 pb-4">
         {preview.length === 0 ? (
-          <p className="py-2 text-center text-xs text-muted-foreground">
-            Nothing here — add something below.
-          </p>
+          <DashboardEmptyState
+            icon={<CheckSquare className="h-4 w-4 text-sky-500" />}
+            title="Create one clean loop"
+            message="Add the task that would make today feel lighter."
+            actionLabel="Open"
+            href="/app/todos"
+            hint="One open loop is easier to coach than a crowded list."
+          />
         ) : (
           <>
             {preview.map((item) => (

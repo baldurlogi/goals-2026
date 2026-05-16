@@ -1,6 +1,6 @@
 /* localStorage keys are limited to query seeding, optimistic rollback, or local-only UX state. Server-backed entities should flow through TanStack Query. */
 export const CACHE_KEYS = {
-  AI_COACH: "cache:ai-coach:v1",
+  AI_COACH: "cache:ai-coach:v2",
   AI_COACH_LAST_MODULE: "cache:ai-coach:last-module:v2",
   AI_COACH_LAST_SESSION: "cache:ai-coach:last-session:v2",
   AI_SIGNALS: "cache:ai-signals:v1",

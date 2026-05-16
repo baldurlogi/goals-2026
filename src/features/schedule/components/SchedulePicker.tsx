@@ -15,7 +15,7 @@ export function SchedulePicker(props: {
       onValueChange={(v) => {
         if (v) onChange(v as ScheduleDayKey);
       }}
-      className="grid min-w-[280px] w-full grid-cols-7"
+      className="grid w-full min-w-0 grid-cols-7"
     >
       {SCHEDULE_DAY_ORDER.map((v) => (
         <ToggleGroupItem key={v} value={v} className="px-2 text-[11px] sm:text-xs">

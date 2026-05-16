@@ -77,7 +77,7 @@ function ScheduleCardInner() {
   if (loading && cacheEmpty) return <ScheduleCardSkeleton />;
 
   return (
-    <Card className="relative min-h-[320px] overflow-hidden lg:col-span-7">
+    <Card className="ai-layer relative min-h-[320px] overflow-hidden border-0 bg-transparent shadow-none lg:col-span-7">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-purple-400 to-fuchsia-400" />
 
       <CardHeader className="pb-2 pt-5">

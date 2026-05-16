@@ -7,6 +7,7 @@ import { SpendingCardSkeleton } from '@/features/dashboard/skeletons';
 import { makeShapeFn } from '@/app/pieShape';
 import { useSpendingDashboard } from '../hooks/useSpendingDashboard';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
+import { DashboardEmptyState } from './DashboardEmptyState';
 
 const FINANCE_GOAL_ID = 'finance';
 
@@ -27,7 +28,7 @@ function SpendingCardInner() {
   const topCategories = donutData.slice(0, 3);
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-6">
+    <Card className="ai-layer relative overflow-hidden border-0 bg-transparent shadow-none lg:col-span-6">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -50,12 +51,14 @@ function SpendingCardInner() {
 
       <CardContent className="space-y-3 pb-5">
         {isEmpty ? (
-          <div className="rounded-lg bg-muted/40 px-3 py-4 text-center">
-            <p className="text-sm font-medium">No spending logged yet</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Add expenses in the Finance goal page.
-            </p>
-          </div>
+          <DashboardEmptyState
+            icon={<Wallet className="h-4 w-4 text-emerald-500" />}
+            title="Start this month's money picture"
+            message="One expense is enough to reveal the first spending pattern."
+            actionLabel="Add spend"
+            href="/app/finance"
+            hint="Your coach can spot drift once the first signal exists."
+          />
         ) : (
           <div className="flex items-center gap-4">
             <div className="relative h-24 w-24 shrink-0">

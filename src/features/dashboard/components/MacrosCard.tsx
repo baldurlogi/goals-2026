@@ -11,6 +11,7 @@ import {
 import { isMacroSuccessful } from '@/features/nutrition/nutritionStatus';
 import { useNutritionDashboard } from '../hooks/useNutritionDashboard';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
+import { DashboardEmptyState } from './DashboardEmptyState';
 
 function pct(value: number, target: number) {
   return Math.min(
@@ -119,7 +120,7 @@ function MacrosCardInner() {
   const phaseBadge = getPhaseBadge(phase);
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-7">
+    <Card className="ai-layer relative overflow-hidden border-0 bg-transparent shadow-none lg:col-span-7">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -191,12 +192,18 @@ function MacrosCardInner() {
         </div>
 
         <div className="rounded-lg bg-muted/50 px-3 py-2">
-          <p className="text-[11px] text-muted-foreground">
-            {logged.cal === 0 ? (
-              <>
-                No meals logged yet — head to <strong>Nutrition</strong> to log your first meal.
-              </>
-            ) : caloriesRemaining > 0 ? (
+          {logged.cal === 0 ? (
+            <DashboardEmptyState
+              icon={<Flame className="h-4 w-4 text-orange-500" />}
+              title="Start today's nutrition streak"
+              message="A single meal gives your coach enough signal to guide energy and recovery."
+              actionLabel="Log food"
+              href="/app/nutrition"
+              hint="Small signal now, smarter coaching later."
+            />
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              {caloriesRemaining > 0 ? (
               <>
                 <span className="font-semibold text-foreground">
                   {caloriesRemaining} kcal
@@ -207,15 +214,16 @@ function MacrosCardInner() {
                 </span>{' '}
                 to go
               </>
-            ) : (
+              ) : (
               <>
                 <span className="font-semibold text-orange-500">
                   Over target
                 </span>{' '}
                 by {Math.abs(caloriesRemaining)} kcal
               </>
-            )}
-          </p>
+              )}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-between">

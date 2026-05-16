@@ -80,7 +80,7 @@ export function AIUsageLimitNotice({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex min-w-0 flex-wrap gap-2">
         {secondaryActionLabel && onSecondaryAction && (
           <Button
             type="button"
@@ -93,12 +93,14 @@ export function AIUsageLimitNotice({
         )}
 
         {nextTier && nextTierLabel && (
-          <Button asChild size="sm" className="gap-1.5">
+          <Button asChild size="sm" className="max-w-full gap-1.5">
             <Link to="/app/upgrade">
               <Sparkles className="h-3.5 w-3.5" />
-              {PAID_PLANS_COMING_SOON
-                ? "Pricing preview"
-                : `Upgrade to ${nextTierLabel}`}
+              <span className="min-w-0 truncate">
+                {PAID_PLANS_COMING_SOON
+                  ? "Pricing preview"
+                  : `Upgrade to ${nextTierLabel}`}
+              </span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>

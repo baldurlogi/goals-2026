@@ -6,6 +6,7 @@ import { fmtValue } from '@/features/fitness/fitnessStorage';
 import { useFitnessDashboard } from '../hooks/useFitnessDashboard';
 import { FitnessCardSkeleton } from '@/features/dashboard/skeletons';
 import { ErrorBoundary, CardErrorFallback } from '@/components/ErrorBoundary';
+import { DashboardEmptyState } from './DashboardEmptyState';
 
 function MiniBar({
   pct,
@@ -33,7 +34,7 @@ function FitnessCardInner() {
   const anyData = topLifts.some((l) => l.best !== null);
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-4">
+    <Card className="ai-layer relative overflow-hidden border-0 bg-transparent shadow-none lg:col-span-4">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-purple-400 to-fuchsia-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -49,12 +50,14 @@ function FitnessCardInner() {
 
       <CardContent className="space-y-3 pb-4">
         {!anyData ? (
-          <div className="rounded-lg bg-muted/40 px-3 py-4 text-center">
-            <p className="text-sm font-medium">No PRs logged yet</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Head to Fitness to log your first PR.
-            </p>
-          </div>
+          <DashboardEmptyState
+            icon={<Dumbbell className="h-4 w-4 text-violet-500" />}
+            title="Set one strength baseline"
+            message="One lift or skill gives your coach a recovery-aware progress signal."
+            actionLabel="Add PR"
+            href="/app/fitness"
+            hint="Start with the movement you care about most."
+          />
         ) : (
           <div className="space-y-2">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">

@@ -31,7 +31,7 @@ function WellbeingCardInner() {
   const entry = hasEntry && checkedInToday ? latest : null;
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-6 min-h-[220px]">
+    <Card className="ai-layer relative min-h-[220px] overflow-hidden border-0 bg-transparent shadow-none lg:col-span-6">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-pink-500 via-rose-400 to-orange-300" />
 
       <CardHeader className="pb-2 pt-5">

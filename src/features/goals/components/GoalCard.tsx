@@ -1,15 +1,30 @@
-import { Link } from 'react-router-dom';
-import { Pencil, Trash2, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  MoreHorizontal,
+  Pencil,
+  Sparkles,
+  Trash2,
+  TrendingUp,
+} from 'lucide-react';
 import type { UserGoal } from '../goalTypes';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { cn } from '@/lib/utils';
 
 
 const PRIORITY_COLOR: Record<string, string> = {
-  high: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-  medium: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  low: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  high: 'text-rose-500',
+  medium: 'text-amber-500',
+  low: 'text-emerald-500',
+};
+
+const PRIORITY_GLOW: Record<string, string> = {
+  high: 'from-rose-500/24 via-violet-500/8 to-transparent',
+  medium: 'from-amber-500/20 via-cyan-500/8 to-transparent',
+  low: 'from-emerald-500/20 via-cyan-500/8 to-transparent',
 };
 
 type Props = {
@@ -17,20 +32,77 @@ type Props = {
   doneMap?: Record<string, boolean>;
   overdueCount?: number;
   isCompleted?: boolean;
+  variant?: 'featured' | 'compact' | 'archive';
   onEdit?: () => void;
   onDelete?: () => void;
   onImprove?: () => void;
 };
+
+function getMomentumSignal({
+  pct,
+  doneCount,
+  total,
+  overdueCount,
+  priority,
+  isCompleted,
+}: {
+  pct: number;
+  doneCount: number;
+  total: number;
+  overdueCount: number;
+  priority: UserGoal['priority'];
+  isCompleted: boolean;
+}) {
+  if (isCompleted) {
+    return {
+      label: 'Resolved trajectory',
+      insight: 'This path is complete. Keep it as proof of progress, not another task.',
+      tone: 'text-emerald-400',
+    };
+  }
+
+  if (overdueCount > 0) {
+    return {
+      label: 'Momentum slowing',
+      insight: `${overdueCount} step${overdueCount === 1 ? '' : 's'} need a lighter next move.`,
+      tone: 'text-amber-400',
+    };
+  }
+
+  if (pct >= 70) {
+    return {
+      label: 'Strong consistency',
+      insight: 'You are close enough for a focused finish window.',
+      tone: 'text-emerald-400',
+    };
+  }
+
+  if (doneCount === 0 && total > 0) {
+    return {
+      label: priority === 'high' ? 'Best tackled early' : 'Waiting for first signal',
+      insight: 'One completed step will turn this from intention into trajectory.',
+      tone: 'text-sky-400',
+    };
+  }
+
+  return {
+    label: 'Stable progress rhythm',
+    insight: 'Keep the next action small enough to preserve motion.',
+    tone: 'text-cyan-400',
+  };
+}
 
 export function GoalCard({
   goal,
   doneMap = {},
   overdueCount = 0,
   isCompleted = false,
+  variant = 'compact',
   onEdit,
   onDelete,
   onImprove,
 }: Props) {
+  const navigate = useNavigate();
   const total = goal.steps.length;
   const doneCount = goal.steps.filter((s) => doneMap[s.id]).length;
   const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
@@ -41,105 +113,222 @@ export function GoalCard({
     (s) => s.idealFinish && s.idealFinish < today && !doneMap[s.id],
   ).length;
   const displayOverdue = overdueCount || overdueSteps;
-  const cardClassName = isCompleted
-    ? 'border-emerald-500/30 bg-linear-to-br from-emerald-500/10 via-card to-emerald-400/5 shadow-[0_18px_45px_-28px_rgba(16,185,129,0.45)]'
-    : 'border bg-card shadow-sm';
+  const nextStep = goal.steps.find((step) => !doneMap[step.id]);
+  const signal = getMomentumSignal({
+    pct,
+    doneCount,
+    total,
+    overdueCount: displayOverdue,
+    priority: goal.priority,
+    isCompleted,
+  });
+
+  const baseClassName =
+    'group relative min-w-0 overflow-hidden rounded-[1.35rem] transition-all duration-500 hover:-translate-y-0.5';
+  const surfaceClassName =
+    variant === 'featured'
+      ? 'ai-reactive-edge border border-white/10 bg-background/52 p-5 shadow-[0_24px_80px_rgba(2,6,23,0.28)] backdrop-blur-xl sm:p-6'
+      : variant === 'archive'
+        ? 'border border-white/6 bg-background/24 px-3 py-3 opacity-78 hover:opacity-100'
+        : 'border border-white/8 bg-background/36 p-4 shadow-[0_16px_48px_rgba(2,6,23,0.12)] backdrop-blur-md';
+
+  if (variant === 'archive') {
+    return (
+      <div
+        className={cn(baseClassName, 'cursor-pointer', surfaceClassName)}
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate(`/app/goals/${goal.id}`)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            navigate(`/app/goals/${goal.id}`);
+          }
+        }}
+      >
+        <div className="relative z-10 flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-lg">
+            {goal.emoji}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold">{goal.title}</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
+              <CheckCircle2 className="h-3 w-3 shrink-0" />
+              <span className="truncate">Completed memory</span>
+            </div>
+          </div>
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{pct}%</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`rounded-2xl p-5 space-y-4 ${cardClassName}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-lg">{goal.emoji}</span>
-            <h3 className="text-base font-semibold">{goal.title}</h3>
+    <div
+      className={cn(baseClassName, 'cursor-pointer', surfaceClassName)}
+      role="button"
+      tabIndex={0}
+      onClick={() => navigate(`/app/goals/${goal.id}`)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          navigate(`/app/goals/${goal.id}`);
+        }
+      }}
+    >
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-br opacity-80 blur-2xl',
+          PRIORITY_GLOW[goal.priority] ?? PRIORITY_GLOW.low,
+        )}
+      />
+      <div className="relative z-10 space-y-4">
+        <div className="flex min-w-0 items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={cn(
+                'flex shrink-0 items-center justify-center rounded-2xl bg-background/48 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.08)]',
+                variant === 'featured' ? 'h-12 w-12 text-2xl' : 'h-10 w-10 text-xl',
+              )}>
+                {goal.emoji}
+              </span>
+              <div className="min-w-0">
+                <h3 className={cn(
+                  'truncate font-semibold tracking-tight',
+                  variant === 'featured' ? 'text-xl sm:text-2xl' : 'text-base',
+                )}>
+                  {goal.title}
+                </h3>
+                <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px]">
+                  <span className={cn('font-semibold', signal.tone)}>{signal.label}</span>
+                  <span className="text-muted-foreground/45">/</span>
+                  <span className={cn('capitalize', PRIORITY_COLOR[goal.priority] ?? PRIORITY_COLOR.low)}>
+                    {goal.priority}
+                  </span>
+                </div>
+              </div>
+            </div>
 
-            <span
-              className={[
-                'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
-                PRIORITY_COLOR[goal.priority] ?? PRIORITY_COLOR.low,
-              ].join(' ')}
-            >
-              {goal.priority}
+            {goal.subtitle && variant === 'featured' && (
+              <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
+                {goal.subtitle}
+              </p>
+            )}
+          </div>
+
+          <div className="shrink-0 text-right">
+            <div className={cn(
+              'font-semibold tabular-nums',
+              variant === 'featured' ? 'text-3xl' : 'text-lg',
+            )}>
+              {pct}%
+            </div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">flow</div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Progress
+            value={pct}
+            className="h-2 bg-white/8"
+            indicatorClassName={cn(
+              'bg-gradient-to-r',
+              isCompleted
+                ? 'from-emerald-400 to-cyan-300'
+                : displayOverdue > 0
+                  ? 'from-amber-400 via-rose-400 to-violet-400'
+                  : 'from-emerald-400 via-cyan-300 to-violet-400',
+            )}
+          />
+          <div className="flex min-w-0 items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span className="truncate">
+              {doneCount}/{total} steps integrated
             </span>
+            {displayOverdue > 0 ? (
+              <span className="shrink-0 text-amber-400">{displayOverdue} overdue</span>
+            ) : (
+              <span className="shrink-0">rhythm stable</span>
+            )}
+          </div>
+        </div>
 
-            {isCompleted && (
-              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                completed
-              </span>
+        <div className={cn(
+          'rounded-2xl border border-white/6 bg-background/24',
+          variant === 'featured' ? 'p-3.5' : 'p-3',
+        )}>
+          <div className="flex min-w-0 items-start gap-2.5">
+            <TrendingUp className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', signal.tone)} />
+            <div className="min-w-0">
+              <p className="text-xs leading-5 text-muted-foreground">{signal.insight}</p>
+              {nextStep ? (
+                <p className="mt-1 truncate text-xs font-medium text-foreground/88">
+                  Next: {nextStep.label}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {onImprove && goal.steps.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onImprove();
+                }}
+                className="relative z-10 h-8 rounded-full px-2.5 text-xs text-violet-300 hover:bg-violet-500/10 hover:text-violet-200"
+                title="Refine trajectory"
+              >
+                <Sparkles className="h-3 w-3" />
+                <span className={variant === 'featured' ? '' : 'sr-only'}>Refine</span>
+              </Button>
             )}
 
-            {!isCompleted && displayOverdue > 0 && (
-              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                {displayOverdue} overdue
-              </span>
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onEdit();
+                }}
+                className="relative z-10 h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
+                title="Edit goal"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDelete();
+                }}
+                className="relative z-10 h-8 w-8 rounded-full p-0 text-muted-foreground/60 hover:text-destructive"
+                title="Delete goal"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             )}
           </div>
 
-          {goal.subtitle && (
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              {goal.subtitle}
-            </p>
+          {variant === 'featured' ? (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground/88">
+              Open path <ArrowUpRight className="h-3.5 w-3.5" />
+            </div>
+          ) : (
+            <MoreHorizontal className="h-4 w-4 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
           )}
         </div>
-
-        <div className="shrink-0 text-right">
-          <div className="text-sm font-semibold tabular-nums">
-            {doneCount}/{total}
-          </div>
-          <div className="text-xs text-muted-foreground">steps</div>
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Progress</span>
-          <span className="tabular-nums">{pct}%</span>
-        </div>
-        <Progress
-          value={pct}
-          className={isCompleted ? 'h-2 bg-emerald-500/10' : 'h-2'}
-          indicatorClassName={isCompleted ? 'bg-emerald-500' : undefined}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-1">
-          {onEdit && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onEdit}
-              className="h-8 w-8 p-0"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onDelete}
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {onImprove && goal.steps.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onImprove}
-              className="h-8 gap-1.5 px-2 text-xs text-violet-400 hover:bg-violet-500/10 hover:text-violet-400"
-              title="Improve with AI"
-            >
-              <Sparkles className="h-3 w-3" /> Improve with AI
-            </Button>
-          )}
-        </div>
-
-        <Button asChild variant="secondary" size="sm" className="w-full sm:w-auto">
-          <Link to={`/app/goals/${goal.id}`}>View details</Link>
-        </Button>
       </div>
     </div>
   );

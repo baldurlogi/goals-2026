@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -94,6 +94,10 @@ const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
 
 const RANGE_FORMATTER = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
+  month: "short",
+});
+
+const MONTH_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: "short",
 });
 
@@ -388,6 +392,7 @@ function EditableBlockList({
 export function SchedulePage() {
   const today = useTodayDate();
   const { userId, authReady } = useAuth();
+  const weekRailRef = useRef<HTMLDivElement | null>(null);
   const [selectedDate, setSelectedDate] = useState(today);
   const [log, setLog] = useState<ScheduleLog>(() =>
     authReady && userId ? seedScheduleLog(userId) : buildEmptyScheduleLog(today),
@@ -462,6 +467,19 @@ export function SchedulePage() {
   const weekStart = weekDates[0] ?? selectedDate;
   const weekEnd = weekDates[6] ?? selectedDate;
 
+  useEffect(() => {
+    const rail = weekRailRef.current;
+    const selectedDay = rail?.querySelector<HTMLButtonElement>(
+      `[data-schedule-date="${selectedDate}"]`,
+    );
+
+    selectedDay?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [selectedDate, weekDates]);
+
   function startEdit() {
     setPendingBlocks([...blocks]);
     setEditMode(true);
@@ -506,18 +524,21 @@ export function SchedulePage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="px-4 pb-3 pt-4">
+      <Card className="overflow-hidden border-border/70 bg-card/80 shadow-[0_18px_50px_rgba(2,6,23,0.18)]">
+        <CardHeader className="px-4 pb-3 pt-4 sm:px-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{config.label}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.45)]" />
+                <p className="truncate text-base font-semibold">{config.label}</p>
+              </div>
+              <p className="max-w-lg text-xs leading-5 text-muted-foreground">
                 Edit each weekday separately. The selected day repeats week to week.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
+              <span className="rounded-full bg-muted/50 px-2.5 py-1 text-xs tabular-nums text-muted-foreground">
                 {summary.done}/{summary.total} done
               </span>
 
@@ -525,10 +546,11 @@ export function SchedulePage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 gap-1 text-xs"
+                  className="h-8 rounded-full px-3 text-xs"
                   onClick={startEdit}
                 >
-                  <Pencil className="h-3 w-3" /> Edit {config.shortLabel}
+                  <Pencil className="h-3 w-3" />
+                  <span>Edit {config.shortLabel}</span>
                 </Button>
               ) : (
                 <div className="flex w-full gap-1.5 sm:w-auto">
@@ -553,24 +575,25 @@ export function SchedulePage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border bg-muted/20 p-2">
-            <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="mt-4 rounded-2xl border border-border/70 bg-background/35 p-2.5 shadow-inner">
+            <div className="mb-3 grid grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1 px-2 text-xs"
+                className="h-9 w-9 rounded-full p-0 sm:w-auto sm:px-3"
                 onClick={() => setSelectedDate((current) => addDays(current, -7))}
+                aria-label="Previous week"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
-                Previous week
+                <span className="hidden text-xs sm:inline">Previous week</span>
               </Button>
-              <div className="text-center">
+              <div className="min-w-0 text-center">
                 <p className="text-[11px] font-medium text-muted-foreground">
                   {RANGE_FORMATTER.format(parseDateKey(weekStart))} - {RANGE_FORMATTER.format(parseDateKey(weekEnd))}
                 </p>
                 <button
                   type="button"
-                  className="text-xs font-semibold text-foreground hover:text-primary"
+                  className="mt-0.5 rounded-full px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 hover:text-primary"
                   onClick={() => setSelectedDate(today)}
                 >
                   Jump to today
@@ -579,46 +602,59 @@ export function SchedulePage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1 px-2 text-xs"
+                className="h-9 w-9 rounded-full p-0 sm:w-auto sm:px-3"
                 onClick={() => setSelectedDate((current) => addDays(current, 7))}
+                aria-label="Next week"
               >
-                Next week
+                <span className="hidden text-xs sm:inline">Next week</span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
 
-            <div className="grid grid-cols-7 gap-2">
+            <div
+              ref={weekRailRef}
+              className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0 sm:[&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:hidden"
+            >
               {weekDates.map((date) => {
                 const dayKey = getScheduleDayKeyForDate(date);
                 const isActive = date === selectedDate;
                 const isToday = date === today;
+                const parsedDate = parseDateKey(date);
                 return (
                   <button
                     key={date}
                     type="button"
+                    data-schedule-date={date}
                     onClick={() => {
                       setSelectedDate(date);
                       setEditMode(false);
                     }}
                     className={cn(
-                      "rounded-xl border px-2 py-2 text-center transition-colors",
+                      "min-h-[5rem] min-w-[4.45rem] snap-start rounded-2xl border px-2.5 py-2.5 text-center transition-all duration-200 sm:min-w-0",
                       isActive
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border bg-background text-foreground hover:bg-muted/50",
+                        ? "border-foreground bg-foreground text-background shadow-[0_14px_30px_rgba(226,232,240,0.14)]"
+                        : isToday
+                          ? "border-emerald-400/40 bg-emerald-400/10 text-foreground hover:bg-emerald-400/15"
+                          : "border-border bg-background/70 text-foreground hover:bg-muted/50",
                     )}
                   >
-                    <div className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-                      {WEEKDAY_FORMATTER.format(parseDateKey(date))}
+                    <div className="text-[10px] font-semibold uppercase tracking-wide opacity-75">
+                      {WEEKDAY_FORMATTER.format(parsedDate)}
                     </div>
-                    <div className="mt-1 text-sm font-semibold">
-                      {DATE_FORMATTER.format(parseDateKey(date))}
+                    <div className="mt-1 flex items-baseline justify-center gap-1">
+                      <span className="text-xl font-bold leading-none tabular-nums">
+                        {parsedDate.getDate()}
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase opacity-75">
+                        {MONTH_FORMATTER.format(parsedDate)}
+                      </span>
                     </div>
                     {isToday ? (
-                      <div className="mt-1 text-[10px] font-medium opacity-80">
+                      <div className="mx-auto mt-1 w-fit rounded-full bg-current/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide opacity-80">
                         Today
                       </div>
                     ) : (
-                      <div className="mt-1 text-[10px] opacity-70">
+                      <div className="mt-1 truncate text-[10px] opacity-60">
                         {SCHEDULE_CONFIG[dayKey].shortLabel}
                       </div>
                     )}
@@ -633,7 +669,7 @@ export function SchedulePage() {
               {getDayLabel(selectedDayKey)} plan for {DATE_FORMATTER.format(parseDateKey(selectedDate))}
             </p>
             {summary.total > 0 ? (
-              <div className="min-w-[180px] flex-1 space-y-1 sm:max-w-xs">
+              <div className="min-w-0 flex-1 basis-full space-y-1 sm:basis-auto sm:max-w-xs">
                 <Progress value={summary.pct} className="h-1.5" />
                 <div className="text-right text-[10px] tabular-nums text-muted-foreground">
                   {summary.pct}%

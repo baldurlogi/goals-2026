@@ -319,8 +319,8 @@ export function DailyPlanHeader() {
         </DropdownMenu>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-3 z-40 px-3 pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="mx-auto flex max-w-[min(34rem,calc(100vw-1.5rem))] items-center justify-between gap-1 rounded-full border border-border/60 bg-background/90 p-1.5 shadow-[0_18px_48px_rgba(15,23,42,0.20)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/78">
+      <nav className="fixed inset-x-0 bottom-3 z-40 px-4 pb-[env(safe-area-inset-bottom)] md:hidden">
+        <div className="ai-reactive-edge mx-auto flex max-w-[min(31rem,calc(100vw-2rem))] items-center justify-between gap-1 rounded-full border border-white/10 bg-background/58 px-1.5 py-1.5 shadow-[0_18px_58px_rgba(2,6,23,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/42">
           {mobilePrimaryItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -333,19 +333,42 @@ export function DailyPlanHeader() {
                 key={item.href}
                 to={item.href}
                 className={cn(
-                  "group relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-full px-1 py-2 text-[10px] font-semibold leading-none transition-all duration-200 ease-out",
+                  "group relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-full px-1 py-1.5 text-[9.5px] font-semibold leading-none transition-all duration-300 ease-out active:scale-95",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:-translate-y-0.5 hover:text-foreground",
                 )}
               >
-                <Icon
+                <span
                   className={cn(
-                    "h-4 w-4 transition-transform duration-200 group-active:scale-95",
-                    isActive && "-translate-y-0.5",
+                    "absolute inset-x-2 top-1 h-8 rounded-full opacity-0 blur-md transition-all duration-500",
+                    isActive && "bg-primary/22 opacity-100",
                   )}
                 />
-                <span className="max-w-full truncate text-[9.5px]">{item.label}</span>
+                <span
+                  className={cn(
+                    "relative flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300",
+                    isActive
+                      ? "bg-background/70 shadow-[0_8px_24px_rgba(74,222,128,0.20)]"
+                      : "group-hover:bg-background/45",
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 transition-transform duration-300",
+                      isActive
+                        ? "-translate-y-0.5 scale-105 text-primary"
+                        : "group-hover:-translate-y-0.5",
+                    )}
+                  />
+                </span>
+                <span className="relative max-w-full truncate">{item.label}</span>
+                <span
+                  className={cn(
+                    "relative mt-0.5 h-1 w-1 rounded-full bg-primary opacity-0 transition-all duration-300",
+                    isActive && "opacity-100 shadow-[0_0_14px_rgba(74,222,128,0.7)]",
+                  )}
+                />
               </Link>
             );
           })}
@@ -356,18 +379,48 @@ export function DailyPlanHeader() {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "group flex h-auto min-w-0 flex-1 flex-col gap-0.5 rounded-full px-1 py-2 text-[10px] font-semibold leading-none transition-all duration-200 ease-out",
+                  "group relative flex h-auto min-w-0 flex-1 flex-col gap-0.5 rounded-full px-1 py-1.5 text-[9.5px] font-semibold leading-none transition-all duration-300 ease-out active:scale-95",
                   overflowMobileItems.some((item) => pathname.startsWith(item.href))
-                    ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                    ? "text-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:-translate-y-0.5 hover:text-foreground",
                 )}
               >
-                <Ellipsis className="h-4 w-4 transition-transform duration-200 group-active:scale-95" />
-                <span className="text-[9.5px]">More</span>
+                <span
+                  className={cn(
+                    "absolute inset-x-2 top-1 h-8 rounded-full opacity-0 blur-md transition-all duration-500",
+                    overflowMobileItems.some((item) => pathname.startsWith(item.href)) &&
+                      "bg-primary/22 opacity-100",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "relative flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300",
+                    overflowMobileItems.some((item) => pathname.startsWith(item.href))
+                      ? "bg-background/70 shadow-[0_8px_24px_rgba(74,222,128,0.20)]"
+                      : "group-hover:bg-background/45",
+                  )}
+                >
+                  <Ellipsis
+                    className={cn(
+                      "h-4 w-4 transition-transform duration-300",
+                      overflowMobileItems.some((item) => pathname.startsWith(item.href))
+                        ? "-translate-y-0.5 scale-105 text-primary"
+                        : "group-hover:-translate-y-0.5",
+                    )}
+                  />
+                </span>
+                <span className="relative text-[9.5px]">More</span>
+                <span
+                  className={cn(
+                    "relative mt-0.5 h-1 w-1 rounded-full bg-primary opacity-0 transition-all duration-300",
+                    overflowMobileItems.some((item) => pathname.startsWith(item.href)) &&
+                      "opacity-100 shadow-[0_0_14px_rgba(74,222,128,0.7)]",
+                  )}
+                />
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="mb-3 w-56 rounded-2xl">
+            <DropdownMenuContent align="end" className="mb-3 w-56 rounded-2xl bg-background/90 backdrop-blur-xl">
               {overflowMobileItems.length === 0 ? (
                 <DropdownMenuItem asChild>
                   <Link to="/app/profile">Configure modules</Link>

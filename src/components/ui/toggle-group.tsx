@@ -32,7 +32,10 @@ function ToggleGroup({
       data-variant={variant}
       data-size={size}
       data-spacing={spacing}
-      className={cn("group flex w-fit items-center gap-1 rounded-md", className)}
+      className={cn(
+        "group flex w-fit max-w-full min-w-0 items-center gap-1 overflow-x-auto rounded-md [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        className,
+      )}
       {...props}
     >
       <ToggleGroupContext.Provider value={{ variant, size, spacing }}>

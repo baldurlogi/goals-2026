@@ -17,7 +17,7 @@ export function PWAInstallBanner() {
     >
       {/* Backdrop blur strip */}
       <div className="border-t border-white/10 bg-slate-900/95 backdrop-blur-md px-4 py-3 shadow-2xl">
-        <div className="mx-auto flex max-w-2xl items-center gap-3">
+        <div className="mx-auto flex max-w-2xl min-w-0 items-center gap-2 sm:gap-3">
 
           {/* Icon */}
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/30">
@@ -38,7 +38,7 @@ export function PWAInstallBanner() {
           <button
             onClick={triggerInstall}
             className={[
-              "shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5",
+              "flex min-w-0 shrink items-center gap-1.5 rounded-lg px-2.5 py-1.5 sm:px-3",
               "bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600",
               "text-xs font-semibold text-white transition-colors",
             ].join(" ")}

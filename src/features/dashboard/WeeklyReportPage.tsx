@@ -316,7 +316,7 @@ function GenerateState({
       <Button
         onClick={onGenerate}
         disabled={generating}
-        className="gap-2 min-w-[180px]"
+        className="w-full gap-2 sm:w-auto sm:min-w-[180px]"
       >
         {generating ? (
           <>

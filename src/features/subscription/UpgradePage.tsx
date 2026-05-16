@@ -382,8 +382,8 @@ function PlanCard({
 
 function ComparisonTable({ currentTier }: { currentTier: Tier }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border">
-      <table className="w-full text-sm">
+    <div className="max-w-full overflow-x-auto rounded-2xl border">
+      <table className="w-full min-w-[36rem] text-sm">
         <thead>
           <tr className="border-b bg-muted/30">
             <th className="px-4 py-3 text-left font-semibold">Feature</th>
@@ -455,7 +455,7 @@ export function UpgradePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10 px-4 py-6">
+    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-10 overflow-x-clip px-4 py-6">
       {success && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">
           🎉 Payment successful! Your plan has been upgraded. It may take a moment
@@ -503,9 +503,9 @@ export function UpgradePage() {
             </div>
           )}
 
-          <div className="mx-auto grid max-w-md grid-cols-[auto,52px,auto] items-center justify-center gap-x-3 gap-y-2 pt-2">
+          <div className="mx-auto grid w-full max-w-md grid-cols-[minmax(0,auto)_52px_minmax(0,auto)] items-center justify-center gap-x-3 gap-y-2 pt-2">
             <span
-              className={`text-sm font-medium ${
+              className={`min-w-0 truncate text-sm font-medium ${
                 !isYearly ? "text-foreground" : "text-muted-foreground"
               }`}
             >
@@ -529,17 +529,17 @@ export function UpgradePage() {
             </button>
 
             <span
-              className={`text-sm font-medium ${
+              className={`min-w-0 truncate text-sm font-medium ${
                 isYearly ? "text-foreground" : "text-muted-foreground"
               }`}
             >
               Yearly
             </span>
 
-            <div className="col-span-3 h-5 text-center">
+            <div className="col-span-3 min-w-0 text-center">
               <span
                 className={cn(
-                  "inline-flex rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-400 transition-opacity",
+                  "inline-flex max-w-full rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-400 transition-opacity",
                   isYearly ? "opacity-100" : "opacity-0",
                 )}
                 aria-hidden={!isYearly}

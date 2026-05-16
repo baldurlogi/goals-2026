@@ -14,7 +14,7 @@ function SkincareCardInner() {
   if (loading && cacheEmpty) return <FitnessCardSkeleton />;
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-4">
+    <Card className="ai-layer relative overflow-hidden border-0 bg-transparent shadow-none lg:col-span-4">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-fuchsia-500 via-pink-400 to-rose-400" />
 
       <CardHeader className="pb-2 pt-5">

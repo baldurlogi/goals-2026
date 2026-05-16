@@ -23,11 +23,12 @@ import {
 
 function ProgressBar({ pct, accentClass }: { pct: number; accentClass: string }) {
   return (
-    <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
+    <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted/70 shadow-inner">
       <div
-        className={`h-full rounded-full transition-all duration-700 ease-out ${accentClass}`}
+        className={`h-full rounded-full shadow-[0_0_16px_rgba(139,92,246,0.18)] transition-all duration-700 ease-out ${accentClass}`}
         style={{ width: `${pct}%` }}
       />
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-35 animate-[ai-sheen_6s_ease-in-out_infinite]" />
     </div>
   );
 }
@@ -36,7 +37,7 @@ function ModuleTile({ item }: { item: ModuleProgress }) {
   return (
     <Link
       to={item.href}
-      className="group flex flex-col gap-2.5 rounded-xl border bg-card/60 p-3.5 transition-all hover:bg-card hover:shadow-sm hover:ring-1 hover:ring-border"
+      className="ai-layer-soft group flex flex-col gap-2.5 rounded-xl p-3.5 transition-all duration-500 hover:-translate-y-0.5 hover:bg-background/35 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
@@ -45,8 +46,9 @@ function ModuleTile({ item }: { item: ModuleProgress }) {
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {item.streak != null && item.streak > 0 && (
-            <span className="flex items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-500">
-              🔥 {item.streak}
+            <span className="flex items-center gap-1 rounded-full bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.14)] dark:text-emerald-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
+              {item.streak}d
             </span>
           )}
           <span className={`text-${item.color}-500 text-xs font-bold tabular-nums`}>
@@ -73,7 +75,7 @@ function ModuleTile({ item }: { item: ModuleProgress }) {
 
 function SkeletonTile() {
   return (
-    <div className="animate-pulse rounded-xl border bg-card/40 p-3.5">
+    <div className="ai-layer-soft animate-pulse rounded-xl p-3.5">
       <div className="flex items-center justify-between">
         <div className="h-3 w-16 rounded bg-muted" />
         <div className="h-3 w-8 rounded bg-muted" />
@@ -88,17 +90,25 @@ function OverallRing({ score }: { score: number }) {
   const circumference = 2 * Math.PI * 18;
   const offset = circumference - (score / 100) * circumference;
   const label =
-    score >= 80 ? "Crushing it" :
-    score >= 60 ? "Good momentum" :
-    score >= 40 ? "Building up" :
-    score >= 20 ? "Getting started" :
-    "Let's go";
+    score >= 80 ? "Strong current" :
+    score >= 60 ? "Steady rhythm" :
+    score >= 40 ? "Taking shape" :
+    score >= 20 ? "Small signal" :
+    "Quiet start";
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="relative h-14 w-14">
+      <div className="relative h-14 w-14 drop-shadow-[0_12px_22px_rgba(103,232,249,0.22)]">
+        <div className="absolute inset-1 rounded-full bg-gradient-to-br from-emerald-400/12 via-cyan-300/10 to-violet-400/12 blur-sm" />
         <svg className="h-14 w-14 -rotate-90" viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r="18" fill="none" strokeWidth="3" className="stroke-muted" />
+          <defs>
+            <linearGradient id="life-progress-ring" x1="4" y1="4" x2="36" y2="36">
+              <stop offset="0%" stopColor="#34d399" />
+              <stop offset="52%" stopColor="#67e8f9" />
+              <stop offset="100%" stopColor="#a78bfa" />
+            </linearGradient>
+          </defs>
+          <circle cx="20" cy="20" r="18" fill="none" strokeWidth="3" className="stroke-muted/70" />
           <circle
             cx="20"
             cy="20"
@@ -108,7 +118,8 @@ function OverallRing({ score }: { score: number }) {
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            className="stroke-violet-500 transition-all duration-700"
+            stroke="url(#life-progress-ring)"
+            className="transition-all duration-700"
           />
         </svg>
         <span className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums">
@@ -160,7 +171,7 @@ function TrendSparkline({
   const renderDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: LifeProgressChartPoint }) => {
     if (payload?.synthetic || cx == null || cy == null) return null;
 
-    return <circle cx={cx} cy={cy} r={2.5} fill="#8b5cf6" />;
+    return <circle cx={cx} cy={cy} r={2.5} fill="#67e8f9" />;
   };
   const renderActiveDot = ({
     cx,
@@ -173,16 +184,16 @@ function TrendSparkline({
   }) => {
     if (payload?.synthetic || cx == null || cy == null) return null;
 
-    return <circle cx={cx} cy={cy} r={4} fill="#8b5cf6" />;
+    return <circle cx={cx} cy={cy} r={4} fill="#34d399" />;
   };
   const renderXAxisLabel = (_value: string, index: number) => chartData[index]?.label ?? "";
 
   return (
-    <div className="rounded-2xl border bg-muted/20 p-3">
+    <div className="ai-surface rounded-2xl p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            7-day trend
+            Consistency arc
           </p>
           <p className="mt-1 text-sm font-semibold text-foreground">
             Today {score}% · Avg {average}%
@@ -194,10 +205,6 @@ function TrendSparkline({
         >
           Full graph <ArrowRight className="h-3 w-3" />
         </Link>
-      </div>
-
-      <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-        <span>Progress (%)</span>
       </div>
 
       <div className="h-28 w-full">
@@ -215,6 +222,11 @@ function TrendSparkline({
                   stopColor="#8b5cf6"
                   stopOpacity={singleDayView ? 0.14 : 0.06}
                 />
+              </linearGradient>
+              <linearGradient id="life-progress-dashboard-line" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="48%" stopColor="#67e8f9" />
+                <stop offset="100%" stopColor="#a78bfa" />
               </linearGradient>
             </defs>
             <CartesianGrid
@@ -254,7 +266,7 @@ function TrendSparkline({
             <Line
               type="monotone"
               dataKey="score"
-              stroke="#8b5cf6"
+              stroke="url(#life-progress-dashboard-line)"
               strokeWidth={2.5}
               connectNulls={false}
               dot={renderDot}
@@ -272,7 +284,7 @@ function LifeProgressCardInner() {
   const { modulesProgress, overallScore, loading, skeletonCount } = useLifeProgress();
 
   return (
-    <Card className="overflow-hidden lg:col-span-12">
+    <Card className="ai-layer overflow-hidden border-0 bg-transparent shadow-none lg:col-span-12">
       <CardHeader className="pb-3 pt-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -280,7 +292,7 @@ function LifeProgressCardInner() {
               <Target className="h-3.5 w-3.5 text-violet-400" />
             </div>
             <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Today&apos;s progress
+              Momentum field
             </span>
           </div>
           <span className="text-[10px] text-muted-foreground/50">

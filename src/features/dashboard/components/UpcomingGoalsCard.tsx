@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { UpcomingGoalsCardSkeleton } from "@/features/dashboard/skeletons";
 import { ErrorBoundary, CardErrorFallback } from "@/components/ErrorBoundary";
 import { useGoalsDashboard, type UpcomingItem } from "../hooks/useGoalsDashboard";
+import { DashboardEmptyState } from "./DashboardEmptyState";
 
 function GoalRow({
   goalEmoji,
@@ -55,7 +56,7 @@ function UpcomingGoalsCardInner() {
   if (loading && cacheEmpty) return <UpcomingGoalsCardSkeleton />;
 
   return (
-    <Card className="relative overflow-hidden lg:col-span-5">
+    <Card className="ai-layer relative overflow-hidden border-0 bg-transparent shadow-none lg:col-span-5">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-rose-500 via-pink-400 to-orange-400" />
 
       <CardHeader className="pb-2 pt-5">
@@ -83,12 +84,14 @@ function UpcomingGoalsCardInner() {
 
       <CardContent className="pb-5">
         {previewItems.length === 0 ? (
-          <div className="rounded-lg bg-muted/40 px-3 py-4 text-center">
-            <p className="text-sm font-medium">All clear 🎉</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              No overdue steps or goals due today.
-            </p>
-          </div>
+          <DashboardEmptyState
+            icon={<Target className="h-4 w-4 text-rose-500" />}
+            title="Your goal runway is clear"
+            message="Use this quiet moment to choose tomorrow's easiest first step."
+            actionLabel="Plan ahead"
+            href="/app/goals"
+            hint="Clear is good. Your coach will surface urgency when it appears."
+          />
         ) : (
           <>
             <div className="divide-y divide-border/50">

@@ -64,7 +64,7 @@ export function WeeklyReportCard() {
     !!error;
 
   return (
-    <div className="lg:col-span-6 rounded-2xl border bg-card p-5 space-y-4 min-h-[220px]">
+    <div className="ai-layer min-h-[180px] space-y-3 rounded-2xl p-4 lg:col-span-6">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/15">
@@ -90,7 +90,7 @@ export function WeeklyReportCard() {
         </div>
 
         {hasThisWeekReport && report && (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-500/20">
+          <div className="ai-layer-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
             <span className="text-lg font-bold text-violet-300">
               {report.report.overallScore}
             </span>
@@ -107,11 +107,16 @@ export function WeeklyReportCard() {
 
       {!showLoadingState && !hasThisWeekReport && (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <div className="ai-layer-soft rounded-2xl px-3 py-2">
+            <p className="text-sm font-semibold leading-tight">
+              {todayIsSunday ? "Turn this week into signal" : "Your weekly pattern is waiting"}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground leading-5">
             {todayIsSunday
-              ? "It's Sunday — your weekly review is ready to generate."
-              : "No report for this week yet. Generate one any time."}
-          </p>
+              ? "Generate a focused review while the week is still fresh."
+              : "Create a short AI read on wins, drift, and next week's first move."}
+            </p>
+          </div>
 
           {limitHit ? (
             <AIUsageLimitNotice
@@ -124,7 +129,7 @@ export function WeeklyReportCard() {
               requiredTier="pro"
             />
           ) : showGenericError ? (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3">
+            <div className="rounded-xl bg-destructive/5 px-4 py-3 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.14)]">
               <p className="text-sm font-medium text-foreground">
                 Couldn't generate your weekly report
               </p>
@@ -166,7 +171,7 @@ export function WeeklyReportCard() {
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  {todayIsSunday ? "Generate Sunday Report" : "Generate Report"}
+                  {todayIsSunday ? "Generate Sunday read" : "Generate pattern read"}
                 </>
               )}
             </Button>
@@ -181,7 +186,7 @@ export function WeeklyReportCard() {
           </p>
 
           {report.report.wins?.[0] && (
-            <div className="flex items-start gap-2 rounded-lg bg-emerald-500/8 border border-emerald-500/15 px-3 py-2">
+            <div className="flex items-start gap-2 rounded-lg bg-emerald-500/8 px-3 py-2 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.12)]">
               <Trophy className="h-3.5 w-3.5 shrink-0 text-emerald-400 mt-0.5" />
               <p className="text-xs text-emerald-300 leading-relaxed">
                 {report.report.wins[0].title}
@@ -190,7 +195,7 @@ export function WeeklyReportCard() {
           )}
 
           {report.report.nextWeekFocus?.[0] && (
-            <div className="flex items-start gap-2 rounded-lg bg-primary/8 border border-primary/15 px-3 py-2">
+            <div className="flex items-start gap-2 rounded-lg bg-primary/8 px-3 py-2 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.10)]">
               <Target className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
               <p className="text-xs text-primary/80 leading-relaxed">
                 {report.report.nextWeekFocus[0].action}
@@ -200,7 +205,7 @@ export function WeeklyReportCard() {
 
           <Link
             to="/app/weekly-report"
-            className="flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted/30 transition-colors"
+            className="ai-layer-soft flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-colors hover:bg-muted/30"
           >
             <span>View full report</span>
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />

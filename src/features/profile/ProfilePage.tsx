@@ -382,7 +382,7 @@ export function ProfilePage() {
       </div>
 
       <div className="sticky top-14 z-20 -mx-4 border-y bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/75 lg:mx-0 lg:rounded-xl lg:border">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {SETTINGS_NAV_ITEMS.map((item) => (
             <Button
               key={item.id}
