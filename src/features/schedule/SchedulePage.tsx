@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  Activity,
+  Brain,
+  CalendarClock,
   Plus,
   Pencil,
   Trash2,
@@ -9,6 +12,9 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  Repeat,
+  Sparkles,
 } from "lucide-react";
 import type { ScheduleLog } from "./scheduleStorage";
 import type { TimelineItem } from "./scheduleTypes";
@@ -17,8 +23,6 @@ import {
   getScheduleDayLabel,
   getScheduleDayLabel as getDayLabel,
 } from "./scheduleData";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineList } from "./components/TimelineList";
@@ -62,6 +66,22 @@ function addDays(dateKey: string, amount: number) {
   return formatDateKey(next);
 }
 
+function parseScheduleTimeToMinutes(time: string) {
+  const match = time.trim().match(/^(\d{1,2})(?::(\d{2}))?/);
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2] ?? "0");
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+  return Math.min(Math.max(hours, 0), 23) * 60 + Math.min(Math.max(minutes, 0), 59);
+}
+
+function getNowMinutes() {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
 function getStartOfWeek(dateKey: string) {
   const date = parseDateKey(dateKey);
   const offset = (date.getDay() + 6) % 7;
@@ -101,28 +121,18 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: "short",
 });
 
-const EMOJI_SUGGESTIONS = [
-  "⏰",
-  "💪",
-  "🥣",
-  "💻",
-  "🥗",
-  "🍎",
-  "✅",
-  "🏋️",
-  "🥤",
-  "🚿",
-  "🍽️",
-  "🧠",
-  "📝",
-  "🌙",
-  "📖",
-  "🚶",
-  "🏃",
-  "🏢",
-  "🎉",
-  "🏠",
-  "📅",
+const QUICK_BLOCKS: Array<Omit<TimelineItem, "id">> = [
+  { time: "7:30", label: "Morning reset", detail: "A calm start before the day accelerates.", icon: "⏰", tag: "routine" },
+  { time: "9:00", label: "Deep work", detail: "Protect one focused block.", icon: "💻", tag: "focus" },
+  { time: "12:30", label: "Meal break", detail: "Step away and refuel properly.", icon: "🥗", tag: "recovery" },
+  { time: "17:30", label: "Workout", detail: "Move before the evening opens up.", icon: "💪", tag: "energy" },
+  { time: "21:30", label: "Wind down", detail: "Lower the pace and protect tomorrow.", icon: "🌙", tag: "sleep" },
+];
+
+const ICON_GROUPS = [
+  ["⏰", "💻", "🧠", "📝", "📅"],
+  ["💪", "🏋️", "🏃", "🚶", "🥤"],
+  ["🥣", "🥗", "🍽️", "🍎", "🌙"],
 ];
 
 type BlockFormState = Omit<TimelineItem, "id">;
@@ -158,103 +168,115 @@ function BlockModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl border bg-card shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <h3 className="font-semibold">{initial ? "Edit block" : "Add block"}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="ai-layer relative w-full max-w-md overflow-hidden rounded-[2rem] border-0 bg-background/80 shadow-[0_34px_120px_rgba(2,6,23,0.45)]">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-emerald-300/10 blur-3xl" />
+        <div className="relative flex items-center justify-between px-5 pb-2 pt-5">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Schedule block
+            </p>
+            <h3 className="mt-1 text-lg font-semibold">{initial ? "Refine rhythm" : "Add rhythm"}</h3>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
+            className="rounded-full bg-background/30 p-2 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-4 px-5 py-4">
+        <div className="relative space-y-4 px-5 py-4">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Icon
+            <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Rhythm icon
             </label>
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {EMOJI_SUGGESTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => set("icon", emoji)}
-                  className={cn(
-                    "rounded-lg px-2 py-1 text-base transition-colors",
-                    form.icon === emoji
-                      ? "bg-primary/20 ring-1 ring-primary"
-                      : "hover:bg-muted",
-                  )}
-                >
-                  {emoji}
-                </button>
+            <div className="space-y-2">
+              {ICON_GROUPS.map((group, groupIndex) => (
+                <div key={groupIndex} className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  {group.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => set("icon", emoji)}
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base transition-all",
+                        form.icon === emoji
+                          ? "bg-emerald-300 text-slate-950 shadow-[0_0_22px_rgba(74,222,128,0.22)]"
+                          : "bg-background/30 hover:bg-background/50",
+                      )}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
             <Input
               value={form.icon}
               onChange={(event) => set("icon", event.target.value)}
               placeholder="Or type any emoji"
-              className="h-8 text-sm"
+              className="mt-2 h-9 rounded-xl border-white/8 bg-background/30 text-sm"
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Time
+          <div className="grid gap-3 sm:grid-cols-[0.42fr_1fr]">
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Time
+              </span>
+              <Input
+                value={form.time}
+                onChange={(event) => set("time", event.target.value)}
+                placeholder="7:00"
+                className="h-10 rounded-xl border-white/8 bg-background/30 text-sm"
+              />
             </label>
-            <Input
-              value={form.time}
-              onChange={(event) => set("time", event.target.value)}
-              placeholder="e.g. 7:00"
-              className="h-8 text-sm"
-            />
-          </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Label *
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Label
+              </span>
+              <Input
+                value={form.label}
+                onChange={(event) => set("label", event.target.value)}
+                placeholder="Morning workout"
+                className="h-10 rounded-xl border-white/8 bg-background/30 text-sm"
+              />
             </label>
-            <Input
-              value={form.label}
-              onChange={(event) => set("label", event.target.value)}
-              placeholder="e.g. Morning workout"
-              className="h-8 text-sm"
-            />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+          <label className="space-y-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Detail
-            </label>
+            </span>
             <Input
               value={form.detail}
               onChange={(event) => set("detail", event.target.value)}
-              placeholder="Optional description"
-              className="h-8 text-sm"
+              placeholder="Optional note for this rhythm"
+              className="h-10 rounded-xl border-white/8 bg-background/30 text-sm"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Tag <span className="font-normal">(optional)</span>
-            </label>
+          <label className="space-y-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Tag
+            </span>
             <Input
               value={form.tag ?? ""}
               onChange={(event) => set("tag", event.target.value)}
-              placeholder="Optional tag"
-              className="h-8 text-sm"
+              placeholder="focus, recovery, routine..."
+              className="h-10 rounded-xl border-white/8 bg-background/30 text-sm"
             />
-          </div>
+          </label>
         </div>
 
-        <div className="flex justify-end gap-2 border-t px-5 py-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
+        <div className="relative flex justify-end gap-2 px-5 pb-5 pt-2">
+          <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full text-muted-foreground">
             Cancel
           </Button>
-          <Button size="sm" onClick={handleSave}>
+          <Button size="sm" onClick={handleSave} className="rounded-full bg-emerald-500 text-slate-950 hover:bg-emerald-400">
             <Check className="mr-1.5 h-3.5 w-3.5" />
             {initial ? "Save changes" : "Add block"}
           </Button>
@@ -314,7 +336,21 @@ function EditableBlockList({
 
   return (
     <>
-      <div className="space-y-1">
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        {QUICK_BLOCKS.map((block) => (
+          <button
+            key={`${block.time}-${block.label}`}
+            type="button"
+            onClick={() => onUpdate([...blocks, { ...block, id: makeId() }])}
+            className="rounded-full bg-background/24 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-background/40 hover:text-foreground"
+          >
+            <span className="mr-1.5">{block.icon}</span>
+            {block.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-2">
         {blocks.map((block, index) => (
           <div
             key={block.id}
@@ -324,14 +360,16 @@ function EditableBlockList({
             onDragEnd={handleDrop}
             onDragOver={(event) => event.preventDefault()}
             className={cn(
-              "flex items-start gap-2 rounded-lg border px-3 py-2 transition-colors sm:items-center",
+              "group flex items-start gap-2 rounded-[1.25rem] px-3 py-3 transition-colors sm:items-center",
               dragOver === index
-                ? "border-primary/50 bg-primary/5"
-                : "border-transparent bg-muted/30 hover:bg-muted/50",
+                ? "bg-emerald-300/10 shadow-[inset_0_0_0_1px_rgba(110,231,183,0.22)]"
+                : "bg-background/16 hover:bg-background/28",
             )}
           >
             <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground/50 sm:mt-0" />
-            <span className="mt-0.5 text-base sm:mt-0">{block.icon}</span>
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 text-sm sm:mt-0">
+              {block.icon}
+            </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:w-14">
@@ -350,28 +388,30 @@ function EditableBlockList({
                 {block.tag}
               </span>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setEditing(block)}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDelete(block.id)}
-              className="shrink-0 text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex shrink-0 items-center gap-1 opacity-80 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={() => setEditing(block)}
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-background/38 hover:text-foreground"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(block.id)}
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-background/38 hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
-        className="mt-3 w-full gap-1.5"
+        className="mt-4 w-full gap-1.5 rounded-full bg-background/22 text-muted-foreground hover:bg-background/38 hover:text-foreground"
         onClick={() => setAdding(true)}
       >
         <Plus className="h-3.5 w-3.5" /> Add block
@@ -392,6 +432,7 @@ function EditableBlockList({
 export function SchedulePage() {
   const today = useTodayDate();
   const { userId, authReady } = useAuth();
+  const preferences = useUserPreferences();
   const weekRailRef = useRef<HTMLDivElement | null>(null);
   const [selectedDate, setSelectedDate] = useState(today);
   const [log, setLog] = useState<ScheduleLog>(() =>
@@ -463,6 +504,47 @@ export function SchedulePage() {
     () => new Set<number>(log.completed ?? []),
     [log.completed],
   );
+  const isSelectedToday = selectedDate === today;
+  const rhythm = useMemo(() => {
+    const nowMinutes = getNowMinutes();
+    const timedBlocks = blocks.map((block, index) => ({
+      block,
+      index,
+      minutes: parseScheduleTimeToMinutes(block.time),
+      done: completedSet.has(index),
+    }));
+    const sorted = timedBlocks
+      .filter((item) => item.minutes !== null)
+      .sort((left, right) => (left.minutes ?? 0) - (right.minutes ?? 0));
+
+    const firstIncomplete = timedBlocks.find((item) => !item.done) ?? null;
+    let nowItem: (typeof timedBlocks)[number] | null = null;
+    let nextItem: (typeof timedBlocks)[number] | null = null;
+
+    if (isSelectedToday) {
+      nowItem =
+        [...sorted]
+          .reverse()
+          .find((item) => (item.minutes ?? 0) <= nowMinutes && !item.done) ??
+        null;
+      nextItem =
+        sorted.find((item) => (item.minutes ?? 0) > nowMinutes && !item.done) ??
+        firstIncomplete;
+    } else {
+      nextItem = firstIncomplete;
+    }
+
+    const progressPct = isSelectedToday
+      ? Math.min(100, Math.round((nowMinutes / 1440) * 100))
+      : summary.pct;
+
+    return {
+      nowItem,
+      nextItem,
+      progressPct,
+      remaining: timedBlocks.filter((item) => !item.done).length,
+    };
+  }, [blocks, completedSet, isSelectedToday, summary.pct]);
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
   const weekStart = weekDates[0] ?? selectedDate;
   const weekEnd = weekDates[6] ?? selectedDate;
@@ -523,194 +605,287 @@ export function SchedulePage() {
   const scheduleConfig = { ...config, blocks };
 
   return (
-    <div className="space-y-4">
-      <Card className="overflow-hidden border-border/70 bg-card/80 shadow-[0_18px_50px_rgba(2,6,23,0.18)]">
-        <CardHeader className="px-4 pb-3 pt-4 sm:px-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.45)]" />
-                <p className="truncate text-base font-semibold">{config.label}</p>
+    <div className="relative -mx-4 -mt-6 min-h-[calc(100vh-5rem)] overflow-hidden px-4 pb-14 pt-6 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_16%_2%,rgba(74,222,128,0.12),transparent_28%),radial-gradient(circle_at_86%_16%,rgba(103,232,249,0.09),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_44%)]" />
+
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="ai-atmosphere ai-depth-stage ai-motion-enter relative overflow-hidden rounded-[2rem] border border-white/8 bg-[radial-gradient(circle_at_18%_10%,rgba(74,222,128,0.15),transparent_30%),radial-gradient(circle_at_88%_0%,rgba(103,232,249,0.10),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.014))] px-4 py-5 shadow-[0_28px_90px_rgba(2,6,23,0.20)] sm:px-6">
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-emerald-200/40 to-transparent" />
+          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(22rem,0.75fr)] lg:items-end">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-background/24 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100/80">
+                <CalendarClock className="h-3.5 w-3.5" />
+                Daily rhythm
               </div>
-              <p className="max-w-lg text-xs leading-5 text-muted-foreground">
-                Edit each weekday separately. The selected day repeats week to week.
+              <h1 className="mt-4 text-3xl font-semibold leading-tight sm:text-4xl">
+                {config.label} rhythm
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                The shape of this day repeats every {config.label}. Adjust it once, and future {config.label}s inherit the rhythm.
               </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-background/24 px-3 py-1.5 text-xs text-muted-foreground">
+                  <Repeat className="h-3.5 w-3.5 text-emerald-100" />
+                  Repeats weekly
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-background/24 px-3 py-1.5 text-xs text-muted-foreground">
+                  <Activity className="h-3.5 w-3.5 text-cyan-100" />
+                  {summary.done}/{summary.total} complete
+                </span>
+              </div>
             </div>
 
-            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-              <span className="rounded-full bg-muted/50 px-2.5 py-1 text-xs tabular-nums text-muted-foreground">
-                {summary.done}/{summary.total} done
-              </span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">
+                  Day progress
+                </span>
+                <span className="text-xs font-semibold tabular-nums text-emerald-100">
+                  {isSelectedToday ? rhythm.progressPct : summary.pct}%
+                </span>
+              </div>
+              <div className="relative h-2.5 overflow-hidden rounded-full bg-background/45 shadow-inner">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-300 via-cyan-200 to-violet-300 shadow-[0_0_24px_rgba(52,211,153,0.24)] transition-all duration-700"
+                  style={{ width: `${isSelectedToday ? rhythm.progressPct : summary.pct}%` }}
+                />
+                <div className="absolute inset-0 animate-[ai-sheen_6s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-30" />
+              </div>
 
-              {!editMode ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-full px-3 text-xs"
-                  onClick={startEdit}
-                >
-                  <Pencil className="h-3 w-3" />
-                  <span>Edit {config.shortLabel}</span>
-                </Button>
-              ) : (
-                <div className="flex w-full gap-1.5 sm:w-auto">
+              <div className="flex flex-wrap gap-2">
+                {!editMode ? (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 flex-1 text-xs sm:flex-none"
-                    onClick={cancelEdit}
+                    className="h-9 rounded-full bg-background/26 px-3 text-xs text-foreground hover:bg-background/42"
+                    onClick={startEdit}
                   >
-                    Cancel
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                    Tune {config.shortLabel}
                   </Button>
-                  <Button
-                    size="sm"
-                    className="h-7 flex-1 text-xs sm:flex-none"
-                    onClick={saveEdit}
-                    disabled={saving}
-                  >
-                    {saving ? "Saving…" : "Save"}
-                  </Button>
-                </div>
-              )}
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 rounded-full text-xs text-muted-foreground"
+                      onClick={cancelEdit}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-9 rounded-full bg-emerald-500 px-4 text-xs text-slate-950 hover:bg-emerald-400"
+                      onClick={saveEdit}
+                      disabled={saving}
+                    >
+                      {saving ? "Saving..." : "Save rhythm"}
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="mt-4 rounded-2xl border border-border/70 bg-background/35 p-2.5 shadow-inner">
-            <div className="mb-3 grid grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 rounded-full p-0 sm:w-auto sm:px-3"
-                onClick={() => setSelectedDate((current) => addDays(current, -7))}
-                aria-label="Previous week"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-                <span className="hidden text-xs sm:inline">Previous week</span>
-              </Button>
-              <div className="min-w-0 text-center">
-                <p className="text-[11px] font-medium text-muted-foreground">
-                  {RANGE_FORMATTER.format(parseDateKey(weekStart))} - {RANGE_FORMATTER.format(parseDateKey(weekEnd))}
-                </p>
-                <button
-                  type="button"
-                  className="mt-0.5 rounded-full px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 hover:text-primary"
-                  onClick={() => setSelectedDate(today)}
-                >
-                  Jump to today
-                </button>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 rounded-full p-0 sm:w-auto sm:px-3"
-                onClick={() => setSelectedDate((current) => addDays(current, 7))}
-                aria-label="Next week"
-              >
-                <span className="hidden text-xs sm:inline">Next week</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-
-            <div
-              ref={weekRailRef}
-              className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0 sm:[&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:hidden"
+        <section className="space-y-3">
+          <div className="grid grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 rounded-full bg-background/20 p-0 sm:w-auto sm:px-3"
+              onClick={() => setSelectedDate((current) => addDays(current, -7))}
+              aria-label="Previous week"
             >
-              {weekDates.map((date) => {
-                const dayKey = getScheduleDayKeyForDate(date);
-                const isActive = date === selectedDate;
-                const isToday = date === today;
-                const parsedDate = parseDateKey(date);
-                return (
-                  <button
-                    key={date}
-                    type="button"
-                    data-schedule-date={date}
-                    onClick={() => {
-                      setSelectedDate(date);
-                      setEditMode(false);
-                    }}
-                    className={cn(
-                      "min-h-[5rem] min-w-[4.45rem] snap-start rounded-2xl border px-2.5 py-2.5 text-center transition-all duration-200 sm:min-w-0",
-                      isActive
-                        ? "border-foreground bg-foreground text-background shadow-[0_14px_30px_rgba(226,232,240,0.14)]"
-                        : isToday
-                          ? "border-emerald-400/40 bg-emerald-400/10 text-foreground hover:bg-emerald-400/15"
-                          : "border-border bg-background/70 text-foreground hover:bg-muted/50",
-                    )}
-                  >
-                    <div className="text-[10px] font-semibold uppercase tracking-wide opacity-75">
-                      {WEEKDAY_FORMATTER.format(parsedDate)}
-                    </div>
-                    <div className="mt-1 flex items-baseline justify-center gap-1">
-                      <span className="text-xl font-bold leading-none tabular-nums">
-                        {parsedDate.getDate()}
-                      </span>
-                      <span className="text-[10px] font-semibold uppercase opacity-75">
-                        {MONTH_FORMATTER.format(parsedDate)}
-                      </span>
-                    </div>
-                    {isToday ? (
-                      <div className="mx-auto mt-1 w-fit rounded-full bg-current/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide opacity-80">
-                        Today
-                      </div>
-                    ) : (
-                      <div className="mt-1 truncate text-[10px] opacity-60">
-                        {SCHEDULE_CONFIG[dayKey].shortLabel}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+              <ChevronLeft className="h-3.5 w-3.5" />
+              <span className="hidden text-xs sm:inline">Previous week</span>
+            </Button>
+            <div className="min-w-0 text-center">
+              <p className="text-[11px] font-medium text-muted-foreground">
+                {RANGE_FORMATTER.format(parseDateKey(weekStart))} - {RANGE_FORMATTER.format(parseDateKey(weekEnd))}
+              </p>
+              <button
+                type="button"
+                className="mt-0.5 rounded-full px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-background/32 hover:text-emerald-100"
+                onClick={() => setSelectedDate(today)}
+              >
+                Jump to today
+              </button>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 rounded-full bg-background/20 p-0 sm:w-auto sm:px-3"
+              onClick={() => setSelectedDate((current) => addDays(current, 7))}
+              aria-label="Next week"
+            >
+              <span className="hidden text-xs sm:inline">Next week</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">
-              {getDayLabel(selectedDayKey)} plan for {DATE_FORMATTER.format(parseDateKey(selectedDate))}
-            </p>
-            {summary.total > 0 ? (
-              <div className="min-w-0 flex-1 basis-full space-y-1 sm:basis-auto sm:max-w-xs">
-                <Progress value={summary.pct} className="h-1.5" />
-                <div className="text-right text-[10px] tabular-nums text-muted-foreground">
-                  {summary.pct}%
+          <div
+            ref={weekRailRef}
+            className="flex snap-x gap-2 overflow-x-auto px-1 pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden"
+          >
+            {weekDates.map((date) => {
+              const dayKey = getScheduleDayKeyForDate(date);
+              const isActive = date === selectedDate;
+              const isToday = date === today;
+              const parsedDate = parseDateKey(date);
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  data-schedule-date={date}
+                  onClick={() => {
+                    setSelectedDate(date);
+                    setEditMode(false);
+                  }}
+                  className={cn(
+                    "min-h-[4.4rem] min-w-[4.9rem] snap-center rounded-[1.35rem] px-3 py-2.5 text-center transition-all duration-300 sm:min-w-0",
+                    isActive
+                      ? "bg-emerald-300 text-slate-950 shadow-[0_16px_42px_rgba(74,222,128,0.16)]"
+                      : isToday
+                        ? "bg-emerald-300/10 text-foreground hover:bg-emerald-300/15"
+                        : "bg-background/18 text-foreground hover:bg-background/30",
+                  )}
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-75">
+                    {WEEKDAY_FORMATTER.format(parsedDate)}
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-center gap-1">
+                    <span className="text-xl font-bold leading-none tabular-nums">
+                      {parsedDate.getDate()}
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase opacity-70">
+                      {MONTH_FORMATTER.format(parsedDate)}
+                    </span>
+                  </div>
+                  <div className="mt-1 truncate text-[10px] opacity-70">
+                    {isToday ? "Today" : SCHEDULE_CONFIG[dayKey].shortLabel}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.72fr)_minmax(20rem,0.28fr)] lg:items-start">
+          <section className="ai-layer relative overflow-hidden rounded-[2rem] p-4 sm:p-5">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                  {getDayLabel(selectedDayKey)} plan
+                </p>
+                <h2 className="mt-1 text-xl font-semibold">
+                  {DATE_FORMATTER.format(parseDateKey(selectedDate))}
+                </h2>
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground">
+                {editMode
+                  ? `Changes update every future ${config.label}.`
+                  : rhythm.remaining > 0
+                    ? `${rhythm.remaining} block${rhythm.remaining === 1 ? "" : "s"} remaining today.`
+                    : "The rhythm is complete for this view."}
+              </p>
+            </div>
+
+            {editMode ? (
+              <>
+                <div className="mb-4 rounded-[1.35rem] bg-background/18 px-4 py-3 text-xs leading-5 text-muted-foreground">
+                  Tuning this rhythm changes every {config.label}. Quick adds are suggestions you can adjust after placing them.
+                </div>
+                <EditableBlockList blocks={pendingBlocks} onUpdate={setPendingBlocks} />
+              </>
+            ) : blocks.length === 0 ? (
+              <div className="rounded-[1.5rem] bg-background/20 px-4 py-8 text-center">
+                <p className="text-sm font-medium">No rhythm blocks yet</p>
+                <p className="mb-4 mt-1 text-xs text-muted-foreground">
+                  Add the first {config.label.toLowerCase()} block to give the day shape.
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={startEdit}
+                  className="gap-1.5 rounded-full bg-background/28"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add blocks
+                </Button>
+              </div>
+            ) : (
+              <TimelineList
+                schedule={scheduleConfig}
+                completedSet={completedSet}
+                onToggle={handleToggleBlock}
+                focusIndex={rhythm.nowItem?.index ?? null}
+                nextIndex={rhythm.nextItem?.index ?? null}
+              />
+            )}
+          </section>
+
+          <aside className="space-y-4 lg:sticky lg:top-6">
+            <section className="ai-layer-soft rounded-[1.75rem] p-4">
+              <div className="flex items-start gap-3">
+                <span className="ai-float flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-300/10 text-emerald-100">
+                  <Brain className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-100/80">
+                    Rhythm signal
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {summary.total === 0
+                      ? "Give this day one anchor block and it will start to feel easier to follow."
+                      : summary.pct >= 80
+                        ? "Most of the rhythm is resolved. Keep the ending gentle."
+                        : rhythm.remaining <= 2
+                          ? "Only a small amount remains. The day is narrowing nicely."
+                          : "Today has a clear structure. Follow the next visible block, not the whole list."}
+                  </p>
                 </div>
               </div>
-            ) : null}
-          </div>
-        </CardHeader>
+            </section>
 
-        <CardContent className="px-3 pb-4">
-          {editMode ? (
-            <>
-              <div className="mb-3 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                Changes here update every {config.label} in future weeks.
-              </div>
-              <EditableBlockList blocks={pendingBlocks} onUpdate={setPendingBlocks} />
-            </>
-          ) : blocks.length === 0 ? (
-            <div className="rounded-lg bg-muted/40 px-3 py-6 text-center">
-              <p className="text-sm font-medium">No blocks yet</p>
-              <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
-                Add your first {config.label.toLowerCase()} block to get started.
+            <section className="ai-layer-soft rounded-[1.75rem] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100/80">
+                Now / next
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={startEdit}
-                className="gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add blocks
-              </Button>
-            </div>
-          ) : (
-            <TimelineList
-              schedule={scheduleConfig}
-              completedSet={completedSet}
-              onToggle={handleToggleBlock}
-            />
-          )}
-        </CardContent>
-      </Card>
+              <div className="mt-4 space-y-3">
+                <div className="rounded-[1.25rem] bg-background/18 px-3 py-3">
+                  <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    Now
+                  </div>
+                  <p className="text-sm font-semibold">
+                    {rhythm.nowItem?.block.label ?? (isSelectedToday ? "Between blocks" : "Not today")}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {rhythm.nowItem?.block.time
+                      ? formatTimeStringWithPreferences(rhythm.nowItem.block.time, preferences)
+                      : "Use the next block as your anchor."}
+                  </p>
+                </div>
+
+                <div className="rounded-[1.25rem] bg-background/18 px-3 py-3">
+                  <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Next
+                  </div>
+                  <p className="text-sm font-semibold">
+                    {rhythm.nextItem?.block.label ?? "Nothing remaining"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {rhythm.nextItem?.block.time
+                      ? formatTimeStringWithPreferences(rhythm.nextItem.block.time, preferences)
+                      : "The day is complete in this rhythm."}
+                  </p>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </div>
     </div>
   );
 }
