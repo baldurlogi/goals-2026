@@ -15,21 +15,16 @@ export function DifferentiationSection({
 
   return (
     <section
-      className="relative mx-auto max-w-7xl px-3 pb-24 pt-10 sm:px-6 lg:px-8"
+      className="relative mx-auto max-w-7xl px-3 pb-20 pt-8 sm:px-6 sm:pb-24 lg:px-8"
     >
       <m.div
         initial="hidden"
         whileInView="visible"
         viewport={landingViewport}
         variants={fadeUp(18)}
-        className="relative overflow-hidden rounded-[34px] border px-5 py-8 sm:px-7 sm:py-10 lg:px-10"
+        className="relative overflow-hidden px-2 py-8 sm:px-4 sm:py-10 lg:px-0"
         style={{
-          borderColor: t.borderStrong,
-          background:
-            theme === "dark"
-              ? "linear-gradient(145deg, rgba(15,23,42,0.95), rgba(6,11,20,0.90))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.98), rgba(248,250,252,0.92))",
-          boxShadow: t.shadow,
+          background: "transparent",
         }}
       >
         <div
@@ -42,7 +37,14 @@ export function DifferentiationSection({
           }}
         />
 
-        <div className="relative grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10">
+        <div
+          className="pointer-events-none absolute inset-x-4 top-1/2 hidden h-px lg:block"
+          style={{
+            background: `linear-gradient(90deg, transparent, ${t.borderStrong}, transparent)`,
+          }}
+        />
+
+        <div className="relative grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
           <div className="text-center lg:pr-4 lg:text-left">
             <div
               className="mb-4 font-mono text-[11px] tracking-[0.18em]"
@@ -76,10 +78,9 @@ export function DifferentiationSection({
             </p>
 
             <div
-              className="mt-6 rounded-[26px] border p-5 text-center lg:text-left"
+              className="mt-8 border-l px-5 py-1 text-center lg:text-left"
               style={{
-                borderColor: t.border,
-                background: t.surface3,
+                borderColor: t.primaryBorder,
               }}
             >
               <div
@@ -98,7 +99,7 @@ export function DifferentiationSection({
             </div>
           </div>
 
-          <div className="grid gap-4">
+          <div className="grid gap-5">
             {DIFFERENT_SECTION.map((item, index) => (
               <m.div
                 key={item.title}
@@ -106,15 +107,19 @@ export function DifferentiationSection({
                 whileInView="visible"
                 viewport={landingViewport}
                 variants={fadeUp(18, index * 0.06)}
-                className="relative overflow-hidden rounded-[28px] border px-5 py-5 sm:px-6"
+                className={[
+                  "relative overflow-hidden px-5 py-5 sm:px-6",
+                  index === 1 ? "rounded-[30px]" : "",
+                ].join(" ")}
                 style={{
-                  borderColor: t.border,
                   background:
                     index === 1
                       ? theme === "dark"
-                        ? "linear-gradient(145deg, rgba(11,18,32,0.94), rgba(15,23,42,0.84))"
+                        ? "linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018))"
                         : "linear-gradient(145deg, rgba(255,255,255,0.98), rgba(239,246,255,0.85))"
-                      : t.surface3,
+                      : "transparent",
+                  boxShadow:
+                    index === 1 ? `inset 0 0 0 1px ${t.border}` : undefined,
                 }}
               >
                 <div

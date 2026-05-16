@@ -36,14 +36,13 @@ export function FeatureCard({
       variants={fadeUp(24, index * 0.08)}
     >
       <div
-        className="relative overflow-hidden rounded-[28px] border px-5 pb-5 pt-6 sm:px-6 sm:pb-6"
+        className="relative overflow-hidden rounded-[28px] px-5 pb-5 pt-6 transition-all duration-500 hover:-translate-y-1 sm:px-6 sm:pb-6"
         style={{
           background:
             theme === "dark"
-              ? "linear-gradient(150deg, rgba(15,23,42,0.98), rgba(11,18,32,0.88))"
+              ? "linear-gradient(150deg, rgba(255,255,255,0.045), rgba(255,255,255,0.014))"
               : "linear-gradient(150deg, rgba(255,255,255,0.98), rgba(248,250,252,0.9))",
-          border: `1px solid ${t.borderStrong}`,
-          boxShadow: t.shadow,
+          boxShadow: `inset 0 0 0 1px ${t.border}, 0 22px 60px rgba(0,0,0,0.12)`,
         }}
       >
         <div
@@ -71,11 +70,11 @@ export function FeatureCard({
         <div className="relative">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div
-              className="flex h-12 w-12 items-center justify-center rounded-[18px] border text-xl"
+              className="flex h-12 w-12 items-center justify-center rounded-full text-xl"
               style={{
                 background: `${accentColor}18`,
-                borderColor: `${accentColor}33`,
                 color: accentColor,
+                boxShadow: `0 0 38px ${accentColor}18`,
               }}
             >
               {icon}

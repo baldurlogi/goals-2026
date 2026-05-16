@@ -24,26 +24,23 @@ export function HowItWorksCard({
 
   return (
     <m.div
-      className={topSpacing}
+      className={`${topSpacing} relative`}
       initial="hidden"
       whileInView="visible"
       viewport={landingViewport}
       variants={fadeUp(20, index * 0.08)}
     >
       <div
-        className="relative overflow-hidden rounded-[30px] p-[1px]"
+        className="relative overflow-hidden rounded-[30px] px-5 pb-6 pt-5 transition-transform duration-500 hover:-translate-y-1 sm:px-6 sm:pb-7 sm:pt-6"
         style={{
-          background: `linear-gradient(160deg, ${accent}55, ${t.borderStrong})`,
-          boxShadow: t.shadow,
-        }}
-      >
-        <div
-          className="relative h-full rounded-[29px] px-5 pb-6 pt-5 sm:px-6 sm:pb-7 sm:pt-6"
-          style={{
-            background:
-              theme === "dark"
-                ? "linear-gradient(180deg, rgba(15,23,42,0.98), rgba(6,11,20,0.92))"
-                : "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.92))",
+          background:
+            theme === "dark"
+              ? "linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.014))"
+              : "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.86))",
+          boxShadow:
+            index === 1
+              ? `0 30px 90px rgba(0,0,0,0.24), inset 0 0 0 1px ${accent}33`
+              : `inset 0 0 0 1px ${t.border}`,
           }}
         >
           <div
@@ -53,10 +50,9 @@ export function HowItWorksCard({
 
           <div className="mb-6 flex items-center justify-between gap-3">
             <div
-              className="inline-flex rounded-full border px-3 py-1 text-[11px] font-mono tracking-[0.14em]"
+              className="inline-flex rounded-full px-3 py-1 text-[11px] font-mono tracking-[0.14em]"
               style={{
                 color: accent,
-                borderColor: `${accent}44`,
                 background: `${accent}14`,
               }}
             >
@@ -73,11 +69,11 @@ export function HowItWorksCard({
 
           <div className="mb-5 flex items-center gap-4">
             <div
-              className="flex h-14 w-14 items-center justify-center rounded-[22px] border text-base font-semibold"
+              className="flex h-14 w-14 items-center justify-center rounded-full text-base font-semibold"
               style={{
                 color: accent,
-                borderColor: `${accent}40`,
                 background: `${accent}15`,
+                boxShadow: `0 0 42px ${accent}22`,
               }}
             >
               {step}
@@ -104,7 +100,6 @@ export function HowItWorksCard({
           >
             {body}
           </div>
-        </div>
       </div>
     </m.div>
   );

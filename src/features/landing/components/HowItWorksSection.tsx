@@ -16,7 +16,7 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
   return (
     <section
       id="how-it-works"
-      className="relative mx-auto max-w-7xl px-3 py-24 sm:px-6 lg:px-8"
+      className="relative mx-auto max-w-7xl px-3 py-20 sm:px-6 sm:py-24 lg:px-8"
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-10 h-64 blur-3xl"
@@ -33,7 +33,7 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
         whileInView="visible"
         viewport={landingViewport}
         variants={fadeUp(18)}
-        className="relative mb-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end"
+        className="relative mb-14 grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end"
       >
         <div className="text-center lg:text-left">
           <div
@@ -60,18 +60,19 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
         </div>
 
         <div
-          className="rounded-[30px] border p-5 text-center sm:p-6 lg:text-left"
+          className="relative text-center lg:text-left"
           style={{
-            background:
-              theme === "dark"
-                ? "linear-gradient(145deg, rgba(15,23,42,0.9), rgba(11,18,32,0.72))"
-                : "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(248,250,252,0.9))",
-            borderColor: t.border,
-            boxShadow: t.shadow,
+            color: t.textSoft,
           }}
         >
+          <div
+            className="pointer-events-none absolute -left-8 top-1/2 hidden h-28 w-px -translate-y-1/2 lg:block"
+            style={{
+              background: `linear-gradient(to bottom, transparent, ${t.primaryBorder}, transparent)`,
+            }}
+          />
           <p
-            className="text-sm leading-7 sm:text-[15px] sm:leading-8"
+            className="text-sm leading-7 sm:text-[15px] sm:leading-8 lg:max-w-xl"
             style={{ color: t.textSoft }}
           >
             Most people do not need more motivation. They need a product that
@@ -79,16 +80,17 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
             can actually act on.
           </p>
 
-          <div className="mt-5 flex flex-wrap justify-center gap-2.5 lg:justify-start">
+          <div className="mt-6 flex flex-wrap justify-center gap-3 lg:justify-start">
             {checkpoints.map((label) => (
               <span
                 key={label}
-                className="rounded-full border px-3 py-1.5 text-[11px] font-mono tracking-[0.12em]"
+                className="rounded-full px-3 py-1.5 text-[11px] font-mono tracking-[0.12em]"
                 style={{
                   color: label === "Momentum" ? t.primary : t.textSoft,
-                  background: label === "Momentum" ? t.primarySoft : t.surface3,
-                  borderColor:
-                    label === "Momentum" ? t.primaryBorder : t.border,
+                  background:
+                    label === "Momentum"
+                      ? t.primarySoft
+                      : "rgba(255,255,255,0.035)",
                 }}
               >
                 {label}
@@ -98,11 +100,11 @@ export function HowItWorksSection({ theme }: HowItWorksSectionProps) {
         </div>
       </m.div>
 
-      <div className="relative grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
+      <div className="relative grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-4 lg:gap-6">
         <div
-          className="pointer-events-none absolute left-[16px] right-[16px] top-[92px] hidden h-px md:block"
+          className="pointer-events-none absolute left-[16px] right-[16px] top-[96px] hidden h-px md:block"
           style={{
-            background: `linear-gradient(90deg, transparent, ${t.borderStrong}, transparent)`,
+            background: `linear-gradient(90deg, transparent, ${t.primaryBorder}, ${t.borderStrong}, transparent)`,
           }}
         />
         {HOW_IT_WORKS.map((item, i) => (

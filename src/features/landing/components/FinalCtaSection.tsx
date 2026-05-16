@@ -18,7 +18,7 @@ export function FinalCtaSection({
   const t = TOKENS[theme];
 
   return (
-    <section className="relative px-3 pb-24 pt-20 text-center sm:px-6 sm:pb-28 sm:pt-24 lg:px-8">
+    <section className="relative overflow-hidden px-3 pb-24 pt-16 text-center sm:px-6 sm:pb-28 sm:pt-24 lg:px-8">
       <m.div
         className="pointer-events-none absolute inset-0"
         initial={{ opacity: 0 }}
@@ -26,20 +26,43 @@ export function FinalCtaSection({
         viewport={landingViewport}
         transition={{ duration: 0.7, ease: landingEase }}
         style={{
-          background: t.heroGlow,
+          background:
+            theme === "dark"
+              ? "radial-gradient(circle at 50% 22%, rgba(74,222,128,0.18), transparent 30%), radial-gradient(circle at 50% 68%, rgba(96,165,250,0.08), transparent 36%)"
+              : t.heroGlow,
           opacity: 0.6,
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${t.primaryBorder}, transparent)`,
         }}
       />
 
       <m.div
-        className="relative mx-auto max-w-4xl"
+        className="relative mx-auto max-w-5xl rounded-[38px] px-3 py-10 sm:px-8 sm:py-14"
         initial="hidden"
         whileInView="visible"
         viewport={landingViewport}
         variants={staggerContainer(0.1)}
+        style={{
+          background:
+            theme === "dark"
+              ? "linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.008))"
+              : "rgba(255,255,255,0.7)",
+          boxShadow: `inset 0 0 0 1px ${t.border}`,
+        }}
       >
+        <m.div
+          className="mx-auto mb-5 h-1 w-20 rounded-full"
+          variants={fadeUp(12)}
+          style={{
+            background: `linear-gradient(90deg, transparent, ${t.primary}, transparent)`,
+          }}
+        />
         <m.h2
-          className="mb-4 text-[clamp(34px,5vw,58px)] leading-[1.05] tracking-[-0.04em]"
+          className="mx-auto mb-5 max-w-[13ch] text-[clamp(38px,6vw,72px)] leading-[0.96] tracking-[-0.04em]"
           variants={fadeUp(22)}
           style={{
             fontFamily: "'Instrument Serif', serif",
@@ -55,7 +78,7 @@ export function FinalCtaSection({
         </m.h2>
 
         <m.p
-          className="mx-auto mb-8 max-w-2xl text-sm leading-7 sm:text-[15px] sm:leading-8"
+          className="mx-auto mb-9 max-w-2xl text-sm leading-7 sm:text-[15px] sm:leading-8"
           variants={fadeUp(16)}
           style={{ color: t.faint }}
         >
@@ -70,7 +93,7 @@ export function FinalCtaSection({
           <Button
             type="button"
             onClick={onGetStarted}
-            className="min-h-12 rounded-xl px-6 py-3.5 text-sm font-semibold sm:py-6"
+            className="min-h-12 rounded-full px-7 py-3.5 text-sm font-semibold shadow-[0_18px_54px_rgba(74,222,128,0.20)] sm:py-6"
             style={{
               background: t.primary,
               color: theme === "dark" ? "#052e16" : "#ffffff",
@@ -84,10 +107,10 @@ export function FinalCtaSection({
               type="button"
               variant="ghost"
               onClick={onSeePricing}
-              className="min-h-12 rounded-xl border px-6 py-3.5 text-sm font-semibold sm:py-6"
+              className="min-h-12 rounded-full px-7 py-3.5 text-sm font-semibold sm:py-6"
               style={{
-                background: "transparent",
-                borderColor: t.borderStrong,
+                background: "rgba(255,255,255,0.045)",
+                borderColor: "transparent",
                 color: t.textSoft,
               }}
             >

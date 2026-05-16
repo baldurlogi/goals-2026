@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { m } from "framer-motion";
 import { useState, type FormEvent } from "react";
@@ -88,29 +87,37 @@ export function PricingCard({
       viewport={landingViewport}
       variants={fadeUp(24, index * 0.08)}
     >
-      <Card
-        className="relative h-full overflow-hidden rounded-3xl"
+      <div
+        className="relative h-full overflow-hidden rounded-[32px] p-[1px]"
         style={{
-          background: isPreviewOnly
-            ? t.surface2
-            : featured
-              ? t.primarySoft
-              : t.surface,
-          border: `1px solid ${isPreviewOnly ? t.border : featured ? t.primaryBorder : t.border}`,
-          boxShadow: isPreviewOnly ? "none" : featured ? t.shadow : "none",
+          background: featured
+            ? `linear-gradient(145deg, ${t.primaryBorder}, rgba(255,255,255,0.08))`
+            : `linear-gradient(145deg, ${t.borderStrong}, rgba(255,255,255,0.025))`,
+          boxShadow: featured
+            ? "0 36px 110px rgba(0,0,0,0.34), 0 0 80px rgba(74,222,128,0.08)"
+            : "0 20px 70px rgba(0,0,0,0.16)",
           opacity: isPreviewOnly ? 0.82 : 1,
           filter: isPreviewOnly ? "saturate(0.82)" : undefined,
         }}
       >
-        <CardContent className="flex h-full min-h-0 flex-col p-5 sm:min-h-[560px] sm:p-6">
+        <div
+          className="flex h-full min-h-0 flex-col rounded-[31px] p-5 sm:min-h-[520px] sm:p-6"
+          style={{
+            background: isPreviewOnly
+              ? "linear-gradient(155deg, rgba(255,255,255,0.032), rgba(255,255,255,0.012))"
+              : featured
+                ? "linear-gradient(155deg, rgba(74,222,128,0.14), rgba(255,255,255,0.035) 42%, rgba(255,255,255,0.018))"
+                : "linear-gradient(155deg, rgba(255,255,255,0.046), rgba(255,255,255,0.016))",
+            backdropFilter: "blur(18px)",
+          }}
+        >
           <div className="mb-5 flex min-h-[28px] items-start justify-between gap-3">
             <div>
               {isPreviewOnly ? (
                 <div
                   className="rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em]"
                   style={{
-                    background: t.surface,
-                    border: `1px solid ${t.border}`,
+                    background: "rgba(255,255,255,0.04)",
                     color: t.primary,
                   }}
                 >
@@ -129,7 +136,6 @@ export function PricingCard({
                   className="rounded-full px-3 py-1 text-right font-mono text-[10px] tracking-[0.08em]"
                   style={{
                     background: t.primarySoft,
-                    border: `1px solid ${t.primaryBorder}`,
                     color: t.primary,
                   }}
                 >
@@ -148,13 +154,13 @@ export function PricingCard({
           </div>
 
           <div
-            className="mb-4 min-h-0 text-sm leading-6 sm:mb-5 sm:min-h-[48px]"
+            className="mb-5 min-h-0 text-sm leading-6 sm:min-h-[42px]"
             style={{ color: t.muted }}
           >
             {sub}
           </div>
 
-          <div className="mb-4 min-h-0 sm:min-h-[108px]">
+          <div className="mb-5 min-h-0">
             <div className="mb-2 flex min-h-[52px] items-end gap-2">
               <div
                 className="text-[38px] leading-none sm:text-[42px]"
@@ -173,7 +179,7 @@ export function PricingCard({
               )}
             </div>
 
-            <div className="min-h-0 sm:min-h-[52px]">
+            <div className="min-h-0">
               {isFree ? (
                 <div className="text-xs" style={{ color: t.primary }}>
                   No credit card required
@@ -195,13 +201,6 @@ export function PricingCard({
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <div
-                    className="min-h-[20px] text-sm"
-                    style={{ visibility: "hidden" }}
-                  >
-                    ${monthly}/mo equivalent
-                  </div>
-
                   <div className="text-xs" style={{ color: t.primary }}>
                     or ${yearly}/year · billed once yearly · save 17%
                   </div>
@@ -210,7 +209,7 @@ export function PricingCard({
             </div>
           </div>
 
-          <div className="mb-6 grid min-h-0 gap-2.5 sm:min-h-[190px]">
+          <div className="mb-7 grid min-h-0 gap-2.5">
             {points.map((point) => (
               <div key={point} className="flex items-start gap-2.5">
                 <span style={{ color: t.primary }}>●</span>
@@ -239,10 +238,10 @@ export function PricingCard({
                   }}
                   disabled={isJoiningWaitlist}
                   aria-label={`Email for ${name} launch waitlist`}
-                  className="h-11 rounded-xl border px-4 text-sm"
+                  className="h-11 rounded-full border px-4 text-sm"
                   style={{
-                    borderColor: t.borderStrong,
-                    background: t.surface,
+                    borderColor: t.border,
+                    background: "rgba(255,255,255,0.04)",
                     color: t.text,
                   }}
                 />
@@ -250,11 +249,10 @@ export function PricingCard({
                 <Button
                   type="submit"
                   disabled={isJoiningWaitlist}
-                  className="w-full rounded-xl font-semibold"
+                  className="w-full rounded-full font-semibold"
                   style={{
-                    background: t.surface,
+                    background: featured ? t.primarySoft : "rgba(255,255,255,0.055)",
                     color: t.text,
-                    border: `1px solid ${t.borderStrong}`,
                   }}
                 >
                   {isJoiningWaitlist ? "Saving..." : "Notify me when Pro launches"}
@@ -279,7 +277,7 @@ export function PricingCard({
               <Button
                 type="button"
                 onClick={onChoosePlan}
-                className="w-full rounded-xl font-semibold"
+                className="w-full rounded-full font-semibold"
                 style={{
                   background: featured ? t.primary : t.text,
                   color: featured ? "#052e16" : t.bg,
@@ -289,8 +287,8 @@ export function PricingCard({
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </m.div>
   );
 }

@@ -27,8 +27,17 @@ export function PricingSection({
   return (
     <section
       id="pricing"
-      className="mx-auto max-w-7xl px-3 py-24 sm:px-6 lg:px-8"
+      className="relative mx-auto max-w-7xl px-3 py-20 sm:px-6 sm:py-24 lg:px-8"
     >
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-80 blur-3xl"
+        style={{
+          background:
+            theme === "dark"
+              ? "radial-gradient(circle at 50% 20%, rgba(74,222,128,0.10), transparent 46%)"
+              : t.heroGlow,
+        }}
+      />
       <m.div
         initial="hidden"
         whileInView="visible"
@@ -36,7 +45,7 @@ export function PricingSection({
         variants={fadeUp(18)}
         style={{
           textAlign: "center",
-          marginBottom: 44,
+          marginBottom: 48,
         }}
       >
         <div
@@ -89,7 +98,7 @@ export function PricingSection({
         </div>
       </m.div>
 
-      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 md:grid-cols-2">
+      <div className="relative mx-auto grid max-w-5xl grid-cols-1 gap-5 md:grid-cols-2 lg:gap-7">
         {PRICING_PLANS.map((plan, index) => (
           <PricingCard
             key={plan.name}
@@ -103,7 +112,7 @@ export function PricingSection({
       </div>
 
       <div
-        className="mx-auto mt-6 max-w-3xl text-center text-sm"
+        className="relative mx-auto mt-8 max-w-3xl text-center text-sm leading-7"
         style={{ color: t.faint }}
       >
         {PAID_PLANS_PREVIEW_MESSAGE}

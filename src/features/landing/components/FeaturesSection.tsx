@@ -21,7 +21,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
   return (
     <section
       id="features"
-      className="relative mx-auto max-w-7xl px-3 py-24 sm:px-6 lg:px-8"
+      className="relative mx-auto max-w-7xl px-3 py-20 sm:px-6 sm:py-24 lg:px-8"
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-24 h-72 blur-3xl"
@@ -38,7 +38,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
         whileInView="visible"
         viewport={landingViewport}
         variants={fadeUp(18)}
-        className="relative mb-10 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end"
+        className="relative mb-14 grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-end"
       >
         <div className="text-center lg:text-left">
           <div
@@ -71,15 +71,14 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
             and keep your goals, routines, and energy pointed in the same direction.
           </p>
 
-          <div className="mt-5 flex flex-wrap justify-center gap-2.5 lg:justify-start">
+          <div className="mt-6 flex flex-wrap justify-center gap-3 lg:justify-start">
             {outcomes.map((item) => (
               <span
                 key={item}
-                className="rounded-full border px-3 py-1.5 text-[11px] font-mono tracking-[0.12em]"
+                className="rounded-full px-3 py-1.5 text-[11px] font-mono tracking-[0.12em]"
                 style={{
                   color: t.textSoft,
-                  borderColor: t.border,
-                  background: t.surface3,
+                  background: "rgba(255,255,255,0.035)",
                 }}
               >
                 {item}
@@ -89,20 +88,19 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
         </div>
       </m.div>
 
-      <div className="relative grid gap-5 xl:grid-cols-[1.1fr_0.9fr] xl:items-start">
+      <div className="relative grid gap-8 xl:grid-cols-[1.12fr_0.88fr] xl:items-start">
         <m.div
           initial="hidden"
           whileInView="visible"
           viewport={landingViewport}
           variants={fadeUp(20)}
-          className="relative overflow-hidden rounded-[34px] border p-6 sm:p-8"
+          className="relative overflow-hidden rounded-[34px] p-6 sm:p-8"
           style={{
-            borderColor: t.borderStrong,
             background:
               theme === "dark"
-                ? "linear-gradient(155deg, rgba(11,18,32,0.95), rgba(15,23,42,0.92))"
+                ? "linear-gradient(155deg, rgba(11,18,32,0.78), rgba(15,23,42,0.58))"
                 : "linear-gradient(155deg, rgba(255,255,255,0.98), rgba(248,250,252,0.94))",
-            boxShadow: t.shadow,
+            boxShadow: `0 38px 120px rgba(0,0,0,0.24), inset 0 0 0 1px ${t.border}`,
           }}
         >
           <div
@@ -145,7 +143,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
             </p>
           </div>
 
-          <div className="relative mt-8 grid gap-3 sm:grid-cols-3">
+          <div className="relative mt-10 grid gap-4 sm:grid-cols-3">
             {[
               ["One place", "for goals, habits, health, and routines"],
               ["One focus", "so the day does not split your attention"],
@@ -153,10 +151,9 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
             ].map(([title, body]) => (
               <div
                 key={title}
-                className="rounded-[22px] border p-4"
+                className="border-l pl-4"
                 style={{
-                  borderColor: t.border,
-                  background: t.surface3,
+                  borderColor: t.primaryBorder,
                 }}
               >
                 <div
@@ -173,7 +170,7 @@ export function FeaturesSection({ theme }: FeaturesSectionProps) {
           </div>
         </m.div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-1">
           {secondaryCards.map((item, i) => (
             <FeatureCard
               key={item.title}
