@@ -8,7 +8,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSupabaseFunctionUrl, supabase } from "@/lib/supabaseClient";
 import { buildAIContext } from "@/features/ai/buildAIContext";
@@ -115,20 +115,20 @@ function getPhaseCoachFrame(phase: DayPhase) {
 function getModuleGlow(module?: string) {
   switch (module) {
     case "sleep":
-      return "shadow-[0_22px_70px_rgba(99,102,241,0.22)]";
+      return "shadow-[0_18px_52px_rgba(99,102,241,0.14)]";
     case "wellbeing":
-      return "shadow-[0_22px_70px_rgba(236,72,153,0.18)]";
+      return "shadow-[0_18px_52px_rgba(236,72,153,0.12)]";
     case "nutrition":
-      return "shadow-[0_22px_70px_rgba(249,115,22,0.18)]";
+      return "shadow-[0_18px_52px_rgba(249,115,22,0.12)]";
     case "fitness":
-      return "shadow-[0_22px_70px_rgba(139,92,246,0.20)]";
+      return "shadow-[0_18px_52px_rgba(139,92,246,0.13)]";
     case "goals":
     case "todos":
-      return "shadow-[0_22px_70px_rgba(244,63,94,0.16)]";
+      return "shadow-[0_18px_52px_rgba(244,63,94,0.11)]";
     case "schedule":
-      return "shadow-[0_22px_70px_rgba(14,165,233,0.17)]";
+      return "shadow-[0_18px_52px_rgba(14,165,233,0.11)]";
     default:
-      return "shadow-[0_22px_70px_rgba(124,58,237,0.16)]";
+      return "shadow-[0_18px_52px_rgba(124,58,237,0.11)]";
   }
 }
 
@@ -966,147 +966,149 @@ function AICoachCardInner() {
 
   return (
     <Card
-      className={[
-        "ai-companion-surface relative gap-0 overflow-hidden border-0 bg-transparent py-0 transition-all duration-700 lg:col-span-12",
-        getModuleGlow(suggestion?.module),
-      ].join(" ")}
+      className="relative gap-0 overflow-visible border-0 bg-transparent py-0 shadow-none lg:col-span-12"
     >
-      <div className={`absolute inset-0 bg-gradient-to-br ${phaseFrame.tone} opacity-55 transition-opacity duration-700`} />
+      <div className={`pointer-events-none absolute -inset-x-4 -inset-y-6 bg-gradient-to-br ${phaseFrame.tone} opacity-45 blur-2xl transition-opacity duration-700`} />
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/16 to-transparent" />
 
-      <CardHeader className="relative pb-2 pt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="relative flex h-7 w-7 items-center justify-center rounded-2xl bg-background/42 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.08)]">
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]" />
-              <Brain className="relative h-3.5 w-3.5 text-violet-300" />
-            </div>
-            <div>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Begyn
-              </span>
-              <div className="mt-0.5 text-[10px] text-muted-foreground/60">
-                {getPhaseLabel(phase)} · {coachStateLabel}
+      <div
+        className={[
+          "relative overflow-hidden rounded-[1.85rem] border border-white/10 bg-background/48 px-4 py-4 shadow-[0_20px_58px_rgba(2,6,23,0.16)] backdrop-blur-md transition-all duration-700 sm:rounded-[2rem] sm:px-5 sm:py-5 lg:rounded-[2.05rem]",
+          getModuleGlow(suggestion?.module),
+        ].join(" ")}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.045] via-transparent to-transparent" />
+        <div className="pointer-events-none absolute -right-16 -top-24 h-48 w-48 rounded-full bg-cyan-300/[0.08] blur-2xl" />
+
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="relative mt-0.5">
+                <Brain className="h-4 w-4 text-violet-300" />
+                <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
               </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={loading}
-            className="rounded-full bg-background/30 p-2 text-muted-foreground/50 transition-all hover:-translate-y-0.5 hover:bg-background/45 hover:text-muted-foreground disabled:opacity-30"
-            title="Get a new suggestion"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="relative pb-4">
-        {loading && !suggestion && (
-          <div className="rounded-[1.65rem] bg-background/34 p-4 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.07)]">
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-violet-300 shadow-[0_0_14px_rgba(167,139,250,0.7)]" />
-              Reading the current state
-            </div>
-            <div className="mt-4 h-1 overflow-hidden rounded-full bg-background/50">
-              <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-violet-400 via-cyan-300 to-emerald-300" />
-            </div>
-          </div>
-        )}
-
-        {error && !suggestion && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Couldn't load your next suggestion right now.</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-8 text-xs">Try again</Button>
-              <Button asChild size="sm" className="gap-1.5">
-                <Link to="/app/goals">Start with goals <ArrowRight className="h-3.5 w-3.5" /></Link>
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {limitHit && (
-          <AIUsageLimitNotice
-            feature="AI coach refresh"
-            message={limitMessage ?? undefined}
-            className="mb-3"
-          />
-        )}
-
-        {suggestion && !isCompleted && (
-          <div className="rounded-[1.65rem] bg-background/34 p-4 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.07)] transition-all duration-700">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-background/40 text-xl shadow-[inset_0_0_0_1px_rgba(148,163,184,0.06)]">
-                {loading ? <Sparkles className="h-4 w-4 animate-pulse text-violet-300" /> : (
-                  <span aria-hidden="true">
-                  {suggestion.emoji}
-                  </span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/80">
-                    {signalChip}
-                  </span>
+              <div className="min-w-0">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Begyn
+                </span>
+                <div className="mt-0.5 truncate text-[10px] text-muted-foreground/60">
+                  {getPhaseLabel(phase)} · {coachStateLabel}
                 </div>
-                <p className="text-[1.28rem] font-semibold leading-[1.12] tracking-tight">
-                  {loading ? <span className="text-muted-foreground">Refreshing...</span> : suggestion.action}
-                </p>
-                {suggestion.reason && !loading && (
-                  <p className="mt-2 text-sm leading-5 text-muted-foreground">{suggestion.reason}</p>
-                )}
-                <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{companionInsight}</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loading}
+              className="rounded-xl p-2 text-muted-foreground/45 transition-all hover:-translate-y-0.5 hover:bg-white/5 hover:text-muted-foreground disabled:opacity-30"
+              title="Get a new suggestion"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
 
-            {!loading && (
-              <div className="mt-4 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleMarkCompleted}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-background/30 text-muted-foreground/60 transition-all hover:-translate-y-0.5 hover:bg-emerald-500/10 hover:text-emerald-400"
-                  title="Mark complete"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                </button>
-                <Button asChild size="sm" className="h-9 flex-1 gap-1.5 rounded-full bg-foreground/92 text-background shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition-transform hover:-translate-y-0.5 hover:bg-foreground">
-                  <Link to={suggestion.href}>Open path <ArrowRight className="h-3.5 w-3.5" /></Link>
+          {loading && !suggestion && (
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-violet-300 shadow-[0_0_14px_rgba(167,139,250,0.55)]" />
+                Reading the current state
+              </div>
+              <div className="h-px overflow-hidden bg-white/8">
+                <div className="h-full w-2/3 animate-pulse bg-gradient-to-r from-violet-400 via-cyan-300 to-emerald-300" />
+              </div>
+            </div>
+          )}
+
+          {error && !suggestion && (
+            <div className="mt-5 space-y-3">
+              <p className="text-sm text-muted-foreground">Couldn't load your next suggestion right now.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-8 rounded-lg text-xs">Try again</Button>
+                <Button asChild size="sm" className="h-8 gap-1.5 rounded-full">
+                  <Link to="/app/goals">Start with goals <ArrowRight className="h-3.5 w-3.5" /></Link>
                 </Button>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {suggestion && isCompleted && (
-          <div className="rounded-[1.65rem] bg-emerald-500/[0.07] p-4 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.10)]">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-lg">
-                {suggestion.emoji}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">Momentum secured</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {suggestion.action}
-                </p>
+          {limitHit && (
+            <AIUsageLimitNotice
+              feature="AI coach refresh"
+              message={limitMessage ?? undefined}
+              className="mt-4 border-amber-500/20 bg-amber-500/[0.06]"
+            />
+          )}
+
+          {suggestion && !isCompleted && (
+            <div className="mt-5 transition-all duration-700">
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <div className="flex min-w-0 items-start gap-3.5">
+                  <div className="shrink-0 pt-1 text-2xl leading-none">
+                    {loading ? <Sparkles className="h-5 w-5 animate-pulse text-violet-300" /> : (
+                      <span aria-hidden="true">{suggestion.emoji}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/65">
+                      {signalChip}
+                    </div>
+                    <p className="max-w-3xl text-[1.28rem] font-semibold leading-[1.12] tracking-tight sm:text-[1.42rem]">
+                      {loading ? <span className="text-muted-foreground">Refreshing...</span> : suggestion.action}
+                    </p>
+                    {suggestion.reason && !loading && (
+                      <p className="mt-2 max-w-2xl text-sm leading-5 text-muted-foreground">{suggestion.reason}</p>
+                    )}
+                    <p className="mt-3 max-w-2xl border-l border-white/10 pl-3 text-xs leading-5 text-muted-foreground/68">
+                      {companionInsight}
+                    </p>
+                  </div>
+                </div>
+
+                {!loading && (
+                  <div className="flex items-center gap-2 sm:min-w-[12rem] sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={handleMarkCompleted}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/55 transition-all hover:-translate-y-0.5 hover:bg-emerald-500/10 hover:text-emerald-400"
+                      title="Mark complete"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                    </button>
+                    <Button asChild size="sm" className="h-9 flex-1 gap-1.5 rounded-full bg-foreground/92 text-background shadow-[0_10px_24px_rgba(15,23,42,0.16)] transition-transform hover:-translate-y-0.5 hover:bg-foreground sm:flex-none sm:px-4">
+                      <Link to={suggestion.href}>Open path <ArrowRight className="h-3.5 w-3.5" /></Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
+          )}
 
-            <div className="mt-3 flex justify-end">
+          {suggestion && isCompleted && (
+            <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="shrink-0 pt-0.5 text-xl leading-none">{suggestion.emoji}</div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">Momentum secured</p>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+                    {suggestion.action}
+                  </p>
+                </div>
+              </div>
+
               <Button
                 type="button"
                 size="sm"
                 onClick={handleGenerateNextMove}
                 variant="ghost"
-                className="h-8 gap-1.5 rounded-full text-xs text-muted-foreground"
+                className="h-8 gap-1.5 self-start rounded-full text-xs text-muted-foreground sm:self-auto"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 Next move
               </Button>
             </div>
-          </div>
-        )}
-      </CardContent>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }

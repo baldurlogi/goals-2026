@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import {
+  ArrowRight,
+  Brain,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Flame,
+  Radar,
+  Sparkles,
+  TrendingUp,
+} from 'lucide-react';
 import { useGoalProgressState, useToggleGoalStepMutation } from '@/features/goals/goalStore';
 import { useGoalsState } from './useGoalsQuery';
 import type { UserGoal } from './goalTypes';
 import type { UpcomingItem } from '@/features/dashboard/hooks/useGoalsDashboard';
 import { getLocalDateKey } from '@/hooks/useTodayDate';
+import { cn } from '@/lib/utils';
 
 type JustCompletedItem = {
   key: string;
@@ -54,138 +66,172 @@ function getUpcomingItems(
   return items.sort((a, b) => a.daysFromToday - b.daysFromToday);
 }
 
-function groupItemsByGoal(items: UpcomingItem[]) {
-  const map = new Map<string, UpcomingItem[]>();
-
-  for (const item of items) {
-    const existing = map.get(item.goalId) ?? [];
-    existing.push(item);
-    map.set(item.goalId, existing);
-  }
-
-  return Array.from(map.entries());
+function formatDateLabel(iso: string | null) {
+  if (!iso) return '';
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(`${iso}T12:00:00`));
 }
 
-function UpcomingSection({
-  title,
-  subtitle,
-  items,
-  done,
-  onToggle,
-  defaultCollapsed = false,
+function getTimingLabel(days: number) {
+  if (days < 0) return `${Math.abs(days)}d overdue`;
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  return `in ${days}d`;
+}
+
+function getUrgencyTone(days: number) {
+  if (days < 0) {
+    return {
+      label: 'Requires intervention',
+      accent: 'text-rose-300',
+      dot: 'bg-rose-300 shadow-[0_0_14px_rgba(253,164,175,0.45)]',
+      row: 'hover:bg-rose-500/[0.045]',
+    };
+  }
+
+  if (days === 0) {
+    return {
+      label: 'Active today',
+      accent: 'text-amber-300',
+      dot: 'bg-amber-300 shadow-[0_0_14px_rgba(252,211,77,0.42)]',
+      row: 'hover:bg-amber-500/[0.04]',
+    };
+  }
+
+  return {
+    label: days <= 3 ? 'Quietly approaching' : 'Background signal',
+    accent: 'text-cyan-300',
+    dot: 'bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.36)]',
+    row: 'hover:bg-cyan-500/[0.035]',
+  };
+}
+
+function getSystemInsight({
+  itemCount,
+  overdueCount,
+  dueTodayCount,
+  futureCount,
 }: {
-  title: string;
-  subtitle: string;
-  items: UpcomingItem[];
-  done: Record<string, Record<string, boolean>>;
-  onToggle: (item: UpcomingItem) => void;
-  defaultCollapsed?: boolean;
+  itemCount: number;
+  overdueCount: number;
+  dueTodayCount: number;
+  futureCount: number;
 }) {
-  const grouped = useMemo(() => groupItemsByGoal(items), [items]);
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  if (itemCount === 0) {
+    return 'The near field is quiet. This is a good window to protect momentum instead of adding pressure.';
+  }
 
-  useEffect(() => {
-    setCollapsed(defaultCollapsed);
-  }, [defaultCollapsed]);
+  if (overdueCount > 0) {
+    return 'Some trajectories have crossed into friction. Clear one overdue step before scanning the rest.';
+  }
 
-  if (grouped.length === 0) return null;
+  if (dueTodayCount > 0) {
+    return 'Today has active weight. Finish the smallest visible step first to keep the day moving.';
+  }
+
+  if (futureCount > 0) {
+    return 'Nothing is pressing yet. The system is surfacing quiet commitments before they become pressure.';
+  }
+
+  return 'Your attention field is stable.';
+}
+
+function TaskSignalRow({
+  item,
+  onToggle,
+  prominent = false,
+}: {
+  item: UpcomingItem;
+  onToggle: (item: UpcomingItem) => void;
+  prominent?: boolean;
+}) {
+  const tone = getUrgencyTone(item.daysFromToday);
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
+    <div
+      className={cn(
+        'group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 rounded-xl px-2 py-2.5 transition-colors sm:px-3',
+        prominent ? 'bg-background/28' : 'bg-transparent',
+        tone.row,
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onToggle(item)}
+        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/12 text-muted-foreground/50 transition-all hover:border-emerald-300/40 hover:bg-emerald-400/10 hover:text-emerald-300"
+        aria-label={`Mark ${item.step.label} complete`}
+      >
+        <CheckCircle2 className="h-3.5 w-3.5" />
+      </button>
+
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', tone.dot)} />
+          <span className={cn('text-[10px] font-semibold uppercase tracking-[0.17em]', tone.accent)}>
+            {tone.label}
+          </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setCollapsed((current) => !current)}
-          className="shrink-0 rounded-full border px-3 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        <p className={cn('mt-1 truncate font-medium leading-snug', prominent ? 'text-base' : 'text-sm')}>
+          {item.step.label}
+        </p>
+        <Link
+          to={`/app/goals/${item.goalId}`}
+          className="mt-1 inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
-          {collapsed ? `Show ${items.length}` : 'Hide'}
-        </button>
+          <span className="truncate">
+            {item.goalEmoji} {item.goalTitle}
+          </span>
+          <ArrowRight className="h-3 w-3 shrink-0" />
+        </Link>
       </div>
 
-      {!collapsed && (
-        <div className="grid gap-4 lg:grid-cols-2">
-        {grouped.map(([goalId, arr]) => (
-          <div key={goalId} className="rounded-xl border p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="font-medium leading-snug">
-                  {arr[0].goalEmoji} {arr[0].goalTitle}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {arr.length} step{arr.length === 1 ? '' : 's'} here
-                </div>
-              </div>
-              <Link
-                to={`/app/goals/${goalId}`}
-                className="shrink-0 text-sm underline underline-offset-4 text-muted-foreground hover:text-foreground"
-              >
-                Open
-              </Link>
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {arr.slice(0, 6).map((it) => {
-                const overdue = it.daysFromToday < 0;
-                const label = overdue
-                  ? `${Math.abs(it.daysFromToday)}d overdue`
-                  : it.daysFromToday === 0
-                    ? 'today'
-                    : `in ${it.daysFromToday}d`;
-
-                return (
-                  <div
-                    key={it.step.id}
-                    className="rounded-lg border border-transparent p-2 -mx-2 sm:mx-0 sm:p-0"
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <label className="flex min-w-0 cursor-pointer items-start gap-3">
-                        <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={!!done[it.goalId]?.[it.step.id]}
-                          onChange={() => onToggle(it)}
-                        />
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium leading-snug">
-                            {it.step.label}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            due {it.step.idealFinish}
-                          </div>
-                        </div>
-                      </label>
-
-                      <div
-                        className={
-                          'self-start rounded-full px-2 py-1 text-xs tabular-nums sm:shrink-0 ' +
-                          (overdue
-                            ? 'bg-destructive/15 text-destructive'
-                            : it.daysFromToday === 0
-                              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                              : 'bg-muted text-muted-foreground')
-                        }
-                      >
-                        {label}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {arr.length > 6 && (
-                <div className="text-xs text-muted-foreground">
-                  +{arr.length - 6} more…
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+      <div className="shrink-0 text-right">
+        <div className={cn('text-xs font-semibold tabular-nums', tone.accent)}>
+          {getTimingLabel(item.daysFromToday)}
         </div>
-      )}
+        <div className="mt-1 text-[10px] text-muted-foreground/58">
+          {formatDateLabel(item.step.idealFinish)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AttentionBand({
+  title,
+  items,
+  icon: Icon,
+  tone,
+  onToggle,
+}: {
+  title: string;
+  items: UpcomingItem[];
+  icon: typeof Flame;
+  tone: string;
+  onToggle: (item: UpcomingItem) => void;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <section className={cn('relative overflow-hidden rounded-[1.6rem] px-3 py-3 sm:px-4', tone)}>
+      <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/14 to-transparent" />
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+          <h3 className="truncate text-sm font-semibold">{title}</h3>
+        </div>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {items.length}
+        </span>
+      </div>
+
+      <div className="space-y-1">
+        {items.map((item) => (
+          <TaskSignalRow key={`${item.goalId}:${item.step.id}`} item={item} onToggle={onToggle} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -220,6 +266,26 @@ export function UpcomingTasksPage() {
     () => items.filter((item) => item.daysFromToday > 0),
     [items],
   );
+  const primaryItem = items[0] ?? null;
+  const primaryKey = primaryItem ? `${primaryItem.goalId}:${primaryItem.step.id}` : null;
+  const overdueFlow = useMemo(
+    () => overdueItems.filter((item) => `${item.goalId}:${item.step.id}` !== primaryKey),
+    [overdueItems, primaryKey],
+  );
+  const dueTodayFlow = useMemo(
+    () => dueTodayItems.filter((item) => `${item.goalId}:${item.step.id}` !== primaryKey),
+    [dueTodayItems, primaryKey],
+  );
+  const futureFlow = useMemo(
+    () => futureItems.filter((item) => `${item.goalId}:${item.step.id}` !== primaryKey),
+    [futureItems, primaryKey],
+  );
+  const systemInsight = getSystemInsight({
+    itemCount: items.length,
+    overdueCount,
+    dueTodayCount: dueTodayItems.length,
+    futureCount: futureItems.length,
+  });
 
   useEffect(() => {
     return () => {
@@ -274,114 +340,179 @@ export function UpcomingTasksPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold">📌 Upcoming</h2>
-          <p className="text-sm text-muted-foreground">
-            Overdue + due in the next {horizonDays} days across all goals.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {([7, 14] as const).map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setHorizonDays(d)}
-              className={
-                'rounded-full border px-3 py-1 text-sm ' +
-                (horizonDays === d
-                  ? 'bg-foreground text-background'
-                  : 'bg-transparent text-muted-foreground hover:text-foreground')
-              }
-            >
-              {d} days
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-2xl border bg-card p-4">
-        <div className="text-sm text-muted-foreground">
-          {loading
-            ? 'Loading…'
-            : items.length === 0
-              ? 'Nothing due soon 🎉'
-              : `${items.length} step${items.length === 1 ? '' : 's'} need attention · ${overdueCount} overdue`}
-        </div>
-
-        <div className="mt-4">
-          {!loading && justCompleted.length > 0 && (
-            <div className="mb-4 rounded-xl border border-emerald-500/25 bg-emerald-500/8 p-3">
-              <div className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
-                Just completed
-              </div>
-              <div className="mt-2 space-y-1.5">
-                {justCompleted.map((entry) => (
-                  <div key={entry.key} className="text-sm">
-                    <span className="font-medium text-foreground">
-                      {entry.goalEmoji} {entry.stepLabel}
-                    </span>
-                    <span className="text-muted-foreground"> in {entry.goalTitle}</span>
-                  </div>
-                ))}
-              </div>
+    <div className="ai-depth-stage mx-auto max-w-6xl space-y-5 overflow-x-clip">
+      <section className="ai-atmosphere ai-reactive-edge overflow-hidden rounded-[2rem] border border-white/8 px-4 py-5 shadow-[0_26px_90px_rgba(2,6,23,0.24)] sm:px-6">
+        <div className="relative z-10 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              <Radar className="h-3.5 w-3.5 text-cyan-300" />
+              Attention timeline
             </div>
-          )}
+            <h2 className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
+              What needs energy next.
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {systemInsight}
+            </p>
+          </div>
 
-          {!loading && items.length === 0 && (
-            <div className="text-sm text-muted-foreground">
-              {goals.length === 0
-                ? 'No goals yet — add some from the Goals tab.'
-                : 'No steps with due dates in this window. Add due dates to your goal steps to see them here.'}
+          <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
+            <div className="ai-layer-soft rounded-2xl p-3">
+              <div className="text-2xl font-semibold tabular-nums">{items.length}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">signals</div>
             </div>
-          )}
+            <div className="ai-layer-soft rounded-2xl p-3">
+              <div className="text-2xl font-semibold tabular-nums">{overdueCount}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">overdue</div>
+            </div>
+            <div className="ai-layer-soft rounded-2xl p-3">
+              <div className="text-2xl font-semibold tabular-nums">{dueTodayItems.length}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">today</div>
+            </div>
+          </div>
+        </div>
 
-          {loading && (
-            <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="animate-pulse space-y-2 rounded-xl border p-3"
-                >
-                  <div className="h-4 w-1/3 rounded bg-muted" />
-                  <div className="h-3 w-1/2 rounded bg-muted" />
-                </div>
+        <div className="relative z-10 mt-5 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            <Brain className="h-3.5 w-3.5 shrink-0 text-violet-300" />
+            <span className="truncate">
+              {overdueCount > 0
+                ? 'Resolve pressure before adding new scope.'
+                : 'Near-term commitments are being kept visible.'}
+            </span>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 rounded-full border border-white/8 bg-background/34 p-1">
+            {([7, 14] as const).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setHorizonDays(d)}
+                className={cn(
+                  'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                  horizonDays === d
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {!loading && justCompleted.length > 0 && (
+        <div className="ai-layer-soft flex min-w-0 items-start gap-3 rounded-[1.35rem] px-4 py-3">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300/85">
+              Momentum restored
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              {justCompleted.map((entry) => (
+                <span key={entry.key} className="min-w-0">
+                  <span className="font-medium text-foreground">
+                    {entry.goalEmoji} {entry.stepLabel}
+                  </span>
+                  <span> / {entry.goalTitle}</span>
+                </span>
               ))}
             </div>
-          )}
-
-          {!loading && items.length > 0 && (
-            <div className="space-y-6">
-              <UpcomingSection
-                title="Overdue"
-                subtitle="These need attention first."
-                items={overdueItems}
-                done={done}
-                onToggle={handleToggle}
-              />
-
-              <UpcomingSection
-                title="Due today"
-                subtitle="These are on the clock today."
-                items={dueTodayItems}
-                done={done}
-                onToggle={handleToggle}
-              />
-
-              <UpcomingSection
-                title="Coming up"
-                subtitle={`Still within the next ${horizonDays} days, but not urgent yet.`}
-                items={futureItems}
-                done={done}
-                onToggle={handleToggle}
-                defaultCollapsed={overdueItems.length > 0}
-              />
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {loading && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="ai-layer-soft animate-pulse space-y-3 rounded-[1.5rem] p-4"
+            >
+              <div className="h-3 w-24 rounded bg-muted" />
+              <div className="h-5 w-2/3 rounded bg-muted" />
+              <div className="h-3 w-1/2 rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && items.length === 0 && (
+        <div className="ai-layer-soft rounded-[1.75rem] p-8 text-center">
+          <Sparkles className="mx-auto h-8 w-8 text-cyan-300" />
+          <div className="mt-4 text-lg font-semibold">Near field is clear</div>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            {goals.length === 0
+              ? 'Create one meaningful trajectory and Begyn will start surfacing what needs attention.'
+              : 'No dated steps are approaching in this window.'}
+          </p>
+        </div>
+      )}
+
+      {!loading && primaryItem && (
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.7fr)] lg:items-start">
+          <div className="ai-priority-surface ai-reactive-edge overflow-hidden rounded-[1.85rem] p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                <Flame className="h-4 w-4 shrink-0 text-rose-300" />
+                Primary signal
+              </div>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {getTimingLabel(primaryItem.daysFromToday)}
+              </span>
+            </div>
+            <TaskSignalRow item={primaryItem} onToggle={handleToggle} prominent />
+            <p className="mt-4 border-l border-white/10 pl-3 text-xs leading-5 text-muted-foreground/72">
+              {primaryItem.daysFromToday < 0
+                ? 'This is becoming overdue momentum. Make the next action smaller, then clear it.'
+                : primaryItem.daysFromToday === 0
+                  ? 'This belongs to today. Treat it as an active focus, not background noise.'
+                  : 'This is early enough to handle calmly before pressure forms.'}
+            </p>
+          </div>
+
+          <div className="ai-layer-soft rounded-[1.6rem] p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <TrendingUp className="h-3.5 w-3.5 text-cyan-300" />
+              Trajectory read
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {overdueCount > 0
+                ? 'Pressure is concentrated. One overdue completion will change the emotional shape of this page.'
+                : dueTodayItems.length > 1
+                  ? 'Today has multiple active commitments. Clear the shortest one first.'
+                  : 'The timeline is calm. Keep future steps visible without pulling them into today.'}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div className="space-y-3">
+          <AttentionBand
+            title="Pressure"
+            items={overdueFlow}
+            icon={Flame}
+            tone="border border-rose-500/10 bg-rose-500/[0.035] shadow-[0_18px_60px_rgba(244,63,94,0.07)]"
+            onToggle={handleToggle}
+          />
+          <AttentionBand
+            title="Today"
+            items={dueTodayFlow}
+            icon={Clock3}
+            tone="border border-amber-400/10 bg-amber-400/[0.035] shadow-[0_18px_60px_rgba(245,158,11,0.06)]"
+            onToggle={handleToggle}
+          />
+          <AttentionBand
+            title="Approaching"
+            items={futureFlow}
+            icon={CalendarDays}
+            tone="border border-cyan-400/10 bg-cyan-400/[0.025] shadow-[0_18px_60px_rgba(34,211,238,0.045)]"
+            onToggle={handleToggle}
+          />
+        </div>
+      )}
     </div>
   );
 }
