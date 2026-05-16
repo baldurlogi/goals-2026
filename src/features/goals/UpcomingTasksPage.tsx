@@ -349,7 +349,7 @@ export function UpcomingTasksPage() {
               Attention timeline
             </div>
             <h2 className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              What needs energy next.
+              What needs energy next
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
               {systemInsight}

@@ -320,7 +320,7 @@ export function DailyPlanHeader() {
       </div>
 
       <nav className="fixed inset-x-0 bottom-3 z-40 px-4 pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="ai-reactive-edge mx-auto flex max-w-[min(31rem,calc(100vw-2rem))] items-center justify-between gap-1 rounded-full border border-white/10 bg-background/58 px-1.5 py-1.5 shadow-[0_18px_58px_rgba(2,6,23,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/42">
+        <div className="ai-reactive-edge mx-auto flex max-w-[min(31rem,calc(100vw-2rem))] items-center justify-between gap-1 rounded-full border border-white/7 bg-background/46 px-1.5 py-1.5 shadow-[0_14px_42px_rgba(2,6,23,0.18)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/34">
           {mobilePrimaryItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -342,14 +342,14 @@ export function DailyPlanHeader() {
                 <span
                   className={cn(
                     "absolute inset-x-2 top-1 h-8 rounded-full opacity-0 blur-md transition-all duration-500",
-                    isActive && "bg-primary/22 opacity-100",
+                    isActive && "bg-primary/12 opacity-100",
                   )}
                 />
                 <span
                   className={cn(
                     "relative flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300",
                     isActive
-                      ? "bg-background/70 shadow-[0_8px_24px_rgba(74,222,128,0.20)]"
+                      ? "bg-background/52 shadow-[0_6px_18px_rgba(74,222,128,0.11)]"
                       : "group-hover:bg-background/45",
                   )}
                 >
@@ -366,7 +366,7 @@ export function DailyPlanHeader() {
                 <span
                   className={cn(
                     "relative mt-0.5 h-1 w-1 rounded-full bg-primary opacity-0 transition-all duration-300",
-                    isActive && "opacity-100 shadow-[0_0_14px_rgba(74,222,128,0.7)]",
+                    isActive && "opacity-80 shadow-[0_0_10px_rgba(74,222,128,0.38)]",
                   )}
                 />
               </Link>
@@ -389,14 +389,14 @@ export function DailyPlanHeader() {
                   className={cn(
                     "absolute inset-x-2 top-1 h-8 rounded-full opacity-0 blur-md transition-all duration-500",
                     overflowMobileItems.some((item) => pathname.startsWith(item.href)) &&
-                      "bg-primary/22 opacity-100",
+                      "bg-primary/12 opacity-100",
                   )}
                 />
                 <span
                   className={cn(
                     "relative flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300",
                     overflowMobileItems.some((item) => pathname.startsWith(item.href))
-                      ? "bg-background/70 shadow-[0_8px_24px_rgba(74,222,128,0.20)]"
+                      ? "bg-background/52 shadow-[0_6px_18px_rgba(74,222,128,0.11)]"
                       : "group-hover:bg-background/45",
                   )}
                 >
@@ -414,7 +414,7 @@ export function DailyPlanHeader() {
                   className={cn(
                     "relative mt-0.5 h-1 w-1 rounded-full bg-primary opacity-0 transition-all duration-300",
                     overflowMobileItems.some((item) => pathname.startsWith(item.href)) &&
-                      "opacity-100 shadow-[0_0_14px_rgba(74,222,128,0.7)]",
+                      "opacity-80 shadow-[0_0_10px_rgba(74,222,128,0.38)]",
                   )}
                 />
               </Button>
