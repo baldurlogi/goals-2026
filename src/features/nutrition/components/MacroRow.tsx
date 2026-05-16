@@ -7,17 +7,17 @@ function clamp(v: number, lo = 0, hi = 100) {
 }
 
 function statusColor(status: MacroStatus): string {
-  if (status === "success") return "text-emerald-500";
-  if (status === "warning") return "text-amber-500";
+  if (status === "success") return "text-emerald-200";
+  if (status === "warning") return "text-amber-200";
   if (status === "danger") return "text-destructive";
   return "text-muted-foreground";
 }
 
 function barColor(status: MacroStatus): string {
-  if (status === "success") return "bg-emerald-500";
-  if (status === "warning") return "bg-amber-500";
+  if (status === "success") return "bg-gradient-to-r from-emerald-300 to-cyan-200";
+  if (status === "warning") return "bg-gradient-to-r from-amber-300 to-emerald-200";
   if (status === "danger") return "bg-destructive";
-  return "bg-muted";
+  return "bg-muted-foreground/30";
 }
 
 export function MacroRow(props: {
@@ -50,10 +50,9 @@ export function MacroRow(props: {
       : `${Math.floor(Math.abs(remaining))} ${unit} over`;
 
   return (
-    <div className="space-y-1.5">
-      {/* Label row */}
+    <div className="space-y-2 rounded-[1.15rem] bg-background/14 px-3 py-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           {label}
         </span>
 
@@ -67,13 +66,13 @@ export function MacroRow(props: {
         </div>
       </div>
 
-      {/* Progress row with percentage on the right */}
       <div className="flex items-center gap-2">
-        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
+        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-background/60 shadow-inner">
           <div
-            className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${bar}`}
+            className={`absolute inset-y-0 left-0 rounded-full shadow-[0_0_18px_rgba(52,211,153,0.16)] transition-all duration-700 ease-out ${bar}`}
             style={{ width: `${fillPct}%` }}
           />
+          <div className="absolute inset-0 animate-[ai-sheen_6s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-25" />
         </div>
 
         <div className={`w-12 text-right text-[11px] font-semibold tabular-nums ${color}`}>
@@ -81,7 +80,6 @@ export function MacroRow(props: {
         </div>
       </div>
 
-      {/* Remaining / over hint */}
       <div className="text-right text-[10px] text-muted-foreground tabular-nums">
         {hint}
       </div>

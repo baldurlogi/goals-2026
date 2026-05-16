@@ -17,9 +17,9 @@ function QuickAddButton({
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="ghost"
       size="sm"
-      className="h-8 rounded-full px-3 text-xs font-semibold tabular-nums"
+      className="h-8 rounded-full bg-background/24 px-3 text-xs font-semibold tabular-nums text-cyan-100 hover:bg-background/40"
       onClick={() => {
         void onClick(amount);
       }}
@@ -29,7 +29,7 @@ function QuickAddButton({
   );
 }
 
-function WaterBottle({
+function HydrationOrb({
   fillPct,
   currentMl,
   targetMl,
@@ -40,32 +40,37 @@ function WaterBottle({
   targetMl: number;
   goalHit: boolean;
 }) {
-  return (
-    <div className="relative flex h-32 w-16 shrink-0 items-start justify-center">
-      <div className="absolute top-0 h-3 w-6 rounded-t-xl border-x-2 border-t-2 border-cyan-300/40 bg-card" />
-      <div className="absolute top-2 h-28 w-full overflow-hidden rounded-[1.4rem] border-2 border-cyan-300/30 bg-muted/40 p-1 shadow-inner">
-        <div className="relative h-full w-full overflow-hidden rounded-[1.1rem] bg-background/40">
-          <div
-            className="absolute inset-x-0 bottom-0 transition-all duration-700 ease-out"
-            style={{ height: `${fillPct}%` }}
-          >
-            <div
-              className="absolute inset-0"
-              style={{
-                background: goalHit
-                  ? "linear-gradient(to top, rgba(34,197,94,0.95), rgba(45,212,191,0.85), rgba(103,232,249,0.8))"
-                  : "linear-gradient(to top, rgba(14,165,233,0.95), rgba(34,211,238,0.9), rgba(125,211,252,0.8))",
-              }}
-            />
-            <div className="absolute inset-x-0 top-0 h-3 bg-white/20 blur-sm" />
-          </div>
+  const circumference = 2 * Math.PI * 36;
+  const offset = circumference - (fillPct / 100) * circumference;
 
-          <div className="absolute inset-0 flex items-center justify-center px-1 text-center">
-            <div className="rounded-full bg-background/70 px-2 py-1 text-[10px] font-semibold tabular-nums shadow-sm">
-              {currentMl}/{targetMl}
-            </div>
-          </div>
-        </div>
+  return (
+    <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
+      <div className="absolute inset-2 rounded-full bg-cyan-300/10 blur-xl" />
+      <svg className="relative h-28 w-28 -rotate-90" viewBox="0 0 90 90" aria-hidden="true">
+        <defs>
+          <linearGradient id="hydration-orb-ring" x1="8" y1="8" x2="82" y2="82">
+            <stop offset="0%" stopColor={goalHit ? "#34d399" : "#67e8f9"} />
+            <stop offset="58%" stopColor={goalHit ? "#67e8f9" : "#38bdf8"} />
+            <stop offset="100%" stopColor="#a78bfa" />
+          </linearGradient>
+        </defs>
+        <circle cx="45" cy="45" r="36" fill="none" strokeWidth="6" className="stroke-white/10" />
+        <circle
+          cx="45"
+          cy="45"
+          r="36"
+          fill="none"
+          strokeWidth="6"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          stroke="url(#hydration-orb-ring)"
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <span className="text-xl font-bold tabular-nums">{currentMl}</span>
+        <span className="text-[10px] text-muted-foreground">/{targetMl} ml</span>
       </div>
     </div>
   );
@@ -112,7 +117,8 @@ function WaterIntakeCardInner() {
 
   return (
     <Card className="ai-layer relative overflow-hidden border-0 bg-transparent shadow-none lg:col-span-4">
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-500 via-sky-400 to-blue-500" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/50 to-transparent" />
+      <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
 
       <CardHeader className="pb-2 pt-5">
         <div className="flex items-center justify-between gap-3">
@@ -135,7 +141,7 @@ function WaterIntakeCardInner() {
 
       <CardContent className="pb-4">
         <div className="flex items-center gap-4">
-          <WaterBottle
+          <HydrationOrb
             fillPct={fillPct}
             currentMl={log.ml}
             targetMl={log.targetMl}
@@ -160,7 +166,7 @@ function WaterIntakeCardInner() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-border/60 bg-muted/20 p-2">
+            <div className="rounded-2xl bg-background/18 p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Daily goal
